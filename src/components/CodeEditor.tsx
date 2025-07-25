@@ -67,9 +67,9 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       {/* Editor Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/50">
+      <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/50 flex-shrink-0">
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-foreground">Python</span>
           <Button variant="ghost" size="sm">
@@ -98,7 +98,7 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
       </div>
 
       {/* Code Editor */}
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <Editor
           height="100%"
           defaultLanguage="python"
@@ -126,73 +126,75 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
       </div>
 
       {/* Test Results */}
-      <Card className="m-3 p-4 min-h-[120px] bg-secondary/30">
-        <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
-        
-        {testResults.length === 0 ? (
-          <div className="font-mono text-sm text-muted-foreground">
-            Click "Run" to test your code...
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {testResults.map((result, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-lg border ${
-                  result.passed 
-                    ? 'bg-success/10 border-success/20' 
-                    : 'bg-destructive/10 border-destructive/20'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    {result.passed ? (
-                      <Check className="w-4 h-4 text-success" />
-                    ) : (
-                      <X className="w-4 h-4 text-destructive" />
+      <div className="flex-shrink-0 max-h-80 border-t border-border overflow-hidden">
+        <div className="p-4 bg-secondary/30">
+          <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+          
+          {testResults.length === 0 ? (
+            <div className="font-mono text-sm text-muted-foreground">
+              Click "Run" to test your code...
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              {testResults.map((result, index) => (
+                <div
+                  key={index}
+                  className={`p-3 rounded-lg border ${
+                    result.passed 
+                      ? 'bg-success/10 border-success/20' 
+                      : 'bg-destructive/10 border-destructive/20'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      {result.passed ? (
+                        <Check className="w-4 h-4 text-success" />
+                      ) : (
+                        <X className="w-4 h-4 text-destructive" />
+                      )}
+                      <span className="text-sm font-medium">
+                        Test Case {index + 1}
+                      </span>
+                      <Badge variant={result.passed ? "default" : "destructive"} className="text-xs">
+                        {result.passed ? 'PASSED' : 'FAILED'}
+                      </Badge>
+                    </div>
+                    {result.time && (
+                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>{result.time}</span>
+                      </div>
                     )}
-                    <span className="text-sm font-medium">
-                      Test Case {index + 1}
-                    </span>
-                    <Badge variant={result.passed ? "default" : "destructive"} className="text-xs">
-                      {result.passed ? 'PASSED' : 'FAILED'}
-                    </Badge>
                   </div>
-                  {result.time && (
-                    <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>{result.time}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-1 text-xs font-mono">
-                  <div>
-                    <span className="text-muted-foreground">Input: </span>
-                    <span className="text-foreground">{result.input}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Expected: </span>
-                    <span className="text-foreground">{result.expected}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Actual: </span>
-                    <span className={result.passed ? 'text-success' : 'text-destructive'}>
-                      {result.actual || 'No output'}
-                    </span>
-                  </div>
-                  {result.stderr && (
+                  
+                  <div className="space-y-1 text-xs font-mono">
                     <div>
-                      <span className="text-muted-foreground">Error: </span>
-                      <span className="text-destructive">{result.stderr}</span>
+                      <span className="text-muted-foreground">Input: </span>
+                      <span className="text-foreground">{result.input}</span>
                     </div>
-                  )}
+                    <div>
+                      <span className="text-muted-foreground">Expected: </span>
+                      <span className="text-foreground">{result.expected}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Actual: </span>
+                      <span className={result.passed ? 'text-success' : 'text-destructive'}>
+                        {result.actual || 'No output'}
+                      </span>
+                    </div>
+                    {result.stderr && (
+                      <div>
+                        <span className="text-muted-foreground">Error: </span>
+                        <span className="text-destructive">{result.stderr}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

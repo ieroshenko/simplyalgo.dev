@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import CodeEditor from '@/components/CodeEditor';
 import AIChat from '@/components/AIChat';
 import { ArrowLeft, Star, StarOff } from 'lucide-react';
@@ -72,82 +73,88 @@ const ProblemSolver = () => {
         </div>
       </div>
 
-      {/* Main Content - 3 Column Layout */}
-      <div className="flex h-[calc(100vh-73px)]">
-        {/* Left Panel - Problem Description */}
-        <div className="w-1/3 border-r border-border overflow-hidden">
-          <Card className="h-full rounded-none border-none">
-            <div className="p-6 h-full overflow-y-auto">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground mb-3">Problem Description</h2>
-                  <div className="prose prose-sm max-w-none">
-                    <p className="text-foreground leading-relaxed whitespace-pre-line">
-                      {problem.description}
-                    </p>
+      {/* Main Content - Resizable 3 Column Layout */}
+      <div className="h-[calc(100vh-73px)]">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          {/* Left Panel - Problem Description */}
+          <ResizablePanel defaultSize={33} minSize={20} maxSize={50}>
+            <Card className="h-full rounded-none border-none">
+              <div className="p-6 h-full overflow-y-auto">
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground mb-3">Problem Description</h2>
+                    <div className="prose prose-sm max-w-none">
+                      <p className="text-foreground leading-relaxed whitespace-pre-line">
+                        {problem.description}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <h3 className="text-md font-semibold text-foreground mb-3">Examples</h3>
-                  <div className="space-y-4">
-                    {problem.examples.map((example, index) => (
-                      <div key={index} className="bg-secondary p-4 rounded-lg">
-                        <div className="space-y-2">
-                          <div>
-                            <span className="text-sm font-medium text-foreground">Input: </span>
-                            <code className="text-sm bg-muted px-2 py-1 rounded">
-                              {example.input}
-                            </code>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-foreground">Output: </span>
-                            <code className="text-sm bg-muted px-2 py-1 rounded">
-                              {example.output}
-                            </code>
-                          </div>
-                          {example.explanation && (
+                  <div>
+                    <h3 className="text-md font-semibold text-foreground mb-3">Examples</h3>
+                    <div className="space-y-4">
+                      {problem.examples.map((example, index) => (
+                        <div key={index} className="bg-secondary p-4 rounded-lg">
+                          <div className="space-y-2">
                             <div>
-                              <span className="text-sm font-medium text-foreground">Explanation: </span>
-                              <span className="text-sm text-muted-foreground">
-                                {example.explanation}
-                              </span>
+                              <span className="text-sm font-medium text-foreground">Input: </span>
+                              <code className="text-sm bg-muted px-2 py-1 rounded">
+                                {example.input}
+                              </code>
                             </div>
-                          )}
+                            <div>
+                              <span className="text-sm font-medium text-foreground">Output: </span>
+                              <code className="text-sm bg-muted px-2 py-1 rounded">
+                                {example.output}
+                              </code>
+                            </div>
+                            {example.explanation && (
+                              <div>
+                                <span className="text-sm font-medium text-foreground">Explanation: </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {example.explanation}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <h3 className="text-md font-semibold text-foreground mb-3">Constraints</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>1 ≤ nums.length ≤ 10⁴</li>
-                    <li>-10⁹ ≤ nums[i] ≤ 10⁹</li>
-                    <li>-10⁹ ≤ target ≤ 10⁹</li>
-                    <li>Only one valid answer exists.</li>
-                  </ul>
+                  <div>
+                    <h3 className="text-md font-semibold text-foreground mb-3">Constraints</h3>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>1 ≤ nums.length ≤ 10⁴</li>
+                      <li>-10⁹ ≤ nums[i] ≤ 10⁹</li>
+                      <li>-10⁹ ≤ target ≤ 10⁹</li>
+                      <li>Only one valid answer exists.</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        </div>
+            </Card>
+          </ResizablePanel>
 
-        {/* Middle Panel - Code Editor */}
-        <div className="w-1/3 border-r border-border">
-          <CodeEditor
-            initialCode={problem.functionSignature}
-            testCases={problem.testCases}
-            onRun={handleRun}
-            onSubmit={handleSubmit}
-          />
-        </div>
+          <ResizableHandle withHandle />
 
-        {/* Right Panel - AI Chat */}
-        <div className="w-1/3">
-          <AIChat problemId={problem.id} />
-        </div>
+          {/* Middle Panel - Code Editor */}
+          <ResizablePanel defaultSize={34} minSize={25} maxSize={60}>
+            <CodeEditor
+              initialCode={problem.functionSignature}
+              testCases={problem.testCases}
+              onRun={handleRun}
+              onSubmit={handleSubmit}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Right Panel - AI Chat */}
+          <ResizablePanel defaultSize={33} minSize={20} maxSize={50}>
+            <AIChat problemId={problem.id} />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   );
