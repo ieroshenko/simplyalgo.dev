@@ -138,6 +138,7 @@ const ProblemSolver = () => {
         <div className="w-1/3 border-r border-border">
           <CodeEditor
             initialCode={problem.functionSignature}
+            testCases={problem.testCases}
             onRun={handleRun}
             onSubmit={handleSubmit}
           />

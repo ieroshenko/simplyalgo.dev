@@ -45,6 +45,20 @@ You can return the answer in any order.`,
         input: 'nums = [3,2,4], target = 6',
         output: '[1,2]'
       }
+    ],
+    testCases: [
+      {
+        input: "[2,7,11,15]\n9",
+        expected: "[0,1]"
+      },
+      {
+        input: "[3,2,4]\n6",
+        expected: "[1,2]"
+      },
+      {
+        input: "[3,3]\n6",
+        expected: "[0,1]"
+      }
     ]
   },
   {
@@ -75,6 +89,20 @@ An input string is valid if:
         input: 's = "(]"',
         output: 'false'
       }
+    ],
+    testCases: [
+      {
+        input: "()",
+        expected: "true"
+      },
+      {
+        input: "()[]{}", 
+        expected: "true"
+      },
+      {
+        input: "(]",
+        expected: "false"
+      }
     ]
   },
   {
@@ -97,6 +125,20 @@ Return the maximum profit you can achieve from this transaction. If you cannot a
         output: '5',
         explanation: 'Buy on day 2 (price = 1) and sell on day 5 (price = 6), profit = 6-1 = 5.'
       }
+    ],
+    testCases: [
+      {
+        input: "[7,1,5,3,6,4]",
+        expected: "5"
+      },
+      {
+        input: "[7,6,4,3,1]",
+        expected: "0"
+      },
+      {
+        input: "[1,2]",
+        expected: "1"
+      }
     ]
   },
   {
@@ -118,6 +160,20 @@ Return the maximum profit you can achieve from this transaction. If you cannot a
         input: 'nums = [1,2,3,4]',
         output: 'false'
       }
+    ],
+    testCases: [
+      {
+        input: "[1,2,3,1]",
+        expected: "true"
+      },
+      {
+        input: "[1,2,3,4]",
+        expected: "false"
+      },
+      {
+        input: "[1,1,1,3,3,4,3,2,4,2]",
+        expected: "true"
+      }
     ]
   },
   {
@@ -138,6 +194,20 @@ Return the maximum profit you can achieve from this transaction. If you cannot a
       {
         input: 'head = [1,2]',
         output: '[2,1]'
+      }
+    ],
+    testCases: [
+      {
+        input: "[1,2,3,4,5]",
+        expected: "[5,4,3,2,1]"
+      },
+      {
+        input: "[1,2]",
+        expected: "[2,1]"
+      },
+      {
+        input: "[]",
+        expected: "[]"
       }
     ]
   }

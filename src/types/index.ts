@@ -1,3 +1,18 @@
+export interface TestCase {
+  input: string;
+  expected: string;
+}
+
+export interface TestResult {
+  passed: boolean;
+  input: string;
+  expected: string;
+  actual: string;
+  stdout: string;
+  stderr: string | null;
+  time?: string;
+}
+
 export interface Problem {
   id: string;
   title: string;
@@ -12,6 +27,7 @@ export interface Problem {
     output: string;
     explanation?: string;
   }>;
+  testCases: TestCase[];
 }
 
 export interface User {

@@ -1,28 +1,65 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Upload, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Play, Upload, Settings, Check, X, Clock } from 'lucide-react';
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { TestRunnerService } from '@/services/testRunner';
+import { TestCase, TestResult } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface CodeEditorProps {
   initialCode: string;
+  testCases: TestCase[];
   onRun: (code: string) => void;
   onSubmit: (code: string) => void;
 }
 
-const CodeEditor = ({ initialCode, onRun, onSubmit }: CodeEditorProps) => {
+const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
-  const [output, setOutput] = useState('');
+  const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const { toast } = useToast();
 
   const handleRun = async () => {
     setIsRunning(true);
-    // Simulate code execution
-    setTimeout(() => {
-      setOutput('Test Case 1: ✅ Passed\nTest Case 2: ✅ Passed\nTest Case 3: ✅ Passed\n\nAll test cases passed!');
+    setTestResults([]);
+    
+    try {
+      const response = await TestRunnerService.runCode({
+        language: 'python',
+        code: code,
+        testCases: testCases
+      });
+      
+      setTestResults(response.results);
+      
+      const passedCount = response.results.filter(r => r.passed).length;
+      const totalCount = response.results.length;
+      
+      if (passedCount === totalCount) {
+        toast({
+          title: "All tests passed! 🎉",
+          description: `${passedCount}/${totalCount} test cases passed`,
+        });
+      } else {
+        toast({
+          title: "Some tests failed",
+          description: `${passedCount}/${totalCount} test cases passed`,
+          variant: "destructive",
+        });
+      }
+      
+      onRun(code);
+    } catch (error) {
+      toast({
+        title: "Error running code",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
       setIsRunning(false);
-    }, 1500);
-    onRun(code);
+    }
   };
 
   const handleSubmit = () => {
@@ -88,12 +125,73 @@ const CodeEditor = ({ initialCode, onRun, onSubmit }: CodeEditorProps) => {
         />
       </div>
 
-      {/* Console Output */}
+      {/* Test Results */}
       <Card className="m-3 p-4 min-h-[120px] bg-secondary/30">
-        <div className="text-sm font-medium text-foreground mb-2">Console</div>
-        <div className="font-mono text-sm text-muted-foreground whitespace-pre-line">
-          {output || 'Click "Run" to test your code...'}
-        </div>
+        <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+        
+        {testResults.length === 0 ? (
+          <div className="font-mono text-sm text-muted-foreground">
+            Click "Run" to test your code...
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {testResults.map((result, index) => (
+              <div
+                key={index}
+                className={`p-3 rounded-lg border ${
+                  result.passed 
+                    ? 'bg-success/10 border-success/20' 
+                    : 'bg-destructive/10 border-destructive/20'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    {result.passed ? (
+                      <Check className="w-4 h-4 text-success" />
+                    ) : (
+                      <X className="w-4 h-4 text-destructive" />
+                    )}
+                    <span className="text-sm font-medium">
+                      Test Case {index + 1}
+                    </span>
+                    <Badge variant={result.passed ? "default" : "destructive"} className="text-xs">
+                      {result.passed ? 'PASSED' : 'FAILED'}
+                    </Badge>
+                  </div>
+                  {result.time && (
+                    <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{result.time}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-1 text-xs font-mono">
+                  <div>
+                    <span className="text-muted-foreground">Input: </span>
+                    <span className="text-foreground">{result.input}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Expected: </span>
+                    <span className="text-foreground">{result.expected}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Actual: </span>
+                    <span className={result.passed ? 'text-success' : 'text-destructive'}>
+                      {result.actual || 'No output'}
+                    </span>
+                  </div>
+                  {result.stderr && (
+                    <div>
+                      <span className="text-muted-foreground">Error: </span>
+                      <span className="text-destructive">{result.stderr}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
