@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Upload, Settings } from 'lucide-react';
 import { useState } from 'react';
+import Editor from '@monaco-editor/react';
 
 interface CodeEditorProps {
   initialCode: string;
@@ -61,15 +62,29 @@ const CodeEditor = ({ initialCode, onRun, onSubmit }: CodeEditorProps) => {
 
       {/* Code Editor */}
       <div className="flex-1 relative">
-        <textarea
+        <Editor
+          height="100%"
+          defaultLanguage="python"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
-          className="w-full h-full p-4 font-mono text-sm bg-background text-foreground border-none outline-none resize-none"
-          style={{ 
+          onChange={(value) => setCode(value || '')}
+          theme="light"
+          options={{
+            minimap: { enabled: false },
+            fontSize: 14,
             fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
-            lineHeight: '1.5'
+            lineHeight: 1.5,
+            padding: { top: 16, bottom: 16 },
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 4,
+            insertSpaces: true,
+            wordWrap: 'on',
+            lineNumbers: 'on',
+            glyphMargin: false,
+            folding: false,
+            lineDecorationsWidth: 0,
+            lineNumbersMinChars: 3,
           }}
-          placeholder="Write your solution here..."
         />
       </div>
 
