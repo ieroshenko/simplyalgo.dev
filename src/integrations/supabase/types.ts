@@ -14,7 +14,354 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          problem_id: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          problem_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          problem_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_sessions_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      problems: {
+        Row: {
+          acceptance_rate: number | null
+          category_id: string
+          constraints: Json
+          created_at: string
+          description: string
+          difficulty: Database["public"]["Enums"]["difficulty_level"]
+          dislikes: number | null
+          examples: Json
+          function_signature: string
+          hints: Json
+          id: string
+          likes: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          acceptance_rate?: number | null
+          category_id: string
+          constraints?: Json
+          created_at?: string
+          description: string
+          difficulty: Database["public"]["Enums"]["difficulty_level"]
+          dislikes?: number | null
+          examples?: Json
+          function_signature: string
+          hints?: Json
+          id: string
+          likes?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          acceptance_rate?: number | null
+          category_id?: string
+          constraints?: Json
+          created_at?: string
+          description?: string
+          difficulty?: Database["public"]["Enums"]["difficulty_level"]
+          dislikes?: number | null
+          examples?: Json
+          function_signature?: string
+          hints?: Json
+          id?: string
+          likes?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problems_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_cases: {
+        Row: {
+          created_at: string
+          expected_output: string
+          explanation: string | null
+          id: string
+          input: string
+          is_example: boolean | null
+          problem_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_output: string
+          explanation?: string | null
+          id?: string
+          input: string
+          is_example?: boolean | null
+          problem_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_output?: string
+          explanation?: string | null
+          id?: string
+          input?: string
+          is_example?: boolean | null
+          problem_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_cases_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_problem_attempts: {
+        Row: {
+          code: string | null
+          created_at: string
+          execution_time: number | null
+          id: string
+          language: string | null
+          memory_usage: number | null
+          problem_id: string
+          status: Database["public"]["Enums"]["attempt_status"] | null
+          test_results: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          execution_time?: number | null
+          id?: string
+          language?: string | null
+          memory_usage?: number | null
+          problem_id: string
+          status?: Database["public"]["Enums"]["attempt_status"] | null
+          test_results?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          execution_time?: number | null
+          id?: string
+          language?: string | null
+          memory_usage?: number | null
+          problem_id?: string
+          status?: Database["public"]["Enums"]["attempt_status"] | null
+          test_results?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_starred_problems: {
+        Row: {
+          created_at: string
+          id: string
+          problem_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          problem_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          problem_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_starred_problems_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_statistics: {
+        Row: {
+          ai_sessions: number | null
+          created_at: string
+          current_streak: number | null
+          easy_solved: number | null
+          hard_solved: number | null
+          id: string
+          last_activity_date: string | null
+          max_streak: number | null
+          medium_solved: number | null
+          total_solved: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_sessions?: number | null
+          created_at?: string
+          current_streak?: number | null
+          easy_solved?: number | null
+          hard_solved?: number | null
+          id?: string
+          last_activity_date?: string | null
+          max_streak?: number | null
+          medium_solved?: number | null
+          total_solved?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_sessions?: number | null
+          created_at?: string
+          current_streak?: number | null
+          easy_solved?: number | null
+          hard_solved?: number | null
+          id?: string
+          last_activity_date?: string | null
+          max_streak?: number | null
+          medium_solved?: number | null
+          total_solved?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +370,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      attempt_status: "pending" | "passed" | "failed" | "error"
+      difficulty_level: "Easy" | "Medium" | "Hard"
+      problem_status: "solved" | "attempted" | "not-started"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +499,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      attempt_status: ["pending", "passed", "failed", "error"],
+      difficulty_level: ["Easy", "Medium", "Hard"],
+      problem_status: ["solved", "attempted", "not-started"],
+    },
   },
 } as const
