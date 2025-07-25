@@ -8,35 +8,42 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* LeetCoach Nature-Inspired Design System */
+    --background: 43 33% 98%; /* #FDFBF7 - Soft cream */
+    --foreground: 152 17% 25%; /* #3D5A40 - Deep forest green */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 43 33% 98%; /* #FDFBF7 */
+    --card-foreground: 152 17% 25%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 43 33% 98%;
+    --popover-foreground: 152 17% 25%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 98 28% 63%; /* #A1C181 - Primary green */
+    --primary-foreground: 152 17% 25%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 76 26% 83%; /* #DBE4C6 - Light green */
+    --secondary-foreground: 152 17% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 76 26% 83%;
+    --muted-foreground: 0 0% 51%; /* #818181 - Secondary text */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 25 100% 65%; /* #FF914D - Orange accent */
+    --accent-foreground: 43 33% 98%;
+
+    --success: 100 50% 85%; /* #DAF0D5 - Success badge */
+    --success-foreground: 152 17% 25%;
+
+    --profile-header: 100 30% 93%; /* #E7F1E5 */
+    --profile-header-foreground: 152 17% 25%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 43 33% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 88%; /* #E0E0E0 - Inactive elements */
+    --input: 76 26% 83%;
+    --ring: 98 28% 63%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
