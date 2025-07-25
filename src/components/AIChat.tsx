@@ -5,16 +5,19 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User } from 'lucide-react';
 import { useState } from 'react';
 import { ChatMessage } from '@/types';
-import { mockChatMessages } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AIChatProps {
   problemId: string;
+  problemDescription: string;
 }
 
-const AIChat = ({ problemId }: AIChatProps) => {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
+const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const { toast } = useToast();
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -30,17 +33,39 @@ const AIChat = ({ problemId }: AIChatProps) => {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: input,
+          problemDescription,
+          conversationHistory
+        }
+      });
+
+      if (error) throw error;
+
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Great thinking! Let's explore that approach step by step. What would you store as the key and value in your hash map?",
+        content: data.response,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error('Error calling AI:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const formatTime = (timestamp: Date) => {

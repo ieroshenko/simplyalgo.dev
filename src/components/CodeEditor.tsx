@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, Upload, Settings, Check, X, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult } from '@/types';
@@ -104,6 +104,21 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
           defaultLanguage="python"
           value={code}
           onChange={(value) => setCode(value || '')}
+          onMount={(editor, monaco) => {
+            // Configure Python-specific settings
+            monaco.languages.setLanguageConfiguration('python', {
+              indentationRules: {
+                increaseIndentPattern: /^\s*(class|def|if|elif|else|for|while|with|try|except|finally|async def).*:$/,
+                decreaseIndentPattern: /^\s*(elif|else|except|finally)\b.*$/
+              }
+            });
+
+            editor.updateOptions({
+              autoIndent: 'full',
+              formatOnPaste: true,
+              formatOnType: true,
+            });
+          }}
           theme="light"
           options={{
             minimap: { enabled: false },
@@ -121,6 +136,9 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
             folding: false,
             lineDecorationsWidth: 0,
             lineNumbersMinChars: 3,
+            autoIndent: 'full',
+            formatOnPaste: true,
+            formatOnType: true,
           }}
         />
       </div>

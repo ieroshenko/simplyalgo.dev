@@ -152,7 +152,7 @@ const ProblemSolver = () => {
 
           {/* Right Panel - AI Chat */}
           <ResizablePanel defaultSize={33} minSize={20} maxSize={50}>
-            <AIChat problemId={problem.id} />
+            <AIChat problemId={problem.id} problemDescription={problem.description} />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
