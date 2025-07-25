@@ -6,16 +6,37 @@ import CodeEditor from '@/components/CodeEditor';
 import AIChat from '@/components/AIChat';
 import { ArrowLeft, Star, StarOff } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mockProblems } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { useProblems } from '@/hooks/useProblems';
 import { useState } from 'react';
 
 const ProblemSolver = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { problems } = useProblems(user?.id);
   const [isStarred, setIsStarred] = useState(false);
   
   // Get problem by ID or default to first problem
-  const problem = mockProblems.find(p => p.id === id) || mockProblems[0];
+  const problem = problems.find(p => p.id === id) || problems[0];
+
+  // Redirect if not authenticated
+  if (!user) {
+    navigate('/');
+    return null;
+  }
+
+  // Show loading if no problems loaded yet
+  if (!problems.length) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">Loading problem...</p>
+        </div>
+      </div>
+    );
+  }
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {

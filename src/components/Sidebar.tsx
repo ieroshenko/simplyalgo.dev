@@ -14,11 +14,14 @@ import {
   Layers
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { mockCategories } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { useProblems } from '@/hooks/useProblems';
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { categories } = useProblems(user?.id);
   
   const navigationItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
@@ -66,7 +69,7 @@ const Sidebar = () => {
         <Card className="p-4 space-y-4">
           <h3 className="font-semibold text-foreground text-sm">Category Progress</h3>
           <div className="space-y-3">
-            {mockCategories.map((category) => {
+            {categories.map((category) => {
               const IconComponent = categoryIcons[category.name as keyof typeof categoryIcons];
               const percentage = (category.solved / category.total) * 100;
               
