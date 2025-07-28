@@ -16,14 +16,6 @@ const CoreBattleCards = () => {
       path: '/leetcode'
     },
     {
-      title: 'Problem Grind',
-      description: 'Solve LeetCode-style problems',
-      icon: Grid3x3,
-      color: 'bg-accent/10',
-      iconColor: 'text-accent',
-      path: '/problems'
-    },
-    {
       title: 'System-Design War-Room',
       description: 'Prepare for system design interviews',
       icon: Share2,
@@ -42,7 +34,7 @@ const CoreBattleCards = () => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
       {battles.map((battle) => {
         const Icon = battle.icon;
         return (

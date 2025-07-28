@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import LeetCodeArena from "./pages/LeetCodeArena";
 import ProblemSolver from "./pages/ProblemSolver";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -36,6 +37,11 @@ const App = () => (
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/leetcode" element={
+            <ProtectedRoute>
+              <LeetCodeArena />
             </ProtectedRoute>
           } />
           <Route path="/problem/:id" element={
