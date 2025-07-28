@@ -47,6 +47,16 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  sessionId?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  problemId: string;
+  title?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Category {
