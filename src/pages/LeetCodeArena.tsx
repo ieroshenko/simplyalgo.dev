@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Sidebar from '@/components/Sidebar';
 import ProblemTable from '@/components/ProblemTable';
+import DataStructureVault from '@/components/DataStructureVault';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Target, Brain } from 'lucide-react';
@@ -101,35 +103,49 @@ const LeetCodeArena = () => {
           </Card>
         </div>
 
-        {/* Category Filters */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Filter by Category</h2>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Button
-                key={category}
-                variant={selectedCategory === category || (category === 'All' && !selectedCategory) ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(category === 'All' ? undefined : category)}
-                className={
-                  selectedCategory === category || (category === 'All' && !selectedCategory)
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-secondary'
-                }
-              >
-                {category}
-              </Button>
-            ))}
-          </div>
-        </div>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="problems" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="problems">Problems</TabsTrigger>
+            <TabsTrigger value="data-structures">Data Structures</TabsTrigger>
+          </TabsList>
 
-        {/* Problems Table */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            {selectedCategory ? `${selectedCategory} Problems` : 'All Problems'}
-          </h2>
-          <ProblemTable problems={problems} filteredCategory={selectedCategory} />
-        </div>
+          <TabsContent value="problems" className="space-y-6">
+            {/* Category Filters */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">Filter by Category</h2>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category || (category === 'All' && !selectedCategory) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory(category === 'All' ? undefined : category)}
+                    className={
+                      selectedCategory === category || (category === 'All' && !selectedCategory)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-secondary'
+                    }
+                  >
+                    {category}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Problems Table */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">
+                {selectedCategory ? `${selectedCategory} Problems` : 'All Problems'}
+              </h2>
+              <ProblemTable problems={problems} filteredCategory={selectedCategory} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="data-structures">
+            <DataStructureVault />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

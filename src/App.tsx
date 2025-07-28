@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import LeetCodeArena from "./pages/LeetCodeArena";
 import ProblemSolver from "./pages/ProblemSolver";
+import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
@@ -47,6 +48,11 @@ const App = () => (
           <Route path="/problem/:id" element={
             <ProtectedRoute>
               <ProblemSolver />
+            </ProtectedRoute>
+          } />
+          <Route path="/leetcode/data-structures/:slug" element={
+            <ProtectedRoute>
+              <DataStructureDetail />
             </ProtectedRoute>
           } />
           <Route path="/progress" element={
