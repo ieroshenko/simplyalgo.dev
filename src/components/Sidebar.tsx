@@ -3,15 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { 
   Home, 
-  TrendingUp, 
-  Brain, 
-  Shuffle,
+  BarChart3, 
+  Settings,
   Code,
   List,
   Database,
   GitBranch,
-  BarChart3,
-  Layers
+  Layers,
+  Brain
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,8 +24,8 @@ const Sidebar = () => {
   
   const navigationItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
-    { icon: TrendingUp, label: 'Progress', path: '/progress' },
-    { icon: Brain, label: 'AI Tutor', path: '/tutor' }
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+    { icon: Settings, label: 'Settings', path: '/settings' }
   ];
 
   const categoryIcons = {
@@ -40,6 +39,16 @@ const Sidebar = () => {
 
   return (
     <div className="w-64 bg-background border-r border-border h-full flex flex-col">
+      {/* Logo */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
+            <Brain className="w-5 h-5 text-accent-foreground" />
+          </div>
+          <span className="text-lg font-bold text-foreground">LeetCoach</span>
+        </div>
+      </div>
+
       {/* Navigation */}
       <div className="p-4 space-y-2">
         {navigationItems.map((item) => {
@@ -91,14 +100,6 @@ const Sidebar = () => {
           </div>
         </Card>
 
-        {/* Random Problem Button */}
-        <Button 
-          className="w-full mt-4 bg-accent hover:bg-accent/90 text-accent-foreground"
-          onClick={() => navigate('/problem/random')}
-        >
-          <Shuffle className="w-4 h-4 mr-2" />
-          Random Problem
-        </Button>
       </div>
     </div>
   );
