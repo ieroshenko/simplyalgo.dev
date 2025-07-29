@@ -225,184 +225,201 @@ for i, test_case in enumerate(test_cases):
 json.dumps(batch_results)
 `;
 
-        console.log('Executing Python code using simple evaluation');
+        console.log('Executing Python code using evaluation engine');
         
-        // Simple Python-like execution for basic algorithms
-        // This is a simplified approach that works within Edge Runtime constraints
-        for (let i = 0; i < testCases.length; i++) {
-          const testCase = testCases[i];
+        // Mock Python execution method
+        const mockPythonExecution = (code, testCases) => {
+          const results = [];
           
-          try {
-            // Basic input parsing
-            const parseInput = (input: string) => {
-              const lines = input.trim().split('\n');
-              const parsed = [];
-              
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                
-                // Try JSON parsing first
-                try {
-                  parsed.push(JSON.parse(trimmed));
-                } catch {
-                  // Try numeric parsing
-                  if (/^\d+$/.test(trimmed)) {
-                    parsed.push(parseInt(trimmed));
-                  } else if (/^\d+\.\d+$/.test(trimmed)) {
-                    parsed.push(parseFloat(trimmed));
-                  } else {
-                    // Split by spaces and parse each token
-                    const tokens = trimmed.split(/\s+/);
-                    for (const token of tokens) {
-                      try {
-                        parsed.push(JSON.parse(token));
-                      } catch {
-                        if (/^\d+$/.test(token)) {
-                          parsed.push(parseInt(token));
-                        } else if (/^\d+\.\d+$/.test(token)) {
-                          parsed.push(parseFloat(token));
-                        } else {
-                          parsed.push(token);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              
-              return parsed;
-            };
-
-            const inputs = parseInput(testCase.input);
-            let actualOutput = '';
-            let passed = false;
-            let error = null;
-
-            // Execute user's Python code using simple evaluation
-            try {
-              // Extract function name from the code
-              const functionMatch = code.match(/def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-              const functionName = functionMatch ? functionMatch[1] : null;
-              
-              if (!functionName) {
-                actualOutput = '';
-                error = 'No function definition found in code';
-              } else {
-                // Create a sandboxed evaluation context
-                const evalCode = `
-                  ${code}
-                  
-                  // Call the function with parsed inputs
-                  const inputs = ${JSON.stringify(inputs)};
-                  let result;
-                  
-                  if (typeof ${functionName} === 'function') {
-                    if (inputs.length === 0) {
-                      result = ${functionName}();
-                    } else if (inputs.length === 1) {
-                      result = ${functionName}(inputs[0]);
-                    } else if (inputs.length === 2) {
-                      result = ${functionName}(inputs[0], inputs[1]);
-                    } else if (inputs.length === 3) {
-                      result = ${functionName}(inputs[0], inputs[1], inputs[2]);
-                    } else {
-                      result = ${functionName}(...inputs);
-                    }
-                    
-                    // Format the result
-                    if (Array.isArray(result)) {
-                      JSON.stringify(result);
-                    } else if (typeof result === 'boolean') {
-                      result.toString();
-                    } else {
-                      String(result);
-                    }
-                  } else {
-                    'Function not found';
-                  }
-                `;
-                
-                // For now, use a simple pattern matching approach for Two Sum
-                if (code.includes('def twoSum') || code.includes('def two_sum')) {
-                  // Extract the logic from user's code and try to execute it
-                  if (inputs.length >= 2 && Array.isArray(inputs[0]) && typeof inputs[1] === 'number') {
-                    const nums = inputs[0];
-                    const target = inputs[1];
-                    
-                    // Check if code uses hash map approach
-                    if (code.includes('{}') || code.includes('dict') || code.includes('HashMap')) {
-                      const map = new Map();
-                      let found = false;
-                      for (let j = 0; j < nums.length; j++) {
-                        const complement = target - nums[j];
-                        if (map.has(complement)) {
-                          actualOutput = JSON.stringify([map.get(complement), j]);
-                          found = true;
-                          break;
-                        }
-                        map.set(nums[j], j);
-                      }
-                      if (!found) {
-                        actualOutput = '[]';
-                      }
-                    } else if (code.includes('for') && code.includes('range')) {
-                      // Brute force approach
-                      let found = false;
-                      for (let i = 0; i < nums.length; i++) {
-                        for (let j = i + 1; j < nums.length; j++) {
-                          if (nums[i] + nums[j] === target) {
-                            actualOutput = JSON.stringify([i, j]);
-                            found = true;
-                            break;
-                          }
-                        }
-                        if (found) break;
-                      }
-                      if (!found) {
-                        actualOutput = '[]';
-                      }
-                    } else {
-                      actualOutput = '';
-                      error = 'Unable to execute this code pattern';
-                    }
-                  }
-                } else {
-                  actualOutput = '';
-                  error = 'Only Two Sum algorithm is currently supported';
-                }
-              }
-            } catch (execError) {
-              actualOutput = '';
-              error = execError.message;
-            }
-
-            passed = actualOutput === testCase.expected;
-
-            results.push({
-              passed,
-              input: testCase.input,
-              expected: testCase.expected,
-              actual: actualOutput,
-              stdout: actualOutput,
-              stderr: error,
-              time: '10ms',
-              status: passed ? 'Accepted' : error ? 'Runtime Error' : 'Wrong Answer'
-            });
-
-          } catch (execError) {
-            results.push({
+          // Extract function name
+          const functionMatch = code.match(/def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
+          const functionName = functionMatch ? functionMatch[1] : null;
+          
+          if (!functionName) {
+            return testCases.map(testCase => ({
               passed: false,
               input: testCase.input,
               expected: testCase.expected,
               actual: '',
               stdout: '',
-              stderr: execError.message,
-              time: '0ms',
+              stderr: 'No function definition found',
+              time: '10ms',
               status: 'Runtime Error'
-            });
+            }));
           }
-        }
+
+          for (const testCase of testCases) {
+            try {
+              // Parse input
+              const inputs = parseTestInput(testCase.input);
+              let actualOutput = '';
+              
+              // Execute the user's Python code logic
+              actualOutput = executeUserCode(code, functionName, inputs);
+              
+              const passed = actualOutput === testCase.expected;
+              
+              results.push({
+                passed,
+                input: testCase.input,
+                expected: testCase.expected,
+                actual: actualOutput,
+                stdout: actualOutput,
+                stderr: null,
+                time: '10ms',
+                status: passed ? 'Accepted' : 'Wrong Answer'
+              });
+            } catch (error) {
+              results.push({
+                passed: false,
+                input: testCase.input,
+                expected: testCase.expected,
+                actual: '',
+                stdout: '',
+                stderr: error.message,
+                time: '10ms',
+                status: 'Runtime Error'
+              });
+            }
+          }
+          
+          return results;
+        };
+
+        const parseTestInput = (input) => {
+          const lines = input.trim().split('\n');
+          const parsed = [];
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            // Split by spaces but keep JSON structures intact
+            const tokens = [];
+            let current = '';
+            let bracketCount = 0;
+            let inQuotes = false;
+            
+            for (let i = 0; i < trimmed.length; i++) {
+              const char = trimmed[i];
+              
+              if (char === '"' && (i === 0 || trimmed[i-1] !== '\\')) {
+                inQuotes = !inQuotes;
+                current += char;
+              } else if (!inQuotes && (char === '[' || char === '{')) {
+                bracketCount++;
+                current += char;
+              } else if (!inQuotes && (char === ']' || char === '}')) {
+                bracketCount--;
+                current += char;
+              } else if (!inQuotes && char === ' ' && bracketCount === 0) {
+                if (current.trim()) {
+                  tokens.push(current.trim());
+                  current = '';
+                }
+              } else {
+                current += char;
+              }
+            }
+            
+            if (current.trim()) {
+              tokens.push(current.trim());
+            }
+            
+            // Parse each token
+            for (const token of tokens) {
+              try {
+                parsed.push(JSON.parse(token));
+              } catch {
+                if (/^\d+$/.test(token)) {
+                  parsed.push(parseInt(token));
+                } else if (/^\d+\.\d+$/.test(token)) {
+                  parsed.push(parseFloat(token));
+                } else {
+                  parsed.push(token);
+                }
+              }
+            }
+          }
+          
+          return parsed;
+        };
+
+        const executeUserCode = (code, functionName, inputs) => {
+          try {
+            // Convert Python code patterns to JavaScript equivalent
+            let jsCode = code
+              .replace(/def\s+(\w+)\s*\(/g, 'function $1(')
+              .replace(/:\s*$/gm, ' {')
+              .replace(/^\s+/gm, match => match.replace(/    /g, '  ')) // Convert Python indentation
+              .replace(/\bTrue\b/g, 'true')
+              .replace(/\bFalse\b/g, 'false')
+              .replace(/\bNone\b/g, 'null')
+              .replace(/\blen\(/g, '.length')
+              .replace(/\brange\(/g, '... Array(')
+              .replace(/for\s+(\w+)\s+in\s+range\(([^)]+)\):/g, 'for (let $1 = 0; $1 < $2; $1++) {')
+              .replace(/for\s+(\w+)\s+in\s+(\w+):/g, 'for (let $1 of $2) {')
+              .replace(/if\s+([^:]+):/g, 'if ($1) {')
+              .replace(/elif\s+([^:]+):/g, '} else if ($1) {')
+              .replace(/else:/g, '} else {')
+              .replace(/return\s+([^}\n]+)/g, 'return $1');
+            
+            // Add closing braces for Python blocks
+            const lines = jsCode.split('\n');
+            let indentLevel = 0;
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              const currentIndent = (line.match(/^\s*/)[0].length / 2);
+              
+              if (currentIndent < indentLevel) {
+                const closeBraces = '}'.repeat(indentLevel - currentIndent);
+                lines[i] = closeBraces + '\n' + line;
+              }
+              
+              if (line.includes('{')) {
+                indentLevel = currentIndent + 1;
+              }
+            }
+            
+            // Add final closing braces
+            if (indentLevel > 0) {
+              lines.push('}'.repeat(indentLevel));
+            }
+            
+            jsCode = lines.join('\n');
+            
+            // Execute the JavaScript version
+            const func = new Function('return ' + jsCode + '; return ' + functionName + ';')();
+            
+            let result;
+            if (inputs.length === 0) {
+              result = func();
+            } else if (inputs.length === 1) {
+              result = func(inputs[0]);
+            } else if (inputs.length === 2) {
+              result = func(inputs[0], inputs[1]);
+            } else {
+              result = func(...inputs);
+            }
+            
+            // Format result
+            if (Array.isArray(result)) {
+              return JSON.stringify(result);
+            } else if (typeof result === 'boolean') {
+              return result.toString();
+            } else {
+              return String(result);
+            }
+            
+          } catch (error) {
+            throw new Error(`Code execution failed: ${error.message}`);
+          }
+        };
+
+        // Execute the Python code
+        const pythonResults = mockPythonExecution(code, testCases);
+        results.push(...pythonResults);
+        
       } else {
         // For non-Python languages, create placeholder results
         for (const testCase of testCases) {
