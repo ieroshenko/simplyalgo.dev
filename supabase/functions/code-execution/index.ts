@@ -79,17 +79,33 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
-          // For Python, we'll simulate input and add necessary imports
+          // Parse the input to extract array and target for Two Sum type problems
+          const inputLines = testCase.input.trim().split('\n');
+          const arrayStr = inputLines[0];
+          const target = inputLines[1];
+          
           executableCode = `
 import sys
-from io import StringIO
+import json
 from typing import List, Optional, Dict, Set, Tuple
 
-# Simulate input
-test_input = """${testCase.input}"""
-sys.stdin = StringIO(test_input)
+# Parse input
+nums = ${arrayStr}
+target = ${target}
 
 ${code}
+
+# Call the function and print result
+if 'twoSum' in locals():
+    result = twoSum(nums, target)
+    print(json.dumps(result))
+elif 'isValid' in locals():
+    # For parentheses problems
+    s = nums[0] if isinstance(nums, list) else str(nums)
+    result = isValid(s)
+    print(str(result).lower())
+else:
+    print("Function not found")
 `;
         }
 
