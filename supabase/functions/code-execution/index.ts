@@ -287,7 +287,16 @@ else:
         // Process result
         const stdout = resultData.stdout || '';
         const stderr = resultData.stderr || null;
-        const actualOutput = stdout.trim();
+        
+        // Clean up the actual output by removing debug lines and extracting the result
+        const lines = stdout.split('\n');
+        const resultLine = lines.find(line => 
+          !line.startsWith('DEBUG:') && 
+          line.trim() !== '' && 
+          !line.startsWith('Error:')
+        );
+        
+        const actualOutput = resultLine ? resultLine.trim() : stdout.trim();
         const expectedOutput = testCase.expected.trim();
         const passed = actualOutput === expectedOutput;
 
