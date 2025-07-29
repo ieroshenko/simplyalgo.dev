@@ -196,7 +196,7 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
                     </div>
                     <div>
                       <span className="text-muted-foreground">Actual: </span>
-                      <span className={result.passed ? 'text-success' : 'text-destructive'}>
+                      <span className={result.passed ? 'text-success' : 'text-orange-500'}>
                         {result.actual || 'No output'}
                       </span>
                     </div>
