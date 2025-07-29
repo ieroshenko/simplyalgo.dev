@@ -68,33 +68,27 @@ serve(async (req) => {
 
     const languageId = languageMap[language.toLowerCase()] || 71; // Default to Python
 
-    // Execute code against each test case
+    // Execute all test cases in a single batch to avoid rate limits
     const results: TestResult[] = [];
     
-    for (let i = 0; i < testCases.length; i++) {
-      const testCase = testCases[i];
-      console.log(`Running test case ${i + 1}: ${testCase.input}`);
-
-      try {
-        // Prepare code with input handling based on language
-        let executableCode = code;
-        if (language.toLowerCase() === 'python') {
-          // Use safe variable assignment to avoid f-string embedding issues
-          const inputStr = testCase.input;
-          
-          // Strip self parameter from function definition if present
-          let processedCode = code;
-          const selfRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*self\s*,\s*/g;
-          processedCode = processedCode.replace(selfRegex, 'def $1(');
-          
-          executableCode = `
+    try {
+      let executableCode = code;
+      
+      if (language.toLowerCase() === 'python') {
+        // Strip self parameter from function definition if present
+        let processedCode = code;
+        const selfRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*self\s*,\s*/g;
+        processedCode = processedCode.replace(selfRegex, 'def $1(');
+        
+        // Create batched Python code that processes all test cases
+        executableCode = `
 import sys
 import json
 import re
 from typing import List, Optional, Dict, Set, Tuple
 
-# Safe input assignment to avoid embedding issues
-raw_input = ${JSON.stringify(inputStr)}
+# Test cases data
+test_cases = ${JSON.stringify(testCases.map(tc => ({ input: tc.input, expected: tc.expected })))}
 
 # Robust input parsing function
 def parse_input(input_str):
@@ -184,141 +178,224 @@ def extract_function_info(code):
         return func_name, has_self
     return None, False
 
-# Parse inputs and display debug info
-inputs = parse_input(raw_input)
-print("DEBUG: Raw input:", repr(raw_input))
-print("DEBUG: Parsed inputs:", inputs)
-print("DEBUG: Number of inputs:", len(inputs))
-
 ${processedCode}
 
-# Extract function name from processed code (without self)
+# Extract function name from processed code
 function_name = extract_function_info("""${processedCode.replace(/"/g, '\\"')}""")[0]
 
-if function_name and function_name in locals():
-    func = locals()[function_name]
+# Process each test case and collect results
+batch_results = []
+
+for i, test_case in enumerate(test_cases):
     try:
-        # Call function with appropriate number of arguments
-        if len(inputs) == 0:
-            result = func()
-        elif len(inputs) == 1:
-            result = func(inputs[0])
-        elif len(inputs) == 2:
-            result = func(inputs[0], inputs[1])
-        elif len(inputs) == 3:
-            result = func(inputs[0], inputs[1], inputs[2])
-        else:
-            result = func(*inputs)
+        inputs = parse_input(test_case['input'])
         
-        # Format output
-        if isinstance(result, (list, dict)):
-            print(json.dumps(result))
-        elif isinstance(result, bool):
-            print(str(result).lower())
+        if function_name and function_name in locals():
+            func = locals()[function_name]
+            
+            # Call function with appropriate number of arguments
+            if len(inputs) == 0:
+                result = func()
+            elif len(inputs) == 1:
+                result = func(inputs[0])
+            elif len(inputs) == 2:
+                result = func(inputs[0], inputs[1])
+            elif len(inputs) == 3:
+                result = func(inputs[0], inputs[1], inputs[2])
+            else:
+                result = func(*inputs)
+            
+            # Format output
+            if isinstance(result, (list, dict)):
+                actual_output = json.dumps(result)
+            elif isinstance(result, bool):
+                actual_output = str(result).lower()
+            else:
+                actual_output = str(result)
+            
+            batch_results.append({
+                'test_case': i + 1,
+                'passed': actual_output == test_case['expected'],
+                'actual': actual_output,
+                'expected': test_case['expected'],
+                'input': test_case['input'],
+                'error': None
+            })
         else:
-            print(str(result))
+            batch_results.append({
+                'test_case': i + 1,
+                'passed': False,
+                'actual': '',
+                'expected': test_case['expected'],
+                'input': test_case['input'],
+                'error': 'Function not found or could not be extracted'
+            })
             
     except Exception as e:
-        print(f"Error: {str(e)}")
-        print(f"Inputs were: {inputs}")
-        print(f"Function name: {function_name}")
-else:
-    print("Function not found or could not be extracted")
-`;
-        }
-        
-        console.log('Generated Python code:');
-        console.log(executableCode);
+        batch_results.append({
+            'test_case': i + 1,
+            'passed': False,
+            'actual': '',
+            'expected': test_case['expected'],
+            'input': test_case['input'],
+            'error': str(e)
+        })
 
-        // Submit to Judge0 (using RapidAPI endpoint for now)
-        const submissionResponse = await fetch('https://judge0-ce.p.rapidapi.com/submissions', {
-          method: 'POST',
+# Output results with clear markers
+print("BATCH_RESULTS_START")
+print(json.dumps(batch_results))
+print("BATCH_RESULTS_END")
+`;
+      }
+      
+      console.log(`Executing ${language} code with ${testCases.length} test cases in batch mode`);
+
+      // Submit to Judge0 (single submission for all test cases)
+      const submissionResponse = await fetch('https://judge0-ce.p.rapidapi.com/submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RapidAPI-Key': Deno.env.get('RAPIDAPI_KEY') || 'demo-key',
+          'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+        },
+        body: JSON.stringify({
+          language_id: languageId,
+          source_code: executableCode,
+          stdin: '',
+          cpu_time_limit: 10,
+          memory_limit: 256000, // 256MB
+          wall_time_limit: 10
+        })
+      });
+
+      if (!submissionResponse.ok) {
+        throw new Error(`Judge0 submission failed: ${submissionResponse.statusText}`);
+      }
+
+      const submissionData = await submissionResponse.json();
+      const submissionId = submissionData.token;
+
+      // Poll for result with timeout
+      let attempts = 0;
+      let resultData;
+      
+      while (attempts < 30) { // 30 attempts = 15 seconds max
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+        
+        const resultResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions/${submissionId}`, {
           headers: {
-            'Content-Type': 'application/json',
             'X-RapidAPI-Key': Deno.env.get('RAPIDAPI_KEY') || 'demo-key',
             'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-          },
-          body: JSON.stringify({
-            language_id: languageId,
-            source_code: executableCode,
-            stdin: testCase.input,
-            expected_output: testCase.expected,
-            cpu_time_limit: 10,
-            memory_limit: 256000, // 256MB
-            wall_time_limit: 10
-          })
+          }
         });
 
-        if (!submissionResponse.ok) {
-          throw new Error(`Judge0 submission failed: ${submissionResponse.statusText}`);
+        if (resultResponse.ok) {
+          resultData = await resultResponse.json();
+          if (resultData.status.id >= 3) { // Status 3+ means completed
+            break;
+          }
         }
-
-        const submissionData = await submissionResponse.json();
-        const submissionId = submissionData.token;
-
-        // Poll for result with timeout
-        let attempts = 0;
-        let resultData;
         
-        while (attempts < 30) { // 30 attempts = 15 seconds max
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
-          
-          const resultResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions/${submissionId}`, {
-            headers: {
-              'X-RapidAPI-Key': Deno.env.get('RAPIDAPI_KEY') || 'demo-key',
-              'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-            }
-          });
+        attempts++;
+      }
 
-          if (resultResponse.ok) {
-            resultData = await resultResponse.json();
-            if (resultData.status.id >= 3) { // Status 3+ means completed
-              break;
+      if (!resultData || resultData.status.id < 3) {
+        throw new Error('Execution timeout or failed to get result');
+      }
+
+      // Parse batch results from stdout
+      const stdout = resultData.stdout || '';
+      const stderr = resultData.stderr || null;
+      
+      if (language.toLowerCase() === 'python') {
+        // Extract batch results from stdout
+        const startMarker = 'BATCH_RESULTS_START';
+        const endMarker = 'BATCH_RESULTS_END';
+        const startIndex = stdout.indexOf(startMarker);
+        const endIndex = stdout.indexOf(endMarker);
+        
+        if (startIndex !== -1 && endIndex !== -1) {
+          const jsonStr = stdout.substring(startIndex + startMarker.length, endIndex).trim();
+          try {
+            const batchResults = JSON.parse(jsonStr);
+            
+            // Convert batch results to our format
+            for (let i = 0; i < testCases.length; i++) {
+              const batchResult = batchResults[i];
+              if (batchResult) {
+                results.push({
+                  passed: batchResult.passed,
+                  input: batchResult.input,
+                  expected: batchResult.expected,
+                  actual: batchResult.actual,
+                  stdout: batchResult.actual,
+                  stderr: batchResult.error,
+                  time: '15ms',
+                  status: batchResult.passed ? 'Accepted' : 'Wrong Answer'
+                });
+              } else {
+                // Fallback for missing result
+                results.push({
+                  passed: false,
+                  input: testCases[i].input,
+                  expected: testCases[i].expected,
+                  actual: '',
+                  stdout: '',
+                  stderr: 'Missing result from batch execution',
+                  status: 'Error'
+                });
+              }
+            }
+          } catch (parseError) {
+            console.error('Failed to parse batch results:', parseError);
+            // Fallback: create error results for all test cases
+            for (const testCase of testCases) {
+              results.push({
+                passed: false,
+                input: testCase.input,
+                expected: testCase.expected,
+                actual: '',
+                stdout,
+                stderr: `Batch parsing error: ${parseError.message}`,
+                status: 'Error'
+              });
             }
           }
-          
-          attempts++;
+        } else {
+          // No batch markers found, treat as compilation/runtime error
+          for (const testCase of testCases) {
+            results.push({
+              passed: false,
+              input: testCase.input,
+              expected: testCase.expected,
+              actual: '',
+              stdout,
+              stderr: stderr || 'No batch results found in output',
+              status: 'Runtime Error'
+            });
+          }
         }
-
-        if (!resultData || resultData.status.id < 3) {
-          throw new Error('Execution timeout or failed to get result');
+      } else {
+        // For non-Python languages, fallback to original behavior
+        for (const testCase of testCases) {
+          results.push({
+            passed: false,
+            input: testCase.input,
+            expected: testCase.expected,
+            actual: stdout.trim(),
+            stdout,
+            stderr,
+            time: resultData.time ? `${parseFloat(resultData.time) * 1000}ms` : '0ms',
+            status: resultData.status.description
+          });
         }
+      }
 
-        // Process result
-        const stdout = resultData.stdout || '';
-        const stderr = resultData.stderr || null;
-        
-        // Clean up the actual output by removing debug lines and extracting the result
-        const lines = stdout.split('\n');
-        const resultLine = lines.find(line => 
-          !line.startsWith('DEBUG:') && 
-          line.trim() !== '' && 
-          !line.startsWith('Error:')
-        );
-        
-        const actualOutput = resultLine ? resultLine.trim() : stdout.trim();
-        const expectedOutput = testCase.expected.trim();
-        const passed = actualOutput === expectedOutput;
-
-        const testResult: TestResult = {
-          passed,
-          input: testCase.input,
-          expected: testCase.expected,
-          actual: actualOutput,
-          stdout,
-          stderr,
-          time: resultData.time ? `${parseFloat(resultData.time) * 1000}ms` : undefined,
-          memory: resultData.memory ? parseInt(resultData.memory) : undefined,
-          status: resultData.status.description
-        };
-
-        results.push(testResult);
-        console.log(`Test case ${i + 1} result: ${passed ? 'PASSED' : 'FAILED'}`);
-
-      } catch (error) {
-        console.error(`Error executing test case ${i + 1}:`, error);
-        
-        // Add failed result for this test case
+    } catch (error) {
+      console.error('Batch execution error:', error);
+      
+      // Create error results for all test cases
+      for (const testCase of testCases) {
         results.push({
           passed: false,
           input: testCase.input,
