@@ -79,8 +79,8 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
-          // Use JSON encoding to safely pass the input string
-          const inputStr = JSON.stringify(testCase.input);
+          // Use safe variable assignment to avoid f-string embedding issues
+          const inputStr = testCase.input;
           
           executableCode = `
 import sys
@@ -88,17 +88,20 @@ import json
 import re
 from typing import List, Optional, Dict, Set, Tuple
 
-# Parse input dynamically
+# Safe input assignment to avoid embedding issues
+raw_input = ${JSON.stringify(inputStr)}
+
+# Robust input parsing function
 def parse_input(input_str):
     lines = input_str.strip().split('\\n')
     parsed = []
+    
     for line in lines:
         line = line.strip()
         if not line:
             continue
         
-        # Check if line contains space-separated values (e.g., "[2,7,11,15] 9")
-        # Use regex to find JSON arrays/objects and separate values
+        # Handle space-separated tokens while respecting JSON boundaries
         tokens = []
         i = 0
         current_token = ""
@@ -113,17 +116,13 @@ def parse_input(input_str):
                 in_quotes = not in_quotes
                 current_token += char
             elif not in_quotes:
-                if char == '[':
-                    bracket_count += 1
+                if char in '[{':
+                    bracket_count += 1 if char == '[' else 0
+                    brace_count += 1 if char == '{' else 0
                     current_token += char
-                elif char == ']':
-                    bracket_count -= 1
-                    current_token += char
-                elif char == '{':
-                    brace_count += 1
-                    current_token += char
-                elif char == '}':
-                    brace_count -= 1
+                elif char in ']}':
+                    bracket_count -= 1 if char == ']' else 0
+                    brace_count -= 1 if char == '}' else 0
                     current_token += char
                 elif char == ' ' and bracket_count == 0 and brace_count == 0:
                     if current_token.strip():
@@ -138,80 +137,109 @@ def parse_input(input_str):
         if current_token.strip():
             tokens.append(current_token.strip())
         
-        # If we found multiple tokens, parse each separately
+        # Parse each token
         if len(tokens) > 1:
             for token in tokens:
                 parsed.append(parse_single_value(token))
         else:
-            # Single value on the line
             parsed.append(parse_single_value(line))
     
     return parsed
 
 def parse_single_value(value_str):
     value_str = value_str.strip()
-    # Try to parse as JSON first (for arrays, objects)
+    
+    # Try JSON parsing first (arrays, objects, strings)
     try:
         return json.loads(value_str)
     except:
-        # Try to parse as integer
-        try:
+        pass
+    
+    # Try numeric parsing
+    try:
+        if '.' in value_str:
+            return float(value_str)
+        else:
             return int(value_str)
-        except:
-            # Try to parse as float
-            try:
-                return float(value_str)
-            except:
-                # Keep as string, removing quotes if present
-                if value_str.startswith('"') and value_str.endswith('"'):
-                    return value_str[1:-1]
-                else:
-                    return value_str
+    except:
+        pass
+    
+    # Return as string, removing outer quotes if present
+    if value_str.startswith('"') and value_str.endswith('"'):
+        return value_str[1:-1]
+    return value_str
 
-# Extract function name from code
-def extract_function_name(code):
-    # Look for function definition
-    match = re.search(r'def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(', code)
+# Extract function name and check if it has self parameter
+def extract_function_info(code):
+    match = re.search(r'def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)', code)
     if match:
-        return match.group(1)
-    return None
+        func_name = match.group(1)
+        params = match.group(2).strip()
+        has_self = params.startswith('self')
+        return func_name, has_self
+    return None, False
 
-# Parse inputs
-inputs = parse_input(${inputStr})
-print(f"DEBUG: Raw input: {${inputStr}}")
-print(f"DEBUG: Parsed inputs: {inputs}")
-print(f"DEBUG: Number of inputs: {len(inputs)}")
+# Parse inputs and display debug info
+inputs = parse_input(raw_input)
+print("DEBUG: Raw input:", repr(raw_input))
+print("DEBUG: Parsed inputs:", inputs)
+print("DEBUG: Number of inputs:", len(inputs))
 
 ${code}
 
-# Dynamic function calling
-function_name = extract_function_name("""${code}""")
+# Dynamic function calling with proper self handling
+function_name, has_self = extract_function_info("""${code.replace(/"/g, '\\"')}""")
+
 if function_name and function_name in locals():
     func = locals()[function_name]
     try:
-        # Call function with appropriate number of arguments
-        if len(inputs) == 0:
-            result = func()
-        elif len(inputs) == 1:
-            result = func(inputs[0])
-        elif len(inputs) == 2:
-            result = func(inputs[0], inputs[1])
-        elif len(inputs) == 3:
-            result = func(inputs[0], inputs[1], inputs[2])
+        # Handle self parameter for class methods
+        if has_self:
+            # For class methods, we need to skip the self parameter
+            # Create a dummy object to call the method
+            class DummyClass:
+                pass
+            dummy = DummyClass()
+            setattr(dummy, function_name, func)
+            method = getattr(dummy, function_name)
+            
+            # Call with inputs (self is handled automatically)
+            if len(inputs) == 0:
+                result = method()
+            elif len(inputs) == 1:
+                result = method(inputs[0])
+            elif len(inputs) == 2:
+                result = method(inputs[0], inputs[1])
+            elif len(inputs) == 3:
+                result = method(inputs[0], inputs[1], inputs[2])
+            else:
+                result = method(*inputs)
         else:
-            result = func(*inputs)
+            # Regular function call
+            if len(inputs) == 0:
+                result = func()
+            elif len(inputs) == 1:
+                result = func(inputs[0])
+            elif len(inputs) == 2:
+                result = func(inputs[0], inputs[1])
+            elif len(inputs) == 3:
+                result = func(inputs[0], inputs[1], inputs[2])
+            else:
+                result = func(*inputs)
         
-        # Format output based on type
+        # Format output
         if isinstance(result, (list, dict)):
             print(json.dumps(result))
         elif isinstance(result, bool):
             print(str(result).lower())
         else:
             print(str(result))
+            
     except Exception as e:
         print(f"Error: {str(e)}")
         print(f"Inputs were: {inputs}")
-        print(f"Function signature: {func.__code__.co_varnames[:func.__code__.co_argcount]}")
+        print(f"Function name: {function_name}")
+        print(f"Has self parameter: {has_self}")
 else:
     print("Function not found or could not be extracted")
 `;
