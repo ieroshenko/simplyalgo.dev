@@ -152,14 +152,15 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
 
       {/* Message Input */}
       <div className="p-4 border-t border-border">
-        <div className="flex space-x-2">
-          <Input
+        <div className="flex gap-2 items-end">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your AI coach anything..."
             onKeyPress={handleKeyPress}
+            placeholder="Ask your AI coach anything..."
             disabled={loading || isTyping}
-            className="flex-1"
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            rows={Math.min(Math.max(input.split('\n').length, 1), 4)}
           />
           <Button 
             onClick={handleSend} 

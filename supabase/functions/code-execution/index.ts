@@ -79,10 +79,11 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
-          // For Python, we'll simulate input by replacing input() calls
+          // For Python, we'll simulate input and add necessary imports
           executableCode = `
 import sys
 from io import StringIO
+from typing import List, Optional, Dict, Set, Tuple
 
 # Simulate input
 test_input = """${testCase.input}"""
