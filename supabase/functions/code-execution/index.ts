@@ -82,6 +82,11 @@ serve(async (req) => {
           // Use safe variable assignment to avoid f-string embedding issues
           const inputStr = testCase.input;
           
+          // Strip self parameter from function definition if present
+          let processedCode = code;
+          const selfRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*self\s*,\s*/g;
+          processedCode = processedCode.replace(selfRegex, 'def $1(');
+          
           executableCode = `
 import sys
 import json
@@ -185,47 +190,25 @@ print("DEBUG: Raw input:", repr(raw_input))
 print("DEBUG: Parsed inputs:", inputs)
 print("DEBUG: Number of inputs:", len(inputs))
 
-${code}
+${processedCode}
 
-# Dynamic function calling with proper self handling
-function_name, has_self = extract_function_info("""${code.replace(/"/g, '\\"')}""")
+# Extract function name from processed code (without self)
+function_name = extract_function_info("""${processedCode.replace(/"/g, '\\"')}""")[0]
 
 if function_name and function_name in locals():
     func = locals()[function_name]
     try:
-        # Handle self parameter for class methods
-        if has_self:
-            # For class methods, we need to skip the self parameter
-            # Create a dummy object to call the method
-            class DummyClass:
-                pass
-            dummy = DummyClass()
-            setattr(dummy, function_name, func)
-            method = getattr(dummy, function_name)
-            
-            # Call with inputs (self is handled automatically)
-            if len(inputs) == 0:
-                result = method()
-            elif len(inputs) == 1:
-                result = method(inputs[0])
-            elif len(inputs) == 2:
-                result = method(inputs[0], inputs[1])
-            elif len(inputs) == 3:
-                result = method(inputs[0], inputs[1], inputs[2])
-            else:
-                result = method(*inputs)
+        # Call function with appropriate number of arguments
+        if len(inputs) == 0:
+            result = func()
+        elif len(inputs) == 1:
+            result = func(inputs[0])
+        elif len(inputs) == 2:
+            result = func(inputs[0], inputs[1])
+        elif len(inputs) == 3:
+            result = func(inputs[0], inputs[1], inputs[2])
         else:
-            # Regular function call
-            if len(inputs) == 0:
-                result = func()
-            elif len(inputs) == 1:
-                result = func(inputs[0])
-            elif len(inputs) == 2:
-                result = func(inputs[0], inputs[1])
-            elif len(inputs) == 3:
-                result = func(inputs[0], inputs[1], inputs[2])
-            else:
-                result = func(*inputs)
+            result = func(*inputs)
         
         # Format output
         if isinstance(result, (list, dict)):
@@ -239,7 +222,6 @@ if function_name and function_name in locals():
         print(f"Error: {str(e)}")
         print(f"Inputs were: {inputs}")
         print(f"Function name: {function_name}")
-        print(f"Has self parameter: {has_self}")
 else:
     print("Function not found or could not be extracted")
 `;
