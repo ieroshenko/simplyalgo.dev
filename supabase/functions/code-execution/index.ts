@@ -79,8 +79,8 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
-          // Create a simpler, more reliable input parsing approach
-          const inputStr = testCase.input.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          // Use JSON encoding to safely pass the input string
+          const inputStr = JSON.stringify(testCase.input);
           
           executableCode = `
 import sys
@@ -177,8 +177,8 @@ def extract_function_name(code):
     return None
 
 # Parse inputs
-inputs = parse_input("${inputStr}")
-print(f"DEBUG: Raw input: '${inputStr}'")
+inputs = parse_input(${inputStr})
+print(f"DEBUG: Raw input: {${inputStr}}")
 print(f"DEBUG: Parsed inputs: {inputs}")
 print(f"DEBUG: Number of inputs: {len(inputs)}")
 
