@@ -93,24 +93,77 @@ def parse_input(input_str):
         line = line.strip()
         if not line:
             continue
-        # Try to parse as JSON first (for arrays, objects)
-        try:
-            parsed.append(json.loads(line))
-        except:
-            # Try to parse as integer
-            try:
-                parsed.append(int(line))
-            except:
-                # Try to parse as float
-                try:
-                    parsed.append(float(line))
-                except:
-                    # Keep as string, removing quotes if present
-                    if line.startswith('"') and line.endswith('"'):
-                        parsed.append(line[1:-1])
-                    else:
-                        parsed.append(line)
+        
+        # Check if line contains space-separated values (e.g., "[2,7,11,15] 9")
+        # Use regex to find JSON arrays/objects and separate values
+        tokens = []
+        i = 0
+        current_token = ""
+        bracket_count = 0
+        brace_count = 0
+        in_quotes = False
+        
+        while i < len(line):
+            char = line[i]
+            
+            if char == '"' and (i == 0 or line[i-1] != '\\\\'):
+                in_quotes = not in_quotes
+                current_token += char
+            elif not in_quotes:
+                if char == '[':
+                    bracket_count += 1
+                    current_token += char
+                elif char == ']':
+                    bracket_count -= 1
+                    current_token += char
+                elif char == '{':
+                    brace_count += 1
+                    current_token += char
+                elif char == '}':
+                    brace_count -= 1
+                    current_token += char
+                elif char == ' ' and bracket_count == 0 and brace_count == 0:
+                    if current_token.strip():
+                        tokens.append(current_token.strip())
+                        current_token = ""
+                else:
+                    current_token += char
+            else:
+                current_token += char
+            i += 1
+        
+        if current_token.strip():
+            tokens.append(current_token.strip())
+        
+        # If we found multiple tokens, parse each separately
+        if len(tokens) > 1:
+            for token in tokens:
+                parsed.append(parse_single_value(token))
+        else:
+            # Single value on the line
+            parsed.append(parse_single_value(line))
+    
     return parsed
+
+def parse_single_value(value_str):
+    value_str = value_str.strip()
+    # Try to parse as JSON first (for arrays, objects)
+    try:
+        return json.loads(value_str)
+    except:
+        # Try to parse as integer
+        try:
+            return int(value_str)
+        except:
+            # Try to parse as float
+            try:
+                return float(value_str)
+            except:
+                # Keep as string, removing quotes if present
+                if value_str.startswith('"') and value_str.endswith('"'):
+                    return value_str[1:-1]
+                else:
+                    return value_str
 
 # Extract function name from code
 def extract_function_name(code):
