@@ -79,6 +79,9 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
+          // Create a simpler, more reliable input parsing approach
+          const inputStr = testCase.input.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          
           executableCode = `
 import sys
 import json
@@ -174,7 +177,10 @@ def extract_function_name(code):
     return None
 
 # Parse inputs
-inputs = parse_input("""${testCase.input}""")
+inputs = parse_input("${inputStr}")
+print(f"DEBUG: Raw input: '${inputStr}'")
+print(f"DEBUG: Parsed inputs: {inputs}")
+print(f"DEBUG: Number of inputs: {len(inputs)}")
 
 ${code}
 
@@ -204,10 +210,15 @@ if function_name and function_name in locals():
             print(str(result))
     except Exception as e:
         print(f"Error: {str(e)}")
+        print(f"Inputs were: {inputs}")
+        print(f"Function signature: {func.__code__.co_varnames[:func.__code__.co_argcount]}")
 else:
     print("Function not found or could not be extracted")
 `;
         }
+        
+        console.log('Generated Python code:');
+        console.log(executableCode);
 
         // Submit to Judge0 (using RapidAPI endpoint for now)
         const submissionResponse = await fetch('https://judge0-ce.p.rapidapi.com/submissions', {
