@@ -79,33 +79,80 @@ serve(async (req) => {
         // Prepare code with input handling based on language
         let executableCode = code;
         if (language.toLowerCase() === 'python') {
-          // Parse the input to extract array and target for Two Sum type problems
-          const inputLines = testCase.input.trim().split('\n');
-          const arrayStr = inputLines[0];
-          const target = inputLines[1];
-          
           executableCode = `
 import sys
 import json
+import re
 from typing import List, Optional, Dict, Set, Tuple
 
-# Parse input
-nums = ${arrayStr}
-target = ${target}
+# Parse input dynamically
+def parse_input(input_str):
+    lines = input_str.strip().split('\\n')
+    parsed = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # Try to parse as JSON first (for arrays, objects)
+        try:
+            parsed.append(json.loads(line))
+        except:
+            # Try to parse as integer
+            try:
+                parsed.append(int(line))
+            except:
+                # Try to parse as float
+                try:
+                    parsed.append(float(line))
+                except:
+                    # Keep as string, removing quotes if present
+                    if line.startswith('"') and line.endswith('"'):
+                        parsed.append(line[1:-1])
+                    else:
+                        parsed.append(line)
+    return parsed
+
+# Extract function name from code
+def extract_function_name(code):
+    # Look for function definition
+    match = re.search(r'def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(', code)
+    if match:
+        return match.group(1)
+    return None
+
+# Parse inputs
+inputs = parse_input("""${testCase.input}""")
 
 ${code}
 
-# Call the function and print result
-if 'twoSum' in locals():
-    result = twoSum(nums, target)
-    print(json.dumps(result))
-elif 'isValid' in locals():
-    # For parentheses problems
-    s = nums[0] if isinstance(nums, list) else str(nums)
-    result = isValid(s)
-    print(str(result).lower())
+# Dynamic function calling
+function_name = extract_function_name("""${code}""")
+if function_name and function_name in locals():
+    func = locals()[function_name]
+    try:
+        # Call function with appropriate number of arguments
+        if len(inputs) == 0:
+            result = func()
+        elif len(inputs) == 1:
+            result = func(inputs[0])
+        elif len(inputs) == 2:
+            result = func(inputs[0], inputs[1])
+        elif len(inputs) == 3:
+            result = func(inputs[0], inputs[1], inputs[2])
+        else:
+            result = func(*inputs)
+        
+        # Format output based on type
+        if isinstance(result, (list, dict)):
+            print(json.dumps(result))
+        elif isinstance(result, bool):
+            print(str(result).lower())
+        else:
+            print(str(result))
+    except Exception as e:
+        print(f"Error: {str(e)}")
 else:
-    print("Function not found")
+    print("Function not found or could not be extracted")
 `;
         }
 
