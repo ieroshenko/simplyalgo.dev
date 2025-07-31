@@ -8,7 +8,9 @@ import { ArrowLeft, Star, StarOff } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
+import { UserAttemptsService } from '@/services/userAttempts';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 const ProblemSolver = () => {
   const { id } = useParams();
@@ -47,12 +49,26 @@ const ProblemSolver = () => {
     }
   };
 
-  const handleRun = (code: string) => {
-    console.log('Running code:', code);
+  const handleRun = async (code: string) => {
+    if (!user?.id) return;
+    
+    try {
+      await UserAttemptsService.saveDraft(user.id, problem.id, code);
+      toast.success('Code saved and executed');
+    } catch (error) {
+      toast.error('Failed to save code');
+    }
   };
 
-  const handleSubmit = (code: string) => {
-    console.log('Submitting code:', code);
+  const handleSubmit = async (code: string) => {
+    if (!user?.id) return;
+    
+    try {
+      await UserAttemptsService.submitCode(user.id, problem.id, code);
+      toast.success('Code submitted successfully!');
+    } catch (error) {
+      toast.error('Failed to submit code');
+    }
   };
 
   return (
@@ -164,6 +180,7 @@ const ProblemSolver = () => {
             <CodeEditor
               initialCode={problem.functionSignature}
               testCases={problem.testCases}
+              problemId={problem.id}
               onRun={handleRun}
               onSubmit={handleSubmit}
             />

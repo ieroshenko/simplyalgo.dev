@@ -1,24 +1,39 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Upload, Settings, Check, X, Clock } from 'lucide-react';
+import { Play, Upload, Settings, Check, X, Clock, Save, CheckIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 interface CodeEditorProps {
   initialCode: string;
   testCases: TestCase[];
+  problemId: string;
   onRun: (code: string) => void;
   onSubmit: (code: string) => void;
 }
 
-const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps) => {
+const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  
+  const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(problemId);
+
+  // Load previous code on component mount
+  useEffect(() => {
+    const loadCode = async () => {
+      const savedCode = await loadLatestCode();
+      if (savedCode) {
+        setCode(savedCode);
+      }
+    };
+    loadCode();
+  }, [loadLatestCode]);
   const { toast } = useToast();
 
   const handleRun = async () => {
@@ -62,6 +77,12 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
     }
   };
 
+  const handleCodeChange = (value: string | undefined) => {
+    const newCode = value || '';
+    setCode(newCode);
+    saveCode(newCode);
+  };
+
   const handleSubmit = () => {
     onSubmit(code);
   };
@@ -70,11 +91,25 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
     <div className="flex flex-col h-full bg-background">
       {/* Editor Header */}
       <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/50 flex-shrink-0">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <span className="text-sm font-medium text-foreground">Python</span>
-          <Button variant="ghost" size="sm">
-            <Settings className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            {isSaving && (
+              <div className="flex items-center">
+                <Save className="w-3 h-3 mr-1 animate-pulse" />
+                Saving...
+              </div>
+            )}
+            {!isSaving && lastSaved && (
+              <div className="flex items-center">
+                <CheckIcon className="w-3 h-3 mr-1 text-success" />
+                Saved {new Date(lastSaved).toLocaleTimeString()}
+              </div>
+            )}
+            {hasUnsavedChanges && !isSaving && (
+              <div className="text-accent">Unsaved changes</div>
+            )}
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Button 
@@ -103,7 +138,7 @@ const CodeEditor = ({ initialCode, testCases, onRun, onSubmit }: CodeEditorProps
           height="100%"
           defaultLanguage="python"
           value={code}
-          onChange={(value) => setCode(value || '')}
+          onChange={handleCodeChange}
           onMount={(editor, monaco) => {
             // Configure Python-specific settings
             monaco.languages.setLanguageConfiguration('python', {
