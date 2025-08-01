@@ -1,0 +1,523 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, './.env') });
+
+const app = express();
+const PORT = process.env.PORT || 3001; // Changed to 3001 since Judge0 uses 3000
+
+// Judge0 configuration
+const JUDGE0_API_URL = process.env.JUDGE0_API_URL || 'https://judge0-extra-ce.p.rapidapi.com';
+const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY; // RapidAPI key - REQUIRED
+
+// Supabase configuration
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Debug environment variables
+console.log('🔧 Environment variables loaded:');
+console.log('   SUPABASE_URL:', SUPABASE_URL ? '✅ Loaded' : '❌ Missing');
+console.log('   SUPABASE_SERVICE_ROLE_KEY:', SUPABASE_SERVICE_ROLE_KEY ? '✅ Loaded' : '❌ Missing');
+console.log('   JUDGE0_API_KEY:', JUDGE0_API_KEY ? '✅ Loaded' : '❌ Missing');
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ Missing required Supabase environment variables!');
+  console.error('   Please check your .env file in code-executor-api/');
+  process.exit(1);
+}
+
+// Initialize Supabase client (using service role key for server-side operations)
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Language mapping to Judge0 Extra CE language IDs
+const languageMap = {
+  python: 10,        // Python for ML (3.7.7)
+  python3: 31,       // Python for ML (3.12.5) - latest
+  c: 1,              // C (Clang 10.0.1)
+  cpp: 2,            // C++ (Clang 10.0.1)
+  java: 4,           // Java (OpenJDK 14.0.1)
+  csharp: 21,        // C# (.NET Core SDK 3.1.406)
+  nim: 9             // Nim (stable)
+};
+
+// Fetch test cases from Supabase database
+async function fetchTestCasesFromDB(problemId) {
+  try {
+    console.log(`Fetching test cases for problem: ${problemId}`);
+    
+    // First, verify the problem exists
+    const { data: problem, error: problemError } = await supabase
+      .from('problems')
+      .select('id, title, function_signature')
+      .eq('id', problemId)
+      .single();
+    
+    if (problemError || !problem) {
+      console.error('Problem not found:', problemError);
+      return null;
+    }
+    
+    console.log(`Found problem: ${problem.title}`);
+    console.log(`Function signature: ${problem.function_signature}`);
+    
+    // Fetch test cases for this problem
+    const { data: testCases, error: testCasesError } = await supabase
+      .from('test_cases')
+      .select('input, expected_output, is_example')
+      .eq('problem_id', problemId)
+      .order('is_example', { ascending: false });
+    
+    if (testCasesError) {
+      console.error('Error fetching test cases:', testCasesError);
+      return null;
+    }
+    
+    if (!testCases || testCases.length === 0) {
+      console.log('No test cases found for problem:', problemId);
+      return null;
+    }
+    
+    console.log(`Found ${testCases.length} test cases`);
+    console.log('Raw test cases from DB:', JSON.stringify(testCases, null, 2));
+    
+    // Convert database format to our expected format
+    const formattedTestCases = testCases.map((tc, index) => {
+      console.log(`\n--- Processing test case ${index} ---`);
+      console.log('Raw input:', JSON.stringify(tc.input));
+      console.log('Raw expected_output:', JSON.stringify(tc.expected_output));
+      
+      // Parse the input string to extract parameters
+      const inputParams = parseTestCaseInput(tc.input, problem.function_signature);
+      
+      // Parse expected output (handle different types)
+      let expectedOutput;
+      try {
+        expectedOutput = JSON.parse(tc.expected_output);
+      } catch {
+        // If JSON parsing fails, treat as string/number
+        expectedOutput = tc.expected_output;
+      }
+      
+      console.log('Final inputParams:', inputParams);
+      console.log('Final expectedOutput:', expectedOutput);
+      
+      return {
+        input: inputParams,
+        expected: expectedOutput,
+        isExample: tc.is_example
+      };
+    });
+    
+    console.log('Formatted test cases:', JSON.stringify(formattedTestCases, null, 2));
+    return formattedTestCases;
+    
+  } catch (error) {
+    console.error('Error in fetchTestCasesFromDB:', error);
+    return null;
+  }
+}
+
+// Parse test case input string based on function signature
+function parseTestCaseInput(inputString, functionSignature) {
+  console.log('Raw input string:', JSON.stringify(inputString));
+  console.log('Function signature:', functionSignature);
+  
+  // Extract parameter names from function signature
+  const paramMatch = functionSignature.match(/def\s+\w+\s*\(([^)]+)\)/);
+  if (!paramMatch) {
+    console.warn('Could not parse function signature:', functionSignature);
+    return {};
+  }
+  
+  // Filter out 'self' parameter since we're calling as standalone function
+  const params = paramMatch[1]
+    .split(',')
+    .map(p => p.split(':')[0].trim())
+    .filter(p => p !== 'self');
+  
+  console.log('Extracted parameters (filtered):', params);
+  
+  const inputParams = {};
+  
+  // Parse input string
+  const lines = inputString.split('\n').map(line => line.trim()).filter(line => line);
+  console.log('Split lines:', lines);
+  
+  // Check if it's Format 1 (with parameter names: "nums = [2,7,11,15]")
+  const hasParameterNames = lines.some(line => line.includes(' = '));
+  console.log('Has parameter names:', hasParameterNames);
+  
+  if (hasParameterNames) {
+    // Format 1: "nums = [2,7,11,15]\ntarget = 9"
+    for (const line of lines) {
+      if (line.includes(' = ')) {
+        const [paramName, paramValue] = line.split(' = ');
+        const cleanParamName = paramName.trim();
+        
+        try {
+          inputParams[cleanParamName] = JSON.parse(paramValue);
+        } catch {
+          inputParams[cleanParamName] = paramValue.replace(/^"(.*)"$/, '$1');
+        }
+      }
+    }
+  } else {
+    // Format 2: "[2,7,11,15]\n9" - map values to parameter names
+    console.log('Using Format 2 parsing');
+    
+    for (let i = 0; i < Math.min(params.length, lines.length); i++) {
+      const paramName = params[i];
+      const paramValue = lines[i];
+      
+      console.log(`Mapping param ${i}: ${paramName} = ${paramValue}`);
+      
+      try {
+        inputParams[paramName] = JSON.parse(paramValue);
+      } catch (e) {
+        console.warn(`JSON parse failed for ${paramValue}:`, e.message);
+        // If JSON parsing fails, treat as string
+        inputParams[paramName] = paramValue.replace(/^"(.*)"$/, '$1');
+      }
+    }
+  }
+  
+  console.log(`Final parsed input parameters:`, inputParams);
+  return inputParams;
+}
+
+// Process Python code to add imports and test case execution
+function processPythonCode(userCode, testCases) {
+  // Add typing imports if needed
+  const needsTyping = /\b(List|Dict|Set|Tuple|Optional|Union)\b/.test(userCode);
+  let processedCode = userCode;
+  
+  if (needsTyping && !userCode.includes('from typing import')) {
+    processedCode = `from typing import List, Dict, Set, Tuple, Optional, Union\n${userCode}`;
+  }
+  
+  // Extract function name from the code
+  const functionMatch = userCode.match(/def\s+(\w+)\s*\(/);
+  if (!functionMatch) {
+    throw new Error('No function definition found in Python code');
+  }
+  
+  const functionName = functionMatch[1];
+  console.log(`Detected function: ${functionName}`);
+  
+  // Analyze function signature to determine input format
+  const signatureMatch = userCode.match(/def\s+\w+\s*\([^)]+\)/);
+  const signature = signatureMatch ? signatureMatch[0] : '';
+  
+  // Generate test execution code with dynamic test cases
+  const testExecutionCode = generateTestExecutionCode(functionName, signature, testCases);
+  
+  // Combine user code with test execution
+  const finalCode = `${processedCode}
+
+${testExecutionCode}`;
+  
+  console.log('Generated complete Python code:', finalCode);
+  return finalCode;
+}
+
+// Generate test execution code with dynamic test cases
+function generateTestExecutionCode(functionName, signature, testCases) {
+  // Convert test cases to Python format
+  const pythonTestCases = testCases.map(tc => ({
+    ...tc.input,
+    expected: tc.expected
+  }));
+  
+  const testCasesJson = JSON.stringify(pythonTestCases, null, 2);
+  
+  // Extract parameter names from signature
+  const paramMatch = signature.match(/def\s+\w+\s*\(([^)]+)\)/);
+  const params = paramMatch ? paramMatch[1].split(',').map(p => p.split(':')[0].trim()) : [];
+  
+  // Generate function call based on parameters
+  let functionCall;
+  if (params.length === 1) {
+    functionCall = `${functionName}(tc["${params[0]}"])`;
+  } else if (params.length === 2) {
+    functionCall = `${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
+  } else {
+    // Handle multiple parameters dynamically
+    const paramList = params.map(p => `tc["${p}"]`).join(', ');
+    functionCall = `${functionName}(${paramList})`;
+  }
+  
+  return `
+import sys
+import json
+
+# Read test case index from stdin
+test_case_index = int(sys.stdin.read().strip())
+
+# Dynamic test cases from database/API
+test_cases = ${testCasesJson}
+
+if 0 <= test_case_index < len(test_cases):
+    tc = test_cases[test_case_index]
+    result = ${functionCall}
+    print(json.dumps(result))
+else:
+    print("Invalid test case index")`;
+}
+
+// Middleware
+app.use(helmet());
+const corsOptions = {
+  origin: 'http://localhost:8080',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(express.json({ limit: '1mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'simplyalgo-code-executor'
+  });
+});
+
+// Main code execution endpoint
+app.post('/execute', async (req, res) => {
+  try {
+    let { language, code, problemId } = req.body;
+    let { testCases } = req.body;
+
+    // Validate request
+    if (!language || !code) {
+      return res.status(400).json({
+        error: 'Missing required fields: language, code'
+      });
+    }
+
+    // If problemId is provided but no testCases, fetch from database
+    if (problemId && !testCases) {
+      console.log(`Fetching test cases for problem ID: ${problemId}`);
+      testCases = await fetchTestCasesFromDB(problemId);
+      if (!testCases || testCases.length === 0) {
+        return res.status(400).json({
+          error: `No test cases found for problem ID: ${problemId}`
+        });
+      }
+    }
+
+    // Validate we have test cases
+    if (!testCases || testCases.length === 0) {
+      return res.status(400).json({
+        error: 'Missing test cases - provide either testCases or problemId'
+      });
+    }
+
+    console.log(`Executing ${language} code with ${testCases.length} test cases`);
+
+    const languageId = languageMap[language.toLowerCase()];
+    if (!languageId) {
+      return res.status(400).json({
+        error: `Language ${language} not supported. Supported languages: ${Object.keys(languageMap).join(', ')}`
+      });
+    }
+
+    console.log(`Received language: ${language}`);
+
+    // Auto-process Python code for LeetCode-style execution
+    if (language.toLowerCase() === 'python' || language.toLowerCase() === 'python3') {
+      code = processPythonCode(code, testCases);
+    }
+
+    // Prepare batched submissions for all test cases
+    // Using batched submissions is efficient: 1 batch request counts as 1 API call
+    // instead of N individual submissions (saves API quota)
+    const submissions = testCases.map((testCase, index) => {
+      // For Python functions, send test case index
+      // For other languages, use the original input format
+      let stdin;
+      if (language.toLowerCase() === 'python' || language.toLowerCase() === 'python3') {
+        stdin = String(index); // Send test case index
+      } else {
+        stdin = Array.isArray(testCase.input) 
+          ? testCase.input.join('\n')  // Join array elements with newlines
+          : String(testCase.input);    // Convert to string if not array
+      }
+
+      return {
+        language_id: languageId,
+        source_code: Buffer.from(code).toString('base64'),
+        stdin: Buffer.from(stdin).toString('base64'),
+        expected_output: testCase.expected ? Buffer.from(String(testCase.expected)).toString('base64') : undefined
+      };
+    });
+
+    console.log(`Submitting batch of ${submissions.length} test cases`);
+
+    // Submit batch to Judge0
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Add RapidAPI headers if using subscription service
+    if (JUDGE0_API_KEY) {
+      headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+      headers['X-RapidAPI-Host'] = 'judge0-extra-ce.p.rapidapi.com';
+    }
+
+    console.log('Submitting to Judge0 with headers:', headers);
+
+    const response = await fetch(`${JUDGE0_API_URL}/submissions/batch?base64_encoded=true`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ submissions })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Judge0 API error: ${response.status} ${response.statusText}`);
+    }
+
+    const batchResult = await response.json();
+    const tokens = batchResult.map(item => item.token);
+    
+    console.log(`Batch submitted, waiting for results for tokens: ${tokens.join(', ')}`);
+
+    // Wait for processing - adjust timeout based on batch size and complexity
+    const waitTime = Math.max(1000, testCases.length * 500); // 500ms per test case, min 1s
+    console.log(`Waiting ${waitTime}ms for batch processing...`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+
+    // Get batch results
+    const resultResponse = await fetch(`${JUDGE0_API_URL}/submissions/batch?tokens=${tokens.join(',')}&base64_encoded=true`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!resultResponse.ok) {
+      throw new Error(`Judge0 batch result error: ${resultResponse.status} ${resultResponse.statusText}`);
+    }
+
+    const batchResults = await resultResponse.json();
+    
+    // Process results
+    const results = batchResults.submissions.map((result, index) => {
+      const testCase = testCases[index];
+      
+      // Decode base64 outputs
+      const stdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString().trim() : '';
+      const stderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString().trim() : '';
+      
+      // Parse actual output as JSON if possible
+      let actualOutput;
+      try {
+        actualOutput = JSON.parse(stdout);
+      } catch {
+        actualOutput = stdout;
+      }
+      
+      // Compare actual vs expected (both as JSON objects/arrays)
+      const passed = JSON.stringify(actualOutput) === JSON.stringify(testCase.expected);
+      
+      // Format input display (remove outer braces for cleaner look)
+      const inputDisplay = Object.entries(testCase.input)
+        .map(([key, value]) => `"${key}":${JSON.stringify(value)}`)
+        .join(', ');
+      
+      return {
+        input: inputDisplay,
+        expected: testCase.expected,
+        actual: actualOutput,
+        passed,
+        status: result.status.description,
+        time: result.time,
+        memory: result.memory,
+        stderr: stderr || null
+      };
+    });
+    
+    console.log(`Code execution completed with ${results.length} results`);
+    res.json({ results });
+
+  } catch (error) {
+    console.error('Code execution error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      results: []
+    });
+  }
+});
+
+// Judge0 system info endpoint
+app.get('/judge0-info', async (req, res) => {
+  try {
+    // Check if Judge0 is available
+    const headers = {};
+    
+    // Add RapidAPI headers if using subscription service
+    if (JUDGE0_API_KEY) {
+      headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+      headers['X-RapidAPI-Host'] = 'judge0-extra-ce.p.rapidapi.com';
+    }
+
+    const response = await fetch(`${JUDGE0_API_URL}/system_info`, { headers });
+    
+    if (response.ok) {
+      const systemInfo = await response.json();
+      res.json({
+        judge0Available: true,
+        ready: true,
+        executor: 'judge0',
+        systemInfo,
+        supportedLanguages: Object.keys(languageMap),
+        usingSubscription: !!JUDGE0_API_KEY
+      });
+    } else {
+      throw new Error(`Judge0 not responding: ${response.status}`);
+    }
+  } catch (error) {
+    res.json({
+      judge0Available: false,
+      ready: false,
+      executor: 'judge0',
+      error: error.message,
+      supportedLanguages: Object.keys(languageMap),
+      usingSubscription: !!JUDGE0_API_KEY
+    });
+  }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 simplyalgo Code Executor API (Judge0) running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`⚖️  Judge0 info: http://localhost:${PORT}/judge0-info`);
+  console.log(`⚡ Execute endpoint: POST http://localhost:${PORT}/execute`);
+  console.log(`🔗 Judge0 API URL: ${JUDGE0_API_URL}`);
+  console.log(`🌐 Supported languages: ${Object.keys(languageMap).join(', ')}`);
+});

@@ -21,6 +21,21 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
   const [code, setCode] = useState(initialCode);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Helper function to safely render values (handles objects, arrays, strings, etc.)
+  const renderValue = (value: any): string => {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
   
   const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(problemId);
 
@@ -44,7 +59,8 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
       const response = await TestRunnerService.runCode({
         language: 'python',
         code: code,
-        testCases: testCases
+        testCases: testCases,
+        problemId: problemId  // Pass problemId for dynamic Supabase fetching
       });
       
       setTestResults(response.results);
@@ -192,24 +208,30 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
               {testResults.map((result, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg border ${
+                  className={`p-4 rounded-lg border-2 ${
                     result.passed 
-                      ? 'bg-success/10 border-success/20' 
-                      : 'bg-destructive/10 border-destructive/20'
+                      ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                      : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
                       {result.passed ? (
-                        <Check className="w-4 h-4 text-success" />
+                        <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
                       ) : (
-                        <X className="w-4 h-4 text-destructive" />
+                        <X className="w-5 h-5 text-red-600 dark:text-red-400" />
                       )}
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Test Case {index + 1}
                       </span>
-                      <Badge variant={result.passed ? "default" : "destructive"} className="text-xs">
-                        {result.passed ? 'PASSED' : 'FAILED'}
+                      <Badge 
+                        className={`text-xs font-semibold px-3 py-1 ${
+                          result.passed 
+                            ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600' 
+                            : 'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
+                        }`}
+                      >
+                        {result.passed ? '✅ PASSED' : '❌ FAILED'}
                       </Badge>
                     </div>
                     {result.time && (
@@ -220,25 +242,29 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
                     )}
                   </div>
                   
-                  <div className="space-y-1 text-xs font-mono">
-                    <div>
-                      <span className="text-muted-foreground">Input: </span>
-                      <span className="text-foreground">{result.input}</span>
+                  <div className="space-y-2 text-sm font-mono bg-white/50 dark:bg-gray-800/50 p-3 rounded-md">
+                    <div className="flex flex-wrap items-start">
+                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Input:</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.input)}</span>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Expected: </span>
-                      <span className="text-foreground">{result.expected}</span>
+                    <div className="flex flex-wrap items-start">
+                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Expected:</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.expected)}</span>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Actual: </span>
-                      <span className={result.passed ? 'text-success' : 'text-orange-500'}>
-                        {result.actual || 'No output'}
+                    <div className="flex flex-wrap items-start">
+                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Actual:</span>
+                      <span className={`font-medium ml-2 break-all ${
+                        result.passed 
+                          ? 'text-green-700 dark:text-green-300' 
+                          : 'text-red-700 dark:text-red-300'
+                      }`}>
+                        {renderValue(result.actual) || 'No output'}
                       </span>
                     </div>
                     {result.stderr && (
-                      <div>
-                        <span className="text-muted-foreground">Error: </span>
-                        <span className="text-destructive">{result.stderr}</span>
+                      <div className="flex flex-wrap items-start">
+                        <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Error:</span>
+                        <span className="text-red-700 dark:text-red-300 font-medium ml-2 break-all">{result.stderr}</span>
                       </div>
                     )}
                   </div>

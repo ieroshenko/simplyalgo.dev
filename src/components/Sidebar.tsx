@@ -45,7 +45,7 @@ const Sidebar = () => {
           <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
             <Brain className="w-5 h-5 text-accent-foreground" />
           </div>
-          <span className="text-lg font-bold text-foreground">LeetCoach</span>
+          <span className="text-lg font-bold text-foreground">simplyalgo</span>
         </div>
       </div>
 

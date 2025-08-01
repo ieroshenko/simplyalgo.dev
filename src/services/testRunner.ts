@@ -1,5 +1,4 @@
 import { TestCase, TestResult } from '@/types';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface RunCodePayload {
   language: string;
@@ -13,119 +12,66 @@ export interface RunCodeResponse {
 }
 
 export class TestRunnerService {
+  // Code Executor API endpoint - using localhost for development
+  private static CODE_EXECUTOR_API_URL = import.meta.env.VITE_CODE_EXECUTOR_URL || 'http://localhost:3001';
+
   static async runCode(payload: RunCodePayload): Promise<RunCodeResponse> {
+    console.log(`🚀 Calling Code Executor API: ${this.CODE_EXECUTOR_API_URL}/execute`);
+    
     try {
-      // Call the Supabase Edge Function for code execution
-      const { data, error } = await supabase.functions.invoke('code-execution', {
-        body: {
-          language: payload.language,
-          code: payload.code,
-          testCases: payload.testCases,
-          problemId: payload.problemId
-        }
+      // New system: Send problemId for dynamic test case fetching
+      // If problemId is provided, API will fetch test cases from Supabase
+      // Otherwise, use the provided testCases (backward compatibility)
+      const requestBody = {
+        language: payload.language,
+        code: payload.code,
+        ...(payload.problemId 
+          ? { problemId: payload.problemId }  // Dynamic: fetch from Supabase
+          : { testCases: payload.testCases }   // Manual: use provided test cases
+        )
+      };
+
+      console.log('📤 Request payload:', requestBody);
+
+      const response = await fetch(`${this.CODE_EXECUTOR_API_URL}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      if (error) {
-        console.error('Error calling code-execution function:', error);
-        throw new Error(`Code execution failed: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Code Executor API error: ${response.status} - ${errorData.error || errorData.message}`);
       }
+
+      const data = await response.json();
 
       if (!data || !data.results) {
-        throw new Error('Invalid response from code execution service');
+        throw new Error('Invalid response from Code Executor API');
       }
 
-      return { results: data.results };
-    } catch (error) {
-      console.error('TestRunnerService error:', error);
+      console.log(`✅ Code Executor API: Executed ${payload.language} code successfully`);
+      console.log(`📊 Results: ${data.results.length} test cases processed`);
       
-      // Fallback to mock execution for development/testing
-      return this.fallbackMockExecution(payload);
-    }
-  }
+      return { results: data.results };
 
-  // Fallback mock execution for development/testing
-  private static async fallbackMockExecution(payload: RunCodePayload): Promise<RunCodeResponse> {
-    console.log('Using fallback mock execution');
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const results: TestResult[] = [];
-    
-    for (const testCase of payload.testCases) {
-      const result = this.simulateExecution(payload.code, testCase);
-      results.push(result);
-    }
-    
-    return { results };
-  }
-  
-  private static simulateExecution(code: string, testCase: TestCase): TestResult {
-    const isCodeComplete = !code.includes('pass') && code.trim().length > 50;
-    
-    // Simple mock logic for Two Sum problem
-    if (testCase.input.includes('[2,7,11,15]')) {
-      const actualOutput = isCodeComplete ? '[0,1]' : '[]';
-      return {
-        passed: actualOutput === testCase.expected,
+    } catch (error) {
+      console.error('❌ Code Executor API execution failed:', error);
+      
+      // Return error results instead of fallback
+      const errorResults: TestResult[] = payload.testCases.map(testCase => ({
+        passed: false,
         input: testCase.input,
         expected: testCase.expected,
-        actual: actualOutput,
-        stdout: actualOutput,
-        stderr: null,
-        time: '0.01s'
-      };
+        actual: '',
+        stdout: '',
+        stderr: `API Error: ${error.message}`,
+        time: '0ms'
+      }));
+
+      return { results: errorResults };
     }
-    
-    if (testCase.input.includes('[3,2,4]')) {
-      const actualOutput = isCodeComplete ? '[1,2]' : '[]';
-      return {
-        passed: actualOutput === testCase.expected,
-        input: testCase.input,
-        expected: testCase.expected,
-        actual: actualOutput,
-        stdout: actualOutput,
-        stderr: null,
-        time: '0.02s'
-      };
-    }
-    
-    if (testCase.input.includes('[3,3]')) {
-      const actualOutput = isCodeComplete ? '[0,1]' : '[]';
-      return {
-        passed: actualOutput === testCase.expected,
-        input: testCase.input,
-        expected: testCase.expected,
-        actual: actualOutput,
-        stdout: actualOutput,
-        stderr: null,
-        time: '0.01s'
-      };
-    }
-    
-    // Mock logic for Valid Parentheses
-    if (testCase.input === '()') {
-      const actualOutput = isCodeComplete ? 'true' : 'false';
-      return {
-        passed: actualOutput === testCase.expected,
-        input: testCase.input,
-        expected: testCase.expected,
-        actual: actualOutput,
-        stdout: actualOutput,
-        stderr: null,
-        time: '0.01s'
-      };
-    }
-    
-    // Default case
-    return {
-      passed: false,
-      input: testCase.input,
-      expected: testCase.expected,
-      actual: '',
-      stdout: '',
-      stderr: isCodeComplete ? null : 'Code incomplete',
-      time: '0.00s'
-    };
   }
 }

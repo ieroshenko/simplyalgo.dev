@@ -4,7 +4,7 @@ import { Brain, TrendingUp, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import logoImage from '@/assets/leetcoach-logo.jpg';
+import logoImage from '@/assets/simplyalgo-logo.jpg';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -55,10 +55,10 @@ const Auth = () => {
         {/* Logo and Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
-            <img src={logoImage} alt="LeetCoach" className="w-16 h-16 rounded-lg" />
+            <img src={logoImage} alt="simplyalgo" className="w-16 h-16 rounded-lg" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">LeetCoach</h1>
+            <h1 className="text-3xl font-bold text-foreground">simplyalgo</h1>
             <p className="text-muted-foreground mt-2">Learn LeetCode with AI guidance</p>
           </div>
         </div>
