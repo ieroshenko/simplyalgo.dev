@@ -106,7 +106,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Editor Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/50 flex-shrink-0">
+      <div className="flex items-center justify-between h-12 px-6 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-3">
           <span className="text-sm font-medium text-foreground">Python</span>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -176,7 +176,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
             fontSize: 14,
             fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
             lineHeight: 1.5,
-            padding: { top: 16, bottom: 16, left: 8, right: 8 },
+            padding: { top: 16, bottom: 16 },
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 4,

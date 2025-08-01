@@ -53,7 +53,7 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
   return (
     <Card className="h-full flex flex-col border-0 rounded-none shadow-none max-h-[calc(100vh-81px)]">
       {/* Chat Header */}
-      <div className="flex-shrink-0 p-4 border-b border-border bg-secondary/50">
+      <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">

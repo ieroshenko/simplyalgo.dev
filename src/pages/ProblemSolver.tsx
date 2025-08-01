@@ -75,7 +75,7 @@ const ProblemSolver = () => {
     if (!user?.id) return;
     
     try {
-      await UserAttemptsService.saveSubmission(user.id, problem.id, code, 'accepted');
+      await UserAttemptsService.submitCode(user.id, problem.id, code);
       toast.success('Solution submitted successfully!');
     } catch (error) {
       toast.error('Failed to submit solution');
