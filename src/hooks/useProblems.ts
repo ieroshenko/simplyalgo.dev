@@ -45,36 +45,60 @@ export const useProblems = (userId?: string) => {
   const fetchProblems = async () => {
     try {
       // Fetch problems with category names and user attempt data
-      const { data: problemsData, error: problemsError } = await supabase
+      let query = supabase
         .from('problems')
         .select(`
           *,
           categories!inner(name, color),
-          test_cases(input, expected_output),
-          user_problem_attempts(status),
-          user_starred_problems(id)
+          test_cases(input, expected_output)
         `);
+
+      const { data: problemsData, error: problemsError } = await query;
 
       if (problemsError) throw problemsError;
 
-      const formattedProblems: Problem[] = problemsData.map((problem: any) => ({
-        id: problem.id,
-        title: problem.title,
-        difficulty: problem.difficulty,
-        category: problem.categories.name,
-        status: getStatus(problem.user_problem_attempts),
-        isStarred: problem.user_starred_problems.length > 0,
-        description: problem.description,
-        functionSignature: problem.function_signature,
-        examples: problem.examples || [],
-        testCases: problem.test_cases.map((tc: any) => ({
-          input: tc.input,
-          expected: tc.expected_output
-        })),
-        likes: problem.likes,
-        dislikes: problem.dislikes,
-        acceptanceRate: problem.acceptance_rate
-      }));
+      // Fetch user-specific data separately if userId exists
+      let userAttempts: any[] = [];
+      let userStars: any[] = [];
+
+      if (userId) {
+        const { data: attemptsData } = await supabase
+          .from('user_problem_attempts')
+          .select('problem_id, status')
+          .eq('user_id', userId);
+
+        const { data: starsData } = await supabase
+          .from('user_starred_problems')
+          .select('problem_id')
+          .eq('user_id', userId);
+
+        userAttempts = attemptsData || [];
+        userStars = starsData || [];
+      }
+
+      const formattedProblems: Problem[] = problemsData.map((problem: any) => {
+        const attempts = userAttempts.filter(a => a.problem_id === problem.id);
+        const isStarred = userStars.some(s => s.problem_id === problem.id);
+
+        return {
+          id: problem.id,
+          title: problem.title,
+          difficulty: problem.difficulty,
+          category: problem.categories.name,
+          status: getStatus(attempts),
+          isStarred,
+          description: problem.description,
+          functionSignature: problem.function_signature,
+          examples: problem.examples || [],
+          testCases: problem.test_cases.map((tc: any) => ({
+            input: tc.input,
+            expected: tc.expected_output
+          })),
+          likes: problem.likes,
+          dislikes: problem.dislikes,
+          acceptanceRate: problem.acceptance_rate
+        };
+      });
 
       setProblems(formattedProblems);
     } catch (err: any) {
@@ -116,11 +140,46 @@ export const useProblems = (userId?: string) => {
     return 'attempted';
   };
 
+  const toggleStar = async (problemId: string) => {
+    if (!userId) return;
+    
+    try {
+      const problem = problems.find(p => p.id === problemId);
+      if (!problem) return;
+      
+      if (problem.isStarred) {
+        // Remove star
+        const { error } = await supabase
+          .from('user_starred_problems')
+          .delete()
+          .eq('user_id', userId)
+          .eq('problem_id', problemId);
+        
+        if (error) throw error;
+      } else {
+        // Add star
+        const { error } = await supabase
+          .from('user_starred_problems')
+          .insert({ user_id: userId, problem_id: problemId });
+        
+        if (error) throw error;
+      }
+      
+      // Update local state
+      setProblems(prev => prev.map(p => 
+        p.id === problemId ? { ...p, isStarred: !p.isStarred } : p
+      ));
+    } catch (err: any) {
+      throw new Error(err.message);
+    }
+  };
+
   return {
     problems,
     categories,
     loading,
     error,
+    toggleStar,
     refetch: () => {
       fetchProblems();
       fetchCategories();

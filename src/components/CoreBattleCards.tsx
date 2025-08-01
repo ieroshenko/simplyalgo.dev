@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Code, Grid3x3, Share2, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { isFeatureEnabled } from '@/config/features';
 
 const CoreBattleCards = () => {
   const navigate = useNavigate();
@@ -13,7 +14,8 @@ const CoreBattleCards = () => {
       icon: Code,
       color: 'bg-primary/10',
       iconColor: 'text-primary',
-      path: '/leetcode'
+      path: '/leetcode',
+      featureFlag: 'LEETCODE_ARENA' as const
     },
     {
       title: 'System-Design War-Room',
@@ -21,7 +23,8 @@ const CoreBattleCards = () => {
       icon: Share2,
       color: 'bg-success/20',
       iconColor: 'text-primary',
-      path: '/system-design'
+      path: '/system-design',
+      featureFlag: 'SYSTEM_DESIGN_WAR_ROOM' as const
     },
     {
       title: 'Mock Interviews',
@@ -29,13 +32,17 @@ const CoreBattleCards = () => {
       icon: MessageCircle,
       color: 'bg-primary/10',
       iconColor: 'text-primary',
-      path: '/mock-interviews'
+      path: '/mock-interviews',
+      featureFlag: 'MOCK_INTERVIEWS' as const
     }
   ];
 
+  // Filter battles based on feature flags
+  const enabledBattles = battles.filter(battle => isFeatureEnabled(battle.featureFlag));
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
-      {battles.map((battle) => {
+      {enabledBattles.map((battle) => {
         const Icon = battle.icon;
         return (
           <Card 

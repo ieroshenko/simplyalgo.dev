@@ -45,7 +45,7 @@ const App = () => (
               <LeetCodeArena />
             </ProtectedRoute>
           } />
-          <Route path="/problem/:id" element={
+          <Route path="/problem/:problemId" element={
             <ProtectedRoute>
               <ProblemSolver />
             </ProtectedRoute>

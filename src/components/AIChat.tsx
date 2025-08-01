@@ -51,9 +51,9 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
   };
 
   return (
-    <Card className="flex flex-col h-full">
+    <Card className="h-full flex flex-col border-0 rounded-none shadow-none max-h-[calc(100vh-81px)]">
       {/* Chat Header */}
-      <div className="p-4 border-b border-border bg-secondary/50">
+      <div className="flex-shrink-0 p-4 border-b border-border bg-secondary/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -80,78 +80,80 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex items-center space-x-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Loading chat history...</span>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="text-sm">Start a conversation with your AI coach!</p>
-                <p className="text-xs mt-1">Ask questions about the problem or get hints.</p>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading chat history...</span>
               </div>
-            )}
-            {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`flex space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  message.role === 'user' 
-                    ? 'bg-accent' 
-                    : 'bg-primary'
-                }`}>
-                  {message.role === 'user' ? (
-                    <User className="w-4 h-4 text-accent-foreground" />
-                  ) : (
-                    <Bot className="w-4 h-4 text-primary-foreground" />
-                  )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">Start a conversation with your AI coach!</p>
+                  <p className="text-xs mt-1">Ask questions about the problem or get hints.</p>
                 </div>
-                <div className={`space-y-1 ${message.role === 'user' ? 'text-right' : ''}`}>
-                  <div className={`p-3 rounded-lg ${
-                    message.role === 'user'
-                      ? 'bg-accent text-accent-foreground'
-                      : 'bg-secondary text-foreground'
+              )}
+              {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`flex space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    message.role === 'user' 
+                      ? 'bg-accent' 
+                      : 'bg-primary'
                   }`}>
-                    <p className="text-sm">{message.content}</p>
+                    {message.role === 'user' ? (
+                      <User className="w-4 h-4 text-accent-foreground" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-primary-foreground" />
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatTime(message.timestamp)}
-                  </div>
-                </div>
-              </div>
-            </div>
-            ))}
-            
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="flex space-x-2 max-w-[80%]">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-primary-foreground" />
-                  </div>
-                  <div className="bg-secondary text-foreground p-3 rounded-lg">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className={`space-y-1 ${message.role === 'user' ? 'text-right' : ''}`}>
+                    <div className={`p-3 rounded-lg ${
+                      message.role === 'user'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-secondary text-foreground'
+                    }`}>
+                      <p className="text-sm">{message.content}</p>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatTime(message.timestamp)}
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              ))}
+              
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="flex space-x-2 max-w-[80%]">
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                    <div className="bg-secondary text-foreground p-3 rounded-lg">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-border">
+      <div className="flex-shrink-0 p-4 border-t border-border">
         <div className="flex gap-2 items-end">
           <textarea
             value={input}
