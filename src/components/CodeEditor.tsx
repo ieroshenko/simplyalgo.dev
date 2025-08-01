@@ -195,8 +195,8 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
       </div>
 
       {/* Test Results */}
-      <div className="flex-shrink-0 max-h-60 border-t border-border overflow-hidden">
-        <div className="p-4 bg-secondary/30">
+      <div className="h-60 border-t border-border overflow-hidden flex-shrink-0">
+        <div className="p-4 bg-secondary/30 h-full flex flex-col">
           <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
           
           {testResults.length === 0 ? (
@@ -204,7 +204,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
               Click "Run" to test your code...
             </div>
           ) : (
-            <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-2">
               {testResults.map((result, index) => (
                 <div
                   key={index}
