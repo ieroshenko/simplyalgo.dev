@@ -8,19 +8,24 @@ import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { UserAttemptsService } from '@/services/userAttempts';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CodeEditorProps {
   initialCode: string;
   testCases: TestCase[];
   problemId: string;
+  problemDifficulty?: 'Easy' | 'Medium' | 'Hard';
   onRun: (code: string) => void;
   onSubmit: (code: string) => void;
+  onProblemSolved?: (difficulty: 'Easy' | 'Medium' | 'Hard') => void;
 }
 
-const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: CodeEditorProps) => {
+const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRun, onSubmit, onProblemSolved }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const { user } = useAuth();
 
   // Helper function to safely render values (handles objects, arrays, strings, etc.)
   const renderValue = (value: any): string => {
@@ -73,6 +78,23 @@ const CodeEditor = ({ initialCode, testCases, problemId, onRun, onSubmit }: Code
           title: "All tests passed! 🎉",
           description: `${passedCount}/${totalCount} test cases passed`,
         });
+        
+        // Mark problem as solved in database
+        if (user?.id) {
+          console.log('🎯 Marking problem as solved:', {
+            userId: user.id,
+            problemId,
+            difficulty: problemDifficulty
+          });
+          
+          await UserAttemptsService.markProblemSolved(user.id, problemId, code, response.results);
+        }
+        
+        // Update user stats when problem is solved
+        if (onProblemSolved && problemDifficulty) {
+          console.log('📊 Updating stats for difficulty:', problemDifficulty);
+          onProblemSolved(problemDifficulty);
+        }
       } else {
         toast({
           title: "Some tests failed",

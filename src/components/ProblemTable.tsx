@@ -7,12 +7,24 @@ import {
   Star, 
   StarOff, 
   Play,
-  Code,
   List,
   Database,
-  GitBranch,
-  BarChart3,
-  Layers
+  Layers,
+  Hash,
+  Type,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  Search,
+  TreePine,
+  FolderTree,
+  Mountain,
+  RotateCcw,
+  Network,
+  Grid3X3,
+  DollarSign,
+  Calendar,
+  Calculator,
+  Binary
 } from 'lucide-react';
 import { Problem } from '@/types';
 import { useNavigate } from 'react-router-dom';
@@ -20,18 +32,31 @@ import { useNavigate } from 'react-router-dom';
 interface ProblemTableProps {
   problems: Problem[];
   filteredCategory?: string;
+  searchQuery?: string;
 }
 
-const ProblemTable = ({ problems, filteredCategory }: ProblemTableProps) => {
+const ProblemTable = ({ problems, filteredCategory, searchQuery }: ProblemTableProps) => {
   const navigate = useNavigate();
 
   const categoryIcons = {
-    'Array': Code,
-    'Linked List': List,
+    'Array & Hashing': Hash,
+    'String': Type,
+    'Two Pointers': ArrowLeftRight,
+    'Sliding Window': SlidersHorizontal,
     'Stack': Database,
-    'Tree': GitBranch,
-    'Graph': BarChart3,
-    'Dynamic Programming': Layers
+    'Binary Search': Search,
+    'Dynamic Programming': Layers,
+    'Linked List': List,
+    'Trees': TreePine,
+    'Tries': FolderTree,
+    'Heap / Priority Queue': Mountain,
+    'Backtracking': RotateCcw,
+    'Graphs': Network,
+    'Matrix': Grid3X3,
+    'Greedy': DollarSign,
+    'Intervals': Calendar,
+    'Math & Geometry': Calculator,
+    'Bit Manipulation': Binary
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -45,15 +70,18 @@ const ProblemTable = ({ problems, filteredCategory }: ProblemTableProps) => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'solved': return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case 'attempted': return <Circle className="w-4 h-4 text-accent" />;
+      case 'solved': return <CheckCircle2 className="w-4 h-4 text-green-600 fill-green-100" />;
+      case 'attempted': return <Circle className="w-4 h-4 text-orange-500" />;
       default: return <Circle className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
-  const filteredProblems = filteredCategory 
-    ? problems.filter(p => p.category === filteredCategory)
-    : problems;
+  const filteredProblems = problems.filter(problem => {
+    const matchesCategory = !filteredCategory || problem.category === filteredCategory;
+    const matchesSearch = !searchQuery || 
+      problem.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <Card className="overflow-hidden">

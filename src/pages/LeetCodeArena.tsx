@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Sidebar from '@/components/Sidebar';
 import ProblemTable from '@/components/ProblemTable';
 import DataStructureVault from '@/components/DataStructureVault';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Target, Brain } from 'lucide-react';
+import { Clock, Target, Search } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
 import { useUserStats } from '@/hooks/useUserStats';
@@ -14,9 +15,10 @@ import { useUserStats } from '@/hooks/useUserStats';
 const LeetCodeArena = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { problems, categories: dbCategories, loading: problemsLoading } = useProblems(user?.id);
+  const { problems, categories: dbCategories, loading: problemsLoading, refetch: refetchProblems } = useProblems(user?.id);
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const categories = ['All', ...dbCategories.map(c => c.name)];
 
@@ -65,7 +67,7 @@ const LeetCodeArena = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-4">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
@@ -86,18 +88,6 @@ const LeetCodeArena = () => {
               <div>
                 <div className="text-2xl font-bold text-foreground">{stats.streak}</div>
                 <div className="text-sm text-muted-foreground">Day Streak</div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-foreground">{stats.aiSessions}</div>
-                <div className="text-sm text-muted-foreground">AI Sessions</div>
               </div>
             </div>
           </Card>
@@ -133,12 +123,30 @@ const LeetCodeArena = () => {
               </div>
             </div>
 
+            {/* Search */}
+            <div className="space-y-4">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search problems..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
             {/* Problems Table */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">
                 {selectedCategory ? `${selectedCategory} Problems` : 'All Problems'}
               </h2>
-              <ProblemTable problems={problems} filteredCategory={selectedCategory} />
+              <ProblemTable 
+                problems={problems} 
+                filteredCategory={selectedCategory}
+                searchQuery={searchQuery}
+              />
             </div>
           </TabsContent>
 

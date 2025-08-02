@@ -12,11 +12,11 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, './.env') });
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Changed to 3001 since Judge0 uses 3000
+const PORT = process.env.PORT || 3001; 
 
 // Judge0 configuration
 const JUDGE0_API_URL = process.env.JUDGE0_API_URL || 'https://judge0-extra-ce.p.rapidapi.com';
-const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY; // RapidAPI key - REQUIRED
+const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY; 
 
 // Supabase configuration
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -45,7 +45,6 @@ const languageMap = {
   cpp: 2,            // C++ (Clang 10.0.1)
   java: 4,           // Java (OpenJDK 14.0.1)
   csharp: 21,        // C# (.NET Core SDK 3.1.406)
-  nim: 9             // Nim (stable)
 };
 
 // Fetch test cases from Supabase database
@@ -275,7 +274,11 @@ else:
 // Middleware
 app.use(helmet());
 const corsOptions = {
-  origin: 'http://localhost:8080',
+  origin: [
+    'http://localhost:8080',
+    'http://localhost:5173',
+    'https://preview--leetcoach-ai-guide.lovable.app'
+  ],
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   preflightContinue: false,
   optionsSuccessStatus: 204

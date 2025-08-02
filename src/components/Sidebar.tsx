@@ -5,12 +5,25 @@ import {
   Home, 
   BarChart3, 
   Settings,
-  Code,
   List,
   Database,
-  GitBranch,
   Layers,
-  Brain
+  Brain,
+  Hash,
+  Type,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  Search,
+  TreePine,
+  FolderTree,
+  Mountain,
+  RotateCcw,
+  Network,
+  Grid3X3,
+  DollarSign,
+  Calendar,
+  Calculator,
+  Binary
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,12 +42,24 @@ const Sidebar = () => {
   ];
 
   const categoryIcons = {
-    'Array': Code,
-    'Linked List': List,
+    'Array & Hashing': Hash,
+    'String': Type,
+    'Two Pointers': ArrowLeftRight,
+    'Sliding Window': SlidersHorizontal,
     'Stack': Database,
-    'Tree': GitBranch,
-    'Graph': BarChart3,
-    'Dynamic Programming': Layers
+    'Binary Search': Search,
+    'Dynamic Programming': Layers,
+    'Linked List': List,
+    'Trees': TreePine,
+    'Tries': FolderTree,
+    'Heap / Priority Queue': Mountain,
+    'Backtracking': RotateCcw,
+    'Graphs': Network,
+    'Matrix': Grid3X3,
+    'Greedy': DollarSign,
+    'Intervals': Calendar,
+    'Math & Geometry': Calculator,
+    'Bit Manipulation': Binary
   };
 
   return (

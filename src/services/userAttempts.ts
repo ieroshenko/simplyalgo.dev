@@ -102,4 +102,82 @@ export class UserAttemptsService {
 
     return data;
   }
+
+  // Mark a problem as solved
+  static async markProblemSolved(userId: string, problemId: string, code: string, testResults: any[]): Promise<UserAttempt | null> {
+    const { data, error } = await supabase
+      .from('user_problem_attempts')
+      .insert({
+        user_id: userId,
+        problem_id: problemId,
+        code,
+        status: 'passed',
+        test_results: testResults
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error marking problem as solved:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  // Get user problem status (solved/attempted/not-started)
+  static async getUserProblemStatus(userId: string, problemId: string): Promise<'solved' | 'attempted' | 'not-started'> {
+    const { data, error } = await supabase
+      .from('user_problem_attempts')
+      .select('status')
+      .eq('user_id', userId)
+      .eq('problem_id', problemId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return 'not-started';
+    }
+
+    return data.status === 'passed' ? 'solved' : 'attempted';
+  }
+
+  // Get all user problem statuses for multiple problems
+  static async getUserProblemsStatus(userId: string, problemIds: string[]): Promise<Record<string, 'solved' | 'attempted' | 'not-started'>> {
+    const { data, error } = await supabase
+      .from('user_problem_attempts')
+      .select('problem_id, status, updated_at')
+      .eq('user_id', userId)
+      .in('problem_id', problemIds)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user problem statuses:', error);
+      return {};
+    }
+
+    const statusMap: Record<string, 'solved' | 'attempted' | 'not-started'> = {};
+    
+    // Initialize all problems as not-started
+    problemIds.forEach(id => {
+      statusMap[id] = 'not-started';
+    });
+
+    // Group by problem_id and get the latest status for each
+    const latestAttempts: Record<string, any> = {};
+    data?.forEach(attempt => {
+      if (!latestAttempts[attempt.problem_id] || 
+          new Date(attempt.updated_at) > new Date(latestAttempts[attempt.problem_id].updated_at)) {
+        latestAttempts[attempt.problem_id] = attempt;
+      }
+    });
+
+    // Set status based on latest attempt
+    Object.values(latestAttempts).forEach((attempt: any) => {
+      statusMap[attempt.problem_id] = attempt.status === 'passed' ? 'solved' : 'attempted';
+    });
+
+    return statusMap;
+  }
 }

@@ -9,6 +9,7 @@ import { ArrowLeft, Star, StarOff, Copy } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
+import { useUserStats } from '@/hooks/useUserStats';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -17,7 +18,8 @@ const ProblemSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { problems, toggleStar, loading, error } = useProblems(user?.id);
+  const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
+  const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const [activeTab, setActiveTab] = useState('question');
   
   console.log('🔍 ProblemSolver render:', {
@@ -91,6 +93,18 @@ const ProblemSolver = () => {
     } catch (error) {
       toast.error('Failed to update favorites');
     }
+  };
+
+  const handleProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard') => {
+    console.log('🎉 Problem solved! Updating stats and refreshing problems...');
+    
+    // Update user statistics
+    await updateStatsOnProblemSolved(difficulty);
+    
+    // Refresh problems list to update status icons
+    refetch();
+    
+    console.log('✅ Stats updated and problems refreshed');
   };
 
   return (
@@ -328,8 +342,10 @@ const ProblemSolver = () => {
             initialCode={problem.functionSignature}
             testCases={problem.testCases}
             problemId={problem.id}
+            problemDifficulty={problem.difficulty}
             onRun={handleRun}
             onSubmit={handleSubmit}
+            onProblemSolved={handleProblemSolved}
           />
         </ResizablePanel>
         
