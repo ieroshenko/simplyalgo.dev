@@ -7,7 +7,7 @@ import ProblemTable from '@/components/ProblemTable';
 import DataStructureVault from '@/components/DataStructureVault';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Target, Search } from 'lucide-react';
+import { Clock, Target, Search, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
 import { useUserStats } from '@/hooks/useUserStats';
@@ -43,6 +43,21 @@ const LeetCodeArena = () => {
     return null;
   }
 
+  const getUserAvatar = () => {
+    // Try Google avatar from user metadata first
+    if (user.user_metadata?.avatar_url) {
+      return user.user_metadata.avatar_url;
+    }
+    // Fallback to profile avatar
+    if (profile.avatarUrl) {
+      return profile.avatarUrl;
+    }
+    // Generate initials avatar as fallback
+    const name = user.user_metadata?.full_name || profile.name || 'User';
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=80`;
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -59,11 +74,25 @@ const LeetCodeArena = () => {
             </p>
           </div>
           
-          <div className="bg-profile-header px-4 py-2 rounded-lg">
-            <div className="text-sm text-profile-header-foreground">
-              🔥 {stats.streak} day streak
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/profile')}
+            className="flex items-center space-x-3 px-4 py-2 hover:bg-secondary rounded-lg"
+          >
+            <img
+              src={getUserAvatar()}
+              alt="Profile"
+              className="w-8 h-8 rounded-full object-cover"
+            />
+            <div className="text-left">
+              <div className="text-sm font-medium text-foreground">
+                {user.user_metadata?.full_name || profile.name || 'User'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                View Profile
+              </div>
             </div>
-          </div>
+          </Button>
         </div>
 
         {/* Stats Cards */}

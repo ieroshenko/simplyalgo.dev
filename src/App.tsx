@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import LeetCodeArena from "./pages/LeetCodeArena";
 import ProblemSolver from "./pages/ProblemSolver";
+import Profile from "./pages/Profile";
 import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -45,6 +46,11 @@ const App = () => (
               <LeetCodeArena />
             </ProtectedRoute>
           } />
+          <Route path="/arena" element={
+            <ProtectedRoute>
+              <LeetCodeArena />
+            </ProtectedRoute>
+          } />
           <Route path="/problem/:problemId" element={
             <ProtectedRoute>
               <ProblemSolver />
@@ -63,6 +69,11 @@ const App = () => (
           <Route path="/tutor" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
