@@ -23,7 +23,8 @@ import {
   DollarSign,
   Calendar,
   Calculator,
-  Binary
+  Binary,
+  User
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -96,36 +97,38 @@ const Sidebar = () => {
             </Button>
           );
         })}
+
       </div>
 
-      {/* Category Progress */}
-      <div className="px-4 pb-4 flex-1">
-        <Card className="p-4 space-y-4">
-          <h3 className="font-semibold text-foreground text-sm">Category Progress</h3>
-          <div className="space-y-3">
-            {categories.map((category) => {
-              const IconComponent = categoryIcons[category.name as keyof typeof categoryIcons];
-              const percentage = (category.solved / category.total) * 100;
-              
-              return (
-                <div key={category.name} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      {IconComponent && <IconComponent className="w-4 h-4 text-muted-foreground" />}
-                      <span className="text-sm text-foreground">{category.name}</span>
+      {/* Category Progress - Only show on LeetCode Arena pages */}
+      {(location.pathname === '/leetcode' || location.pathname === '/arena') && (
+        <div className="px-4 pb-4 flex-1">
+          <Card className="p-4 space-y-4">
+            <h3 className="font-semibold text-foreground text-sm">Category Progress</h3>
+            <div className="space-y-3">
+              {categories.map((category) => {
+                const IconComponent = categoryIcons[category.name as keyof typeof categoryIcons];
+                const percentage = (category.solved / category.total) * 100;
+                
+                return (
+                  <div key={category.name} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {IconComponent && <IconComponent className="w-4 h-4 text-muted-foreground" />}
+                        <span className="text-sm text-foreground">{category.name}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {category.solved}/{category.total}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {category.solved}/{category.total}
-                    </span>
+                    <Progress value={percentage} className="h-2" />
                   </div>
-                  <Progress value={percentage} className="h-2" />
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
-      </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
