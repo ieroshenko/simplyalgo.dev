@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { useAuth } from '@/hooks/useAuth';
+import '@/styles/monaco-theme.css';
 
 interface CodeEditorProps {
   initialCode: string;
@@ -172,14 +173,6 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
 
       {/* Code Editor */}
       <div className="flex-[2] min-h-0 overflow-hidden">
-        <style>{`
-          .monaco-editor .line-numbers {
-            padding-right: 12px !important;
-          }
-          .monaco-editor .margin {
-            background: transparent !important;
-          }
-        `}</style>
         <Editor
           height="100%"
           defaultLanguage="python"
@@ -221,6 +214,22 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
             overviewRulerBorder: false,
             hideCursorInOverviewRuler: true,
             overviewRulerLanes: 0,
+            rulers: [],
+            renderIndentGuides: false,
+            renderWhitespace: 'none',
+            guides: {
+              bracketPairs: false,
+              bracketPairsHorizontal: false,
+              highlightActiveBracketPair: false,
+              indentation: false,
+              highlightActiveIndentation: false,
+            },
+            bracketPairColorization: {
+              enabled: false,
+            },
+            showUnused: false,
+            occurrencesHighlight: false,
+            selectionHighlight: false,
             autoIndent: 'full',
             formatOnPaste: true,
             formatOnType: true,

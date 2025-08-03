@@ -1,0 +1,14 @@
+/**
+ * Monaco Editor Custom Theme
+ * Removes distracting visual elements for a cleaner interface.
+ */
+
+/* Hide indent guides to prevent vertical lines */
+.monaco-editor .indent-guide {
+  display: none !important;
+}
+
+/* Remove the editor's overview ruler */
+.monaco-editor .overview-ruler {
+  display: none !important;
+}
