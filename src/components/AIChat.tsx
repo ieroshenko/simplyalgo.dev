@@ -2,9 +2,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Trash2, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Trash2, Loader2, Mic, MicOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useChatSession } from '@/hooks/useChatSession';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface AIChatProps {
   problemId: string;
@@ -23,6 +24,28 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
     clearConversation 
   } = useChatSession({ problemId, problemDescription });
 
+  // Speech-to-text functionality
+  const { 
+    isListening, 
+    isSupported: speechSupported,
+    hasNativeSupport,
+    isProcessing,
+    startListening, 
+    stopListening, 
+    error: speechError 
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setInput(prev => {
+        const currentText = prev.trim();
+        return currentText ? `${currentText} ${transcript}` : transcript;
+      });
+    },
+    onError: (error) => {
+      console.error('Speech recognition error:', error);
+    }
+  });
+
+
   const handleSend = async () => {
     if (!input.trim()) return;
     await sendMessage(input);
@@ -33,6 +56,16 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const toggleMicrophone = async () => {
+    if (!hasNativeSupport) return;
+
+    if (isListening) {
+      stopListening();
+    } else {
+      await startListening();
     }
   };
 
@@ -158,21 +191,55 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
 
       {/* Message Input */}
       <div className="flex-shrink-0 p-4 border-t border-border">
-        <div className="flex gap-2 items-end">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask your AI coach anything..."
-            disabled={loading || isTyping}
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            rows={Math.min(Math.max(input.split('\n').length, 1), 4)}
-          />
+        <div className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={
+                isListening ? "🎤 Listening..." : 
+                isProcessing ? "🔄 Processing audio..." :
+                "Ask your AI coach anything..."
+              }
+              disabled={loading || isTyping}
+              className={`w-full min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                hasNativeSupport ? 'pr-10' : 'pr-3'
+              }`}
+              rows={Math.min(Math.max(input.split('\n').length, 1), 4)}
+            />
+            {hasNativeSupport && (
+              <button
+                type="button"
+                onClick={toggleMicrophone}
+                disabled={loading || isTyping}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${
+                  isListening ? 'text-red-500 animate-pulse' : 
+                  isProcessing ? 'text-blue-500' :
+                  'text-gray-500 hover:text-gray-700'
+                }`}
+                title={isListening ? 'Stop listening' : isProcessing ? 'Processing...' : 'Start voice input'}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : isProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {speechError && (
+              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-xs text-red-500 opacity-80" title={speechError}>
+                ⚠️
+              </div>
+            )}
+          </div>
           <Button 
             onClick={handleSend} 
             disabled={!input.trim() || isTyping || loading}
             size="sm"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 px-4"
           >
             {isTyping ? (
               <Loader2 className="w-4 h-4 animate-spin" />
