@@ -126,7 +126,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background min-h-0">
       {/* Editor Header */}
       <div className="flex items-center justify-between h-12 px-6 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-3">
@@ -171,7 +171,15 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
       </div>
 
       {/* Code Editor */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-[2] min-h-0 overflow-hidden">
+        <style>{`
+          .monaco-editor .line-numbers {
+            padding-right: 12px !important;
+          }
+          .monaco-editor .margin {
+            background: transparent !important;
+          }
+        `}</style>
         <Editor
           height="100%"
           defaultLanguage="python"
@@ -198,7 +206,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
             fontSize: 14,
             fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
             lineHeight: 1.5,
-            padding: { top: 16, bottom: 16 },
+            padding: { top: 16, bottom: 16, left: 12, right: 16 },
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 4,
@@ -207,8 +215,12 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
             lineNumbers: 'on',
             glyphMargin: false,
             folding: false,
-            lineDecorationsWidth: 8,
+            lineDecorationsWidth: 0,
             lineNumbersMinChars: 4,
+            renderLineHighlight: 'none',
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
+            overviewRulerLanes: 0,
             autoIndent: 'full',
             formatOnPaste: true,
             formatOnType: true,
@@ -217,7 +229,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
       </div>
 
       {/* Test Results */}
-      <div className="h-60 border-t border-border overflow-hidden flex-shrink-0">
+      <div className="flex-1 min-h-[200px] border-t border-border overflow-hidden">
         <div className="p-4 bg-secondary/30 h-full flex flex-col">
           <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
           
@@ -239,7 +251,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       {result.passed ? (
-                        <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
                       ) : (
                         <X className="w-5 h-5 text-red-600 dark:text-red-400" />
                       )}

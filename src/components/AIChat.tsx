@@ -51,7 +51,7 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
   };
 
   return (
-    <Card className="h-full flex flex-col border-0 rounded-none shadow-none max-h-[calc(100vh-81px)]">
+    <Card className="h-full flex flex-col border-0 rounded-none shadow-none">
       {/* Chat Header */}
       <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center">
         <div className="flex items-center justify-between">
@@ -81,7 +81,7 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
+        <ScrollArea className="h-full min-h-[400px] p-4" ref={scrollAreaRef}>
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex items-center space-x-2 text-muted-foreground">
@@ -90,19 +90,22 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 min-h-full flex flex-col">
               {messages.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Start a conversation with your AI coach!</p>
-                  <p className="text-xs mt-1">Ask questions about the problem or get hints.</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">Start a conversation with your AI coach!</p>
+                    <p className="text-xs mt-1">Ask questions about the problem or get hints.</p>
+                  </div>
                 </div>
               )}
-              {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div className={messages.length === 0 ? '' : 'flex-1 space-y-4'}>
+                {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
                 <div className={`flex space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     message.role === 'user' 
@@ -127,26 +130,27 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
                       {formatTime(message.timestamp)}
                     </div>
                   </div>
+                  </div>
                 </div>
-              </div>
-              ))}
-              
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="flex space-x-2 max-w-[80%]">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-primary-foreground" />
-                    </div>
-                    <div className="bg-secondary text-foreground p-3 rounded-lg">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="flex space-x-2 max-w-[80%]">
+                      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                      <div className="bg-secondary text-foreground p-3 rounded-lg">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </ScrollArea>

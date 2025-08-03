@@ -70,7 +70,7 @@ const ProblemTable = ({ problems, filteredCategory, searchQuery }: ProblemTableP
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'solved': return <CheckCircle2 className="w-4 h-4 text-green-600 fill-green-100" />;
+      case 'solved': return <CheckCircle2 className="w-4 h-4 text-green-700 fill-green-500" />;
       case 'attempted': return <Circle className="w-4 h-4 text-orange-500" />;
       default: return <Circle className="w-4 h-4 text-muted-foreground" />;
     }

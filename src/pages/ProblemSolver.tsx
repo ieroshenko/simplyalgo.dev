@@ -108,9 +108,9 @@ const ProblemSolver = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="border-b border-border bg-background p-4">
+      <div className="border-b border-border bg-background p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button 
@@ -148,7 +148,7 @@ const ProblemSolver = () => {
       </div>
 
       {/* Main Content */}
-      <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-81px)]">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Left Panel - Problem Description */}
         <ResizablePanel defaultSize={35} minSize={25}>
           <div className="h-full flex flex-col">
@@ -170,8 +170,8 @@ const ProblemSolver = () => {
                 </TabsList>
               </div>
 
-              <div className="flex-1 overflow-auto">
-                <TabsContent value="question" className="p-6 space-y-6 m-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <TabsContent value="question" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground mb-4">Problem Description</h2>
                     <div className="prose prose-sm max-w-none text-muted-foreground">
@@ -205,7 +205,7 @@ const ProblemSolver = () => {
                   )}
                 </TabsContent>
 
-                <TabsContent value="solution" className="p-6 space-y-6 m-0">
+                <TabsContent value="solution" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground mb-4">1. Brute Force</h2>
                     <div className="bg-muted rounded-lg p-4">
@@ -275,13 +275,13 @@ const ProblemSolver = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="submissions" className="p-6 m-0">
+                <TabsContent value="submissions" className="p-6 m-0 h-full overflow-y-auto">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground mb-4">Submissions</h2>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm font-medium text-success">Accepted</span>
+                          <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
                         </div>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           <span>Python</span>
@@ -290,7 +290,7 @@ const ProblemSolver = () => {
                       </div>
                       <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm font-medium text-success">Accepted</span>
+                          <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
                         </div>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           <span>Python</span>
@@ -301,12 +301,12 @@ const ProblemSolver = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="notes" className="p-6 m-0">
-                  <div>
+                <TabsContent value="notes" className="p-6 m-0 h-full overflow-y-auto flex flex-col">
+                  <div className="flex-1 flex flex-col">
                     <h2 className="text-lg font-semibold text-foreground mb-4">Notes</h2>
-                    <div className="bg-muted/50 rounded-lg p-4 min-h-[300px]">
+                    <div className="bg-muted/50 rounded-lg p-4 flex-1 min-h-[400px] flex">
                       <textarea
-                        className="w-full h-full bg-transparent border-none outline-none resize-none text-sm"
+                        className="w-full h-full bg-transparent border-none outline-none resize-none text-sm flex-1"
                         placeholder="Start writing your notes in Markdown...
 
 # Heading
