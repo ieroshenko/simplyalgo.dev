@@ -12,3 +12,7 @@
 .monaco-editor .overview-ruler {
   display: none !important;
 }
+
+.monaco-editor .line-numbers {
+  padding-right: 12px !important;
+}

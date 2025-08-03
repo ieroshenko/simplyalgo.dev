@@ -1,48 +1,21 @@
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Play, Upload, Settings, Check, X, Clock, Save, CheckIcon } from 'lucide-react';
+import { Play, Upload, Save, CheckIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { TestRunnerService } from '@/services/testRunner';
-import { TestCase, TestResult } from '@/types';
-import { useToast } from '@/hooks/use-toast';
 import { useAutoSave } from '@/hooks/useAutoSave';
-import { UserAttemptsService } from '@/services/userAttempts';
-import { useAuth } from '@/hooks/useAuth';
 import '@/styles/monaco-theme.css';
 
 interface CodeEditorProps {
   initialCode: string;
-  testCases: TestCase[];
   problemId: string;
-  problemDifficulty?: 'Easy' | 'Medium' | 'Hard';
-  onRun: (code: string) => void;
-  onSubmit: (code: string) => void;
-  onProblemSolved?: (difficulty: 'Easy' | 'Medium' | 'Hard') => void;
+  onCodeChange: (code: string) => void;
+  onRun: () => void;
+  onSubmit: () => void;
+  isRunning: boolean;
 }
 
-const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRun, onSubmit, onProblemSolved }: CodeEditorProps) => {
+const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isRunning }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const { user } = useAuth();
-
-  // Helper function to safely render values (handles objects, arrays, strings, etc.)
-  const renderValue = (value: any): string => {
-    if (value === null || value === undefined) return 'null';
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value);
-      } catch {
-        return String(value);
-      }
-    }
-    return String(value);
-  };
-  
   const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(problemId);
 
   // Load previous code on component mount
@@ -51,79 +24,17 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
       const savedCode = await loadLatestCode();
       if (savedCode) {
         setCode(savedCode);
+        onCodeChange(savedCode);
       }
     };
     loadCode();
-  }, [loadLatestCode]);
-  const { toast } = useToast();
-
-  const handleRun = async () => {
-    setIsRunning(true);
-    setTestResults([]);
-    
-    try {
-      const response = await TestRunnerService.runCode({
-        language: 'python',
-        code: code,
-        testCases: testCases,
-        problemId: problemId  // Pass problemId for dynamic Supabase fetching
-      });
-      
-      setTestResults(response.results);
-      
-      const passedCount = response.results.filter(r => r.passed).length;
-      const totalCount = response.results.length;
-      
-      if (passedCount === totalCount) {
-        toast({
-          title: "All tests passed! 🎉",
-          description: `${passedCount}/${totalCount} test cases passed`,
-        });
-        
-        // Mark problem as solved in database
-        if (user?.id) {
-          console.log('🎯 Marking problem as solved:', {
-            userId: user.id,
-            problemId,
-            difficulty: problemDifficulty
-          });
-          
-          await UserAttemptsService.markProblemSolved(user.id, problemId, code, response.results);
-        }
-        
-        // Update user stats when problem is solved
-        if (onProblemSolved && problemDifficulty) {
-          console.log('📊 Updating stats for difficulty:', problemDifficulty);
-          onProblemSolved(problemDifficulty);
-        }
-      } else {
-        toast({
-          title: "Some tests failed",
-          description: `${passedCount}/${totalCount} test cases passed`,
-          variant: "destructive",
-        });
-      }
-      
-      onRun(code);
-    } catch (error) {
-      toast({
-        title: "Error running code",
-        description: "Please try again",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRunning(false);
-    }
-  };
+  }, [loadLatestCode, onCodeChange]);
 
   const handleCodeChange = (value: string | undefined) => {
     const newCode = value || '';
     setCode(newCode);
+    onCodeChange(newCode);
     saveCode(newCode);
-  };
-
-  const handleSubmit = () => {
-    onSubmit(code);
   };
 
   return (
@@ -154,7 +65,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
           <Button 
             variant="outline" 
             size="sm"
-            onClick={handleRun}
+            onClick={onRun}
             disabled={isRunning}
           >
             <Play className="w-4 h-4 mr-1" />
@@ -162,7 +73,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
           </Button>
           <Button 
             size="sm"
-            onClick={handleSubmit}
+            onClick={onSubmit}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Upload className="w-4 h-4 mr-1" />
@@ -172,7 +83,7 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
       </div>
 
       {/* Code Editor */}
-      <div className="flex-[2] min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <Editor
           height="100%"
           defaultLanguage="python"
@@ -235,87 +146,6 @@ const CodeEditor = ({ initialCode, testCases, problemId, problemDifficulty, onRu
             formatOnType: true,
           }}
         />
-      </div>
-
-      {/* Test Results */}
-      <div className="flex-1 min-h-[200px] border-t border-border overflow-hidden">
-        <div className="p-4 bg-secondary/30 h-full flex flex-col">
-          <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
-          
-          {testResults.length === 0 ? (
-            <div className="font-mono text-sm text-muted-foreground">
-              Click "Run" to test your code...
-            </div>
-          ) : (
-            <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-              {testResults.map((result, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border-2 ${
-                    result.passed 
-                      ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                      : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      {result.passed ? (
-                        <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
-                      ) : (
-                        <X className="w-5 h-5 text-red-600 dark:text-red-400" />
-                      )}
-                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Test Case {index + 1}
-                      </span>
-                      <Badge 
-                        className={`text-xs font-semibold px-3 py-1 ${
-                          result.passed 
-                            ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600' 
-                            : 'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
-                        }`}
-                      >
-                        {result.passed ? '✅ PASSED' : '❌ FAILED'}
-                      </Badge>
-                    </div>
-                    {result.time && (
-                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{result.time}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2 text-sm font-mono bg-white/50 dark:bg-gray-800/50 p-3 rounded-md">
-                    <div className="flex flex-wrap items-start">
-                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Input:</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.input)}</span>
-                    </div>
-                    <div className="flex flex-wrap items-start">
-                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Expected:</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.expected)}</span>
-                    </div>
-                    <div className="flex flex-wrap items-start">
-                      <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Actual:</span>
-                      <span className={`font-medium ml-2 break-all ${
-                        result.passed 
-                          ? 'text-green-700 dark:text-green-300' 
-                          : 'text-red-700 dark:text-red-300'
-                      }`}>
-                        {renderValue(result.actual) || 'No output'}
-                      </span>
-                    </div>
-                    {result.stderr && (
-                      <div className="flex flex-wrap items-start">
-                        <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Error:</span>
-                        <span className="text-red-700 dark:text-red-300 font-medium ml-2 break-all">{result.stderr}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

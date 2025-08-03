@@ -1,11 +1,11 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User, Trash2, Loader2, Mic, MicOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useChatSession } from '@/hooks/useChatSession';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
+import TextareaAutosize from 'react-textarea-autosize';
 
 interface AIChatProps {
   problemId: string;
@@ -84,32 +84,30 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
   };
 
   return (
-    <Card className="h-full flex flex-col border-0 rounded-none shadow-none">
+    <Card className="h-full flex flex-col border-l border-border rounded-none shadow-none">
       {/* Chat Header */}
-      <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Bot className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <div>
-              <div className="font-medium text-foreground">AI Coach</div>
-              <div className="text-xs text-muted-foreground">
-                {loading ? 'Loading chat...' : session ? 'Chat loaded' : 'Online'}
-              </div>
+      <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <Bot className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <div>
+            <div className="font-medium text-foreground">AI Coach</div>
+            <div className="text-xs text-muted-foreground">
+              {loading ? 'Loading chat...' : session ? 'Chat loaded' : 'Online'}
             </div>
           </div>
-          {session && messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearConversation}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
         </div>
+        {session && messages.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearConversation}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       {/* Messages */}
@@ -193,7 +191,7 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
       <div className="flex-shrink-0 p-4 border-t border-border">
         <div className="flex gap-3 items-center">
           <div className="relative flex-1">
-            <textarea
+            <TextareaAutosize
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -203,10 +201,11 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
                 "Ask your AI coach anything..."
               }
               disabled={loading || isTyping}
-              className={`w-full min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                 hasNativeSupport ? 'pr-10' : 'pr-3'
               }`}
-              rows={Math.min(Math.max(input.split('\n').length, 1), 4)}
+              minRows={1}
+              maxRows={6}
             />
             {hasNativeSupport && (
               <button
