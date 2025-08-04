@@ -158,7 +158,7 @@ function parseTestCaseInput(inputString, functionSignature) {
     // Format 1: "nums = [2,7,11,15]\ntarget = 9"
     for (const line of lines) {
       if (line.includes(' = ')) {
-        const [paramName, paramValue] = line.split(' = ');
+        const [paramName, paramValue] = line.split(' = ', 2); // Limit to 2 parts
         const cleanParamName = paramName.trim();
         
         try {
@@ -182,10 +182,22 @@ function parseTestCaseInput(inputString, functionSignature) {
         inputParams[paramName] = JSON.parse(paramValue);
       } catch (e) {
         console.warn(`JSON parse failed for ${paramValue}:`, e.message);
-        // If JSON parsing fails, treat as string
+        // If JSON parsing fails, treat as string (remove quotes if present)
         inputParams[paramName] = paramValue.replace(/^"(.*)"$/, '$1');
       }
     }
+  }
+  
+  // Validate that we have all required parameters
+  console.log('Required params:', params);
+  console.log('Parsed inputParams:', inputParams);
+  const missingParams = params.filter(param => !(param in inputParams));
+  if (missingParams.length > 0) {
+    console.error('Missing parameters:', missingParams);
+    // Try to handle missing parameters by using empty/default values
+    missingParams.forEach(param => {
+      inputParams[param] = "";
+    });
   }
   
   console.log(`Final parsed input parameters:`, inputParams);
@@ -200,6 +212,30 @@ function processPythonCode(userCode, testCases) {
   
   if (needsTyping && !userCode.includes('from typing import')) {
     processedCode = `from typing import List, Dict, Set, Tuple, Optional, Union\n${userCode}`;
+  }
+  
+  // Check if code has methods with 'self' parameter - wrap in Solution class
+  const hasSelfParam = /def\s+\w+\s*\([^)]*self[^)]*\)/.test(userCode);
+  if (hasSelfParam && !userCode.includes('class Solution')) {
+    // Indent all function definitions to be inside Solution class
+    const indentedCode = processedCode
+      .split('\n')
+      .map(line => {
+        // Only indent lines that are function definitions or their content
+        if (line.trim().startsWith('def ') || (line.startsWith('    ') && line.trim() !== '')) {
+          return '    ' + line;
+        } else if (line.trim() === '' || line.startsWith('from ') || line.startsWith('import ')) {
+          return line; // Keep imports and empty lines as-is
+        } else {
+          return '    ' + line; // Indent everything else
+        }
+      })
+      .join('\n');
+    
+    processedCode = `${processedCode.split('\n').filter(line => line.startsWith('from ') || line.startsWith('import ')).join('\n')}
+
+class Solution:
+${indentedCode.split('\n').filter(line => !line.startsWith('from ') && !line.startsWith('import ')).join('\n')}`;
   }
   
   // Extract function name from the code
@@ -235,22 +271,45 @@ function generateTestExecutionCode(functionName, signature, testCases) {
     expected: tc.expected
   }));
   
-  const testCasesJson = JSON.stringify(pythonTestCases, null, 2);
+  // Convert JavaScript booleans to Python booleans in JSON string
+  let testCasesJson = JSON.stringify(pythonTestCases, null, 2);
+  testCasesJson = testCasesJson.replace(/\btrue\b/g, 'True').replace(/\bfalse\b/g, 'False');
   
-  // Extract parameter names from signature
+  // Extract parameter names from signature and filter out 'self'
   const paramMatch = signature.match(/def\s+\w+\s*\(([^)]+)\)/);
-  const params = paramMatch ? paramMatch[1].split(',').map(p => p.split(':')[0].trim()) : [];
+  const params = paramMatch ? paramMatch[1]
+    .split(',')
+    .map(p => p.split(':')[0].trim())
+    .filter(p => p !== 'self') : [];
   
-  // Generate function call based on parameters
+  // Generate function call based on parameters - handle both standalone and method calls
   let functionCall;
-  if (params.length === 1) {
-    functionCall = `${functionName}(tc["${params[0]}"])`;
-  } else if (params.length === 2) {
-    functionCall = `${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
+  
+  // Check if original signature has 'self' parameter
+  const originalSignature = signature;
+  const hasSelfParam = originalSignature.includes('self');
+  
+  if (hasSelfParam) {
+    // If function was defined with 'self', we need to create a class instance and call it as a method
+    const className = 'Solution';
+    if (params.length === 1) {
+      functionCall = `${className}().${functionName}(tc["${params[0]}"])`;
+    } else if (params.length === 2) {
+      functionCall = `${className}().${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
+    } else {
+      const paramList = params.map(p => `tc["${p}"]`).join(', ');
+      functionCall = `${className}().${functionName}(${paramList})`;
+    }
   } else {
-    // Handle multiple parameters dynamically
-    const paramList = params.map(p => `tc["${p}"]`).join(', ');
-    functionCall = `${functionName}(${paramList})`;
+    // Standalone function call
+    if (params.length === 1) {
+      functionCall = `${functionName}(tc["${params[0]}"])`;
+    } else if (params.length === 2) {
+      functionCall = `${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
+    } else {
+      const paramList = params.map(p => `tc["${p}"]`).join(', ');
+      functionCall = `${functionName}(${paramList})`;
+    }
   }
   
   return `

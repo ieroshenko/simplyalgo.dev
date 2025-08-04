@@ -18,7 +18,11 @@ interface CodeEditorProps {
 
 const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isRunning }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
-  const [vimMode, setVimMode] = useState(false);
+  const [vimMode, setVimMode] = useState(() => {
+    // Load vim mode preference from localStorage
+    const saved = localStorage.getItem('editor-vim-mode');
+    return saved === 'true';
+  });
   const { currentTheme, setCurrentTheme, defineCustomThemes } = useEditorTheme();
   const editorRef = useRef<any>(null);
   const vimModeRef = useRef<any>(null);
@@ -42,6 +46,8 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
 
   const handleVimModeToggle = async (enabled: boolean) => {
     setVimMode(enabled);
+    // Persist vim mode preference to localStorage
+    localStorage.setItem('editor-vim-mode', enabled.toString());
     
     if (enabled) {
       await loadVimMode();
@@ -73,12 +79,19 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
     }
   }, [problemId, loadLatestCode]); // Add loadLatestCode as dependency
 
+  // Handle theme changes after editor is mounted
+  useEffect(() => {
+    if (editorRef.current && currentTheme) {
+      // Apply theme change to existing editor
+      editorRef.current.updateOptions({ theme: currentTheme });
+    }
+  }, [currentTheme]);
+
   const handleCodeChange = (value: string | undefined) => {
     const newCode = value || '';
     setCode(newCode);
     onCodeChange(newCode);
     // Re-enable auto-save with proper debouncing
-    console.log('Attempting to save code:', newCode);
     saveCode(newCode);
   };
 
@@ -141,7 +154,14 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
           onChange={handleCodeChange}
           onMount={(editor, monaco) => {
             editorRef.current = editor;
+            
+            // Define custom themes FIRST
             defineCustomThemes(monaco);
+            
+            // Then set the theme if it's a custom one
+            if (currentTheme !== 'light' && currentTheme !== 'vs-dark') {
+              monaco.editor.setTheme(currentTheme);
+            }
             
             // Configure Python settings
             monaco.languages.setLanguageConfiguration('python', {
@@ -151,9 +171,9 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
               }
             });
 
-            // Load vim mode if enabled
+            // Load vim mode if enabled (after editor is fully mounted)
             if (vimMode) {
-              loadVimMode();
+              setTimeout(() => loadVimMode(), 100);
             }
           }}
           theme={currentTheme}

@@ -12,7 +12,18 @@ const themes = {
 };
 
 export const useEditorTheme = () => {
-  const [currentTheme, setCurrentTheme] = useState<EditorTheme>('light');
+  const [currentTheme, setCurrentTheme] = useState<EditorTheme>(() => {
+    // Load theme from localStorage on initialization
+    const saved = localStorage.getItem('editor-theme');
+    const validThemes: EditorTheme[] = ['light', 'vs-dark', 'gruvbox-dark', 'monokai', 'github-dark'];
+    return (saved && validThemes.includes(saved as EditorTheme)) ? (saved as EditorTheme) : 'light';
+  });
+
+  // Persist theme changes to localStorage
+  const setCurrentThemeWithPersistence = (theme: EditorTheme) => {
+    setCurrentTheme(theme);
+    localStorage.setItem('editor-theme', theme);
+  };
 
   const defineCustomThemes = (monaco: any) => {
     // Gruvbox Dark Theme
@@ -93,7 +104,7 @@ export const useEditorTheme = () => {
 
   return {
     currentTheme,
-    setCurrentTheme,
+    setCurrentTheme: setCurrentThemeWithPersistence,
     defineCustomThemes,
     availableThemes: [
       { value: 'light', label: 'Light' },
