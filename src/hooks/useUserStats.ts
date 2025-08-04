@@ -53,14 +53,22 @@ export const useUserStats = (userId?: string) => {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (statsData) {
+        // Validate streak before setting stats
+        const validatedStreak = validateCurrentStreak(statsData);
+        
         setStats({
           totalSolved: statsData.total_solved || 0,
-          streak: statsData.current_streak || 0,
+          streak: validatedStreak,
           easySolved: statsData.easy_solved || 0,
           mediumSolved: statsData.medium_solved || 0,
           hardSolved: statsData.hard_solved || 0,
           maxStreak: statsData.max_streak || 0
         });
+
+        // Update database if streak was broken
+        if (validatedStreak !== (statsData.current_streak || 0)) {
+          await updateStreakInDatabase(validatedStreak);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching user stats:', err.message);
@@ -195,6 +203,42 @@ export const useUserStats = (userId?: string) => {
 
     } catch (err) {
       console.error('❌ Error updating user stats:', err instanceof Error ? err.message : 'Unknown error');
+    }
+  };
+
+  const validateCurrentStreak = (statsData: any): number => {
+    const today = new Date().toISOString().split('T')[0];
+    const lastActivityDate = statsData?.last_activity_date?.split('T')[0];
+    const currentStreak = statsData?.current_streak || 0;
+
+    if (!lastActivityDate) return 0;
+
+    const lastDate = new Date(lastActivityDate);
+    const todayDate = new Date(today);
+    const diffTime = todayDate.getTime() - lastDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Streak is broken if more than 1 day gap
+    if (diffDays > 1) {
+      return 0;
+    }
+
+    return currentStreak;
+  };
+
+  const updateStreakInDatabase = async (newStreak: number) => {
+    if (!userId) return;
+
+    try {
+      await supabase
+        .from('user_statistics')
+        .update({
+          current_streak: newStreak,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+    } catch (error) {
+      console.error('Error updating streak in database:', error);
     }
   };
 

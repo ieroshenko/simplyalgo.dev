@@ -20,13 +20,18 @@ export const useAutoSave = (
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const saveCode = useCallback(async (code: string) => {
-    if (!user?.id || !problemId) return;
+    if (!user?.id || !problemId) {
+      console.log('Cannot save - missing user ID or problem ID:', { userId: user?.id, problemId });
+      return;
+    }
 
+    console.log('Starting save process for:', { userId: user.id, problemId, codeLength: code.length });
     setIsSaving(true);
     setHasUnsavedChanges(false);
 
     try {
-      await UserAttemptsService.saveDraft(user.id, problemId, code);
+      const result = await UserAttemptsService.saveDraft(user.id, problemId, code);
+      console.log('Save successful:', result);
       setLastSaved(new Date());
       onSaveSuccess?.();
     } catch (error) {
@@ -42,19 +47,29 @@ export const useAutoSave = (
     (() => {
       let timeoutId: NodeJS.Timeout;
       return (code: string) => {
+        // Don't try to save if user is not available yet
+        if (!user?.id) {
+          console.log('Skipping save - user not loaded yet');
+          return;
+        }
         setHasUnsavedChanges(true);
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => saveCode(code), debounceMs);
       };
     })(),
-    [saveCode, debounceMs]
+    [saveCode, debounceMs, user?.id]
   );
 
   const loadLatestCode = useCallback(async (): Promise<string | null> => {
-    if (!user?.id || !problemId) return null;
+    if (!user?.id || !problemId) {
+      console.log('Cannot load - missing user ID or problem ID:', { userId: user?.id, problemId });
+      return null;
+    }
 
     try {
+      console.log('Loading latest code for:', { userId: user.id, problemId });
       const attempt = await UserAttemptsService.getLatestAttempt(user.id, problemId);
+      console.log('Loaded attempt:', attempt);
       return attempt?.code || null;
     } catch (error) {
       console.error('Failed to load latest code:', error);

@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Play, Upload, Save, CheckIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useEditorTheme, EditorTheme } from '@/hooks/useEditorTheme';
+import EditorSettings from '@/components/EditorSettings';
 import '@/styles/monaco-theme.css';
 
 interface CodeEditorProps {
@@ -16,24 +18,67 @@ interface CodeEditorProps {
 
 const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isRunning }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
-  const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(problemId);
+  const [vimMode, setVimMode] = useState(false);
+  const { currentTheme, setCurrentTheme, defineCustomThemes } = useEditorTheme();
+  const editorRef = useRef<any>(null);
+  const vimModeRef = useRef<any>(null);
 
-  // Load previous code on component mount
+  const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(problemId, {
+    debounceMs: 3000
+  });
+
+  // Load vim extension dynamically
+  const loadVimMode = async () => {
+    if (typeof window !== 'undefined' && editorRef.current) {
+      try {
+        // You'll need to install: npm install monaco-vim
+        const { initVimMode } = await import('monaco-vim');
+        vimModeRef.current = initVimMode(editorRef.current, document.getElementById('vim-statusbar'));
+      } catch (error) {
+        console.warn('Vim mode not available:', error);
+      }
+    }
+  };
+
+  const handleVimModeToggle = async (enabled: boolean) => {
+    setVimMode(enabled);
+    
+    if (enabled) {
+      await loadVimMode();
+    } else if (vimModeRef.current) {
+      vimModeRef.current.dispose();
+      vimModeRef.current = null;
+    }
+  };
+
+  // Load previous code on component mount - ONLY ONCE
   useEffect(() => {
     const loadCode = async () => {
+      // Wait for user to be available before trying to load saved code
       const savedCode = await loadLatestCode();
-      if (savedCode) {
+      if (savedCode && savedCode.trim() !== initialCode.trim()) {
         setCode(savedCode);
         onCodeChange(savedCode);
+      } else {
+        setCode(initialCode);
       }
     };
-    loadCode();
-  }, [loadLatestCode, onCodeChange]);
+    
+    // Only try to load saved code if we have a user
+    if (loadLatestCode) {
+      loadCode();
+    } else {
+      // If no user context yet, just use initial code
+      setCode(initialCode);
+    }
+  }, [problemId, loadLatestCode]); // Add loadLatestCode as dependency
 
   const handleCodeChange = (value: string | undefined) => {
     const newCode = value || '';
     setCode(newCode);
     onCodeChange(newCode);
+    // Re-enable auto-save with proper debouncing
+    console.log('Attempting to save code:', newCode);
     saveCode(newCode);
   };
 
@@ -44,6 +89,7 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
         <div className="flex items-center space-x-3">
           <span className="text-sm font-medium text-foreground">Python</span>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            {/* Save status */}
             {isSaving && (
               <div className="flex items-center">
                 <Save className="w-3 h-3 mr-1 animate-pulse" />
@@ -62,25 +108,29 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={onRun}
-            disabled={isRunning}
-          >
+          <EditorSettings
+            currentTheme={currentTheme}
+            onThemeChange={setCurrentTheme}
+            vimMode={vimMode}
+            onVimModeChange={handleVimModeToggle}
+          />
+          <Button variant="outline" size="sm" onClick={onRun} disabled={isRunning}>
             <Play className="w-4 h-4 mr-1" />
             {isRunning ? 'Running...' : 'Run'}
           </Button>
-          <Button 
-            size="sm"
-            onClick={onSubmit}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
+          <Button size="sm" onClick={onSubmit}>
             <Upload className="w-4 h-4 mr-1" />
             Submit
           </Button>
         </div>
       </div>
+
+      {/* Vim Status Bar */}
+      {vimMode && (
+        <div id="vim-statusbar" className="h-6 px-4 bg-secondary/50 border-b border-border text-xs flex items-center font-mono">
+          -- INSERT --
+        </div>
+      )}
 
       {/* Code Editor */}
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -90,7 +140,10 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
           value={code}
           onChange={handleCodeChange}
           onMount={(editor, monaco) => {
-            // Configure Python-specific settings
+            editorRef.current = editor;
+            defineCustomThemes(monaco);
+            
+            // Configure Python settings
             monaco.languages.setLanguageConfiguration('python', {
               indentationRules: {
                 increaseIndentPattern: /^\s*(class|def|if|elif|else|for|while|with|try|except|finally|async def).*:$/,
@@ -98,13 +151,12 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
               }
             });
 
-            editor.updateOptions({
-              autoIndent: 'full',
-              formatOnPaste: true,
-              formatOnType: true,
-            });
+            // Load vim mode if enabled
+            if (vimMode) {
+              loadVimMode();
+            }
           }}
-          theme="light"
+          theme={currentTheme}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
@@ -141,9 +193,10 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
             showUnused: false,
             occurrencesHighlight: false,
             selectionHighlight: false,
-            autoIndent: 'full',
-            formatOnPaste: true,
-            formatOnType: true,
+            // Basic editing functionality - keep these minimal
+            autoIndent: 'advanced',
+            formatOnPaste: false,
+            formatOnType: false,
           }}
         />
       </div>

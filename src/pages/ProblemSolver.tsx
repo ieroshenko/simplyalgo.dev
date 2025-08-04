@@ -14,6 +14,7 @@ import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult } from '@/types';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import Timer from '@/components/Timer';
 
 const ProblemSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
@@ -225,18 +226,21 @@ const ProblemSolver = () => {
             </div>
           </div>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleStar}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {problem.isStarred ? (
-              <Star className="w-4 h-4 fill-current" />
-            ) : (
-              <StarOff className="w-4 h-4" />
-            )}
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Timer />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleStar}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {problem.isStarred ? (
+                <Star className="w-4 h-4 fill-current" />
+              ) : (
+                <StarOff className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -180,4 +180,21 @@ export class UserAttemptsService {
 
     return statusMap;
   }
+
+  // Clear all drafts for a specific problem
+  static async clearDraft(userId: string, problemId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('user_problem_attempts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('problem_id', problemId)
+      .eq('status', 'pending');
+
+    if (error) {
+      console.error('Error clearing draft:', error);
+      return false;
+    }
+
+    return true;
+  }
 }
