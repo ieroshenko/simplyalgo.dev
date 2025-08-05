@@ -7,7 +7,7 @@ import ProblemTable from '@/components/ProblemTable';
 import DataStructureVault from '@/components/DataStructureVault';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Target, Search, User } from 'lucide-react';
+import { Clock, Target, Search, User, Trophy, Zap, TrendingUp, Code2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
 import { useUserStats } from '@/hooks/useUserStats';
@@ -17,10 +17,47 @@ const LeetCodeArena = () => {
   const { user, loading: authLoading } = useAuth();
   const { problems, categories: dbCategories, loading: problemsLoading, refetch: refetchProblems } = useProblems(user?.id);
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(() => {
+    // Load selected category from localStorage on initialization
+    const saved = localStorage.getItem('selected-category');
+    console.log('Loading saved category from localStorage:', saved);
+    return saved || undefined;
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
   const categories = ['All', ...dbCategories.map(c => c.name)];
+
+  // Function to handle category selection with persistence
+  const handleCategorySelect = (category: string) => {
+    const categoryValue = category === 'All' ? undefined : category;
+    console.log('Selecting category:', category, 'Value to save:', categoryValue);
+    setSelectedCategory(categoryValue);
+    
+    // Persist to localStorage
+    if (categoryValue) {
+      localStorage.setItem('selected-category', categoryValue);
+      console.log('Saved category to localStorage:', categoryValue);
+    } else {
+      localStorage.removeItem('selected-category');
+      console.log('Removed category from localStorage');
+    }
+  };
+
+  // Validate saved category exists in available categories
+  // Only run validation once categories are fully loaded (more than just "All")
+  useEffect(() => {
+    console.log('Validating category:', selectedCategory);
+    console.log('Available categories:', categories);
+    console.log('Categories loaded:', !problemsLoading, 'Categories count:', categories.length);
+    
+    // Only validate if categories are fully loaded (not just ["All"])
+    if (!problemsLoading && categories.length > 1 && selectedCategory && !categories.includes(selectedCategory)) {
+      // If saved category no longer exists, reset to 'All'
+      console.log('Saved category not found in available categories, resetting to All');
+      setSelectedCategory(undefined);
+      localStorage.removeItem('selected-category');
+    }
+  }, [categories, selectedCategory, problemsLoading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -67,7 +104,7 @@ const LeetCodeArena = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              LeetCode Arena 🥊
+              Leetcode Arena 
             </h1>
             <p className="text-muted-foreground mt-1">
               Master coding patterns and solve problems to sharpen your skills
@@ -97,26 +134,26 @@ const LeetCodeArena = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-4">
+          <Card className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-success-foreground" />
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Trophy className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="text-2xl font-bold text-foreground">{stats.totalSolved}</div>
-                <div className="text-sm text-muted-foreground">Problems Solved</div>
+                <div className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Problems Solved</div>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-accent-foreground" />
+              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Zap className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="text-2xl font-bold text-foreground">{stats.streak}</div>
-                <div className="text-sm text-muted-foreground">Day Streak</div>
+                <div className="text-sm text-orange-700 dark:text-orange-300 font-medium">Day Streak</div>
               </div>
             </div>
           </Card>
@@ -139,7 +176,7 @@ const LeetCodeArena = () => {
                     key={category}
                     variant={selectedCategory === category || (category === 'All' && !selectedCategory) ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedCategory(category === 'All' ? undefined : category)}
+                    onClick={() => handleCategorySelect(category)}
                     className={
                       selectedCategory === category || (category === 'All' && !selectedCategory)
                         ? 'bg-primary text-primary-foreground'

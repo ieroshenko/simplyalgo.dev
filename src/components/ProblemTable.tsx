@@ -8,6 +8,9 @@ import {
   StarOff, 
   Play,
   List,
+  Sparkles,
+  Trophy,
+  Zap,
   Database,
   Layers,
   Hash,
@@ -70,8 +73,8 @@ const ProblemTable = ({ problems, filteredCategory, searchQuery }: ProblemTableP
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'solved': return <CheckCircle2 className="w-4 h-4 text-green-700 fill-green-500" />;
-      case 'attempted': return <Circle className="w-4 h-4 text-orange-500" />;
+      case 'solved': return <Trophy className="w-4 h-4 text-emerald-600 fill-emerald-500" />;
+      case 'attempted': return <Zap className="w-4 h-4 text-orange-500" />;
       default: return <Circle className="w-4 h-4 text-muted-foreground" />;
     }
   };
@@ -109,9 +112,9 @@ const ProblemTable = ({ problems, filteredCategory, searchQuery }: ProblemTableP
                   <td className="px-4 py-3">
                     <button className="hover:scale-110 transition-transform">
                       {problem.isStarred ? (
-                        <Star className="w-4 h-4 text-accent fill-current" />
+                        <Sparkles className="w-4 h-4 text-amber-500 fill-current" />
                       ) : (
-                        <StarOff className="w-4 h-4 text-muted-foreground" />
+                        <Star className="w-4 h-4 text-muted-foreground hover:text-amber-500" />
                       )}
                     </button>
                   </td>

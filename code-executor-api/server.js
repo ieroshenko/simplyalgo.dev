@@ -87,6 +87,15 @@ async function fetchTestCasesFromDB(problemId) {
     console.log(`Found ${testCases.length} test cases`);
     console.log('Raw test cases from DB:', JSON.stringify(testCases, null, 2));
     
+    // Add detailed logging for each test case
+    testCases.forEach((tc, index) => {
+      console.log(`\n=== RAW TEST CASE ${index} ===`);
+      console.log('Raw input string:', JSON.stringify(tc.input));
+      console.log('Raw expected_output string:', JSON.stringify(tc.expected_output));
+      console.log('Type of input:', typeof tc.input);
+      console.log('Type of expected_output:', typeof tc.expected_output);
+    });
+    
     // Convert database format to our expected format
     const formattedTestCases = testCases.map((tc, index) => {
       console.log(`\n--- Processing test case ${index} ---`);
@@ -94,7 +103,9 @@ async function fetchTestCasesFromDB(problemId) {
       console.log('Raw expected_output:', JSON.stringify(tc.expected_output));
       
       // Parse the input string to extract parameters
+      console.log('About to parse input with function signature:', problem.function_signature);
       const inputParams = parseTestCaseInput(tc.input, problem.function_signature);
+      console.log('Parsed input params result:', JSON.stringify(inputParams, null, 2));
       
       // Parse expected output (handle different types)
       let expectedOutput;
@@ -155,16 +166,75 @@ function parseTestCaseInput(inputString, functionSignature) {
   console.log('Has parameter names:', hasParameterNames);
   
   if (hasParameterNames) {
-    // Format 1: "nums = [2,7,11,15]\ntarget = 9"
-    for (const line of lines) {
-      if (line.includes(' = ')) {
-        const [paramName, paramValue] = line.split(' = ', 2); // Limit to 2 parts
-        const cleanParamName = paramName.trim();
+    // Handle both formats:
+    // Format 1a: "nums = [2,7,11,15]\ntarget = 9" (multi-line)
+    // Format 1b: "s = \"anagram\", t = \"nagaram\"" (single line, comma-separated)
+    
+    if (lines.length === 1 && lines[0].includes(',')) {
+      // Single line with comma-separated parameters: "s = \"anagram\", t = \"nagaram\""
+      const line = lines[0];
+      console.log('Parsing single line with comma separation:', line);
+      
+      // Split by comma, but be careful with commas inside quoted strings
+      const parts = [];
+      let current = '';
+      let insideQuotes = false;
+      let escapeNext = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
         
-        try {
-          inputParams[cleanParamName] = JSON.parse(paramValue);
-        } catch {
-          inputParams[cleanParamName] = paramValue.replace(/^"(.*)"$/, '$1');
+        if (escapeNext) {
+          current += char;
+          escapeNext = false;
+        } else if (char === '\\') {
+          current += char;
+          escapeNext = true;
+        } else if (char === '"') {
+          current += char;
+          insideQuotes = !insideQuotes;
+        } else if (char === ',' && !insideQuotes) {
+          parts.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
+      
+      console.log('Split parts:', parts);
+      
+      // Now parse each part as "param = value"
+      for (const part of parts) {
+        if (part.includes(' = ')) {
+          const [paramName, paramValue] = part.split(' = ', 2);
+          const cleanParamName = paramName.trim();
+          const cleanParamValue = paramValue.trim();
+          
+          console.log(`Parsing param: ${cleanParamName} = ${cleanParamValue}`);
+          
+          try {
+            inputParams[cleanParamName] = JSON.parse(cleanParamValue);
+          } catch {
+            // Remove quotes if it's a quoted string
+            inputParams[cleanParamName] = cleanParamValue.replace(/^"(.*)"$/, '$1');
+          }
+        }
+      }
+    } else {
+      // Multi-line format: "nums = [2,7,11,15]\ntarget = 9"
+      for (const line of lines) {
+        if (line.includes(' = ')) {
+          const [paramName, paramValue] = line.split(' = ', 2);
+          const cleanParamName = paramName.trim();
+          
+          try {
+            inputParams[cleanParamName] = JSON.parse(paramValue);
+          } catch {
+            inputParams[cleanParamName] = paramValue.replace(/^"(.*)"$/, '$1');
+          }
         }
       }
     }
@@ -491,10 +561,10 @@ app.post('/execute', async (req, res) => {
       // Compare actual vs expected (both as JSON objects/arrays)
       const passed = JSON.stringify(actualOutput) === JSON.stringify(testCase.expected);
       
-      // Format input display (remove outer braces for cleaner look)
+      // Format input display for better readability
       const inputDisplay = Object.entries(testCase.input)
-        .map(([key, value]) => `"${key}":${JSON.stringify(value)}`)
-        .join(', ');
+        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+        .join('\n');
       
       return {
         input: inputDisplay,

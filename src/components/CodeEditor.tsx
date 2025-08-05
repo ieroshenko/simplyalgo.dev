@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Play, Upload, Save, CheckIcon } from 'lucide-react';
+import { Play, Upload, Save, CheckIcon, Zap, Send, FileCheck } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { useAutoSave } from '@/hooks/useAutoSave';
@@ -104,15 +104,15 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             {/* Save status */}
             {isSaving && (
-              <div className="flex items-center">
+              <div className="flex items-center text-blue-600 dark:text-blue-400">
                 <Save className="w-3 h-3 mr-1 animate-pulse" />
-                Saving...
+                <span className="text-xs font-medium">Saving...</span>
               </div>
             )}
             {!isSaving && lastSaved && (
-              <div className="flex items-center">
-                <CheckIcon className="w-3 h-3 mr-1 text-success" />
-                Saved {new Date(lastSaved).toLocaleTimeString()}
+              <div className="flex items-center text-emerald-600 dark:text-emerald-400">
+                <FileCheck className="w-3 h-3 mr-1" />
+                <span className="text-xs font-medium">Saved {new Date(lastSaved).toLocaleTimeString()}</span>
               </div>
             )}
             {hasUnsavedChanges && !isSaving && (
@@ -127,12 +127,22 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
             vimMode={vimMode}
             onVimModeChange={handleVimModeToggle}
           />
-          <Button variant="outline" size="sm" onClick={onRun} disabled={isRunning}>
-            <Play className="w-4 h-4 mr-1" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onRun} 
+            disabled={isRunning}
+            className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+          >
+            <Zap className="w-4 h-4 mr-1" />
             {isRunning ? 'Running...' : 'Run'}
           </Button>
-          <Button size="sm" onClick={onSubmit}>
-            <Upload className="w-4 h-4 mr-1" />
+          <Button 
+            size="sm" 
+            onClick={onSubmit}
+            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
+          >
+            <Send className="w-4 h-4 mr-1" />
             Submit
           </Button>
         </div>

@@ -101,7 +101,7 @@ export const useUserStats = (userId?: string) => {
     }
   };
 
-  const updateStatsOnProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard') => {
+  const updateStatsOnProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard', problemId: string) => {
     if (!userId) {
       console.error('❌ Cannot update stats: No user ID');
       return;
@@ -109,8 +109,27 @@ export const useUserStats = (userId?: string) => {
 
     console.log('📊 Starting stats update for difficulty:', difficulty);
     console.log('🔍 User ID:', userId);
+    console.log('🎯 Problem ID:', problemId);
 
     try {
+      // First check if user has already solved this problem before
+      const { data: previousSolves, error: solvesError } = await supabase
+        .from('user_problem_attempts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('problem_id', problemId)
+        .eq('status', 'passed');
+
+      if (solvesError) throw solvesError;
+
+      const isFirstTimeSolving = !previousSolves || previousSolves.length === 0;
+      console.log('🎯 Is first time solving this problem:', isFirstTimeSolving);
+
+      if (!isFirstTimeSolving) {
+        console.log('⏭️ User has already solved this problem before, skipping stats update');
+        return;
+      }
+
       // Get current stats
       const { data: currentStats, error: fetchError } = await supabase
         .from('user_statistics')

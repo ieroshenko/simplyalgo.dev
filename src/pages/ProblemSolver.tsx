@@ -182,7 +182,8 @@ const ProblemSolver = () => {
   };
 
   const handleProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard') => {
-    await updateStatsOnProblemSolved(difficulty);
+    if (!problemId) return;
+    await updateStatsOnProblemSolved(difficulty, problemId);
     refetch();
   };
 
@@ -456,80 +457,120 @@ const ProblemSolver = () => {
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={35} minSize={20}>
-                  <div className="h-full bg-background border-t border-border p-4 flex flex-col">
-                    <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+                  <div className="h-full bg-background border-t border-border flex flex-col">
                     {testResults.length === 0 ? (
-                      <div className="font-mono text-sm text-muted-foreground">
-                        Click "Run" to test your code...
+                      <div className="p-4">
+                        <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+                        <div className="font-mono text-sm text-muted-foreground">
+                          Click "Run" to test your code...
+                        </div>
                       </div>
                     ) : (
-                      <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-                        {testResults.map((result, index) => (
-                          <div
-                            key={index}
-                            className={`p-4 rounded-lg border-2 ${
-                              result.passed 
-                                ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                                : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
+                      <Tabs defaultValue="0" className="flex flex-col h-full">
+                        <div className="px-4 pt-4 pb-2">
+                          <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+                          <TabsList className="grid h-10 bg-muted p-1 text-muted-foreground" style={{ gridTemplateColumns: `repeat(${testResults.length}, minmax(0, 1fr))` }}>
+                            {testResults.map((result, index) => (
+                              <TabsTrigger 
+                                key={index}
+                                value={index.toString()}
+                                className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all ${
+                                  result.passed
+                                    ? 'data-[state=active]:bg-green-100 data-[state=active]:text-green-800 dark:data-[state=active]:bg-green-900/20 dark:data-[state=active]:text-green-400'
+                                    : 'data-[state=active]:bg-red-100 data-[state=active]:text-red-800 dark:data-[state=active]:bg-red-900/20 dark:data-[state=active]:text-red-400'
+                                }`}
+                              >
                                 {result.passed ? (
-                                  <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
+                                  <Check className="w-3 h-3" />
                                 ) : (
-                                  <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                  <X className="w-3 h-3" />
                                 )}
-                                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                  Test Case {index + 1}
-                                </span>
-                                <Badge 
-                                  className={`text-xs font-semibold px-3 py-1 ${
-                                    result.passed 
-                                      ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600' 
-                                      : 'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
-                                  }`}
-                                >
-                                  {result.passed ? '✅ PASSED' : '❌ FAILED'}
-                                </Badge>
-                              </div>
-                              {result.time && (
-                                <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{result.time}</span>
+                                <span>Case {index + 1}</span>
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </div>
+                        
+                        <div className="flex-1 overflow-hidden px-4 pb-4">
+                          {testResults.map((result, index) => (
+                            <TabsContent 
+                              key={index}
+                              value={index.toString()}
+                              className="h-full overflow-y-auto mt-0"
+                            >
+                              <div className={`p-4 rounded-lg border-2 h-full ${
+                                result.passed 
+                                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                                  : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+                              }`}>
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center space-x-3">
+                                    {result.passed ? (
+                                      <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
+                                    ) : (
+                                      <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                    )}
+                                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                      Test Case {index + 1}
+                                    </span>
+                                    <Badge 
+                                      className={`text-xs font-semibold px-3 py-1 ${
+                                        result.passed 
+                                          ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600' 
+                                          : 'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
+                                      }`}
+                                    >
+                                      {result.passed ? '✅ PASSED' : '❌ FAILED'}
+                                    </Badge>
+                                  </div>
+                                  {result.time && (
+                                    <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                                      <Clock className="w-4 h-4" />
+                                      <span>{result.time}</span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            
-                            <div className="space-y-2 text-sm font-mono bg-white/50 dark:bg-gray-800/50 p-3 rounded-md">
-                              <div className="flex flex-wrap items-start">
-                                <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Input:</span>
-                                <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.input)}</span>
-                              </div>
-                              <div className="flex flex-wrap items-start">
-                                <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Expected:</span>
-                                <span className="text-gray-900 dark:text-gray-100 font-medium ml-2 break-all">{renderValue(result.expected)}</span>
-                              </div>
-                              <div className="flex flex-wrap items-start">
-                                <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Actual:</span>
-                                <span className={`font-medium ml-2 break-all ${
-                                  result.passed 
-                                    ? 'text-green-700 dark:text-green-300' 
-                                    : 'text-red-700 dark:text-red-300'
-                                }`}>
-                                  {renderValue(result.actual) || 'No output'}
-                                </span>
-                              </div>
-                              {result.stderr && (
-                                <div className="flex flex-wrap items-start">
-                                  <span className="font-semibold text-gray-600 dark:text-gray-300 min-w-[70px]">Error:</span>
-                                  <span className="text-red-700 dark:text-red-300 font-medium ml-2 break-all">{result.stderr}</span>
+                                
+                                <div className="space-y-4">
+                                  <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
+                                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Input:</div>
+                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-all">
+{result.input.split('\n').map((line, i) => (
+  <div key={i}>{line}</div>
+))}
+                                    </pre>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
+                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Expected Output:</div>
+                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-all">{renderValue(result.expected)}</pre>
+                                    </div>
+                                    
+                                    <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
+                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Your Output:</div>
+                                      <pre className={`text-sm font-mono whitespace-pre-wrap break-all ${
+                                        result.passed 
+                                          ? 'text-green-700 dark:text-green-300' 
+                                          : 'text-red-700 dark:text-red-300'
+                                      }`}>
+                                        {renderValue(result.actual) || 'No output'}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                  
+                                  {result.stderr && (
+                                    <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-800">
+                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Error:</div>
+                                      <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">{result.stderr}</pre>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                              </div>
+                            </TabsContent>
+                          ))}
+                        </div>
+                      </Tabs>
                     )}
                   </div>
                 </ResizablePanel>
