@@ -201,50 +201,151 @@ function findCurrentFunctionInsertionPoint(
   cursorPosition?: { line: number; column: number }
 ): number {
   if (!cursorPosition) {
-    // Find the first function and insert at the beginning
+    // Find the first function and insert at the beginning of function body
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].trim().startsWith('def ')) {
-        return i + 1; // Insert after function definition
+        // Look for the first indented line after the function definition (function body)
+        for (let j = i + 1; j < lines.length; j++) {
+          const line = lines[j];
+          if (line.trim() === '') continue; // Skip empty lines
+          
+          // Check if this line is indented (part of function body)
+          const defIndentation = lines[i].match(/^ */)?.[0].length || 0;
+          const lineIndentation = line.match(/^ */)?.[0].length || 0;
+          
+          if (lineIndentation > defIndentation) {
+            // This is the first line of the function body, insert here
+            return j;
+          }
+        }
+        return i + 1; // If no function body found, insert right after def
       }
     }
     return lines.length;
   }
   
-  return cursorPosition.line;
+  // If cursor is provided, find the appropriate insertion point within the current function
+  const currentLine = cursorPosition.line;
+  
+  // Find the function that contains the cursor by looking backwards
+  let functionStartLine = -1;
+  let functionIndentation = 0;
+  
+  for (let i = currentLine; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.startsWith('def ')) {
+      functionStartLine = i;
+      functionIndentation = lines[i].match(/^ */)?.[0].length || 0;
+      break;
+    }
+    // Stop if we hit another function or class at same or lower indentation level
+    if ((line.startsWith('def ') || line.startsWith('class ')) && i !== currentLine) {
+      const lineIndentation = lines[i].match(/^ */)?.[0].length || 0;
+      if (lineIndentation <= functionIndentation) {
+        break;
+      }
+    }
+  }
+  
+  if (functionStartLine === -1) {
+    // Not inside a function, insert at cursor position
+    return currentLine;
+  }
+  
+  // Check if cursor is actually inside the function body
+  const cursorLineIndentation = lines[currentLine].match(/^ */)?.[0].length || 0;
+  if (cursorLineIndentation <= functionIndentation) {
+    // Cursor is not inside function body, insert at cursor position
+    return currentLine;
+  }
+  
+  // Insert at cursor position if we're inside the function
+  return currentLine;
 }
 
 function isInsideFunctionScope(lines: string[], lineNumber: number): boolean {
   // Check if the given line is inside a function
+  let functionStartLine = -1;
+  let functionIndentation = 0;
+  
+  // Look backwards to find the containing function
   for (let i = lineNumber; i >= 0; i--) {
-    const line = lines[i].trim();
-    if (line.startsWith('def ')) {
-      return true;
-    }
-    if (line.startsWith('class ') || (line && !line.startsWith(' ') && !line.startsWith('\t'))) {
-      // Hit class or global level code
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('def ')) {
+      functionStartLine = i;
+      functionIndentation = line.match(/^ */)?.[0].length || 0;
       break;
     }
+    
+    // Stop if we hit a class or global level code at same or lower indentation
+    if (trimmed.startsWith('class ')) {
+      const lineIndentation = line.match(/^ */)?.[0].length || 0;
+      if (lineIndentation <= functionIndentation) {
+        break;
+      }
+    }
   }
-  return false;
+  
+  if (functionStartLine === -1) {
+    return false; // No function found
+  }
+  
+  // Check if current line is actually inside the function body
+  if (lineNumber < lines.length) {
+    const currentLineIndentation = lines[lineNumber].match(/^ */)?.[0].length || 0;
+    return currentLineIndentation > functionIndentation;
+  }
+  
+  return true;
 }
 
 function getFunctionIndentationLevel(lines: string[], lineNumber: number): number {
-  // Find the indentation level inside the current function
+  // Find the function that contains this line
+  let functionStartLine = -1;
+  let functionIndentation = 0;
+  
   for (let i = lineNumber; i >= 0; i--) {
     const line = lines[i];
     if (line.trim().startsWith('def ')) {
-      // Look at the next non-empty line to determine function body indentation
-      for (let j = i + 1; j < lines.length; j++) {
-        const bodyLine = lines[j];
-        if (bodyLine.trim()) {
-          const leadingSpaces = bodyLine.match(/^ */)?.[0].length || 0;
-          return Math.floor(leadingSpaces / 4); // Assuming 4-space indentation
-        }
-      }
-      return 1; // Default to one level inside function
+      functionStartLine = i;
+      functionIndentation = line.match(/^ */)?.[0].length || 0;
+      break;
     }
   }
-  return 0;
+  
+  if (functionStartLine === -1) {
+    // Not inside a function, return current line indentation level
+    if (lineNumber < lines.length) {
+      const currentLine = lines[lineNumber];
+      const indentation = currentLine.match(/^ */)?.[0].length || 0;
+      return Math.floor(indentation / 4);
+    }
+    return 0;
+  }
+  
+  // Look for existing function body to match indentation
+  for (let j = functionStartLine + 1; j < lines.length; j++) {
+    const bodyLine = lines[j];
+    const lineContent = bodyLine.trim();
+    
+    if (lineContent === '') continue; // Skip empty lines
+    
+    const bodyIndentation = bodyLine.match(/^ */)?.[0].length || 0;
+    
+    // If this line is less indented than or equal to function def, we've left the function
+    if (bodyIndentation <= functionIndentation) {
+      break;
+    }
+    
+    // This is a function body line, return its indentation level
+    return Math.floor(bodyIndentation / 4);
+  }
+  
+  // No existing function body found, use standard indentation (1 level more than def line)
+  const standardBodyIndentation = functionIndentation + 4;
+  return Math.floor(standardBodyIndentation / 4);
 }
 
 export function insertCodeSnippet(
@@ -252,7 +353,15 @@ export function insertCodeSnippet(
   snippet: CodeSnippet,
   cursorPosition?: { line: number; column: number }
 ): { newCode: string; newCursorPosition: { line: number; column: number } } {
+  console.log('🔍 Starting code insertion:', {
+    currentCodeLines: currentCode.split('\n').length,
+    snippetType: snippet.insertionHint?.type,
+    cursorPosition
+  });
+
   const insertionPoint = findOptimalInsertionPoint(currentCode, snippet, cursorPosition);
+  console.log('📍 Found insertion point:', insertionPoint);
+  
   const lines = currentCode.split('\n');
   
   // Prepare the snippet with proper indentation
@@ -286,6 +395,14 @@ export function insertCodeSnippet(
   const newCode = newLines.join('\n');
   const newCursorLine = insertionPoint.line + indentedSnippet.length - 1;
   const newCursorColumn = indentedSnippet[indentedSnippet.length - 1].length;
+  
+  console.log('✅ Code insertion complete:', {
+    originalLines: lines.length,
+    newLines: newLines.length,
+    insertedAt: insertionPoint.line,
+    newCursorLine,
+    newCursorColumn
+  });
   
   return {
     newCode,

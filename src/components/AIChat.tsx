@@ -8,6 +8,9 @@ import { useSpeechToText } from '@/hooks/useSpeechToText';
 import TextareaAutosize from 'react-textarea-autosize';
 import { CodeSnippet } from '@/types';
 import CodeSnippetButton from '@/components/CodeSnippetButton';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface AIChatProps {
   problemId: string;
@@ -55,7 +58,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatPr
     setInput('');
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -136,55 +139,120 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatPr
               )}
               <div className={messages.length === 0 ? '' : 'flex-1 space-y-4'}>
                 {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                <div className={`flex space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    message.role === 'user' 
-                      ? 'bg-accent' 
-                      : 'bg-primary'
-                  }`}>
-                    {message.role === 'user' ? (
-                      <User className="w-4 h-4 text-accent-foreground" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-primary-foreground" />
-                    )}
-                  </div>
-                  <div className={`space-y-1 ${message.role === 'user' ? 'text-right' : ''}`}>
-                    <div className={`p-3 rounded-lg ${
-                      message.role === 'user'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-secondary text-foreground'
-                    }`}>
-                      <p className="text-sm">{message.content}</p>
+                  <div key={message.id} className="mb-6">
+                    <div className="flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        message.role === 'user' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-accent text-accent-foreground'
+                      }`}>
+                        {message.role === 'user' ? (
+                          <User className="w-4 h-4" />
+                        ) : (
+                          <Bot className="w-4 h-4" />
+                        )}
+                      </div>
                       
-                      {/* Render code snippet buttons for AI messages */}
-                      {message.role === 'assistant' && message.codeSnippets && message.codeSnippets.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          {message.codeSnippets.map((snippet) => (
-                            <div key={snippet.id} className="bg-black/5 rounded p-2 border-l-2 border-primary/30">
-                              <pre className="text-xs font-mono text-muted-foreground mb-2 overflow-x-auto">
-                                <code>{snippet.code}</code>
-                              </pre>
-                              {onInsertCodeSnippet && (
-                                <CodeSnippetButton
-                                  snippet={snippet}
-                                  onInsert={onInsertCodeSnippet}
-                                />
-                              )}
+                      {/* Message Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {message.role === 'user' ? (
+                            <p className="text-sm whitespace-pre-wrap break-words text-left">{message.content}</p>
+                          ) : (
+                            <div className="text-sm prose prose-sm max-w-none">
+                              <ReactMarkdown
+                                components={{
+                                  code({node, inline, className, children, ...props}: any) {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    return !inline && match ? (
+                                      <SyntaxHighlighter
+                                        style={vscDarkPlus}
+                                        language={match[1]}
+                                        PreTag="div"
+                                        className="rounded-md !mt-2 !mb-2"
+                                        {...props}
+                                      >
+                                        {String(children).replace(/\n$/, '')}
+                                      </SyntaxHighlighter>
+                                    ) : (
+                                      <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                        {children}
+                                      </code>
+                                    );
+                                  },
+                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1">{children}</li>,
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatTime(message.timestamp)}
+                        
+                        {/* Code Snippet Buttons for AI messages */}
+                        {message.role === 'assistant' && message.codeSnippets && message.codeSnippets.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {message.codeSnippets.map((snippet) => (
+                              <div 
+                                key={snippet.id} 
+                                className="bg-card border rounded-lg p-4 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                      {snippet.insertionHint?.type || 'Code'}
+                                    </span>
+                                  </div>
+                                  {onInsertCodeSnippet && (
+                                    <CodeSnippetButton
+                                      snippet={snippet}
+                                      onInsert={onInsertCodeSnippet}
+                                      className="shadow-sm"
+                                    />
+                                  )}
+                                </div>
+                                
+                                <div className="bg-slate-900 rounded-md p-3 mb-3">
+                                  <SyntaxHighlighter
+                                    language={snippet.language}
+                                    style={vscDarkPlus}
+                                    customStyle={{
+                                      margin: 0,
+                                      padding: 0,
+                                      background: 'transparent',
+                                      fontSize: '0.8rem',
+                                    }}
+                                  >
+                                    {snippet.code}
+                                  </SyntaxHighlighter>
+                                </div>
+                                
+                                {snippet.insertionHint?.description && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {snippet.insertionHint.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Timestamp */}
+                        <div className="text-xs text-muted-foreground mt-2 text-left">
+                          {formatTime(message.timestamp)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  </div>
-                </div>
                 ))}
                 
                 {isTyping && (
@@ -216,7 +284,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatPr
             <TextareaAutosize
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder={
                 isListening ? "🎤 Listening..." : 
                 isProcessing ? "🔄 Processing audio..." :

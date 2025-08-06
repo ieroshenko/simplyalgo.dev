@@ -130,56 +130,74 @@ const ProblemSolver = () => {
   };
 
   const handleInsertCodeSnippet = (snippet: CodeSnippet) => {
+    console.log('🔧 Inserting code snippet:', snippet);
+    
     if (!codeEditorRef.current) {
+      console.error('❌ Code editor ref is not available');
       toast.error('Code editor not ready');
       return;
     }
 
     try {
-      // Get current cursor position from Monaco editor
       const editor = codeEditorRef.current;
+      const currentCode = editor.getValue(); // Get live code from Monaco
       const position = editor.getPosition();
+      
       const cursorPosition = {
-        line: position?.lineNumber ? position.lineNumber - 1 : 0, // Monaco is 1-indexed
+        line: position?.lineNumber ? position.lineNumber - 1 : 0,
         column: position?.column || 0
       };
-
-      // Insert the code snippet intelligently
-      const result = insertCodeSnippet(code, snippet, cursorPosition);
       
-      // Update the code in the editor
+      console.log('📍 Current state:', {
+        cursorPosition,
+        currentCodeLength: currentCode.length,
+        snippetType: snippet.insertionHint?.type
+      });
+
+      // Calculate optimal insertion point
+      const result = insertCodeSnippet(currentCode, snippet, cursorPosition);
+      console.log('✨ Insertion result:', result);
+      
+      // Use Monaco's setValue to update the editor directly
+      editor.setValue(result.newCode);
+      
+      // Update our React state to stay in sync
       setCode(result.newCode);
       
-      // Set new cursor position
+      // Set cursor position after a brief delay
       setTimeout(() => {
-        editor.setPosition({
-          lineNumber: result.newCursorPosition.line + 1, // Monaco is 1-indexed
+        const newPosition = {
+          lineNumber: result.newCursorPosition.line + 1,
           column: result.newCursorPosition.column + 1
-        });
+        };
         
-        // Focus the editor
+        editor.setPosition(newPosition);
         editor.focus();
         
-        // Briefly highlight the inserted code
-        const startLine = cursorPosition.line + 1;
-        const endLine = result.newCursorPosition.line + 1;
-        editor.deltaDecorations([], [{
-          range: new (window as any).monaco.Range(startLine, 1, endLine, result.newCursorPosition.column + 1),
+        // Add temporary highlight
+        const decorations = editor.deltaDecorations([], [{
+          range: new (window as any).monaco.Range(
+            Math.max(1, result.newCursorPosition.line - snippet.code.split('\n').length + 2),
+            1,
+            result.newCursorPosition.line + 1,
+            result.newCursorPosition.column + 1
+          ),
           options: {
-            className: 'inserted-code-highlight',
-            isWholeLine: false
+            className: 'inserted-code-highlight'
           }
         }]);
         
         // Remove highlight after 2 seconds
         setTimeout(() => {
-          editor.deltaDecorations(['inserted-code-highlight'], []);
+          editor.deltaDecorations(decorations, []);
         }, 2000);
-      }, 100);
+        
+        console.log('✅ Code insertion completed with highlighting');
+      }, 50);
 
       toast.success('Code snippet inserted successfully!');
     } catch (error) {
-      console.error('Failed to insert code snippet:', error);
+      console.error('❌ Failed to insert code snippet:', error);
       toast.error('Failed to insert code snippet');
     }
   };
