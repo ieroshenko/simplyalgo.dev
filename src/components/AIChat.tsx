@@ -6,13 +6,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useChatSession } from '@/hooks/useChatSession';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import TextareaAutosize from 'react-textarea-autosize';
+import { CodeSnippet } from '@/types';
+import CodeSnippetButton from '@/components/CodeSnippetButton';
 
 interface AIChatProps {
   problemId: string;
   problemDescription: string;
+  onInsertCodeSnippet?: (snippet: CodeSnippet) => void;
 }
 
-const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
+const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { 
@@ -156,6 +159,25 @@ const AIChat = ({ problemId, problemDescription }: AIChatProps) => {
                         : 'bg-secondary text-foreground'
                     }`}>
                       <p className="text-sm">{message.content}</p>
+                      
+                      {/* Render code snippet buttons for AI messages */}
+                      {message.role === 'assistant' && message.codeSnippets && message.codeSnippets.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {message.codeSnippets.map((snippet) => (
+                            <div key={snippet.id} className="bg-black/5 rounded p-2 border-l-2 border-primary/30">
+                              <pre className="text-xs font-mono text-muted-foreground mb-2 overflow-x-auto">
+                                <code>{snippet.code}</code>
+                              </pre>
+                              {onInsertCodeSnippet && (
+                                <CodeSnippetButton
+                                  snippet={snippet}
+                                  onInsert={onInsertCodeSnippet}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {formatTime(message.timestamp)}

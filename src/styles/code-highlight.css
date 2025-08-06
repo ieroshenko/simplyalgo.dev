@@ -1,0 +1,22 @@
+/* Highlight effect for inserted code snippets */
+.inserted-code-highlight {
+  background-color: rgba(34, 197, 94, 0.2) !important; /* green-500 with opacity */
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  animation: fadeHighlight 2s ease-out;
+}
+
+.dark .inserted-code-highlight {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+@keyframes fadeHighlight {
+  0% {
+    background-color: rgba(34, 197, 94, 0.4);
+    border-color: rgba(34, 197, 94, 0.6);
+  }
+  100% {
+    background-color: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.2);
+  }
+}

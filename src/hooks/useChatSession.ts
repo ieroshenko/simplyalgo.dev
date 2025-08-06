@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChatMessage, ChatSession } from '@/types';
+import { ChatMessage, ChatSession, CodeSnippet } from '@/types';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
@@ -86,7 +86,8 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
         timestamp: new Date(msg.created_at),
-        sessionId: msg.session_id
+        sessionId: msg.session_id,
+        codeSnippets: msg.code_snippets || undefined
       }));
 
       setMessages(formattedMessages);
@@ -112,7 +113,8 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
         .insert({
           session_id: session.id,
           role: message.role,
-          content: message.content
+          content: message.content,
+          code_snippets: message.codeSnippets || null
         });
 
       if (error) throw error;
@@ -170,12 +172,18 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
 
       if (error) throw error;
 
+      // Parse AI response with code snippets from LLM analysis
+      const aiResponseContent = data.response;
+      const codeSnippets: CodeSnippet[] | undefined = 
+        data.codeSnippets && Array.isArray(data.codeSnippets) ? data.codeSnippets : undefined;
+
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response,
+        content: aiResponseContent,
         timestamp: new Date(),
-        sessionId: session.id
+        sessionId: session.id,
+        codeSnippets
       };
 
       // Add AI response to UI

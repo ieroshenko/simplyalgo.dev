@@ -42,12 +42,26 @@ export interface User {
   };
 }
 
+export interface CodeSnippet {
+  id: string;
+  code: string;
+  language: string;
+  isValidated: boolean;
+  insertionType: 'smart' | 'cursor' | 'append' | 'prepend' | 'replace';
+  insertionHint?: {
+    type: 'import' | 'variable' | 'function' | 'statement' | 'class';
+    scope: 'global' | 'function' | 'class';
+    description: string;
+  };
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   sessionId?: string;
+  codeSnippets?: CodeSnippet[];
 }
 
 export interface ChatSession {

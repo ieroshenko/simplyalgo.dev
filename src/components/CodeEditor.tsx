@@ -6,6 +6,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useEditorTheme, EditorTheme } from '@/hooks/useEditorTheme';
 import EditorSettings from '@/components/EditorSettings';
 import '@/styles/monaco-theme.css';
+import '@/styles/code-highlight.css';
 
 interface CodeEditorProps {
   initialCode: string;
@@ -14,9 +15,10 @@ interface CodeEditorProps {
   onRun: () => void;
   onSubmit: () => void;
   isRunning: boolean;
+  editorRef?: React.MutableRefObject<any>;
 }
 
-const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isRunning }: CodeEditorProps) => {
+const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isRunning, editorRef: externalEditorRef }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
   const [vimMode, setVimMode] = useState(() => {
     // Load vim mode preference from localStorage
@@ -164,6 +166,9 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
           onChange={handleCodeChange}
           onMount={(editor, monaco) => {
             editorRef.current = editor;
+            if (externalEditorRef) {
+              externalEditorRef.current = editor;
+            }
             
             // Define custom themes FIRST
             defineCustomThemes(monaco);

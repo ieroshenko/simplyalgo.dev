@@ -11,9 +11,10 @@ import { useProblems } from '@/hooks/useProblems';
 import { useUserStats } from '@/hooks/useUserStats';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { TestRunnerService } from '@/services/testRunner';
-import { TestCase, TestResult } from '@/types';
-import { useState, useEffect } from 'react';
+import { TestCase, TestResult, CodeSnippet } from '@/types';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { insertCodeSnippet } from '@/utils/codeInsertion';
 import Timer from '@/components/Timer';
 
 const ProblemSolver = () => {
@@ -26,6 +27,7 @@ const ProblemSolver = () => {
   const [code, setCode] = useState('');
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const codeEditorRef = useRef<any>(null);
   
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
@@ -125,6 +127,61 @@ const ProblemSolver = () => {
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
+  };
+
+  const handleInsertCodeSnippet = (snippet: CodeSnippet) => {
+    if (!codeEditorRef.current) {
+      toast.error('Code editor not ready');
+      return;
+    }
+
+    try {
+      // Get current cursor position from Monaco editor
+      const editor = codeEditorRef.current;
+      const position = editor.getPosition();
+      const cursorPosition = {
+        line: position?.lineNumber ? position.lineNumber - 1 : 0, // Monaco is 1-indexed
+        column: position?.column || 0
+      };
+
+      // Insert the code snippet intelligently
+      const result = insertCodeSnippet(code, snippet, cursorPosition);
+      
+      // Update the code in the editor
+      setCode(result.newCode);
+      
+      // Set new cursor position
+      setTimeout(() => {
+        editor.setPosition({
+          lineNumber: result.newCursorPosition.line + 1, // Monaco is 1-indexed
+          column: result.newCursorPosition.column + 1
+        });
+        
+        // Focus the editor
+        editor.focus();
+        
+        // Briefly highlight the inserted code
+        const startLine = cursorPosition.line + 1;
+        const endLine = result.newCursorPosition.line + 1;
+        editor.deltaDecorations([], [{
+          range: new (window as any).monaco.Range(startLine, 1, endLine, result.newCursorPosition.column + 1),
+          options: {
+            className: 'inserted-code-highlight',
+            isWholeLine: false
+          }
+        }]);
+        
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+          editor.deltaDecorations(['inserted-code-highlight'], []);
+        }, 2000);
+      }, 100);
+
+      toast.success('Code snippet inserted successfully!');
+    } catch (error) {
+      console.error('Failed to insert code snippet:', error);
+      toast.error('Failed to insert code snippet');
+    }
   };
 
   const handleRun = async () => {
@@ -448,6 +505,7 @@ const ProblemSolver = () => {
                 initialCode={problem.functionSignature}
                 problemId={problem.id}
                 onCodeChange={handleCodeChange}
+                editorRef={codeEditorRef}
                 onRun={handleRun}
                 onSubmit={handleSubmit}
                 isRunning={isRunning}
@@ -593,6 +651,7 @@ const ProblemSolver = () => {
               <AIChat 
                 problemId={problem.id}
                 problemDescription={problem.description}
+                onInsertCodeSnippet={handleInsertCodeSnippet}
               />
             </ResizablePanel>
           </>
