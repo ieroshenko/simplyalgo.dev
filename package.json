@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "./scripts/dev-start.sh",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": "cd code-executor-api && npm run dev",
+    "test:ci": "bun run lint && bun run build"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
@@ -64,6 +67,7 @@
     "react-syntax-highlighter": "^15.6.1",
     "react-textarea-autosize": "^8.5.9",
     "recharts": "^2.12.7",
+    "safe-stable-stringify": "^2.5.0",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",

@@ -81,12 +81,13 @@ function smartCompare(actual, expected) {
       const normalizedActual = normalizeArrayOfArrays(actual);
       const normalizedExpected = normalizeArrayOfArrays(expected);
       
-      return JSON.stringify(normalizedActual) === JSON.stringify(normalizedExpected);
+      const result = JSON.stringify(normalizedActual) === JSON.stringify(normalizedExpected);
+      return result;
     }
     
     // For simple arrays, just sort both
-    const sortedActual = [...actual].sort();
-    const sortedExpected = [...expected].sort();
+    const sortedActual = [...actual].sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
+    const sortedExpected = [...expected].sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
     return JSON.stringify(sortedActual) === JSON.stringify(sortedExpected);
   }
   
@@ -217,8 +218,9 @@ function parseTestCaseInput(inputString, functionSignature) {
     // Format 1a: "nums = [2,7,11,15]\ntarget = 9" (multi-line)
     // Format 1b: "s = \"anagram\", t = \"nagaram\"" (single line, comma-separated)
     
-    if (lines.length === 1 && lines[0].includes(',')) {
+    if (lines.length === 1 && lines[0].includes(',') && !lines[0].includes('[') && !lines[0].includes(']')) {
       // Single line with comma-separated parameters: "s = \"anagram\", t = \"nagaram\""
+      // BUT NOT arrays like: "strs = [\"eat\",\"tea\"]"
       const line = lines[0];
       console.log('Parsing single line with comma separation:', line);
       
@@ -481,6 +483,7 @@ app.post('/execute', async (req, res) => {
     
     // Check if this problem requires smart comparison
     const requiresSmartComparison = problemId && SMART_COMPARISON_PROBLEMS.has(problemId);
+    console.log(`🎯 Problem: ${problemId}, Requires smart comparison: ${requiresSmartComparison}`);
     let { testCases } = req.body;
 
     // Validate request
