@@ -16,9 +16,10 @@ interface AIChatProps {
   problemId: string;
   problemDescription: string;
   onInsertCodeSnippet?: (snippet: CodeSnippet) => void;
+  problemTestCases?: unknown[];
 }
 
-const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatProps) => {
+const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { 
@@ -28,7 +29,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet }: AIChatPr
     isTyping, 
     sendMessage, 
     clearConversation 
-  } = useChatSession({ problemId, problemDescription });
+  } = useChatSession({ problemId, problemDescription, problemTestCases });
 
   // Speech-to-text functionality
   const { 

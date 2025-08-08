@@ -47,6 +47,53 @@ const languageMap = {
   csharp: 21,        // C# (.NET Core SDK 3.1.406)
 };
 
+// Problems that require smart comparison (order-independent array comparison)
+const SMART_COMPARISON_PROBLEMS = new Set([
+  'group-anagrams',
+  '3sum',
+  'combination-sum',
+  'generate-parentheses',
+  // Add more problems that return arrays where order doesn't matter
+]);
+
+// Smart comparison function for order-independent arrays
+function smartCompare(actual, expected) {
+  // First try exact comparison
+  if (JSON.stringify(actual) === JSON.stringify(expected)) {
+    return true;
+  }
+  
+  // If both are arrays, try order-independent comparison
+  if (Array.isArray(actual) && Array.isArray(expected)) {
+    if (actual.length !== expected.length) {
+      return false;
+    }
+    
+    // For array of arrays (like group-anagrams), normalize both
+    if (actual.length > 0 && Array.isArray(actual[0])) {
+      // Sort each inner array and then sort the outer array
+      const normalizeArrayOfArrays = (arr) => {
+        return arr
+          .map(innerArr => [...innerArr].sort())
+          .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      };
+      
+      const normalizedActual = normalizeArrayOfArrays(actual);
+      const normalizedExpected = normalizeArrayOfArrays(expected);
+      
+      return JSON.stringify(normalizedActual) === JSON.stringify(normalizedExpected);
+    }
+    
+    // For simple arrays, just sort both
+    const sortedActual = [...actual].sort();
+    const sortedExpected = [...expected].sort();
+    return JSON.stringify(sortedActual) === JSON.stringify(sortedExpected);
+  }
+  
+  // If not arrays, fallback to exact comparison
+  return false;
+}
+
 // Fetch test cases from Supabase database
 async function fetchTestCasesFromDB(problemId) {
   try {
@@ -264,9 +311,11 @@ function parseTestCaseInput(inputString, functionSignature) {
   const missingParams = params.filter(param => !(param in inputParams));
   if (missingParams.length > 0) {
     console.error('Missing parameters:', missingParams);
-    // Try to handle missing parameters by using empty/default values
+    // Try to handle missing parameters with appropriate defaults
     missingParams.forEach(param => {
-      inputParams[param] = "";
+      // Log warning and use null to make the issue more apparent
+      console.warn(`Missing parameter '${param}' - using null as default`);
+      inputParams[param] = null;
     });
   }
   
@@ -429,6 +478,9 @@ app.get('/health', (req, res) => {
 app.post('/execute', async (req, res) => {
   try {
     let { language, code, problemId } = req.body;
+    
+    // Check if this problem requires smart comparison
+    const requiresSmartComparison = problemId && SMART_COMPARISON_PROBLEMS.has(problemId);
     let { testCases } = req.body;
 
     // Validate request
@@ -558,8 +610,10 @@ app.post('/execute', async (req, res) => {
         actualOutput = stdout;
       }
       
-      // Compare actual vs expected (both as JSON objects/arrays)
-      const passed = JSON.stringify(actualOutput) === JSON.stringify(testCase.expected);
+      // Compare actual vs expected with conditional smart comparison
+      const passed = requiresSmartComparison 
+        ? smartCompare(actualOutput, testCase.expected)
+        : JSON.stringify(actualOutput) === JSON.stringify(testCase.expected);
       
       // Format input display for better readability
       const inputDisplay = Object.entries(testCase.input)

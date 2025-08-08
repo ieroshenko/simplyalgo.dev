@@ -29,15 +29,18 @@ export function analyzeCodeContext(code: string): CodeContext {
   let indentationChar = ' ';
   let indentationSize = 4;
   
-  for (const line of lines) {
-    if (line.startsWith('  ') || line.startsWith('\t')) {
-      indentationChar = line.startsWith('\t') ? '\t' : ' ';
+  for (let i = 0; i < lines.length - 1; i++) {
+    const currentLine = lines[i];
+    const nextLine = lines[i + 1];
+    
+    // Look for a line followed by an indented line (e.g., function/class definition)
+    if ((currentLine.trim().endsWith(':')) &&
+        (nextLine.startsWith('  ') || nextLine.startsWith('\t'))) {
+      indentationChar = nextLine.startsWith('\t') ? '\t' : ' ';
       if (indentationChar === ' ') {
-        // Count leading spaces
-        const leadingSpaces = line.match(/^ */)?.[0].length || 0;
-        if (leadingSpaces > 0) {
-          indentationSize = leadingSpaces;
-        }
+        const leadingSpaces = nextLine.match(/^ */)?.[0].length || 0;
+        // For the first level of indentation after a colon
+        indentationSize = leadingSpaces;
       }
       break;
     }
@@ -46,10 +49,17 @@ export function analyzeCodeContext(code: string): CodeContext {
   let currentScope = 'global';
   let indentationLevel = 0;
   let lastLineType: CodeContext['lastLineType'] = 'empty';
-  
+  let lastNonEmptyIndent = 0;
+
   for (const line of lines) {
     const trimmed = line.trim();
-    
+    const currentIndent = line.match(/^ */)?.[0].length || 0;
+
+    // Reset scope when returning to global level
+    if (currentIndent === 0 && trimmed !== '') {
+      currentScope = 'global';
+    }
+
     if (trimmed.startsWith('import ') || trimmed.startsWith('from ')) {
       imports.push(trimmed);
       lastLineType = 'import';
@@ -68,14 +78,19 @@ export function analyzeCodeContext(code: string): CodeContext {
     } else {
       lastLineType = 'statement';
     }
-    
-    // Calculate current indentation level
-    const leadingSpaces = line.match(/^ */)?.[0].length || 0;
-    if (indentationChar === ' ') {
-      indentationLevel = Math.floor(leadingSpaces / indentationSize);
-    } else {
-      indentationLevel = line.match(/^\t*/)?.[0].length || 0;
+
+    // Track last non-empty line's indentation
+    if (trimmed !== '') {
+      lastNonEmptyIndent = currentIndent;
     }
+  }
+
+  // Calculate final indentation level
+  if (indentationChar === ' ' && indentationSize > 0) {
+    indentationLevel = Math.floor(lastNonEmptyIndent / indentationSize);
+  } else {
+    const lastNonEmptyLine = [...lines].reverse().find(l => l.trim() !== '') || '';
+    indentationLevel = lastNonEmptyLine.match(/^\t*/)?.[0].length || 0;
   }
   
   return {
@@ -99,7 +114,8 @@ export function analyzeSnippetType(code: string): CodeSnippet['insertionHint']['
     return 'function';
   } else if (trimmed.startsWith('class ')) {
     return 'class';
-  } else if (trimmed.includes('=') && !trimmed.includes('==') && !trimmed.includes('!=')) {
+  } else if (trimmed.includes('=') && !trimmed.includes('==') && !trimmed.includes('!=')
+             && !trimmed.includes('<=') && !trimmed.includes('>=')) {
     return 'variable';
   } else {
     return 'statement';

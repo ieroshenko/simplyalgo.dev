@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useEditorTheme, EditorTheme } from '@/hooks/useEditorTheme';
 import EditorSettings from '@/components/EditorSettings';
+import { toast } from 'sonner';
 import '@/styles/monaco-theme.css';
 import '@/styles/code-highlight.css';
 
@@ -34,14 +35,26 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
   });
 
   // Load vim extension dynamically
+  // Add a ref for the status bar element
+  const vimStatusbarRef = useRef<HTMLDivElement>(null);
+
   const loadVimMode = async () => {
     if (typeof window !== 'undefined' && editorRef.current) {
       try {
-        // You'll need to install: npm install monaco-vim
         const { initVimMode } = await import('monaco-vim');
-        vimModeRef.current = initVimMode(editorRef.current, document.getElementById('vim-statusbar'));
+        if (vimStatusbarRef.current) {
+          // Dispose existing vim mode if it exists
+          if (vimModeRef.current) {
+            vimModeRef.current.dispose();
+          }
+          vimModeRef.current = initVimMode(editorRef.current, vimStatusbarRef.current);
+          console.log('Vim mode initialized successfully');
+        }
       } catch (error) {
         console.warn('Vim mode not available:', error);
+        toast.error('Failed to load Vim mode');
+        setVimMode(false);
+        localStorage.setItem('editor-vim-mode', 'false');
       }
     }
   };
@@ -88,6 +101,16 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
       editorRef.current.updateOptions({ theme: currentTheme });
     }
   }, [currentTheme]);
+
+  // Cleanup vim mode on unmount
+  useEffect(() => {
+    return () => {
+      if (vimModeRef.current) {
+        vimModeRef.current.dispose();
+        vimModeRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCodeChange = (value: string | undefined) => {
     const newCode = value || '';
@@ -137,22 +160,25 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
             className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
           >
             <Zap className="w-4 h-4 mr-1" />
-            {isRunning ? 'Running...' : 'Run'}
+            {isRunning ? 'Running...' : 'Submit'}
           </Button>
-          <Button 
+          {/* <Button 
             size="sm" 
             onClick={onSubmit}
             className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
           >
             <Send className="w-4 h-4 mr-1" />
             Submit
-          </Button>
+          </Button> */}
         </div>
       </div>
 
       {/* Vim Status Bar */}
       {vimMode && (
-        <div id="vim-statusbar" className="h-6 px-4 bg-secondary/50 border-b border-border text-xs flex items-center font-mono">
+        <div 
+          ref={vimStatusbarRef}
+          className="h-6 px-4 bg-secondary/50 border-b border-border text-xs flex items-center font-mono"
+        >
           -- INSERT --
         </div>
       )}
@@ -188,7 +214,8 @@ const CodeEditor = ({ initialCode, problemId, onCodeChange, onRun, onSubmit, isR
 
             // Load vim mode if enabled (after editor is fully mounted)
             if (vimMode) {
-              setTimeout(() => loadVimMode(), 100);
+              // Give editor more time to fully initialize
+              setTimeout(() => loadVimMode(), 500);
             }
           }}
           theme={currentTheme}

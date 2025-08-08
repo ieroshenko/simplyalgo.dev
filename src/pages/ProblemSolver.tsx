@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import CodeEditor from '@/components/CodeEditor';
 import AIChat from '@/components/AIChat';
+import Notes from '@/components/Notes';
 import { ArrowLeft, Star, StarOff, Copy, Check, X, Clock } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +17,7 @@ import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { insertCodeSnippet } from '@/utils/codeInsertion';
 import Timer from '@/components/Timer';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProblemSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
@@ -129,7 +131,7 @@ const ProblemSolver = () => {
     setCode(newCode);
   };
 
-  const handleInsertCodeSnippet = (snippet: CodeSnippet) => {
+  const handleInsertCodeSnippet = async (snippet: CodeSnippet) => {
     console.log('🔧 Inserting code snippet:', snippet);
     
     if (!codeEditorRef.current) {
@@ -154,8 +156,44 @@ const ProblemSolver = () => {
         snippetType: snippet.insertionHint?.type
       });
 
-      // Calculate optimal insertion point
-      const result = insertCodeSnippet(currentCode, snippet, cursorPosition);
+      // Try backend GPT-assisted insertion first
+      let newCodeFromBackend: string | null = null;
+      let insertedAtLine: number | undefined;
+      try {
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
+          body: {
+            action: 'insert_snippet',
+            code: currentCode,
+            snippet,
+            cursorPosition,
+            problemDescription: problem.description,
+            // Minimal message/context to satisfy backend shape
+            message: '[snippet insertion request]',
+            conversationHistory: []
+          }
+        });
+        if (error) throw error;
+        if (data && typeof data.newCode === 'string') {
+          newCodeFromBackend = data.newCode;
+          insertedAtLine = typeof data.insertedAtLine === 'number' ? data.insertedAtLine : undefined;
+          console.log('🧠 Backend insertion result:', { insertedAtLine });
+        }
+      } catch (e) {
+        console.warn('Backend insert_snippet failed, falling back to local:', e);
+      }
+
+      // Fallback to local insertion if backend failed or did not change code
+      const result = newCodeFromBackend
+        ? {
+            newCode: newCodeFromBackend,
+            newCursorPosition: {
+              line: typeof insertedAtLine === 'number' && insertedAtLine >= 0
+                ? insertedAtLine + (snippet.code.split('\n').length - 1)
+                : cursorPosition.line,
+              column: 0
+            }
+          }
+        : insertCodeSnippet(currentCode, snippet, cursorPosition);
       console.log('✨ Insertion result:', result);
       
       // Use Monaco's setValue to update the editor directly
@@ -265,11 +303,18 @@ const ProblemSolver = () => {
 
   const renderValue = (value: any): string => {
     if (value === null || value === undefined) return 'null';
-    if (typeof value === 'string') return value;
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'string') {
+      // Try to pretty-print if it's JSON-like
+      const trimmed = value.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))){
+        try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { return value; }
+      }
+      return value;
+    }
     if (typeof value === 'object') {
       try {
-        return JSON.stringify(value);
+        return JSON.stringify(value, null, 2);
       } catch {
         return String(value);
       }
@@ -477,32 +522,7 @@ const ProblemSolver = () => {
                     </TabsContent>
 
                     <TabsContent value="notes" className="p-6 m-0 h-full overflow-y-auto flex flex-col">
-                      <div className="flex-1 flex flex-col">
-                        <h2 className="text-lg font-semibold text-foreground mb-4">Notes</h2>
-                        <div className="bg-muted/50 rounded-lg p-4 flex-1 min-h-[400px] flex">
-                          <textarea
-                            className="w-full h-full bg-transparent border-none outline-none resize-none text-sm flex-1"
-                            placeholder="Start writing your notes in Markdown...
-
-# Heading
-**Bold text**
-*Italic text*
-`code`
-- List item
-[Link](url)"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="text-xs text-muted-foreground">
-                            0 / 5000 characters • 0 words
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">Preview</Button>
-                            <Button variant="outline" size="sm">Save</Button>
-                            <Button variant="outline" size="sm">Clear</Button>
-                          </div>
-                        </div>
-                      </div>
+                      <Notes problemId={problemId} />
                     </TabsContent>
                   </div>
                 </Tabs>
@@ -610,22 +630,20 @@ const ProblemSolver = () => {
                                 <div className="space-y-4">
                                   <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
                                     <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Input:</div>
-                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-all">
-{result.input.split('\n').map((line, i) => (
-  <div key={i}>{line}</div>
-))}
+                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
+{result.input}
                                     </pre>
                                   </div>
                                   
                                   <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
                                       <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Expected Output:</div>
-                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-all">{renderValue(result.expected)}</pre>
+                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">{renderValue(result.expected)}</pre>
                                     </div>
                                     
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
                                       <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Your Output:</div>
-                                      <pre className={`text-sm font-mono whitespace-pre-wrap break-all ${
+                                      <pre className={`text-sm font-mono whitespace-pre overflow-x-auto ${
                                         result.passed 
                                           ? 'text-green-700 dark:text-green-300' 
                                           : 'text-red-700 dark:text-red-300'
@@ -670,6 +688,7 @@ const ProblemSolver = () => {
                 problemId={problem.id}
                 problemDescription={problem.description}
                 onInsertCodeSnippet={handleInsertCodeSnippet}
+                problemTestCases={problem.testCases}
               />
             </ResizablePanel>
           </>

@@ -4,12 +4,51 @@ import { ChatMessage, ChatSession, CodeSnippet } from '@/types';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
+// --- Code snippet dedup helpers ---
+const normalizeSnippet = (s: CodeSnippet): string => {
+  const type = s.insertionHint?.type || '';
+  const scope = s.insertionHint?.scope || '';
+  const code = (s.code || '').replace(/\s+/g, ' ').trim();
+  return `${type}|${scope}|${code}`;
+};
+
+const getSeenSnippetKeys = (existingMessages: ChatMessage[]): Set<string> => {
+  const seen = new Set<string>();
+  for (const m of existingMessages) {
+    if (Array.isArray(m.codeSnippets)) {
+      for (const s of m.codeSnippets) {
+        seen.add(normalizeSnippet(s));
+      }
+    }
+  }
+  return seen;
+};
+
+const dedupeSnippets = (
+  incoming: CodeSnippet[] | undefined,
+  existingMessages: ChatMessage[]
+): CodeSnippet[] | undefined => {
+  if (!incoming || incoming.length === 0) return undefined;
+  const seen = getSeenSnippetKeys(existingMessages);
+  const unique: CodeSnippet[] = [];
+  for (const s of incoming) {
+    if (!s?.isValidated) continue; // guard and ensure only validated snippets
+    const key = normalizeSnippet(s);
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(s);
+    }
+  }
+  return unique.length ? unique : undefined;
+};
+
 interface UseChatSessionProps {
   problemId: string;
   problemDescription: string;
+  problemTestCases?: unknown[];
 }
 
-export const useChatSession = ({ problemId, problemDescription }: UseChatSessionProps) => {
+export const useChatSession = ({ problemId, problemDescription, problemTestCases }: UseChatSessionProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [session, setSession] = useState<ChatSession | null>(null);
@@ -166,7 +205,8 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
         body: {
           message: content,
           problemDescription,
-          conversationHistory
+          conversationHistory,
+          testCases: problemTestCases
         }
       });
 
@@ -174,8 +214,10 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
 
       // Parse AI response with code snippets from LLM analysis
       const aiResponseContent = data.response;
-      const codeSnippets: CodeSnippet[] | undefined = 
+      const rawSnippets: CodeSnippet[] | undefined =
         data.codeSnippets && Array.isArray(data.codeSnippets) ? data.codeSnippets : undefined;
+      // Dedupe snippets against entire session and within this response
+      const dedupedSnippets = dedupeSnippets(rawSnippets, messages);
 
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -183,7 +225,7 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
         content: aiResponseContent,
         timestamp: new Date(),
         sessionId: session.id,
-        codeSnippets
+        codeSnippets: dedupedSnippets
       };
 
       // Add AI response to UI
@@ -202,7 +244,7 @@ export const useChatSession = ({ problemId, problemDescription }: UseChatSession
     } finally {
       setIsTyping(false);
     }
-  }, [session, messages, problemDescription, isTyping, saveMessage, toast]);
+  }, [session, messages, problemDescription, problemTestCases, isTyping, saveMessage, toast]);
 
   // Clear conversation
   const clearConversation = useCallback(async () => {

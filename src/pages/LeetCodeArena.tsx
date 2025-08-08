@@ -20,7 +20,6 @@ const LeetCodeArena = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(() => {
     // Load selected category from localStorage on initialization
     const saved = localStorage.getItem('selected-category');
-    console.log('Loading saved category from localStorage:', saved);
     return saved || undefined;
   });
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,34 +29,30 @@ const LeetCodeArena = () => {
   // Function to handle category selection with persistence
   const handleCategorySelect = (category: string) => {
     const categoryValue = category === 'All' ? undefined : category;
-    console.log('Selecting category:', category, 'Value to save:', categoryValue);
     setSelectedCategory(categoryValue);
     
     // Persist to localStorage
     if (categoryValue) {
       localStorage.setItem('selected-category', categoryValue);
-      console.log('Saved category to localStorage:', categoryValue);
     } else {
       localStorage.removeItem('selected-category');
-      console.log('Removed category from localStorage');
     }
   };
 
   // Validate saved category exists in available categories
   // Only run validation once categories are fully loaded (more than just "All")
   useEffect(() => {
-    console.log('Validating category:', selectedCategory);
-    console.log('Available categories:', categories);
-    console.log('Categories loaded:', !problemsLoading, 'Categories count:', categories.length);
-    
     // Only validate if categories are fully loaded (not just ["All"])
-    if (!problemsLoading && categories.length > 1 && selectedCategory && !categories.includes(selectedCategory)) {
-      // If saved category no longer exists, reset to 'All'
-      console.log('Saved category not found in available categories, resetting to All');
+    if (
+      !problemsLoading &&
+      categories.length > 1 &&
+      selectedCategory &&
+      !categories.includes(selectedCategory)
+    ) {
       setSelectedCategory(undefined);
       localStorage.removeItem('selected-category');
     }
-  }, [categories, selectedCategory, problemsLoading]);
+  }, [dbCategories, selectedCategory, problemsLoading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
