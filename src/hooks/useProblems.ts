@@ -45,7 +45,7 @@ export const useProblems = (userId?: string) => {
   const fetchProblems = async () => {
     try {
       // Fetch problems with category names and user attempt data
-      let query = supabase
+      const query = supabase
         .from('problems')
         .select(`
           *,

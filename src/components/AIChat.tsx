@@ -22,6 +22,33 @@ interface AIChatProps {
 const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Function to clean mathematical notation in message content
+  const cleanMathNotation = (content: string): string => {
+    if (typeof content !== 'string') return String(content);
+    
+    // Guard: don't process content that contains backticks (code blocks/inline code)
+    if (/`/.test(content)) {
+      return content;
+    }
+    
+    return content
+      // Clean LaTeX notation
+      .replace(/\\cdot/g, '·')
+      .replace(/\\log/g, 'log')
+      .replace(/\\times/g, '×')
+      .replace(/\\le/g, '≤')
+      .replace(/\\ge/g, '≥')
+      .replace(/\\ne/g, '≠')
+      .replace(/\\infty/g, '∞')
+      // Clean up escaped parentheses
+      .replace(/\\\(/g, '(')
+      .replace(/\\\)/g, ')')
+      // Remove extra backslashes
+      .replace(/\s*\\\s*/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
   const { 
     session, 
     messages, 
@@ -168,7 +195,12 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                             <div className="text-sm prose prose-sm max-w-none">
                               <ReactMarkdown
                                 components={{
-                                  code({node, inline, className, children, ...props}: any) {
+                                  code({inline, className, children, ...props}: {
+                                    inline?: boolean;
+                                    className?: string;
+                                    children?: React.ReactNode;
+                                    [key: string]: unknown;
+                                  }) {
                                     const match = /language-(\w+)/.exec(className || '');
                                     return !inline && match ? (
                                       <SyntaxHighlighter
@@ -186,13 +218,49 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                       </code>
                                     );
                                   },
-                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                                  ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                                  li: ({children}) => <li className="mb-1">{children}</li>,
+                                  p: ({children}) => (
+                                    <p className="mb-2 last:mb-0 leading-relaxed text-left">
+                                      {children}
+                                    </p>
+                                  ),
+                                  ul: ({children}) => (
+                                    <ul className="list-disc list-inside mb-3 space-y-1 pl-2">
+                                      {children}
+                                    </ul>
+                                  ),
+                                  ol: ({children}) => (
+                                    <ol className="list-decimal mb-3 pl-4">
+                                      {children}
+                                    </ol>
+                                  ),
+                                  li: ({children}) => (
+                                    <li className="mb-1 text-left leading-relaxed">
+                                      {children}
+                                    </li>
+                                  ),
+                                  strong: ({children}) => (
+                                    <strong className="font-semibold text-foreground">{children}</strong>
+                                  ),
+                                  em: ({children}) => (
+                                    <em className="italic text-muted-foreground">{children}</em>
+                                  ),
+                                  h1: ({children}) => (
+                                    <h1 className="text-lg font-bold mb-3 mt-4 text-left first:mt-0">{children}</h1>
+                                  ),
+                                  h2: ({children}) => (
+                                    <h2 className="text-base font-bold mb-2 mt-3 text-left first:mt-0">{children}</h2>
+                                  ),
+                                  h3: ({children}) => (
+                                    <h3 className="text-sm font-bold mb-2 mt-2 text-left first:mt-0">{children}</h3>
+                                  ),
+                                  blockquote: ({children}) => (
+                                    <blockquote className="border-l-4 border-primary pl-4 py-2 my-3 bg-muted/30 italic rounded-r-md">
+                                      {children}
+                                    </blockquote>
+                                  ),
                                 }}
                               >
-                                {message.content}
+                                {cleanMathNotation(message.content)}
                               </ReactMarkdown>
                             </div>
                           )}

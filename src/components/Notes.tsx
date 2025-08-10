@@ -131,6 +131,7 @@ const Notes = ({ problemId }: NotesProps) => {
   // Cleanup debounced function
   useEffect(() => {
     return () => {
+      debouncedSave.flush();
       debouncedSave.cancel();
     };
   }, [debouncedSave]);
