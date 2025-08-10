@@ -20,7 +20,7 @@ import { useSubmissions } from '@/hooks/useSubmissions';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult, CodeSnippet } from '@/types';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { insertCodeSnippet } from '@/utils/codeInsertion';
 import Timer from '@/components/Timer';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,15 +36,7 @@ const ProblemSolver = () => {
   const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState('question');
   
-  // Debug scroll area
-  useEffect(() => {
-    if (activeTab === 'solution') {
-      setTimeout(() => {
-        const scrollArea = document.querySelector('[data-radix-scroll-area-viewport]');
-        const contentDiv = scrollArea?.querySelector('div[style*="blue"]');
-      }, 100);
-    }
-  }, [activeTab]);
+  
   const [code, setCode] = useState('');
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -86,7 +78,7 @@ const ProblemSolver = () => {
         try { 
           const parsed = JSON.parse(trimmed);
           const result = safeStableStringify(parsed);
-          return result.replace(/": /g, '":').replace(/, "/g, ',"');
+          return result;
         } catch { 
           return trimmed; 
         }
@@ -95,7 +87,7 @@ const ProblemSolver = () => {
     }
     try {
       const result = safeStableStringify(value);
-      return result.replace(/": /g, '":').replace(/, "/g, ',"');
+      return result;
     } catch {
       try { 
         return JSON.stringify(value); 
@@ -153,19 +145,17 @@ const ProblemSolver = () => {
   const problem = problems.find(p => p.id === problemId);
 
   // Deduplicate submissions by code content, keeping the most recent for each unique solution
-  const uniqueSubmissions = (() => {
-    // Sort newest first by created_at
+  const uniqueSubmissions = useMemo(() => {
     const sorted = [...(submissions || [])].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-    // Keep only the first (newest) for each unique trimmed code
-    const byCode = new Map<string, typeof submissions[number]>();
+    const byCode = new Map<string, NonNullable<typeof submissions>[number]>();
     for (const s of sorted) {
       const key = s.code.trim();
       if (!byCode.has(key)) byCode.set(key, s);
     }
     return Array.from(byCode.values());
-  })();
+  }, [submissions]);
   
   if (loading) {
     return (
