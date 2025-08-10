@@ -8,6 +8,10 @@ export interface UserAttempt {
   status: 'pending' | 'passed' | 'failed' | 'error';
   created_at: string;
   updated_at: string;
+  test_results?: any;
+  execution_time?: number;
+  memory_usage?: number;
+  language?: string;
 }
 
 export class UserAttemptsService {
@@ -196,5 +200,23 @@ export class UserAttemptsService {
     }
 
     return true;
+  }
+
+  // Get all accepted submissions for a specific problem
+  static async getAcceptedSubmissions(userId: string, problemId: string): Promise<UserAttempt[]> {
+    const { data, error } = await supabase
+      .from('user_problem_attempts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('problem_id', problemId)
+      .eq('status', 'passed')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching accepted submissions:', error);
+      return [];
+    }
+
+    return data || [];
   }
 }

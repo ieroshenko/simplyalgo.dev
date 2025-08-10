@@ -111,14 +111,14 @@ Respond naturally and conversationally. Focus on teaching and guiding rather tha
     messages: [
       {
         role: "system",
-        content: "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. The student's code is auto-run on Judge0 with official tests; avoid asking them to run tests or provide test cases. Only after a likely-correct solution, ask one follow-up on time/space complexity."
+        content: "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. Testing is handled automatically by Judge0 with official test cases — never ask the student to run tests, write tests, or provide test cases. You may discuss potential edge cases conceptually. Only after a likely-correct solution, ask one follow-up on time/space complexity."
       },
       {
         role: "user",
         content: conversationPrompt
       }
     ],
-    temperature: 0.7,
+    temperature: 0.5,
     max_tokens: 500
   });
 
@@ -137,10 +137,11 @@ async function analyzeCodeSnippets(
   // Only analyze if message clearly indicates code intent
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
   const explicitAsk = /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(message);
-  const looksLikeCode = /(^(\s*)(def|class)\s+\w+|^(\s*)\w+\s*=\s*.+|\b\w+\(.*\)|\bfrom\b\s+\w+\s+\bimport\b)/m.test(message);
+  const looksLikeCode = /^(\s*)(def|class)\s+\w+|^(\s*)\w+\s*=\s*.+|\b\w+\(.*\)|\bfrom\b\s+\w+\s+\bimport\b/m.test(message);
   const lastAssistant = (conversationHistory || []).slice().reverse().find(m => m.role === 'assistant')?.content?.trim() || '';
   const assistantJustAskedQuestion = /\?\s*$/.test(lastAssistant);
 
+  // Gate strictly: only if the user pasted code, explicitly asked, or message looks like code
   const allowAnalysis = hasExplicitCode || explicitAsk || looksLikeCode;
   if (!allowAnalysis || (assistantJustAskedQuestion && !hasExplicitCode)) {
     return [];
@@ -215,7 +216,7 @@ Student: "Maybe if char in seen:"
 Response: Provide complete conditional logic with proper indentation
 
 Student: "Two pointers approach?"
-Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer initialization), but avoid full solutions unless explicitly requested.`;
+Respond with conceptual guidance only unless the student explicitly asks for code or pastes code.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -257,6 +258,11 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
       const c = snippet.code.trim();
       const incompleteHeader = /^(for\s+\w+\s+in\s+\w+\s*:\s*$)|(if\s+.+:\s*$)|(while\s+.+:\s*$)/.test(c);
       return !incompleteHeader;
+    }).filter(snippet => {
+      // Drop import suggestions unless the user explicitly asked about imports
+      const isImportSnippet = (snippet.insertionHint?.type === 'import') || /^\s*(from\s+\S+\s+import\s+\S+|import\s+\S+)/.test(snippet.code);
+      const explicitImportAsk = /\b(import|from\s+\w+\s+import|how\s+to\s+import)\b/i.test(message);
+      return !isImportSnippet || explicitImportAsk;
     });
 
     // Dedupe within the same response

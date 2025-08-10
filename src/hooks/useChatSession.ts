@@ -9,7 +9,9 @@ const normalizeSnippet = (s: CodeSnippet): string => {
   const type = s.insertionHint?.type || '';
   const scope = s.insertionHint?.scope || '';
   const code = (s.code || '').replace(/\s+/g, ' ').trim();
-  return `${type}|${scope}|${code}`;
+  const language = (s.language || '').toLowerCase();
+  const insertionType = (s.insertionType || '').toString().toLowerCase();
+  return `${language}|${insertionType}|${type}|${scope}|${code}`;
 };
 
 const getSeenSnippetKeys = (existingMessages: ChatMessage[]): Set<string> => {
@@ -216,8 +218,25 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
       const aiResponseContent = data.response;
       const rawSnippets: CodeSnippet[] | undefined =
         data.codeSnippets && Array.isArray(data.codeSnippets) ? data.codeSnippets : undefined;
+
+      // Gate snippet visibility: only when user explicitly asks for code or pasted code
+      const lastUserMsg = content;
+      const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(lastUserMsg);
+      const explicitAsk = /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(lastUserMsg);
+      const allowSnippets = hasExplicitCode || explicitAsk;
+
       // Dedupe snippets against entire session and within this response
-      const dedupedSnippets = dedupeSnippets(rawSnippets, messages);
+      let dedupedSnippets = allowSnippets ? dedupeSnippets(rawSnippets, messages) : undefined;
+
+      // Additional guard: drop import suggestions unless the user explicitly asked about imports
+      const explicitImportAsk = /\b(import|from\s+\w+\s+import|how\s+to\s+import)\b/i.test(lastUserMsg);
+      if (dedupedSnippets && !explicitImportAsk) {
+        dedupedSnippets = dedupedSnippets.filter(s => {
+          const isImport = (s.insertionHint?.type === 'import') || /^(\s*)(from\s+\S+\s+import\s+\S+|import\s+\S+)/.test(s.code || '');
+          return !isImport;
+        });
+        if (dedupedSnippets.length === 0) dedupedSnippets = undefined;
+      }
 
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),

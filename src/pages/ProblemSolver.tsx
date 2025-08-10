@@ -5,19 +5,26 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import CodeEditor from '@/components/CodeEditor';
 import AIChat from '@/components/AIChat';
 import Notes from '@/components/Notes';
-import { ArrowLeft, Star, StarOff, Copy, Check, X, Clock } from 'lucide-react';
+import { ArrowLeft, Star, StarOff, Copy, Check, X, Clock, Calendar } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import safeStableStringify from 'safe-stable-stringify';
+import { useTheme } from '@/hooks/useTheme';
+import { pythonSolutions, Solution } from '@/data/pythonSolutions';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useProblems } from '@/hooks/useProblems';
 import { useUserStats } from '@/hooks/useUserStats';
+import { useSubmissions } from '@/hooks/useSubmissions';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult, CodeSnippet } from '@/types';
-import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { insertCodeSnippet } from '@/utils/codeInsertion';
 import Timer from '@/components/Timer';
 import { supabase } from '@/integrations/supabase/client';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const ProblemSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
@@ -25,11 +32,22 @@ const ProblemSolver = () => {
   const { user } = useAuth();
   const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
+  const { submissions, loading: submissionsLoading, refetch: refetchSubmissions } = useSubmissions(user?.id, problemId);
+  const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState('question');
+  
+  
   const [code, setCode] = useState('');
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const codeEditorRef = useRef<any>(null);
+  const codeEditorRef = useRef<{
+    getValue: () => string;
+    setValue: (value: string) => void;
+    getPosition: () => any;
+    setPosition: (position: any) => void;
+    focus: () => void;
+    deltaDecorations: (oldDecorations: string[], newDecorations: any[]) => string[];
+  } | null>(null);
   
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
@@ -50,6 +68,33 @@ const ProblemSolver = () => {
     const newValue = !showLeftPanel;
     setShowLeftPanel(newValue);
     localStorage.setItem('showLeftPanel', JSON.stringify(newValue));
+  };
+
+  // Compact JSON formatter for single-line array/object display with circular reference protection
+  const toCompactJson = (value: any): string => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try { 
+          const parsed = JSON.parse(trimmed);
+          const result = safeStableStringify(parsed);
+          return result;
+        } catch { 
+          return trimmed; 
+        }
+      }
+      return JSON.stringify(value);
+    }
+    try {
+      const result = safeStableStringify(value);
+      return result;
+    } catch {
+      try { 
+        return JSON.stringify(value); 
+      } catch { 
+        return String(value); 
+      }
+    }
   };
 
   const toggleBottomPanel = () => {
@@ -95,9 +140,22 @@ const ProblemSolver = () => {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showLeftPanel, showBottomPanel, showRightPanel]);
+  }, [toggleLeftPanel, toggleBottomPanel, toggleRightPanel]);
   
   const problem = problems.find(p => p.id === problemId);
+
+  // Deduplicate submissions by code content, keeping the most recent for each unique solution
+  const uniqueSubmissions = useMemo(() => {
+    const sorted = [...(submissions || [])].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const byCode = new Map<string, NonNullable<typeof submissions>[number]>();
+    for (const s of sorted) {
+      const key = s.code.trim();
+      if (!byCode.has(key)) byCode.set(key, s);
+    }
+    return Array.from(byCode.values());
+  }, [submissions]);
   
   if (loading) {
     return (
@@ -262,6 +320,8 @@ const ProblemSolver = () => {
         toast.success('All tests passed! 🎉');
         await UserAttemptsService.markProblemSolved(user.id, problem.id, code, response.results);
         await handleProblemSolved(problem.difficulty as 'Easy' | 'Medium' | 'Hard');
+        // Refetch submissions to show the new accepted solution
+        await refetchSubmissions();
       } else {
         toast.error(`${passedCount}/${totalCount} test cases passed`);
       }
@@ -304,14 +364,16 @@ const ProblemSolver = () => {
   const renderValue = (value: any): string => {
     if (value === null || value === undefined) return 'null';
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    if (typeof value === 'string') {
-      // Try to pretty-print if it's JSON-like
-      const trimmed = value.trim();
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))){
-        try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { return value; }
+    
+    // Handle arrays and objects directly for pretty printing
+    if (Array.isArray(value)) {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
       }
-      return value;
     }
+    
     if (typeof value === 'object') {
       try {
         return JSON.stringify(value, null, 2);
@@ -319,7 +381,82 @@ const ProblemSolver = () => {
         return String(value);
       }
     }
+    
+    if (typeof value === 'string') {
+      // Try to pretty-print if it's JSON-like
+      const trimmed = value.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))){
+        try { 
+          const parsed = JSON.parse(trimmed);
+          return JSON.stringify(parsed, null, 2); 
+        } catch { 
+          return value; 
+        }
+      }
+      return value;
+    }
+    
     return String(value);
+  };
+
+  // Human-friendly formatter (not strict JSON):
+  // - Strings are shown without quotes
+  // - Arrays render as [ a, b ] or multi-line for nested arrays
+  // - Objects render as { key: value }
+  const toHumanReadable = (value: any, indent = 0): string => {
+    const pad = (n: number) => ' '.repeat(n);
+
+    // If value is a JSON-like string, parse then format recursively
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const looksJson =
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed === 'null' || trimmed === 'true' || trimmed === 'false');
+      if (looksJson) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return toHumanReadable(parsed, indent);
+        } catch {
+          // fall through to scalar formatting
+        }
+      }
+    }
+
+    const needsQuotes = (s: string): boolean => {
+      return s === '' || /[\s,[\]{}:]/.test(s);
+    };
+
+    const formatScalar = (v: any): string => {
+      if (v === null || v === undefined) return 'null';
+      const t = typeof v;
+      if (t === 'number' || t === 'boolean') return String(v);
+      if (t === 'string') return needsQuotes(v) ? `"${v}"` : v;
+      return String(v);
+    };
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      const complex = value.some((el) => Array.isArray(el) || (el && typeof el === 'object'));
+      if (complex) {
+        const inner = value
+          .map((el) => `${pad(indent + 2)}${toHumanReadable(el, indent + 2)}`)
+          .join(',\n');
+        return `[\n${inner}\n${pad(indent)}]`;
+      }
+      const inner = value.map((el) => formatScalar(el)).join(', ');
+      return `[ ${inner} ]`;
+    }
+
+    if (value && typeof value === 'object') {
+      const keys = Object.keys(value).sort();
+      if (keys.length === 0) return '{}';
+      const lines = keys.map((k) => `${pad(indent + 2)}${k}: ${toHumanReadable((value as any)[k], indent + 2)}`);
+      return `{\n${lines.join('\n')}\n${pad(indent)}}`;
+    }
+
+    return formatScalar(value);
   };
 
   return (
@@ -371,8 +508,8 @@ const ProblemSolver = () => {
         {showLeftPanel && (
           <>
             <ResizablePanel defaultSize={35} minSize={25}>
-              <div className="h-full flex flex-col">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+              <div className="h-full min-h-0 flex flex-col">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
                   <div className="border-b border-border">
                     <TabsList className="grid w-full grid-cols-4 bg-transparent h-12 px-6">
                       <TabsTrigger value="question" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
@@ -390,139 +527,222 @@ const ProblemSolver = () => {
                     </TabsList>
                   </div>
 
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    <TabsContent value="question" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
-                      <div>
+                  <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                    <TabsContent value="question" className="flex-1 min-h-0 p-0 m-0">
+                      <ScrollArea className="flex-1 min-h-0">
+                        <div className="p-6 space-y-6">
                         <h2 className="text-lg font-semibold text-foreground mb-4">Problem Description</h2>
                         <div className="prose prose-sm max-w-none text-muted-foreground">
                           <p>{problem.description}</p>
                         </div>
-                      </div>
+                        </div>
 
-                      {problem.examples && problem.examples.length > 0 && (
-                        <div>
-                          <h3 className="text-md font-semibold text-foreground mb-3">Examples</h3>
-                          <div className="space-y-4">
-                            {problem.examples.map((example, index) => (
-                              <div key={index} className="bg-muted/50 p-4 rounded-lg">
-                                <div className="space-y-2 font-mono text-sm">
-                                  <div>
-                                    <span className="font-semibold">Input:</span> {example.input}
-                                  </div>
-                                  <div>
-                                    <span className="font-semibold">Output:</span> {example.output}
-                                  </div>
-                                  {example.explanation && (
+                        {problem.examples && problem.examples.length > 0 && (
+                          <div className="p-6 pt-0">
+                            <h3 className="text-md font-semibold text-foreground mb-3">Examples</h3>
+                            <div className="space-y-4">
+                              {problem.examples.map((example, index) => (
+                                <div key={index} className="bg-muted/50 p-4 rounded-lg">
+                                  <div className="space-y-2 font-mono text-sm">
                                     <div>
-                                      <span className="font-semibold">Explanation:</span> {example.explanation}
+                                      <span className="font-semibold">Input:</span> {example.input}
                                     </div>
-                                  )}
+                                    <div>
+                                      <span className="font-semibold">Output:</span> {example.output}
+                                    </div>
+                                    {example.explanation && (
+                                      <div>
+                                        <span className="font-semibold">Explanation:</span> {example.explanation}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent value="solution" className="flex-1 min-h-0 p-0 m-0 overflow-y-auto">
+                        <div className="p-6 space-y-6">
+                          {problemId && pythonSolutions[problemId] ? (
+                            <div className="space-y-6">
+                              {pythonSolutions[problemId].map((solution: Solution, index: number) => (
+                                <div key={index}>
+                                  <h2 className="text-lg font-semibold text-foreground mb-4">
+                                    {index + 1}. {solution.title}
+                                  </h2>
+                                  <div className="bg-muted rounded-lg p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex space-x-2">
+                                        <Button variant="default" size="sm">Python</Button>
+                                      </div>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(solution.code);
+                                          toast.success('Code copied to clipboard!');
+                                        }}
+                                      >
+                                        <Copy className="w-4 h-4 mr-1" />
+                                        Copy
+                                      </Button>
+                                    </div>
+                                    
+                                    <div className="bg-muted/30 rounded-lg overflow-hidden">
+                                      <SyntaxHighlighter
+                                        language="python"
+                                        style={isDark ? vscDarkPlus : vs}
+                                        customStyle={{
+                                          margin: 0,
+                                          padding: '16px',
+                                          backgroundColor: 'transparent',
+                                          fontSize: '16px',
+                                          lineHeight: '1.5'
+                                        }}
+                                        showLineNumbers={true}
+                                        wrapLines={true}
+                                      >
+                                        {solution.code}
+                                      </SyntaxHighlighter>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="mt-4 space-y-3">
+                                    <div>
+                                      <h3 className="font-semibold text-foreground mb-2">Explanation</h3>
+                                      <p className="text-sm text-muted-foreground">{solution.explanation}</p>
+                                    </div>
+                                    <div>
+                                      <h3 className="font-semibold text-foreground mb-2">Time & Space Complexity</h3>
+                                      <ul className="text-sm text-muted-foreground space-y-1">
+                                        <li>• Time complexity: {solution.complexity.time}</li>
+                                        <li>• Space complexity: {solution.complexity.space}</li>
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <div className="text-muted-foreground mb-2">No solutions available</div>
+                              <div className="text-sm text-muted-foreground">
+                                Solutions for this problem haven't been added yet.
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="submissions" className="flex-1 min-h-0 p-0 m-0">
+                      <ScrollArea className="flex-1 min-h-0">
+                        <div className="p-6">
+                        <h2 className="text-lg font-semibold text-foreground mb-4">Submissions</h2>
+                        {submissionsLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          </div>
+                        ) : uniqueSubmissions.length === 0 ? (
+                          <div className="text-center py-8">
+                            <div className="text-muted-foreground mb-2">No accepted submissions yet</div>
+                            <div className="text-sm text-muted-foreground">
+                              Solve this problem to see your submissions here!
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            {uniqueSubmissions.map((submission, index) => (
+                              <div key={submission.id} className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center space-x-3">
+                                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400">
+                                      Accepted
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      Solution #{uniqueSubmissions.length - index}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                    <div className="flex items-center space-x-1">
+                                      <Calendar className="w-4 h-4" />
+                                      <span>{new Date(submission.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <span>{new Date(submission.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                </div>
+                                
+                                {/* Full code with syntax highlighting */}
+                                <div className="bg-muted/30 rounded-lg overflow-hidden mb-4">
+                                  <div className="flex items-center justify-between px-4 py-2 bg-muted/70 border-b border-border">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                      Python Solution
+                                    </span>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(submission.code);
+                                        toast.success('Code copied to clipboard!');
+                                      }}
+                                    >
+                                      <Copy className="w-3 h-3 mr-1" />
+                                      Copy
+                                    </Button>
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <SyntaxHighlighter
+                                      language="python"
+                                      style={isDark ? vscDarkPlus : vs}
+                                      customStyle={{
+                                        margin: 0,
+                                        padding: '16px',
+                                        backgroundColor: 'transparent',
+                                        fontSize: '14px',
+                                        lineHeight: '1.5'
+                                      }}
+                                      showLineNumbers={true}
+                                      wrapLines={true}
+                                    >
+                                      {submission.code}
+                                    </SyntaxHighlighter>
+                                  </div>
+                                </div>
+
+                                {/* Test results summary */}
+                                {submission.test_results && Array.isArray(submission.test_results) && (
+                                  <div className="flex items-center space-x-3 text-sm">
+                                    <div className="flex items-center space-x-1 text-green-600 dark:text-green-400">
+                                      <Check className="w-3 h-3" />
+                                      <span className="font-medium">
+                                        {submission.test_results.filter(r => r.passed).length}/{submission.test_results.length} test cases passed
+                                      </span>
+                                    </div>
+                                    {submission.test_results.some(r => r.time) && (
+                                      <div className="flex items-center space-x-1 text-muted-foreground">
+                                        <Clock className="w-3 h-3" />
+                                        <span>Runtime: {submission.test_results.find(r => r.time)?.time || 'N/A'}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
+                        )}
                         </div>
-                      )}
+                      </ScrollArea>
                     </TabsContent>
 
-                    <TabsContent value="solution" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">1. Brute Force</h2>
-                        <div className="bg-muted rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex space-x-2">
-                              <Button variant="default" size="sm">Python</Button>
-                              <Button variant="outline" size="sm">Java</Button>
-                              <Button variant="outline" size="sm">C++</Button>
-                            </div>
-                            <Button variant="outline" size="sm">
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy
-                            </Button>
-                          </div>
-                          <pre className="text-sm bg-background p-4 rounded border overflow-x-auto">
-                            <code>{`def twoSum(self, nums: List[int], target: int) -> List[int]:
-    for i in range(len(nums)):
-        for j in range(i + 1, len(nums)):
-            if nums[i] + nums[j] == target:
-                return [i, j]
-    return []`}</code>
-                          </pre>
+                    <TabsContent value="notes" className="flex-1 min-h-0 p-0 m-0">
+                      <ScrollArea className="flex-1 min-h-0">
+                        <div className="p-6 h-full flex flex-col">
+                        <Notes problemId={problem.id} />
                         </div>
-                        
-                        <div className="mt-4">
-                          <h3 className="font-semibold text-foreground mb-2">Time & Space Complexity</h3>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Time complexity: O(n²)</li>
-                            <li>• Space complexity: O(1)</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">2. Hash Map</h2>
-                        <div className="bg-muted rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex space-x-2">
-                              <Button variant="default" size="sm">Python</Button>
-                              <Button variant="outline" size="sm">Java</Button>
-                              <Button variant="outline" size="sm">C++</Button>
-                            </div>
-                            <Button variant="outline" size="sm">
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy
-                            </Button>
-                          </div>
-                          <pre className="text-sm bg-background p-4 rounded border overflow-x-auto">
-                            <code>{`def twoSum(self, nums: List[int], target: int) -> List[int]:
-    hashmap = {}
-    for i, num in enumerate(nums):
-        complement = target - num
-        if complement in hashmap:
-            return [hashmap[complement], i]
-        hashmap[num] = i
-    return []`}</code>
-                          </pre>
-                        </div>
-                        
-                        <div className="mt-4">
-                          <h3 className="font-semibold text-foreground mb-2">Time & Space Complexity</h3>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Time complexity: O(n)</li>
-                            <li>• Space complexity: O(n)</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="submissions" className="p-6 m-0 h-full overflow-y-auto">
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">Submissions</h2>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
-                            </div>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Python</span>
-                              <span>2 minutes ago</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
-                            </div>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Python</span>
-                              <span>5 minutes ago</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="notes" className="p-6 m-0 h-full overflow-y-auto flex flex-col">
-                      <Notes problemId={problemId} />
+                      </ScrollArea>
                     </TabsContent>
                   </div>
                 </Tabs>
@@ -638,7 +858,7 @@ const ProblemSolver = () => {
                                   <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
                                       <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Expected Output:</div>
-                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">{renderValue(result.expected)}</pre>
+                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">{toCompactJson(result.expected)}</pre>
                                     </div>
                                     
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
@@ -648,7 +868,7 @@ const ProblemSolver = () => {
                                           ? 'text-green-700 dark:text-green-300' 
                                           : 'text-red-700 dark:text-red-300'
                                       }`}>
-                                        {renderValue(result.actual) || 'No output'}
+                                        {toCompactJson(result.actual) || 'No output'}
                                       </pre>
                                     </div>
                                   </div>
