@@ -62,6 +62,12 @@ export interface ChatMessage {
   timestamp: Date;
   sessionId?: string;
   codeSnippets?: CodeSnippet[];
+  diagram?: {
+    engine: 'mermaid';
+    code: string; // raw mermaid DSL
+    title?: string;
+  };
+  suggestDiagram?: boolean;
 }
 
 export interface ChatSession {

@@ -115,10 +115,10 @@ async function fetchTestCasesFromDB(problemId) {
     console.log(`Found problem: ${problem.title}`);
     console.log(`Function signature: ${problem.function_signature}`);
     
-    // Fetch test cases for this problem
+    // Fetch test cases for this problem (include both legacy and JSON columns)
     const { data: testCases, error: testCasesError } = await supabase
       .from('test_cases')
-      .select('input, expected_output, is_example')
+      .select('input, expected_output, input_json, expected_json, is_example')
       .eq('problem_id', problemId)
       .order('is_example', { ascending: false });
     
@@ -147,21 +147,34 @@ async function fetchTestCasesFromDB(problemId) {
     // Convert database format to our expected format
     const formattedTestCases = testCases.map((tc, index) => {
       console.log(`\n--- Processing test case ${index} ---`);
-      console.log('Raw input:', JSON.stringify(tc.input));
-      console.log('Raw expected_output:', JSON.stringify(tc.expected_output));
       
-      // Parse the input string to extract parameters
-      console.log('About to parse input with function signature:', problem.function_signature);
-      const inputParams = parseTestCaseInput(tc.input, problem.function_signature);
-      console.log('Parsed input params result:', JSON.stringify(inputParams, null, 2));
+      let inputParams, expectedOutput;
       
-      // Parse expected output (handle different types)
-      let expectedOutput;
-      try {
-        expectedOutput = JSON.parse(tc.expected_output);
-      } catch {
-        // If JSON parsing fails, treat as string/number
-        expectedOutput = tc.expected_output;
+      // Prefer JSON columns if available
+      if (tc.input_json && tc.expected_json) {
+        console.log('Using JSON-native columns');
+        console.log('JSON input:', JSON.stringify(tc.input_json));
+        console.log('JSON expected:', JSON.stringify(tc.expected_json));
+        
+        inputParams = tc.input_json;
+        expectedOutput = tc.expected_json;
+      } else {
+        console.log('Using legacy text parsing');
+        console.log('Raw input:', JSON.stringify(tc.input));
+        console.log('Raw expected_output:', JSON.stringify(tc.expected_output));
+        
+        // Parse the input string to extract parameters (legacy method)
+        console.log('About to parse input with function signature:', problem.function_signature);
+        inputParams = parseTestCaseInput(tc.input, problem.function_signature);
+        console.log('Parsed input params result:', JSON.stringify(inputParams, null, 2));
+        
+        // Parse expected output (handle different types)
+        try {
+          expectedOutput = JSON.parse(tc.expected_output);
+        } catch {
+          // If JSON parsing fails, treat as string/number
+          expectedOutput = tc.expected_output;
+        }
       }
       
       console.log('Final inputParams:', inputParams);
@@ -223,15 +236,22 @@ function parseTestCaseInput(inputString, functionSignature) {
       // BUT NOT arrays like: "strs = [\"eat\",\"tea\"]"
       const line = lines[0];
       console.log('Parsing single line with comma separation:', line);
+      console.log('Line length:', line.length);
+      console.log('Line characters:', [...line].map((c, i) => `${i}:${c}`).join(' '));
       
-      // Split by comma, but be careful with commas inside quoted strings
+      // Split by comma, but be careful with commas inside quoted strings and arrays
       const parts = [];
       let current = '';
       let insideQuotes = false;
       let escapeNext = false;
       
+      let bracketDepth = 0;
+      let squareBracketDepth = 0;
+      let curlyBracketDepth = 0;
+      
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
+        console.log(`Character ${i}: '${char}', bracketDepth: ${bracketDepth}, squareBracketDepth: ${squareBracketDepth}, insideQuotes: ${insideQuotes}`);
         
         if (escapeNext) {
           current += char;
@@ -239,10 +259,32 @@ function parseTestCaseInput(inputString, functionSignature) {
         } else if (char === '\\') {
           current += char;
           escapeNext = true;
-        } else if (char === '"') {
+        } else if (char === '"' && !escapeNext) {
           current += char;
           insideQuotes = !insideQuotes;
-        } else if (char === ',' && !insideQuotes) {
+          console.log(`  Quote toggled, insideQuotes now: ${insideQuotes}`);
+        } else if (char === '[' && !insideQuotes) {
+          current += char;
+          squareBracketDepth++;
+          bracketDepth++;
+          console.log(`  Opening bracket, depths: square=${squareBracketDepth}, total=${bracketDepth}`);
+        } else if (char === ']' && !insideQuotes) {
+          current += char;
+          squareBracketDepth--;
+          bracketDepth--;
+          console.log(`  Closing bracket, depths: square=${squareBracketDepth}, total=${bracketDepth}`);
+        } else if (char === '{' && !insideQuotes) {
+          current += char;
+          curlyBracketDepth++;
+          bracketDepth++;
+          console.log(`  Opening brace, depths: curly=${curlyBracketDepth}, total=${bracketDepth}`);
+        } else if (char === '}' && !insideQuotes) {
+          current += char;
+          curlyBracketDepth--;
+          bracketDepth--;
+          console.log(`  Closing brace, depths: curly=${curlyBracketDepth}, total=${bracketDepth}`);
+        } else if (char === ',' && !insideQuotes && bracketDepth === 0) {
+          console.log(`  SPLIT POINT! Current part: '${current.trim()}'`);
           parts.push(current.trim());
           current = '';
         } else {
@@ -250,6 +292,7 @@ function parseTestCaseInput(inputString, functionSignature) {
         }
       }
       if (current.trim()) {
+        console.log(`  Final part: '${current.trim()}'`);
         parts.push(current.trim());
       }
       
@@ -335,28 +378,130 @@ function processPythonCode(userCode, testCases) {
     processedCode = `from typing import List, Dict, Set, Tuple, Optional, Union\n${userCode}`;
   }
   
+  // Add ListNode definition if needed
+  console.log('Checking if ListNode definition is needed...');
+  console.log('User code contains ListNode:', /\bListNode\b/.test(userCode));
+  console.log('User code already has ListNode class:', userCode.includes('class ListNode'));
+  
+  const needsListNode = /\bListNode\b/.test(userCode);
+  if (needsListNode && !userCode.includes('class ListNode')) {
+    console.log('Adding ListNode class definition');
+    const listNodeDef = `# Definition for singly-linked list.
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+`;
+    processedCode = listNodeDef + processedCode;
+    console.log('ListNode definition added');
+  }
+  
+  // Add helper functions for ListNode operations if needed (check both userCode and signature)
+  console.log('Checking if ListNode helper functions are needed...');
+  console.log('User code contains ListNode:', /\bListNode\b/.test(userCode));
+  console.log('Processed code contains ListNode:', /\bListNode\b/.test(processedCode));
+  console.log('Processed code already has array_to_listnode:', processedCode.includes('def array_to_listnode'));
+  
+  const needsListNodeHelpers = /\bListNode\b/.test(userCode) || /\bListNode\b/.test(processedCode);
+  console.log('Needs ListNode helpers:', needsListNodeHelpers);
+  
+  if (needsListNodeHelpers && !processedCode.includes('def array_to_listnode')) {
+    console.log('Adding ListNode helper functions');
+    const helperFunctions = `# Helper functions for ListNode operations
+def array_to_listnode(arr):
+    if not arr:
+        return None
+    head = ListNode(arr[0])
+    current = head
+    for val in arr[1:]:
+        current.next = ListNode(val)
+        current = current.next
+    return head
+
+def listnode_to_array(head):
+    result = []
+    current = head
+    while current:
+        result.append(current.val)
+        current = current.next
+    return result
+
+`;
+    processedCode = helperFunctions + processedCode;
+    console.log('ListNode helper functions added');
+  } else {
+    console.log('ListNode helper functions not added - either not needed or already present');
+  }
+  
   // Check if code has methods with 'self' parameter - wrap in Solution class
   const hasSelfParam = /def\s+\w+\s*\([^)]*self[^)]*\)/.test(userCode);
   if (hasSelfParam && !userCode.includes('class Solution')) {
-    // Indent all function definitions to be inside Solution class
-    const indentedCode = processedCode
-      .split('\n')
-      .map(line => {
-        // Only indent lines that are function definitions or their content
-        if (line.trim().startsWith('def ') || (line.startsWith('    ') && line.trim() !== '')) {
-          return '    ' + line;
-        } else if (line.trim() === '' || line.startsWith('from ') || line.startsWith('import ')) {
-          return line; // Keep imports and empty lines as-is
-        } else {
-          return '    ' + line; // Indent everything else
+    console.log('Code has self parameter, wrapping in Solution class');
+    
+    // Extract imports, ListNode definition, and helper functions to keep them global
+    const lines = processedCode.split('\n');
+    const imports = [];
+    const listNodeDef = [];
+    const helperFunctions = [];
+    const userCodeLines = [];
+    
+    let inListNodeDef = false;
+    let inHelperFunctions = false;
+    let inUserCode = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.startsWith('from ') || line.startsWith('import ')) {
+        imports.push(line);
+      } else if (line.includes('# Definition for singly-linked list')) {
+        inListNodeDef = true;
+        listNodeDef.push(line);
+      } else if (inListNodeDef && (line.startsWith('class ListNode') || line.startsWith('    ') || line.trim() === '')) {
+        listNodeDef.push(line);
+        if (line.trim() === '' && i < lines.length - 1 && !lines[i + 1].startsWith('    ') && lines[i + 1].trim() !== '') {
+          inListNodeDef = false;
         }
+      } else if (line.includes('# Helper functions for ListNode operations')) {
+        inHelperFunctions = true;
+        helperFunctions.push(line);
+      } else if (inHelperFunctions && (line.startsWith('def ') || line.startsWith('    ') || line.trim() === '')) {
+        helperFunctions.push(line);
+        if (line.trim() === '' && i < lines.length - 1 && !lines[i + 1].startsWith('    ') && lines[i + 1].trim() !== '' && !lines[i + 1].startsWith('def ')) {
+          inHelperFunctions = false;
+        }
+      } else if (line.trim() !== '') {
+        inUserCode = true;
+        userCodeLines.push(line);
+      } else if (inUserCode) {
+        userCodeLines.push(line);
+      }
+    }
+    
+    console.log('Extracted sections:');
+    console.log('- Imports:', imports.length);
+    console.log('- ListNode definition:', listNodeDef.length);
+    console.log('- Helper functions:', helperFunctions.length);
+    console.log('- User code:', userCodeLines.length);
+    
+    // Indent only the user code for the Solution class
+    const indentedUserCode = userCodeLines
+      .map(line => {
+        if (line.trim() === '') return line;
+        return '    ' + line;
       })
       .join('\n');
     
-    processedCode = `${processedCode.split('\n').filter(line => line.startsWith('from ') || line.startsWith('import ')).join('\n')}
-
-class Solution:
-${indentedCode.split('\n').filter(line => !line.startsWith('from ') && !line.startsWith('import ')).join('\n')}`;
+    // Reconstruct the code with proper structure
+    const sections = [];
+    if (imports.length > 0) sections.push(imports.join('\n'));
+    if (listNodeDef.length > 0) sections.push(listNodeDef.join('\n'));
+    if (helperFunctions.length > 0) sections.push(helperFunctions.join('\n'));
+    
+    processedCode = sections.join('\n\n') + '\n\nclass Solution:\n' + indentedUserCode;
+    
+    console.log('Restructured code with Solution class');
   }
   
   // Extract function name from the code
@@ -387,10 +532,14 @@ ${testExecutionCode}`;
 // Generate test execution code with dynamic test cases
 function generateTestExecutionCode(functionName, signature, testCases) {
   // Convert test cases to Python format
-  const pythonTestCases = testCases.map(tc => ({
-    ...tc.input,
-    expected: tc.expected
-  }));
+  const pythonTestCases = testCases.map(tc => {
+    console.log('Test case expected output (raw):', tc.expected, 'type:', typeof tc.expected);
+    
+    return {
+      ...tc.input,
+      expected: tc.expected  // Keep as-is - don't convert to string!
+    };
+  });
   
   // Convert JavaScript booleans to Python booleans in JSON string
   let testCasesJson = JSON.stringify(pythonTestCases, null, 2);
@@ -410,10 +559,23 @@ function generateTestExecutionCode(functionName, signature, testCases) {
   const originalSignature = signature;
   const hasSelfParam = originalSignature.includes('self');
   
+  // Check if this is a ListNode problem
+  console.log('Function signature for ListNode detection:', signature);
+  const isListNodeProblem = signature.includes('ListNode');
+  console.log('Is ListNode problem:', isListNodeProblem);
+  console.log('Function has self param:', hasSelfParam);
+  console.log('Function parameters:', params);
+  
   if (hasSelfParam) {
     // If function was defined with 'self', we need to create a class instance and call it as a method
     const className = 'Solution';
-    if (params.length === 1) {
+    if (isListNodeProblem) {
+      console.log('Generating ListNode function call for method');
+      // Convert arrays to ListNodes for function call
+      const paramList = params.map(p => `array_to_listnode(tc["${p}"])`).join(', ');
+      functionCall = `listnode_to_array(${className}().${functionName}(${paramList}))`;
+      console.log('Generated function call:', functionCall);
+    } else if (params.length === 1) {
       functionCall = `${className}().${functionName}(tc["${params[0]}"])`;
     } else if (params.length === 2) {
       functionCall = `${className}().${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
@@ -423,7 +585,11 @@ function generateTestExecutionCode(functionName, signature, testCases) {
     }
   } else {
     // Standalone function call
-    if (params.length === 1) {
+    if (isListNodeProblem) {
+      // Convert arrays to ListNodes for function call
+      const paramList = params.map(p => `array_to_listnode(tc["${p}"])`).join(', ');
+      functionCall = `listnode_to_array(${functionName}(${paramList}))`;
+    } else if (params.length === 1) {
       functionCall = `${functionName}(tc["${params[0]}"])`;
     } else if (params.length === 2) {
       functionCall = `${functionName}(tc["${params[0]}"], tc["${params[1]}"])`;
@@ -443,10 +609,45 @@ test_case_index = int(sys.stdin.read().strip())
 # Dynamic test cases from database/API
 test_cases = ${testCasesJson}
 
+# Helpers for common LeetCode structures (ListNode)
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+def array_to_listnode(arr):
+    if arr is None:
+        return None
+    dummy = ListNode(0)
+    cur = dummy
+    for x in arr:
+        cur.next = ListNode(x)
+        cur = cur.next
+    return dummy.next
+
+def listnode_to_array(head):
+    res = []
+    cur = head
+    while cur is not None:
+        res.append(cur.val)
+        cur = cur.next
+    return res
+
 if 0 <= test_case_index < len(test_cases):
     tc = test_cases[test_case_index]
     result = ${functionCall}
-    print(json.dumps(result))
+    # Auto-convert ListNode outputs
+    try:
+        if isinstance(result, ListNode) or (hasattr(result, 'val') and hasattr(result, 'next')):
+            out = listnode_to_array(result)
+        else:
+            out = result
+        print(json.dumps(out))
+    except Exception:
+        try:
+            print(json.dumps(result))
+        except Exception:
+            print("null")
 else:
     print("Invalid test case index")`;
 }
@@ -623,10 +824,31 @@ app.post('/execute', async (req, res) => {
         .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
         .join('\n');
       
+      // Format expected and actual outputs as compact JSON
+      let formattedExpected = testCase.expected;
+      let formattedActual = actualOutput;
+      
+      // Convert expected to compact format if it's an array/object
+      if (Array.isArray(formattedExpected) || (typeof formattedExpected === 'object' && formattedExpected !== null)) {
+        formattedExpected = JSON.stringify(formattedExpected);
+      } else if (typeof formattedExpected === 'string') {
+        try {
+          const parsed = JSON.parse(formattedExpected);
+          formattedExpected = JSON.stringify(parsed);
+        } catch (e) {
+          // Keep as string if can't parse
+        }
+      }
+      
+      // Convert actual to compact format if it's an array/object
+      if (Array.isArray(formattedActual) || (typeof formattedActual === 'object' && formattedActual !== null)) {
+        formattedActual = JSON.stringify(formattedActual);
+      }
+      
       return {
         input: inputDisplay,
-        expected: testCase.expected,
-        actual: actualOutput,
+        expected: formattedExpected,
+        actual: formattedActual,
         passed,
         status: result.status.description,
         time: result.time,

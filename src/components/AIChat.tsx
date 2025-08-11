@@ -1,12 +1,14 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Trash2, Loader2, Mic, MicOff } from 'lucide-react';
+import { Send, Bot, User, Trash2, Loader2, Mic, MicOff, ChartNetwork as DiagramIcon, Maximize2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+// Using a lightweight custom fullscreen overlay instead of Radix Dialog to avoid MIME issues in some dev setups
 import { useChatSession } from '@/hooks/useChatSession';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import TextareaAutosize from 'react-textarea-autosize';
 import { CodeSnippet } from '@/types';
+import Mermaid from '@/components/diagram/Mermaid';
 import CodeSnippetButton from '@/components/CodeSnippetButton';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -22,40 +24,16 @@ interface AIChatProps {
 const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // Function to clean mathematical notation in message content
-  const cleanMathNotation = (content: string): string => {
-    if (typeof content !== 'string') return String(content);
-    
-    // Guard: don't process content that contains backticks (code blocks/inline code)
-    if (/`/.test(content)) {
-      return content;
-    }
-    
-    return content
-      // Clean LaTeX notation
-      .replace(/\\cdot/g, '·')
-      .replace(/\\log/g, 'log')
-      .replace(/\\times/g, '×')
-      .replace(/\\le/g, '≤')
-      .replace(/\\ge/g, '≥')
-      .replace(/\\ne/g, '≠')
-      .replace(/\\infty/g, '∞')
-      // Clean up escaped parentheses
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      // Remove extra backslashes
-      .replace(/\s*\\\s*/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
+  const [isDiagramOpen, setIsDiagramOpen] = useState(false);
+  const [activeDiagram, setActiveDiagram] = useState<string | null>(null);
   const { 
     session, 
     messages, 
     loading, 
     isTyping, 
     sendMessage, 
-    clearConversation 
+    clearConversation,
+    requestDiagram,
   } = useChatSession({ problemId, problemDescription, problemTestCases });
 
   // Speech-to-text functionality
@@ -91,6 +69,16 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleVisualize = async (sourceMessageContent: string) => {
+    // Request a diagram separately without adding a user message bubble
+    await requestDiagram(sourceMessageContent);
+  };
+
+  const openDiagramDialog = (code: string) => {
+    setActiveDiagram(code);
+    setIsDiagramOpen(true);
   };
 
   const toggleMicrophone = async () => {
@@ -186,22 +174,22 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                       <div className="flex-1 min-w-0">
                         <div className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
                           message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
+                            ? 'border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15'
+                            : 'border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15'
                         }`}>
                           {message.role === 'user' ? (
                             <p className="text-sm whitespace-pre-wrap break-words text-left">{message.content}</p>
                           ) : (
-                            <div className="text-sm prose prose-sm max-w-none">
+                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                               <ReactMarkdown
                                 components={{
-                                  code({inline, className, children, ...props}: {
-                                    inline?: boolean;
-                                    className?: string;
-                                    children?: React.ReactNode;
-                                    [key: string]: unknown;
-                                  }) {
+                                  code({inline, className, children, ...props}: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                                     const match = /language-(\w+)/.exec(className || '');
+                                    if (!inline && match && match[1] === 'mermaid') {
+                                      return (
+                                        <Mermaid chart={String(children)} />
+                                      );
+                                    }
                                     return !inline && match ? (
                                       <SyntaxHighlighter
                                         style={vscDarkPlus}
@@ -218,58 +206,67 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                       </code>
                                     );
                                   },
-                                  p: ({children}) => (
-                                    <p className="mb-2 last:mb-0 leading-relaxed text-left">
-                                      {children}
-                                    </p>
-                                  ),
-                                  ul: ({children}) => (
-                                    <ul className="list-disc list-inside mb-3 space-y-1 pl-2">
-                                      {children}
-                                    </ul>
-                                  ),
-                                  ol: ({children}) => (
-                                    <ol className="list-decimal mb-3 pl-4">
-                                      {children}
-                                    </ol>
-                                  ),
-                                  li: ({children}) => (
-                                    <li className="mb-1 text-left leading-relaxed">
-                                      {children}
-                                    </li>
-                                  ),
-                                  strong: ({children}) => (
-                                    <strong className="font-semibold text-foreground">{children}</strong>
-                                  ),
-                                  em: ({children}) => (
-                                    <em className="italic text-muted-foreground">{children}</em>
-                                  ),
-                                  h1: ({children}) => (
-                                    <h1 className="text-lg font-bold mb-3 mt-4 text-left first:mt-0">{children}</h1>
-                                  ),
-                                  h2: ({children}) => (
-                                    <h2 className="text-base font-bold mb-2 mt-3 text-left first:mt-0">{children}</h2>
-                                  ),
-                                  h3: ({children}) => (
-                                    <h3 className="text-sm font-bold mb-2 mt-2 text-left first:mt-0">{children}</h3>
-                                  ),
-                                  blockquote: ({children}) => (
-                                    <blockquote className="border-l-4 border-primary pl-4 py-2 my-3 bg-muted/30 italic rounded-r-md">
-                                      {children}
-                                    </blockquote>
+                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({children}) => <ul className="list-disc list-outside pl-5 mb-2">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside pl-5 mb-2">{children}</ol>,
+                                  li: ({children}: { children?: React.ReactNode }) => (
+                                    <li className="mb-1">{children}</li>
                                   ),
                                 }}
                               >
-                                {cleanMathNotation(message.content)}
+                                {message.content}
                               </ReactMarkdown>
                             </div>
                           )}
                         </div>
+
+                        {/* Mermaid diagram bubble if attached as structured payload */}
+                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'mermaid'; code: string } }).diagram?.engine === 'mermaid' && (
+                          <div className="mt-3">
+                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-muted-foreground">Diagram</div>
+                                <button
+                                  type="button"
+                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => openDiagramDialog((message as unknown as { diagram: { code: string } }).diagram.code)}
+                                  title="View full screen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  Expand
+                                </button>
+                              </div>
+                              <Mermaid chart={(message as unknown as { diagram: { code: string } }).diagram.code} />
+                            </div>
+                          </div>
+                        )}
                         
-                        {/* Code Snippet Buttons for AI messages */}
-                        {message.role === 'assistant' && message.codeSnippets && message.codeSnippets.length > 0 && (
+                        {/* Actions: Visualize button and code snippets */}
+                        {message.role === 'assistant' && (
                           <div className="mt-3 space-y-3">
-                            {message.codeSnippets.map((snippet) => (
+                            {(() => {
+                              const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+                              const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
+                              const shouldShow = userAsked || (message as unknown as { suggestDiagram?: boolean }).suggestDiagram === true;
+                              return shouldShow ? (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                    onClick={() => handleVisualize(message.content)}
+                                    title="Ask the AI to generate a diagram"
+                                  >
+                                    <DiagramIcon className="w-4 h-4" />
+                                    <span className="text-sm">Visualize</span>
+                                  </Button>
+                                </div>
+                              ) : null;
+                            })()}
+                            {message.codeSnippets && message.codeSnippets.length > 0 && (
+                              <div className="space-y-3">
+                                {message.codeSnippets.map((snippet) => (
                               <div 
                                 key={snippet.id} 
                                 className="bg-card border rounded-lg p-4 shadow-sm"
@@ -311,7 +308,9 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                   </p>
                                 )}
                               </div>
-                            ))}
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -330,7 +329,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                       <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <Bot className="w-4 h-4 text-primary-foreground" />
                       </div>
-                      <div className="bg-secondary text-foreground p-3 rounded-lg">
+                              <div className="bg-secondary text-foreground p-3 rounded-lg">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -407,6 +406,18 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
           </Button>
         </div>
       </div>
+      {isDiagramOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setIsDiagramOpen(false)} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vh] bg-background border rounded-lg shadow-lg p-4 overflow-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">Diagram</div>
+              <Button size="sm" variant="ghost" onClick={() => setIsDiagramOpen(false)}>Close</Button>
+            </div>
+            {activeDiagram && <Mermaid chart={activeDiagram} />}
+          </div>
+        </div>
+      )}
     </Card>
   );
 };
