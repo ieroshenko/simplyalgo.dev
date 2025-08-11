@@ -122,7 +122,15 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
 
       if (messagesError) throw messagesError;
 
-      const formattedMessages: ChatMessage[] = sessionMessages.map(msg => ({
+      type DbMessage = {
+        id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        created_at: string;
+        session_id: string;
+        code_snippets?: CodeSnippet[] | null;
+      };
+      const formattedMessages: ChatMessage[] = (sessionMessages as DbMessage[]).map((msg) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
@@ -177,7 +185,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
   }, [session, toast]);
 
   // Send message to AI and save both user and AI messages
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, options?: { action?: 'diagram' }) => {
     if (!content.trim() || !session || isTyping) return;
 
     const userMessage: ChatMessage = {
@@ -208,7 +216,8 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
           message: content,
           problemDescription,
           conversationHistory,
-          testCases: problemTestCases
+          testCases: problemTestCases,
+          diagram: options?.action === 'diagram'
         }
       });
 
@@ -244,7 +253,11 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         content: aiResponseContent,
         timestamp: new Date(),
         sessionId: session.id,
-        codeSnippets: dedupedSnippets
+        codeSnippets: dedupedSnippets,
+        diagram: data.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
+          ? { engine: 'mermaid', code: data.diagram.code, title: data.diagram.title }
+          : undefined,
+        suggestDiagram: typeof data.suggestDiagram === 'boolean' ? data.suggestDiagram : undefined
       };
 
       // Add AI response to UI
@@ -300,12 +313,61 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
     initializeSession();
   }, [initializeSession]);
 
+  // Generate diagram without posting a user message
+  const requestDiagram = useCallback(async (sourceText: string) => {
+    if (!session || isTyping) return;
+    setIsTyping(true);
+    try {
+      const conversationHistory = messages.map(msg => ({ role: msg.role, content: msg.content }));
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: sourceText,
+          problemDescription,
+          conversationHistory,
+          diagram: true
+        }
+      });
+      if (error) throw error;
+
+      const diagramPayload = data?.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
+        ? { engine: 'mermaid' as const, code: data.diagram.code, title: data.diagram.title as string | undefined }
+        : undefined;
+
+      if (!diagramPayload) {
+        toast({ title: 'No diagram', description: 'The model did not return a diagram for this request.' });
+        return;
+      }
+
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        sessionId: session.id,
+        diagram: diagramPayload
+      };
+
+      setMessages(prev => [...prev, aiResponse]);
+      await saveMessage(aiResponse);
+    } catch (error) {
+      console.error('Error generating diagram:', error);
+      toast({
+        title: 'Diagram error',
+        description: 'Failed to generate diagram. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsTyping(false);
+    }
+  }, [session, isTyping, messages, problemDescription, saveMessage, toast]);
+
   return {
     session,
     messages,
     loading,
     isTyping,
     sendMessage,
-    clearConversation
+    clearConversation,
+    requestDiagram
   };
 };

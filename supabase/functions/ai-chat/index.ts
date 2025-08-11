@@ -31,6 +31,8 @@ interface RequestBody {
   conversationHistory: ChatMessage[];
   // Optional action for smart insertion
   action?: 'insert_snippet';
+  // Optional explicit diagram request
+  diagram?: boolean;
   // Payload for insertion
   code?: string;
   snippet?: CodeSnippet;
@@ -42,6 +44,12 @@ interface RequestBody {
 interface AIResponse {
   response: string;
   codeSnippets?: CodeSnippet[];
+  diagram?: {
+    engine: 'mermaid';
+    code: string;
+    title?: string;
+  };
+  suggestDiagram?: boolean;
 }
 
 // Initialize OpenAI client (will be created with proper error handling in the handler)
@@ -111,18 +119,108 @@ Respond naturally and conversationally. Focus on teaching and guiding rather tha
     messages: [
       {
         role: "system",
-        content: "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. Testing is handled automatically by Judge0 with official test cases — never ask the student to run tests, write tests, or provide test cases. You may discuss potential edge cases conceptually. Only after a likely-correct solution, ask one follow-up on time/space complexity."
+        content: "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. The student's code is auto-run on Judge0 with official tests; avoid asking them to run tests or provide test cases. Only after a likely-correct solution, ask one follow-up on time/space complexity."
       },
       {
         role: "user",
         content: conversationPrompt
       }
     ],
-    temperature: 0.5,
+    temperature: 0.7,
     max_tokens: 500
   });
 
   return response.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
+}
+
+/**
+ * Try to generate a safe Mermaid diagram when the user requests visualization
+ */
+async function maybeGenerateMermaid(
+  message: string,
+  problemDescription: string,
+  conversationHistory: ChatMessage[],
+  force = false
+): Promise<{ engine: 'mermaid'; code: string; title?: string } | undefined> {
+  const wantsDiagram = /\b(visualize|diagram|draw|show.*diagram|mermaid)\b/i.test(message);
+  if (!force && !wantsDiagram) return undefined;
+
+  const prompt = `You will output a Mermaid diagram that visualizes the algorithm discussed.
+STRICT OUTPUT FORMAT: Return JSON only (no markdown, no prose) with this schema: { "mermaid": "<diagram>" }
+Rules for the diagram:
+- Use flowchart LR unless another type is clearly better.
+- Keep under 50 nodes.
+- Avoid htmlLabels and raw HTML.
+- Use concise node labels.
+
+Context:
+Problem: ${problemDescription}
+Recent conversation:\n${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
+Current user request: ${message}`;
+
+  let raw = '';
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 700,
+    });
+    raw = response.choices[0]?.message?.content?.trim() || '';
+  } catch (e) {
+    // fall back to best-effort text mode
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      max_tokens: 700,
+    });
+    raw = response.choices[0]?.message?.content?.trim() || '';
+  }
+
+  let mermaidCode = '';
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.mermaid === 'string') {
+      mermaidCode = String(parsed.mermaid);
+    }
+  } catch {
+    // Try to extract from fenced block
+    const fence = raw.match(/```mermaid([\s\S]*?)```/i);
+    if (fence && fence[1]) {
+      mermaidCode = fence[1];
+    } else if (/flowchart\s+LR|graph\s+LR/i.test(raw)) {
+      mermaidCode = raw;
+    }
+  }
+
+  const sanitized = (mermaidCode || '')
+    .replace(/^```mermaid\n?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+  if (!sanitized) return undefined;
+  return { engine: 'mermaid', code: sanitized };
+}
+
+// Generate a brief, friendly explanation of a given Mermaid diagram
+async function explainMermaid(
+  mermaidCode: string,
+  problemDescription: string
+): Promise<string> {
+  const explainPrompt = `You are a helpful tutor. In 2-4 short bullet points, explain the following Mermaid diagram for a coding problem. Avoid code, be concise, no questions.
+
+Problem context (for reference): ${problemDescription}
+
+Diagram (Mermaid DSL):\n${mermaidCode}`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: explainPrompt }],
+    temperature: 0.5,
+    max_tokens: 180,
+  });
+  return response.choices[0]?.message?.content?.trim() || 'Here is the diagram.';
 }
 
 /**
@@ -137,12 +235,12 @@ async function analyzeCodeSnippets(
   // Only analyze if message clearly indicates code intent
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
   const explicitAsk = /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(message);
-  const looksLikeCode = /^(\s*)(def|class)\s+\w+|^(\s*)\w+\s*=\s*.+|\b\w+\(.*\)|\bfrom\b\s+\w+\s+\bimport\b/m.test(message);
+  // Don't auto-trigger on vague code-like text; rely on explicit ask or explicit code
+  const looksLikeCode = false;
   const lastAssistant = (conversationHistory || []).slice().reverse().find(m => m.role === 'assistant')?.content?.trim() || '';
   const assistantJustAskedQuestion = /\?\s*$/.test(lastAssistant);
 
-  // Gate strictly: only if the user pasted code, explicitly asked, or message looks like code
-  const allowAnalysis = hasExplicitCode || explicitAsk || looksLikeCode;
+  const allowAnalysis = hasExplicitCode || explicitAsk;
   if (!allowAnalysis || (assistantJustAskedQuestion && !hasExplicitCode)) {
     return [];
   }
@@ -216,7 +314,7 @@ Student: "Maybe if char in seen:"
 Response: Provide complete conditional logic with proper indentation
 
 Student: "Two pointers approach?"
-Respond with conceptual guidance only unless the student explicitly asks for code or pastes code.`;
+Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer initialization), but avoid full solutions unless explicitly requested.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -238,32 +336,33 @@ Respond with conceptual guidance only unless the student explicitly asks for cod
     }
     
     // Add unique IDs and validate structure
-    const codeSnippets: CodeSnippet[] = (analysisResult.codeSnippets || []).map((snippet: Record<string, unknown>, index: number) => ({
+    const codeSnippets: CodeSnippet[] = (analysisResult.codeSnippets || []).map((snippet: { [k: string]: unknown; insertionHint?: { type?: string; scope?: string; description?: string } }, index: number) => ({
       id: `snippet-${Date.now()}-${index}`,
       code: typeof snippet.code === 'string' ? snippet.code : '',
       language: typeof snippet.language === 'string' ? (snippet.language as string) : 'python',
       isValidated: typeof snippet.isValidated === 'boolean' ? (snippet.isValidated as boolean) : false,
-      insertionType: typeof snippet.insertionType === 'string' ? (snippet.insertionType as any) : 'smart',
+      insertionType: typeof snippet.insertionType === 'string' ? (snippet.insertionType as 'smart' | 'cursor' | 'append' | 'prepend' | 'replace') : 'smart',
       insertionHint: {
-        type: typeof (snippet as any).insertionHint?.type === 'string' ? (snippet as any).insertionHint.type : 'statement',
-        scope: typeof (snippet as any).insertionHint?.scope === 'string' ? (snippet as any).insertionHint.scope : 'function',
-        description: typeof (snippet as any).insertionHint?.description === 'string' ? (snippet as any).insertionHint.description : 'Code snippet'
+        type: typeof snippet.insertionHint?.type === 'string' ? snippet.insertionHint.type as 'import' | 'variable' | 'function' | 'statement' | 'class' : 'statement',
+        scope: typeof snippet.insertionHint?.scope === 'string' ? snippet.insertionHint.scope as 'global' | 'function' | 'class' : 'function',
+        description: typeof snippet.insertionHint?.description === 'string' ? snippet.insertionHint.description : 'Code snippet'
       }
     }));
 
-    // Filter validated and remove incomplete control-flow headers
-    const validated = codeSnippets.filter(snippet => 
-      snippet.code && snippet.code.trim().length > 0 && snippet.isValidated
-    ).filter(snippet => {
-      const c = snippet.code.trim();
-      const incompleteHeader = /^(for\s+\w+\s+in\s+\w+\s*:\s*$)|(if\s+.+:\s*$)|(while\s+.+:\s*$)/.test(c);
-      return !incompleteHeader;
-    }).filter(snippet => {
-      // Drop import suggestions unless the user explicitly asked about imports
-      const isImportSnippet = (snippet.insertionHint?.type === 'import') || /^\s*(from\s+\S+\s+import\s+\S+|import\s+\S+)/.test(snippet.code);
-      const explicitImportAsk = /\b(import|from\s+\w+\s+import|how\s+to\s+import)\b/i.test(message);
-      return !isImportSnippet || explicitImportAsk;
-    });
+    const normalizedMessage = message.replace(/\s+/g, ' ').toLowerCase();
+    const validated = codeSnippets
+      .filter(snippet => snippet.code && snippet.code.trim().length > 0 && snippet.isValidated)
+      .filter(snippet => {
+        const code = snippet.code.trim();
+        const lower = code.replace(/\s+/g, ' ').toLowerCase();
+        const lineCount = code.split('\n').length;
+        const isControlFlow = /(^|\n)\s*(if|for|while)\b/.test(code) || /(^|\n)\s*(class|def)\b/.test(code);
+        const tooLong = code.length > 200 || lineCount > 3;
+        const appearsInUserText = normalizedMessage.includes(lower);
+        const isSimpleType = snippet.insertionHint?.type === 'import' || snippet.insertionHint?.type === 'variable' || snippet.insertionHint?.type === 'statement';
+        const allowedByPolicy = (hasExplicitCode || explicitAsk) && (appearsInUserText || isSimpleType);
+        return allowedByPolicy && !isControlFlow && !tooLong;
+      });
 
     // Dedupe within the same response
     const normalize = (s: CodeSnippet) => `${(s.insertionHint?.type || '')}|${(s.insertionHint?.scope || '')}|${(s.code || '').replace(/\s+/g, ' ').trim()}`;
@@ -388,7 +487,7 @@ serve(async (req) => {
     });
     // Parse request body
     const body: RequestBody = await req.json();
-    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases } = body;
+    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases, diagram: diagramRequested } = body;
 
     // Validate required fields
     if (!message || !problemDescription) {
@@ -413,15 +512,35 @@ serve(async (req) => {
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Default chat behavior: generate conversation + analyze snippets
-    const [conversationResponse, codeSnippets] = await Promise.all([
+    // If diagram explicitly requested, prioritize diagram and skip snippet analysis
+    if (diagramRequested) {
+      const diagram = await maybeGenerateMermaid(message, problemDescription, conversationHistory || [], true);
+      const responseText = diagram
+        ? await explainMermaid(diagram.code, problemDescription)
+        : 'Unable to create a diagram for this message.';
+      const aiResponse: AIResponse = { response: responseText, diagram };
+      return new Response(JSON.stringify(aiResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Default chat behavior: generate conversation + analyze snippets + opportunistic diagram
+    const [conversationResponse, codeSnippets, diagram] = await Promise.all([
       generateConversationResponse(message, problemDescription, conversationHistory || [], testCases),
-      analyzeCodeSnippets(message, conversationHistory || [], problemDescription, testCases)
+      analyzeCodeSnippets(message, conversationHistory || [], problemDescription, testCases),
+      maybeGenerateMermaid(message, problemDescription, conversationHistory || [])
     ]);
+
+    // Heuristic: suggest diagram if user mentions visualization OR problem classes where visuals help
+    const userAskedForDiagram = /\b(visualize|diagram|flowchart|mermaid|draw)\b/i.test(message);
+    const contextHints = /\b(linked list|two pointers|tree|graph|dfs|bfs|heap|priority queue|sliding window|dp|dynamic programming)\b/i.test(
+      [message, ...conversationHistory.slice(-2).map(m => m.content)].join(' ')
+    );
+    const suggestDiagram = !!diagram || userAskedForDiagram || contextHints;
 
     const aiResponse: AIResponse = {
       response: conversationResponse,
-      codeSnippets: codeSnippets.length > 0 ? codeSnippets : undefined
+      codeSnippets: codeSnippets.length > 0 ? codeSnippets : undefined,
+      diagram: diagram,
+      suggestDiagram
     };
 
     return new Response(
