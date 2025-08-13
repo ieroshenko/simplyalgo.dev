@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChatMessage, ChatSession, CodeSnippet } from '@/types';
+import { ChatMessage, ChatSession, CodeSnippet, FlowGraph } from '@/types';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
@@ -255,8 +255,10 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         sessionId: session.id,
         codeSnippets: dedupedSnippets,
         diagram: data.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
-          ? { engine: 'mermaid', code: data.diagram.code, title: data.diagram.title }
-          : undefined,
+          ? { engine: 'mermaid' as const, code: data.diagram.code, title: data.diagram.title as string | undefined }
+          : (data.diagram && data.diagram.engine === 'reactflow' && data.diagram.graph && Array.isArray(data.diagram.graph.nodes) && Array.isArray(data.diagram.graph.edges)
+              ? { engine: 'reactflow' as const, graph: data.diagram.graph as FlowGraph, title: data.diagram.title as string | undefined }
+              : undefined),
         suggestDiagram: typeof data.suggestDiagram === 'boolean' ? data.suggestDiagram : undefined
       };
 
@@ -283,15 +285,21 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
     if (!session) return;
 
     try {
-      // Delete all messages for this session
-      const { error } = await supabase
-        .from('ai_chat_messages')
-        .delete()
-        .eq('session_id', session.id);
+      // Call edge function to clear chat (messages + session)
+      const { error, data } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          action: 'clear_chat',
+          sessionId: session.id,
+          userId: user?.id,
+        },
+      });
 
-      if (error) throw error;
+      if (error || (data && data.ok === false)) {
+        throw error || new Error('Failed to clear chat');
+      }
 
       setMessages([]);
+      setSession(null);
       
       toast({
         title: "Success",
@@ -306,7 +314,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         variant: "destructive"
       });
     }
-  }, [session, toast]);
+  }, [session, user?.id, toast]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -324,14 +332,17 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
           message: sourceText,
           problemDescription,
           conversationHistory,
-          diagram: true
+          diagram: true,
+          preferredEngines: ['reactflow', 'mermaid']
         }
       });
       if (error) throw error;
 
       const diagramPayload = data?.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
         ? { engine: 'mermaid' as const, code: data.diagram.code, title: data.diagram.title as string | undefined }
-        : undefined;
+        : (data?.diagram && data.diagram.engine === 'reactflow' && data.diagram.graph && Array.isArray(data.diagram.graph.nodes) && Array.isArray(data.diagram.graph.edges)
+            ? { engine: 'reactflow' as const, graph: data.diagram.graph as FlowGraph, title: data.diagram.title as string | undefined }
+            : undefined);
 
       if (!diagramPayload) {
         toast({ title: 'No diagram', description: 'The model did not return a diagram for this request.' });

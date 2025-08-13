@@ -13,8 +13,7 @@ import { useUserStats } from '@/hooks/useUserStats';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { TestRunnerService } from '@/services/testRunner';
 import { TestCase, TestResult, CodeSnippet } from '@/types';
-import { analyzeSnippetType, insertCodeSnippet } from '@/utils/codeInsertion';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import Timer from '@/components/Timer';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,7 +34,7 @@ const ProblemSolver = () => {
     getPosition: () => { lineNumber: number; column: number } | null;
     setPosition: (pos: { lineNumber: number; column: number }) => void;
     focus: () => void;
-    deltaDecorations: (oldDecorations: string[], newDecorations: any[]) => string[];
+    deltaDecorations: (oldDecorations: string[], newDecorations: unknown[]) => string[];
   } | null>(null);
   
   // Panel visibility state
@@ -53,23 +52,23 @@ const ProblemSolver = () => {
   });
 
   // Panel toggle functions
-  const toggleLeftPanel = () => {
+  const toggleLeftPanel = useCallback(() => {
     const newValue = !showLeftPanel;
     setShowLeftPanel(newValue);
     localStorage.setItem('showLeftPanel', JSON.stringify(newValue));
-  };
+  }, [showLeftPanel]);
 
-  const toggleBottomPanel = () => {
+  const toggleBottomPanel = useCallback(() => {
     const newValue = !showBottomPanel;
     setShowBottomPanel(newValue);
     localStorage.setItem('showBottomPanel', JSON.stringify(newValue));
-  };
+  }, [showBottomPanel]);
 
-  const toggleRightPanel = () => {
+  const toggleRightPanel = useCallback(() => {
     const newValue = !showRightPanel;
     setShowRightPanel(newValue);
     localStorage.setItem('showRightPanel', JSON.stringify(newValue));
-  };
+  }, [showRightPanel]);
 
   // Keyboard shortcuts - moved to top with other hooks
   useEffect(() => {
@@ -102,7 +101,7 @@ const ProblemSolver = () => {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showLeftPanel, showBottomPanel, showRightPanel]);
+  }, [showLeftPanel, showBottomPanel, showRightPanel, toggleLeftPanel, toggleBottomPanel, toggleRightPanel]);
   
   const problem = problems.find(p => p.id === problemId);
   
@@ -163,51 +162,45 @@ const ProblemSolver = () => {
         snippetType: snippet.insertionHint?.type
       });
 
-      // Decide strategy by snippet type to avoid over-editing
-      const snippetType = snippet.insertionHint?.type || analyzeSnippetType(snippet.code);
-      let result: { newCode: string; newCursorPosition: { line: number; column: number } };
-
-      if (snippetType === 'import') {
-        // Try backend GPT-assisted insertion for imports (to place at top neatly)
-        let newCodeFromBackend: string | null = null;
-        let insertedAtLine: number | undefined;
-        try {
-          const { data, error } = await supabase.functions.invoke('ai-chat', {
-            body: {
-              action: 'insert_snippet',
-              code: currentCode,
-              snippet,
-              cursorPosition,
-              problemDescription: problem.description,
-              message: '[snippet insertion request]',
-              conversationHistory: []
-            }
-          });
-          if (error) throw error;
-          if (data && typeof data.newCode === 'string') {
-            newCodeFromBackend = data.newCode;
-            insertedAtLine = typeof data.insertedAtLine === 'number' ? data.insertedAtLine : undefined;
-            console.log('🧠 Backend insertion result:', { insertedAtLine });
+      // Always prefer backend GPT-guided insertion for precise placement
+      let newCodeFromBackend: string | null = null;
+      let insertedAtLine: number | undefined;
+      try {
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
+          body: {
+            action: 'insert_snippet',
+            code: currentCode,
+            snippet,
+            cursorPosition,
+            problemDescription: problem.description,
+            message: '[snippet insertion request]',
+            conversationHistory: []
           }
-        } catch (e) {
-          console.warn('Backend insert_snippet failed, falling back to local:', e);
+        });
+        if (error) throw error;
+        if (data && typeof data.newCode === 'string') {
+          newCodeFromBackend = data.newCode;
+          insertedAtLine = typeof data.insertedAtLine === 'number' ? data.insertedAtLine : undefined;
+          console.log('🧠 Backend insertion result:', { insertedAtLine });
         }
-
-        result = newCodeFromBackend
-          ? {
-              newCode: newCodeFromBackend,
-              newCursorPosition: {
-                line: typeof insertedAtLine === 'number' && insertedAtLine >= 0
-                  ? insertedAtLine + (snippet.code.split('\n').length - 1)
-                  : cursorPosition.line,
-                column: 0
-              }
-            }
-          : insertCodeSnippet(currentCode, snippet, cursorPosition);
-      } else {
-        // For variables/statements/functions/classes, do strict local insertion to prevent full-file edits
-        result = insertCodeSnippet(currentCode, snippet, cursorPosition);
+      } catch (e) {
+        console.warn('Backend insert_snippet failed, falling back to local:', e);
       }
+
+      if (!newCodeFromBackend) {
+        toast.error('AI placement failed. Please try again.');
+        return;
+      }
+
+      const result: { newCode: string; newCursorPosition: { line: number; column: number } } = {
+        newCode: newCodeFromBackend,
+        newCursorPosition: {
+          line: typeof insertedAtLine === 'number' && insertedAtLine >= 0
+            ? insertedAtLine + (snippet.code.split('\n').length - 1)
+            : cursorPosition.line,
+          column: 0
+        }
+      };
       console.log('✨ Insertion result:', result);
       
       // Use Monaco's setValue to update the editor directly
@@ -227,8 +220,9 @@ const ProblemSolver = () => {
         editor.focus();
         
         // Add temporary highlight
+        const Monaco = (window as unknown as { monaco?: { Range: new (startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number) => unknown } }).monaco;
         const decorations = editor.deltaDecorations([], [{
-          range: new (window as any).monaco.Range(
+          range: new (Monaco as { Range: new (a: number, b: number, c: number, d: number) => unknown }).Range(
             Math.max(1, result.newCursorPosition.line - snippet.code.split('\n').length + 2),
             1,
             result.newCursorPosition.line + 1,
@@ -315,7 +309,7 @@ const ProblemSolver = () => {
   };
 
 
-  const renderValue = (value: any): string => {
+  const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) return 'null';
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
     if (typeof value === 'string') {
@@ -329,7 +323,7 @@ const ProblemSolver = () => {
     if (typeof value === 'object') {
       try {
         // Compact one-line JSON for arrays/objects to match Expected/Your Output style
-        return JSON.stringify(value);
+        return JSON.stringify(value as Record<string, unknown>);
       } catch {
         return String(value);
       }

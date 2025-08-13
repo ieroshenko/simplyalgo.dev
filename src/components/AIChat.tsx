@@ -9,6 +9,8 @@ import { useSpeechToText } from '@/hooks/useSpeechToText';
 import TextareaAutosize from 'react-textarea-autosize';
 import { CodeSnippet } from '@/types';
 import Mermaid from '@/components/diagram/Mermaid';
+import FlowCanvas from '@/components/diagram/FlowCanvas';
+import type { FlowGraph } from '@/types';
 import CodeSnippetButton from '@/components/CodeSnippetButton';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -24,8 +26,10 @@ interface AIChatProps {
 const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  type ActiveDiagram = { engine: 'mermaid'; code: string } | { engine: 'reactflow'; graph: FlowGraph };
   const [isDiagramOpen, setIsDiagramOpen] = useState(false);
-  const [activeDiagram, setActiveDiagram] = useState<string | null>(null);
+  const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(null);
+  const [hiddenVisualizeForIds, setHiddenVisualizeForIds] = useState<Set<string>>(new Set());
   const { 
     session, 
     messages, 
@@ -71,13 +75,14 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
     }
   };
 
-  const handleVisualize = async (sourceMessageContent: string) => {
+  const handleVisualize = async (sourceMessageContent: string, messageId: string) => {
     // Request a diagram separately without adding a user message bubble
+    setHiddenVisualizeForIds(prev => new Set(prev).add(messageId));
     await requestDiagram(sourceMessageContent);
   };
 
-  const openDiagramDialog = (code: string) => {
-    setActiveDiagram(code);
+  const openDiagramDialog = (diagram: ActiveDiagram) => {
+    setActiveDiagram(diagram);
     setIsDiagramOpen(true);
   };
 
@@ -225,11 +230,11 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                           <div className="mt-3">
                             <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs text-muted-foreground">Diagram</div>
+                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">Mermaid</span></div>
                                 <button
                                   type="button"
                                   className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                  onClick={() => openDiagramDialog((message as unknown as { diagram: { code: string } }).diagram.code)}
+                                  onClick={() => openDiagramDialog({ engine: 'mermaid', code: (message as unknown as { diagram: { code: string } }).diagram.code })}
                                   title="View full screen"
                                 >
                                   <Maximize2 className="w-3.5 h-3.5" />
@@ -240,6 +245,27 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                             </div>
                           </div>
                         )}
+
+                        {/* React Flow diagram bubble if attached */}
+                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'reactflow'; graph: FlowGraph } }).diagram?.engine === 'reactflow' && (
+                          <div className="mt-3">
+                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">React Flow</span></div>
+                                <button
+                                  type="button"
+                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => openDiagramDialog({ engine: 'reactflow', graph: (message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph })}
+                                  title="View full screen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  Expand
+                                </button>
+                              </div>
+                              <FlowCanvas graph={(message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph} />
+                            </div>
+                          </div>
+                        )}
                         
                         {/* Actions: Visualize button and code snippets */}
                         {message.role === 'assistant' && (
@@ -247,7 +273,8 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                             {(() => {
                               const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
                               const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
-                              const shouldShow = userAsked || (message as unknown as { suggestDiagram?: boolean }).suggestDiagram === true;
+                              const hasDiagram = Boolean((message as unknown as { diagram?: unknown }).diagram);
+                              const shouldShow = !hasDiagram && (userAsked || (message as unknown as { suggestDiagram?: boolean }).suggestDiagram === true) && !hiddenVisualizeForIds.has(message.id);
                               return shouldShow ? (
                                 <div className="flex items-center gap-2">
                                   <Button
@@ -255,7 +282,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                     variant="outline"
                                     size="sm"
                                     className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                    onClick={() => handleVisualize(message.content)}
+                                    onClick={() => handleVisualize(message.content, message.id)}
                                     title="Ask the AI to generate a diagram"
                                   >
                                     <DiagramIcon className="w-4 h-4" />
@@ -414,7 +441,13 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
               <div className="text-sm font-medium">Diagram</div>
               <Button size="sm" variant="ghost" onClick={() => setIsDiagramOpen(false)}>Close</Button>
             </div>
-            {activeDiagram && <Mermaid chart={activeDiagram} />}
+            {activeDiagram && (
+              activeDiagram.engine === 'mermaid' ? (
+                <Mermaid chart={activeDiagram.code} />
+              ) : (
+                <FlowCanvas graph={activeDiagram.graph} height="80vh" />
+              )
+            )}
           </div>
         </div>
       )}
