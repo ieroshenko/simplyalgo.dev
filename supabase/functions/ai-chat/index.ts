@@ -33,6 +33,8 @@ interface RequestBody {
   action?: 'insert_snippet';
   // Optional explicit diagram request
   diagram?: boolean;
+  // Preferred engines order for diagram generation
+  preferredEngines?: Array<'reactflow' | 'mermaid'>;
   // Payload for insertion
   code?: string;
   snippet?: CodeSnippet;
@@ -44,16 +46,180 @@ interface RequestBody {
 interface AIResponse {
   response: string;
   codeSnippets?: CodeSnippet[];
-  diagram?: {
-    engine: 'mermaid';
-    code: string;
-    title?: string;
-  };
+  diagram?:
+    | { engine: 'mermaid'; code: string; title?: string }
+    | { engine: 'reactflow'; graph: { nodes: Array<{ id: string; type?: string; data: { label: string }; position: { x: number; y: number } }>; edges: Array<{ id: string; source: string; target: string; label?: string }> }; title?: string };
   suggestDiagram?: boolean;
+  diagramDebug?: {
+    tried: Array<'reactflow' | 'mermaid'>;
+    reactflow?: { ok: boolean; reason?: string };
+    mermaid?: { ok: boolean; reason?: string };
+  };
 }
 
 // Initialize OpenAI client (will be created with proper error handling in the handler)
 let openai: OpenAI;
+
+// Model selection via env var; default to o3-mini if not set
+const configuredModel = (Deno.env.get('OPENAI_MODEL') || 'o3-mini').trim();
+const modelSource = Deno.env.get('OPENAI_MODEL') ? 'OPENAI_MODEL env set' : 'defaulted to o3-mini (no OPENAI_MODEL)';
+const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
+
+// Unified LLM callers (supports Responses API for gpt-5/o3 and falls back to Chat Completions)
+async function llmText(
+  prompt: string,
+  opts: { temperature?: number; maxTokens?: number; responseFormat?: 'json_object' | undefined }
+): Promise<string> {
+  const model = configuredModel;
+  if (useResponsesApi) {
+    // Try configured Responses model first, then o3-mini, then fall back to Chat API
+    const responseModels = [model, 'o3-mini'].filter((v, i, a) => a.indexOf(v) === i);
+    for (const respModel of responseModels) {
+      try {
+        console.log(`[ai-chat] Using Responses API with model=${respModel}`);
+        const req: Record<string, unknown> = {
+          model: respModel,
+          input: prompt,
+          // temperature is not supported by some Responses models (e.g., gpt-5), so omit it entirely
+          max_output_tokens: typeof opts.maxTokens === 'number' ? opts.maxTokens : undefined,
+        };
+        if (/^gpt-5/i.test(respModel)) {
+          req.reasoning = { effort: 'minimal' };
+          req.text = {
+            verbosity: opts.responseFormat ? 'low' : 'medium',
+            ...(opts.responseFormat ? { format: { type: 'json_object' } } : {}),
+          };
+        } else if (/^o3/i.test(respModel)) {
+          req.reasoning = { effort: 'medium' };
+          // o3 may ignore text.verbosity; omit for safety
+        }
+        const response = await openai.responses.create(req as unknown as {
+          output_text?: string;
+          output?: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }>;
+          choices?: Array<{ message?: { content?: string } }>;
+        } );
+        let text: string = 'output_text' in (response as Record<string, unknown>) && typeof (response as Record<string, unknown>).output_text === 'string'
+          ? ((response as unknown as { output_text: string }).output_text)
+          : '';
+        const output: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> = 'output' in (response as Record<string, unknown>)
+          ? ((response as unknown as { output: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> }).output)
+          : [];
+        if (!text && Array.isArray(output)) {
+          for (const item of output) {
+            const content = Array.isArray(item?.content) ? item.content : [];
+            for (const c of content) {
+              const type = c?.type;
+              const textField = c?.text as unknown;
+              const nestedValue = (textField && typeof textField === 'object' && 'value' in (textField as Record<string, unknown>)
+                ? (textField as { value?: string }).value
+                : undefined);
+              if (type === 'output_text' && typeof nestedValue === 'string') {
+                text += nestedValue;
+              } else if (type === 'text') {
+                if (typeof textField === 'string') text += textField;
+                else if (typeof nestedValue === 'string') text += nestedValue;
+              }
+            }
+          }
+        }
+        const choices: Array<{ message?: { content?: string } }> = 'choices' in (response as Record<string, unknown>)
+          ? ((response as unknown as { choices: Array<{ message?: { content?: string } }> }).choices)
+          : [];
+        if (!text && choices?.[0]?.message?.content) {
+          text = choices[0].message!.content || '';
+        }
+        const finalText = (text || '').toString();
+        if (finalText.trim().length > 0) {
+          return finalText;
+        }
+        console.warn(`[ai-chat] Responses API returned empty text for model=${respModel}; trying next option...`);
+        continue;
+      } catch (e) {
+        const err = e as unknown as { name?: string; message?: string };
+        console.warn(`[ai-chat] Responses API failed for model=${respModel}. ${err?.name || ''}: ${err?.message || ''}`);
+        continue;
+      }
+    }
+    console.warn(`[ai-chat] All Responses API attempts failed; falling back to Chat Completions.`);
+  }
+  const chatModel = useResponsesApi ? 'gpt-4o-mini' : model;
+  console.log(`[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? 'yes' : 'no'})`);
+  const chat = await openai.chat.completions.create({
+    model: chatModel,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: opts.temperature ?? 0.7,
+    max_tokens: opts.maxTokens ?? 500,
+    response_format: opts.responseFormat ? ({ type: opts.responseFormat } as { type: 'json_object' }) : undefined,
+  } as unknown as { choices: Array<{ message?: { content?: string } }> });
+  return chat.choices[0]?.message?.content || '';
+}
+
+async function llmJson(
+  prompt: string,
+  opts: { temperature?: number; maxTokens?: number }
+): Promise<string> {
+  return await llmText(prompt, {
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+    responseFormat: 'json_object',
+  });
+}
+
+/**
+ * Fast JSON helper: force a lightweight, fast model for tool-style calls
+ */
+async function llmJsonFast(
+  prompt: string,
+  opts?: { maxTokens?: number }
+): Promise<string> {
+  // Prefer Responses API for gpt-5-mini, fall back to Chat Completions with gpt-4o-mini
+  try {
+    console.log('[ai-chat] llmJsonFast using Responses API with model=gpt-5-mini');
+    const req: Record<string, unknown> = {
+      model: 'gpt-5-mini',
+      input: prompt,
+      max_output_tokens: typeof opts?.maxTokens === 'number' ? opts.maxTokens : 600,
+      text: { verbosity: 'low', format: { type: 'json_object' } },
+      reasoning: { effort: 'minimal' },
+    };
+    const response = await openai.responses.create(req as unknown as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }>;
+    });
+    let text: string = (response as unknown as { output_text?: string }).output_text || '';
+    const output: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> =
+      (response as unknown as { output?: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> }).output || [];
+    if (!text && Array.isArray(output)) {
+      for (const item of output) {
+        const content = Array.isArray(item?.content) ? item.content : [];
+        for (const c of content) {
+          const type = (c as { type?: string })?.type;
+          const textField = (c as { text?: { value?: string } | string })?.text as unknown;
+          const nestedValue = (textField && typeof textField === 'object' && 'value' in (textField as Record<string, unknown>)
+            ? (textField as { value?: string }).value
+            : undefined);
+          if (type === 'output_text' && typeof nestedValue === 'string') {
+            text += nestedValue;
+          } else if (type === 'text') {
+            if (typeof textField === 'string') text += textField;
+            else if (typeof nestedValue === 'string') text += nestedValue;
+          }
+        }
+      }
+    }
+    return text;
+  } catch (err) {
+    console.warn('[ai-chat] llmJsonFast gpt-5-mini Responses failed; falling back to gpt-4o-mini Chat. Error:', err);
+    const chat = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.0,
+      max_tokens: opts?.maxTokens ?? 600,
+      response_format: { type: 'json_object' } as { type: 'json_object' },
+    } as unknown as { choices: Array<{ message?: { content?: string } }> });
+    return chat.choices[0]?.message?.content || '';
+  }
+}
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -64,6 +230,10 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Admin client (if service role key is provided) for maintenance actions like clearing chat
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const supabaseAdmin = supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : supabase;
 
 /**
  * Main conversation handler - generates AI response for general chat
@@ -114,38 +284,99 @@ Important constraints:
 Respond naturally and conversationally. Focus on teaching and guiding rather than just providing answers.
 `;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. The student's code is auto-run on Judge0 with official tests; avoid asking them to run tests or provide test cases. Only after a likely-correct solution, ask one follow-up on time/space complexity."
-      },
-      {
-        role: "user",
-        content: conversationPrompt
-      }
-    ],
-    temperature: 0.7,
-    max_tokens: 500
-  });
+  const systemGuidance = "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. The student's code is auto-run on Judge0 with official tests; avoid asking them to run tests or provide test cases. Only after a likely-correct solution, ask one follow-up on time/space complexity.";
+  const combined = `${systemGuidance}\n\n${conversationPrompt}`;
+  const text = await llmText(combined, { temperature: 0.7, maxTokens: 500 });
+  return text || "I'm sorry, I couldn't generate a response. Please try again.";
+}
 
-  return response.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
+// React Flow types and validator
+type FlowNode = { id: string; type?: string; data: { label: string }; position: { x: number; y: number } };
+type FlowEdge = { id: string; source: string; target: string; label?: string };
+type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[] };
+
+function validateFlowGraph(graph: unknown): graph is FlowGraph {
+  if (!graph || typeof graph !== 'object') return false;
+  const g = graph as { nodes?: unknown; edges?: unknown };
+  if (!Array.isArray(g.nodes) || !Array.isArray(g.edges)) return false;
+  const idSet = new Set<string>();
+  for (const n of g.nodes) {
+    const node = n as FlowNode;
+    if (!node || typeof node.id !== 'string') return false;
+    if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') return false;
+    if (!node.data || typeof node.data.label !== 'string') return false;
+    if (idSet.has(node.id)) return false;
+    idSet.add(node.id);
+  }
+  for (const e of g.edges) {
+    const edge = e as FlowEdge;
+    if (!edge || typeof edge.id !== 'string' || typeof edge.source !== 'string' || typeof edge.target !== 'string') return false;
+  }
+  return true;
 }
 
 /**
- * Try to generate a safe Mermaid diagram when the user requests visualization
+ * Try to generate a React Flow diagram first; fallback to Mermaid
  */
-async function maybeGenerateMermaid(
+async function maybeGenerateDiagram(
   message: string,
   problemDescription: string,
   conversationHistory: ChatMessage[],
-  force = false
-): Promise<{ engine: 'mermaid'; code: string; title?: string } | undefined> {
-  const wantsDiagram = /\b(visualize|diagram|draw|show.*diagram|mermaid)\b/i.test(message);
+  force = false,
+  preferredEngines?: Array<'reactflow' | 'mermaid'>
+): Promise<
+  | { engine: 'reactflow'; graph: FlowGraph; title?: string }
+  | { engine: 'mermaid'; code: string; title?: string }
+  | undefined
+> {
+  const wantsDiagram = /\b(visualize|diagram|draw|show.*diagram|mermaid|flow|graph)\b/i.test(message);
   if (!force && !wantsDiagram) return undefined;
+  const engineOrder: Array<'reactflow' | 'mermaid'> = Array.isArray(preferredEngines) && preferredEngines.length
+    ? Array.from(new Set(preferredEngines.concat(['reactflow', 'mermaid'] as const))) as Array<'reactflow' | 'mermaid'>
+    : ['reactflow', 'mermaid'];
 
-  const prompt = `You will output a Mermaid diagram that visualizes the algorithm discussed.
+  const rfPrompt = `You will output a React Flow graph JSON that visualizes the algorithm discussed.
+STRICT OUTPUT FORMAT: Return JSON only with this schema:
+{ "reactflow": { "nodes": [{ "id": "n1", "type": "default", "data": { "label": "Start" }, "position": { "x": 0, "y": 0 } }], "edges": [{ "id": "e1", "source": "n1", "target": "n2", "label": "next" }] } }
+Rules:
+- Max 40 nodes.
+- Keep labels concise; no code in labels.
+- Provide reasonable positions (x,y in pixels).
+- Node ids and edge ids must be unique strings.
+- No HTML in labels.
+
+Context:
+Problem: ${problemDescription}
+Recent conversation:\n${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
+Current user request: ${message}`;
+
+  // Attempt functions
+  const tryReactFlow = async (): Promise<{ ok: true; diagram: { engine: 'reactflow'; graph: FlowGraph } } | { ok: false; reason: string }> => {
+    let raw = '';
+    try {
+      raw = (await llmJson(rfPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+    } catch (e) {
+      try {
+        raw = (await llmText(rfPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+      } catch (e2) {
+        return { ok: false, reason: `Responses+fallback failed: ${(e2 as Error)?.message || 'unknown error'}` };
+      }
+    }
+    if (!raw) return { ok: false, reason: 'Empty response for reactflow JSON' };
+    try {
+      const parsed = JSON.parse(raw);
+      const rf = (parsed && parsed.reactflow) ? parsed.reactflow : undefined;
+      if (!rf) return { ok: false, reason: 'Missing reactflow key in JSON' };
+      if (validateFlowGraph(rf)) {
+        return { ok: true, diagram: { engine: 'reactflow', graph: rf } };
+      }
+      return { ok: false, reason: 'Schema validation failed' };
+    } catch (parseErr) {
+      return { ok: false, reason: `Invalid JSON: ${(parseErr as Error)?.message || 'parse error'}` };
+    }
+  };
+
+  const mermaidPrompt = `You will output a Mermaid diagram that visualizes the algorithm discussed.
 STRICT OUTPUT FORMAT: Return JSON only (no markdown, no prose) with this schema: { "mermaid": "<diagram>" }
 Rules for the diagram:
 - Use flowchart LR unless another type is clearly better.
@@ -158,49 +389,62 @@ Problem: ${problemDescription}
 Recent conversation:\n${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
 Current user request: ${message}`;
 
-  let raw = '';
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 700,
-    });
-    raw = response.choices[0]?.message?.content?.trim() || '';
-  } catch (e) {
-    // fall back to best-effort text mode
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-      max_tokens: 700,
-    });
-    raw = response.choices[0]?.message?.content?.trim() || '';
+  const tryMermaid = async (): Promise<{ ok: true; diagram: { engine: 'mermaid'; code: string } } | { ok: false; reason: string }> => {
+    let mermaidRaw = '';
+    try {
+      mermaidRaw = (await llmJson(mermaidPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+    } catch (e) {
+      try {
+        mermaidRaw = (await llmText(mermaidPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+      } catch (e2) {
+        return { ok: false, reason: `Responses+fallback failed: ${(e2 as Error)?.message || 'unknown error'}` };
+      }
+    }
+    if (!mermaidRaw) return { ok: false, reason: 'Empty response for mermaid JSON' };
+    let mermaidCode = '';
+    try {
+      const parsed = JSON.parse(mermaidRaw);
+      if (parsed && typeof parsed.mermaid === 'string') {
+        mermaidCode = String(parsed.mermaid);
+      }
+    } catch (parseErr) {
+      const fence = mermaidRaw.match(/```mermaid([\s\S]*?)```/i);
+      if (fence && fence[1]) {
+        mermaidCode = fence[1];
+      } else if (/flowchart\s+LR|graph\s+LR/i.test(mermaidRaw)) {
+        mermaidCode = mermaidRaw;
+      } else {
+        return { ok: false, reason: `Invalid JSON and no fence: ${(parseErr as Error)?.message || 'parse error'}` };
+      }
+    }
+    const sanitized = (mermaidCode || '')
+      .replace(/^```mermaid\n?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+    if (!sanitized) return { ok: false, reason: 'Mermaid content empty after sanitization' };
+    return { ok: true, diagram: { engine: 'mermaid', code: sanitized } };
+  };
+
+  const tried: Array<'reactflow' | 'mermaid'> = [];
+  const debug: { reactflow?: { ok: boolean; reason?: string }; mermaid?: { ok: boolean; reason?: string } } = {};
+
+  for (const engine of engineOrder) {
+    if (engine === 'reactflow') {
+      tried.push('reactflow');
+      const rf = await tryReactFlow();
+      if (rf.ok) return rf.diagram;
+      debug.reactflow = { ok: false, reason: rf.reason };
+    } else if (engine === 'mermaid') {
+      tried.push('mermaid');
+      const mm = await tryMermaid();
+      if (mm.ok) return mm.diagram;
+      debug.mermaid = { ok: false, reason: mm.reason };
+    }
   }
 
-  let mermaidCode = '';
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.mermaid === 'string') {
-      mermaidCode = String(parsed.mermaid);
-    }
-  } catch {
-    // Try to extract from fenced block
-    const fence = raw.match(/```mermaid([\s\S]*?)```/i);
-    if (fence && fence[1]) {
-      mermaidCode = fence[1];
-    } else if (/flowchart\s+LR|graph\s+LR/i.test(raw)) {
-      mermaidCode = raw;
-    }
-  }
-
-  const sanitized = (mermaidCode || '')
-    .replace(/^```mermaid\n?/i, '')
-    .replace(/```$/i, '')
-    .trim();
-  if (!sanitized) return undefined;
-  return { engine: 'mermaid', code: sanitized };
+  // No diagram; attach debug info to console
+  console.warn('[ai-chat] Diagram generation failed', { tried: engineOrder, ...debug });
+  return undefined;
 }
 
 // Generate a brief, friendly explanation of a given Mermaid diagram
@@ -214,13 +458,8 @@ Problem context (for reference): ${problemDescription}
 
 Diagram (Mermaid DSL):\n${mermaidCode}`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: explainPrompt }],
-    temperature: 0.5,
-    max_tokens: 180,
-  });
-  return response.choices[0]?.message?.content?.trim() || 'Here is the diagram.';
+  const text = await llmText(explainPrompt, { temperature: 0.5, maxTokens: 180 });
+  return text?.trim() || 'Here is the diagram.';
 }
 
 /**
@@ -317,19 +556,10 @@ Student: "Two pointers approach?"
 Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer initialization), but avoid full solutions unless explicitly requested.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: analysisPrompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.1, // Low temperature for consistent analysis
-      max_tokens: 1000
-    });
-
+    const raw = await llmJson(analysisPrompt, { temperature: 0.1, maxTokens: 1000 });
     let analysisResult;
     try {
-      analysisResult = JSON.parse(
-        response.choices[0]?.message?.content || '{"codeSnippets": []}'
-      );
+      analysisResult = JSON.parse(raw || '{"codeSnippets": []}');
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       return [];
@@ -362,7 +592,7 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
         const isSimpleType = snippet.insertionHint?.type === 'import' || snippet.insertionHint?.type === 'variable' || snippet.insertionHint?.type === 'statement';
         const allowedByPolicy = (hasExplicitCode || explicitAsk) && (appearsInUserText || isSimpleType);
         return allowedByPolicy && !isControlFlow && !tooLong;
-      });
+    });
 
     // Dedupe within the same response
     const normalize = (s: CodeSnippet) => `${(s.insertionHint?.type || '')}|${(s.insertionHint?.scope || '')}|${(s.code || '').replace(/\s+/g, ' ').trim()}`;
@@ -383,7 +613,7 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
 }
 
 /**
- * Use LLM to compute the best insertion point and return updated code
+ * Use LLM to compute the best insertion line and indentation, then deterministically insert ONLY the snippet
  */
 async function insertSnippetSmart(
   code: string,
@@ -391,7 +621,34 @@ async function insertSnippetSmart(
   problemDescription: string,
   cursorPosition?: { line: number; column: number }
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  const prompt = `You are assisting with inserting a small code snippet into a student's Python solution file.
+  // 1) Deterministic, fast path: anchor-based insertion if the first line exists
+  try {
+    const snippetLines = (snippet.code || '').split('\n');
+    const firstLineTrim = (snippetLines[0] || '').trim();
+    if (firstLineTrim.length > 0) {
+      const lines = code.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === firstLineTrim) {
+          // If next lines already match snippet continuation, skip (already inserted)
+          const secondLineTrim = (snippetLines[1] || '').trim();
+          if (secondLineTrim && lines[i + 1]?.trim() === secondLineTrim) {
+            return { newCode: code, insertedAtLine: -1, rationale: 'Snippet already present after anchor' };
+          }
+          const indent = lines[i].match(/^\s*/)?.[0] || '';
+          const toInsert = snippetLines.slice(1).map((l, idx) => (idx === 0 ? indent + l.trim() : indent + l));
+          const newLines = [...lines];
+          newLines.splice(i + 1, 0, ...toInsert);
+          const newCode = newLines.join('\n');
+          console.log('[ai-chat] insert_snippet anchor-based insertion at line', i + 1);
+          return { newCode, insertedAtLine: i + 1, rationale: 'Anchor-based placement after matching first line' };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[ai-chat] Anchor-based insertion failed, continuing to model placement:', e);
+  }
+
+  const placementPrompt = `You will choose where to insert a SHORT code snippet into a Python file.
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -409,40 +666,55 @@ ${snippet.code}
 CURSOR POSITION (0-based line, column): ${cursorPosition ? `${cursorPosition.line},${cursorPosition.column}` : 'null'}
 
 Task:
-- Determine the best insertion location according to the snippet type/scope and code structure.
-- Maintain valid Python syntax and correct indentation.
-- Avoid duplicating existing code. If the snippet (normalized whitespace) already exists in the file, return the original code.
-- If insertion is ambiguous, prefer placing inside the active function near the cursor when provided; otherwise, at a logical spot following Python best practices.
+- Determine the 0-based line index where the FIRST line of the snippet should be inserted.
+- Provide an indentation string (spaces or tabs) appropriate for that location. Do NOT include any other code.
+- If the exact snippet (normalized whitespace) already exists, set insertAtLine to -1.
+- If insertion is ambiguous, prefer placing inside the active function near the cursor when provided.
 
 Output strictly as JSON (no markdown):
 {
-  "newCode": "<entire updated file content>",
-  "insertedAtLine": <0-based line index where first line of snippet was inserted or -1 if unchanged>,
+  "insertAtLine": <number>,
+  "indentation": "<indent string>",
   "rationale": "<brief explanation>"
 }`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: 'You are a precise code editing assistant. Always return valid JSON with the full updated file content.' },
-      { role: 'user', content: prompt }
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.1,
-    max_tokens: 2000
+  console.log('[ai-chat] insert_snippet using model=gpt-4o-mini (placement-only)');
+  const raw = await llmJsonFast(placementPrompt, { maxTokens: 500 });
+  let insertAtLine: number | undefined;
+  let indent: string | undefined;
+  let rationale: string | undefined;
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    if (typeof parsed.insertAtLine === 'number') insertAtLine = parsed.insertAtLine;
+    if (typeof parsed.indentation === 'string') indent = parsed.indentation;
+    if (typeof parsed.rationale === 'string') rationale = parsed.rationale;
+  } catch {
+    // ignore
+  }
+
+  // If snippet already exists or placement invalid, return original
+  if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
+    return { newCode: code, insertedAtLine: -1, rationale };
+  }
+
+  // Deterministic insertion of ONLY the provided snippet
+  const lines = code.split('\n');
+  const safeInsertLine = Math.min(Math.max(0, insertAtLine), lines.length);
+  // Derive indentation if not provided
+  const contextIndent = indent !== undefined ? indent : (lines[safeInsertLine]?.match(/^\s*/)?.[0] || '');
+
+  const snippetLines = snippet.code.split('\n');
+  const indentedSnippet: string[] = snippetLines.map((line, idx) => {
+    if (idx === 0) {
+      return contextIndent + line.trim();
+    }
+    return contextIndent + line;
   });
 
-  try {
-    const content = response.choices[0]?.message?.content || '{"newCode":"","insertedAtLine":-1}';
-    const parsed = JSON.parse(content);
-    return {
-      newCode: typeof parsed.newCode === 'string' ? parsed.newCode : code,
-      insertedAtLine: typeof parsed.insertedAtLine === 'number' ? parsed.insertedAtLine : undefined,
-      rationale: typeof parsed.rationale === 'string' ? parsed.rationale : undefined
-    };
-  } catch {
-    return { newCode: code };
-  }
+  const newLines = [...lines];
+  newLines.splice(safeInsertLine, 0, ...indentedSnippet);
+  const newCode = newLines.join('\n');
+  return { newCode, insertedAtLine: safeInsertLine, rationale };
 }
 
 /**
@@ -485,9 +757,10 @@ serve(async (req) => {
     openai = new OpenAI({
       apiKey: openaiKey,
     });
+    console.log(`[ai-chat] Model selection: model=${configuredModel} | api=${useResponsesApi ? 'Responses' : 'Chat'} | source=${modelSource}`);
     // Parse request body
     const body: RequestBody = await req.json();
-    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases, diagram: diagramRequested } = body;
+    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases, diagram: diagramRequested, preferredEngines } = body;
 
     // Validate required fields
     if (!message || !problemDescription) {
@@ -514,9 +787,9 @@ serve(async (req) => {
 
     // If diagram explicitly requested, prioritize diagram and skip snippet analysis
     if (diagramRequested) {
-      const diagram = await maybeGenerateMermaid(message, problemDescription, conversationHistory || [], true);
+      const diagram = await maybeGenerateDiagram(message, problemDescription, conversationHistory || [], true, preferredEngines);
       const responseText = diagram
-        ? await explainMermaid(diagram.code, problemDescription)
+        ? (diagram.engine === 'mermaid' ? await explainMermaid(diagram.code, problemDescription) : 'Here is an interactive diagram of the approach.')
         : 'Unable to create a diagram for this message.';
       const aiResponse: AIResponse = { response: responseText, diagram };
       return new Response(JSON.stringify(aiResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -526,7 +799,7 @@ serve(async (req) => {
     const [conversationResponse, codeSnippets, diagram] = await Promise.all([
       generateConversationResponse(message, problemDescription, conversationHistory || [], testCases),
       analyzeCodeSnippets(message, conversationHistory || [], problemDescription, testCases),
-      maybeGenerateMermaid(message, problemDescription, conversationHistory || [])
+      maybeGenerateDiagram(message, problemDescription, conversationHistory || [], false, preferredEngines)
     ]);
 
     // Heuristic: suggest diagram if user mentions visualization OR problem classes where visuals help

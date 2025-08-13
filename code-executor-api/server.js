@@ -805,6 +805,7 @@ app.post('/execute', async (req, res) => {
       // Decode base64 outputs
       const stdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString().trim() : '';
       const stderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString().trim() : '';
+      const statusDesc = result.status && result.status.description ? String(result.status.description) : '';
       
       // Parse actual output as JSON if possible
       let actualOutput;
@@ -812,6 +813,15 @@ app.post('/execute', async (req, res) => {
         actualOutput = JSON.parse(stdout);
       } catch {
         actualOutput = stdout;
+      }
+
+      // Friendly error hints when there is no output or timeouts
+      let friendlyError = null;
+      if (!stdout && !stderr) {
+        friendlyError = 'No output produced. Common causes: returning None, printing instead of returning, or an infinite loop (e.g., not advancing pointers).';
+      }
+      if (/time limit exceeded|timeout/i.test(statusDesc)) {
+        friendlyError = 'Execution timed out. For pointer-based problems, ensure pointers advance each iteration (e.g., ptr1 = ptr1.next or ptr2 = ptr2.next).';
       }
       
       // Compare actual vs expected with conditional smart comparison
@@ -848,12 +858,12 @@ app.post('/execute', async (req, res) => {
       return {
         input: inputDisplay,
         expected: formattedExpected,
-        actual: formattedActual,
+        actual: formattedActual || (friendlyError ? '' : formattedActual),
         passed,
         status: result.status.description,
         time: result.time,
         memory: result.memory,
-        stderr: stderr || null
+        stderr: (friendlyError || stderr) || null
       };
     });
     

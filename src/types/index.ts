@@ -55,6 +55,13 @@ export interface CodeSnippet {
   };
 }
 
+// React Flow diagram types (declarative, safe to render on client)
+export interface FlowNodePosition { x: number; y: number }
+export interface FlowNodeData { label: string }
+export interface FlowNode { id: string; type?: string; data: FlowNodeData; position: FlowNodePosition }
+export interface FlowEdge { id: string; source: string; target: string; label?: string }
+export interface FlowGraph { nodes: FlowNode[]; edges: FlowEdge[] }
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -62,11 +69,17 @@ export interface ChatMessage {
   timestamp: Date;
   sessionId?: string;
   codeSnippets?: CodeSnippet[];
-  diagram?: {
-    engine: 'mermaid';
-    code: string; // raw mermaid DSL
-    title?: string;
-  };
+  diagram?:
+    | {
+        engine: 'mermaid';
+        code: string; // raw mermaid DSL
+        title?: string;
+      }
+    | {
+        engine: 'reactflow';
+        graph: FlowGraph;
+        title?: string;
+      };
   suggestDiagram?: boolean;
 }
 

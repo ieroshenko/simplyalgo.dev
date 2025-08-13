@@ -38,12 +38,15 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
         const mm = mod?.default ?? mod;
         if (!mm || cancelled) return;
         mm.initialize(baseConfig);
-        const { svg } = await mm.render(id, chart);
+        // Sanitize: collapse newlines within bracketed labels to avoid parser errors
+        const sanitized = chart.replace(/\[(?:[^\]\n]|\\.|\n)*\]/g, (label) => label.replace(/\n+/g, ' '));
+        const { svg } = await mm.render(id, sanitized);
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
         }
-      } catch {
+      } catch (e) {
         if (!cancelled && containerRef.current) {
+          console.error('Mermaid rendering error:', e);
           containerRef.current.innerHTML = '<div class="text-destructive text-xs">Failed to render diagram</div>';
         }
       }
