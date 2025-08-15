@@ -270,8 +270,14 @@ function parseTestCaseInput(inputString, functionSignature) {
           console.log(`  Opening bracket, depths: square=${squareBracketDepth}, total=${bracketDepth}`);
         } else if (char === ']' && !insideQuotes) {
           current += char;
-          squareBracketDepth--;
-          bracketDepth--;
+          // Prevent underflow on unmatched closing bracket
+          const hadSquare = squareBracketDepth > 0;
+          squareBracketDepth = Math.max(0, squareBracketDepth - 1);
+          if (hadSquare) {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+          } else {
+            console.warn(`Unmatched ']' at index ${i}; depths unchanged`);
+          }
           console.log(`  Closing bracket, depths: square=${squareBracketDepth}, total=${bracketDepth}`);
         } else if (char === '{' && !insideQuotes) {
           current += char;
@@ -280,8 +286,14 @@ function parseTestCaseInput(inputString, functionSignature) {
           console.log(`  Opening brace, depths: curly=${curlyBracketDepth}, total=${bracketDepth}`);
         } else if (char === '}' && !insideQuotes) {
           current += char;
-          curlyBracketDepth--;
-          bracketDepth--;
+          // Prevent underflow on unmatched closing brace
+          const hadCurly = curlyBracketDepth > 0;
+          curlyBracketDepth = Math.max(0, curlyBracketDepth - 1);
+          if (hadCurly) {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+          } else {
+            console.warn(`Unmatched '}' at index ${i}; depths unchanged`);
+          }
           console.log(`  Closing brace, depths: curly=${curlyBracketDepth}, total=${bracketDepth}`);
         } else if (char === ',' && !insideQuotes && bracketDepth === 0) {
           console.log(`  SPLIT POINT! Current part: '${current.trim()}'`);

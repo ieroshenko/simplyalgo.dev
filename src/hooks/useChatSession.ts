@@ -4,6 +4,47 @@ import { ChatMessage, ChatSession, CodeSnippet, FlowGraph } from '@/types';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
+// --- Diagram payload helper & types ---
+type DiagramPayload =
+  | { engine: 'mermaid'; code: string; title?: string }
+  | { engine: 'reactflow'; graph: FlowGraph; title?: string };
+
+type MaybeMermaid = { engine?: unknown; code?: unknown; title?: unknown } | null | undefined;
+type MaybeReactflow = { engine?: unknown; graph?: { nodes?: unknown; edges?: unknown } | unknown; title?: unknown } | null | undefined;
+
+const isMermaidDiagram = (d: unknown): d is { engine: 'mermaid'; code: string; title?: string } => {
+  const m = d as MaybeMermaid;
+  return !!m && m.engine === 'mermaid' && typeof m.code === 'string';
+};
+
+const isReactflowDiagram = (
+  d: unknown
+): d is { engine: 'reactflow'; graph: { nodes: unknown[]; edges: unknown[] }; title?: string } => {
+  const r = d as MaybeReactflow;
+  const hasGraph = !!r && typeof r === 'object' && 'graph' in (r as object);
+  const graph = hasGraph ? (r as { graph: unknown }).graph as { nodes?: unknown; edges?: unknown } : undefined;
+  const hasEngine = !!r && typeof r === 'object' && 'engine' in (r as object);
+  const engine = hasEngine ? (r as { engine: unknown }).engine : undefined;
+  return (
+    engine === 'reactflow' &&
+    !!graph &&
+    Array.isArray(graph.nodes) &&
+    Array.isArray(graph.edges)
+  );
+};
+
+const getDiagramPayload = (diagram: unknown): DiagramPayload | undefined => {
+  if (isMermaidDiagram(diagram)) {
+    return { engine: 'mermaid', code: diagram.code, title: diagram.title };
+  }
+  if (isReactflowDiagram(diagram)) {
+    const g = diagram.graph as unknown as FlowGraph;
+    const t = diagram.title as string | undefined;
+    return { engine: 'reactflow', graph: g, title: t };
+  }
+  return undefined;
+};
+
 // --- Code snippet dedup helpers ---
 const normalizeSnippet = (s: CodeSnippet): string => {
   const type = s.insertionHint?.type || '';
@@ -254,11 +295,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         timestamp: new Date(),
         sessionId: session.id,
         codeSnippets: dedupedSnippets,
-        diagram: data.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
-          ? { engine: 'mermaid' as const, code: data.diagram.code, title: data.diagram.title as string | undefined }
-          : (data.diagram && data.diagram.engine === 'reactflow' && data.diagram.graph && Array.isArray(data.diagram.graph.nodes) && Array.isArray(data.diagram.graph.edges)
-              ? { engine: 'reactflow' as const, graph: data.diagram.graph as FlowGraph, title: data.diagram.title as string | undefined }
-              : undefined),
+        diagram: getDiagramPayload(data?.diagram),
         suggestDiagram: typeof data.suggestDiagram === 'boolean' ? data.suggestDiagram : undefined
       };
 
@@ -338,11 +375,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
       });
       if (error) throw error;
 
-      const diagramPayload = data?.diagram && data.diagram.engine === 'mermaid' && typeof data.diagram.code === 'string'
-        ? { engine: 'mermaid' as const, code: data.diagram.code, title: data.diagram.title as string | undefined }
-        : (data?.diagram && data.diagram.engine === 'reactflow' && data.diagram.graph && Array.isArray(data.diagram.graph.nodes) && Array.isArray(data.diagram.graph.edges)
-            ? { engine: 'reactflow' as const, graph: data.diagram.graph as FlowGraph, title: data.diagram.title as string | undefined }
-            : undefined);
+      const diagramPayload = getDiagramPayload(data?.diagram ?? data);
 
       if (!diagramPayload) {
         toast({ title: 'No diagram', description: 'The model did not return a diagram for this request.' });

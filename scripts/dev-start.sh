@@ -12,7 +12,7 @@ NC='\033[0m'
 
 API_DIR="code-executor-api"
 API_PORT="3001"
-FRONTEND_PORT="5173"
+FRONTEND_PORT="8080"
 
 # Ensure cleanup on exit
 API_PID=""
