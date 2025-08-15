@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔧 Running pre-commit checks..."
+
+# Run comprehensive security check
+echo "🔒 Checking for secrets..."
+if ! ./scripts/check-secrets.sh; then
+  echo "❌ Security check failed!"
+  exit 1
+fi
+
+# Run basic formatting on staged files only
+echo "💅 Formatting staged files..."
+STAGED_FILES=$(git diff --cached --name-only)
+if [ -n "$STAGED_FILES" ]; then
+  npx prettier --write --ignore-unknown $STAGED_FILES
+  # Add formatted files back to staging
+  git add $STAGED_FILES
+fi
+
+echo "✅ Pre-commit checks passed!"
