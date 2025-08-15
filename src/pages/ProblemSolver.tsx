@@ -220,18 +220,21 @@ const ProblemSolver = () => {
         editor.focus();
         
         // Add temporary highlight
-        const Monaco = (window as unknown as { monaco?: { Range: new (startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number) => unknown } }).monaco;
-        const decorations = editor.deltaDecorations([], [{
-          range: new (Monaco as { Range: new (a: number, b: number, c: number, d: number) => unknown }).Range(
-            Math.max(1, result.newCursorPosition.line - snippet.code.split('\n').length + 2),
-            1,
-            result.newCursorPosition.line + 1,
-            result.newCursorPosition.column + 1
-          ),
+        const monaco = (window as unknown as { monaco?: { Range: new (startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number) => unknown } }).monaco;
+        const linesAdded = snippet.code.split('\n').length;
+        const startLine = Math.max(1, result.newCursorPosition.line - linesAdded + 2);
+        const endLine = startLine + linesAdded - 1;
+        const startColumn = 1;
+        const endColumn = result.newCursorPosition.column + 1;
+        const highlightRange = monaco?.Range
+          ? new monaco.Range(startLine, startColumn, endLine, endColumn)
+          : undefined;
+        const decorations = editor.deltaDecorations([], highlightRange ? [{
+          range: highlightRange,
           options: {
             className: 'inserted-code-highlight'
           }
-        }]);
+        }] : []);
         
         // Remove highlight after 2 seconds
         setTimeout(() => {

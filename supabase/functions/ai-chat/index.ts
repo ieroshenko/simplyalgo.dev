@@ -26,11 +26,11 @@ interface ChatMessage {
 }
 
 interface RequestBody {
-  message: string;
-  problemDescription: string;
-  conversationHistory: ChatMessage[];
-  // Optional action for smart insertion
-  action?: 'insert_snippet';
+  message?: string;
+  problemDescription?: string;
+  conversationHistory?: ChatMessage[];
+  // Optional action for smart insertion or clearing chat
+  action?: 'insert_snippet' | 'clear_chat';
   // Optional explicit diagram request
   diagram?: boolean;
   // Preferred engines order for diagram generation
@@ -41,6 +41,9 @@ interface RequestBody {
   cursorPosition?: { line: number; column: number };
   // Optional problem test cases to condition the tutor (will be executed on Judge0)
   testCases?: unknown[];
+  // For clear_chat action
+  sessionId?: string;
+  userId?: string;
 }
 
 interface AIResponse {
@@ -65,6 +68,73 @@ const configuredModel = (Deno.env.get('OPENAI_MODEL') || 'o3-mini').trim();
 const modelSource = Deno.env.get('OPENAI_MODEL') ? 'OPENAI_MODEL env set' : 'defaulted to o3-mini (no OPENAI_MODEL)';
 const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
+// ---- Responses API helpers ----
+type ResponsesApiRequest = {
+  model: string;
+  input: string;
+  max_output_tokens?: number;
+  reasoning?: { effort: 'minimal' | 'medium' | 'high' };
+  text?: { verbosity?: 'low' | 'medium' | 'high'; format?: { type: 'json_object' } };
+};
+
+function buildResponsesRequest(
+  model: string,
+  prompt: string,
+  opts: { maxTokens?: number; responseFormat?: 'json_object' | undefined }
+): ResponsesApiRequest {
+  const req: ResponsesApiRequest = {
+    model,
+    input: prompt,
+    max_output_tokens: typeof opts.maxTokens === 'number' ? opts.maxTokens : undefined,
+  };
+  if (/^gpt-5/i.test(model)) {
+    req.reasoning = { effort: 'minimal' };
+    req.text = {
+      verbosity: opts.responseFormat ? 'low' : 'medium',
+      ...(opts.responseFormat ? { format: { type: 'json_object' } } : {}),
+    };
+  } else if (/^o3/i.test(model)) {
+    req.reasoning = { effort: 'medium' };
+    // o3 may ignore text.verbosity; omit for safety
+  }
+  return req;
+}
+
+type ResponsesApiResponse = {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }>;
+  choices?: Array<{ message?: { content?: string } }>;
+};
+
+function extractResponsesText(response: ResponsesApiResponse): string {
+  // 1) Direct output_text
+  const direct = typeof response?.output_text === 'string' ? response.output_text : '';
+  if (direct) return direct;
+  // 2) Traverse output[].content[] for output_text/text
+  const output = Array.isArray(response?.output) ? response.output : [];
+  let text = '';
+  for (const item of output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const c of content) {
+      const type = c?.type;
+      const textField = (c as { text?: { value?: string } | string })?.text as unknown;
+      const nestedValue = textField && typeof textField === 'object' && 'value' in (textField as Record<string, unknown>)
+        ? (textField as { value?: string }).value
+        : undefined;
+      if (type === 'output_text' && typeof nestedValue === 'string') {
+        text += nestedValue;
+      } else if (type === 'text') {
+        if (typeof textField === 'string') text += textField;
+        else if (typeof nestedValue === 'string') text += nestedValue;
+      }
+    }
+  }
+  if (text) return text;
+  // 3) Fallback to chat-like choices
+  const choices = Array.isArray(response?.choices) ? response.choices : [];
+  return choices?.[0]?.message?.content || '';
+}
+
 // Unified LLM callers (supports Responses API for gpt-5/o3 and falls back to Chat Completions)
 async function llmText(
   prompt: string,
@@ -77,58 +147,9 @@ async function llmText(
     for (const respModel of responseModels) {
       try {
         console.log(`[ai-chat] Using Responses API with model=${respModel}`);
-        const req: Record<string, unknown> = {
-          model: respModel,
-          input: prompt,
-          // temperature is not supported by some Responses models (e.g., gpt-5), so omit it entirely
-          max_output_tokens: typeof opts.maxTokens === 'number' ? opts.maxTokens : undefined,
-        };
-        if (/^gpt-5/i.test(respModel)) {
-          req.reasoning = { effort: 'minimal' };
-          req.text = {
-            verbosity: opts.responseFormat ? 'low' : 'medium',
-            ...(opts.responseFormat ? { format: { type: 'json_object' } } : {}),
-          };
-        } else if (/^o3/i.test(respModel)) {
-          req.reasoning = { effort: 'medium' };
-          // o3 may ignore text.verbosity; omit for safety
-        }
-        const response = await openai.responses.create(req as unknown as {
-          output_text?: string;
-          output?: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }>;
-          choices?: Array<{ message?: { content?: string } }>;
-        } );
-        let text: string = 'output_text' in (response as Record<string, unknown>) && typeof (response as Record<string, unknown>).output_text === 'string'
-          ? ((response as unknown as { output_text: string }).output_text)
-          : '';
-        const output: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> = 'output' in (response as Record<string, unknown>)
-          ? ((response as unknown as { output: Array<{ content?: Array<{ type?: string; text?: { value?: string } | string }> }> }).output)
-          : [];
-        if (!text && Array.isArray(output)) {
-          for (const item of output) {
-            const content = Array.isArray(item?.content) ? item.content : [];
-            for (const c of content) {
-              const type = c?.type;
-              const textField = c?.text as unknown;
-              const nestedValue = (textField && typeof textField === 'object' && 'value' in (textField as Record<string, unknown>)
-                ? (textField as { value?: string }).value
-                : undefined);
-              if (type === 'output_text' && typeof nestedValue === 'string') {
-                text += nestedValue;
-              } else if (type === 'text') {
-                if (typeof textField === 'string') text += textField;
-                else if (typeof nestedValue === 'string') text += nestedValue;
-              }
-            }
-          }
-        }
-        const choices: Array<{ message?: { content?: string } }> = 'choices' in (response as Record<string, unknown>)
-          ? ((response as unknown as { choices: Array<{ message?: { content?: string } }> }).choices)
-          : [];
-        if (!text && choices?.[0]?.message?.content) {
-          text = choices[0].message!.content || '';
-        }
-        const finalText = (text || '').toString();
+        const req = buildResponsesRequest(respModel, prompt, { maxTokens: opts.maxTokens, responseFormat: opts.responseFormat });
+        const response = await openai.responses.create(req as unknown as ResponsesApiResponse);
+        const finalText = extractResponsesText(response).toString();
         if (finalText.trim().length > 0) {
           return finalText;
         }
@@ -296,22 +317,66 @@ type FlowEdge = { id: string; source: string; target: string; label?: string };
 type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[] };
 
 function validateFlowGraph(graph: unknown): graph is FlowGraph {
-  if (!graph || typeof graph !== 'object') return false;
+  console.log('[Validation] Starting validation for:', JSON.stringify(graph, null, 2));
+  
+  if (!graph || typeof graph !== 'object') {
+    console.log('[Validation] Failed: graph is not an object');
+    return false;
+  }
+  
   const g = graph as { nodes?: unknown; edges?: unknown };
-  if (!Array.isArray(g.nodes) || !Array.isArray(g.edges)) return false;
+  if (!Array.isArray(g.nodes)) {
+    console.log('[Validation] Failed: nodes is not an array, got:', typeof g.nodes);
+    return false;
+  }
+  if (!Array.isArray(g.edges)) {
+    console.log('[Validation] Failed: edges is not an array, got:', typeof g.edges);
+    return false;
+  }
+  
+  console.log(`[Validation] Found ${g.nodes.length} nodes and ${g.edges.length} edges`);
+  
   const idSet = new Set<string>();
-  for (const n of g.nodes) {
+  for (let i = 0; i < g.nodes.length; i++) {
+    const n = g.nodes[i];
     const node = n as FlowNode;
-    if (!node || typeof node.id !== 'string') return false;
-    if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') return false;
-    if (!node.data || typeof node.data.label !== 'string') return false;
-    if (idSet.has(node.id)) return false;
+    console.log(`[Validation] Checking node ${i}:`, JSON.stringify(node, null, 2));
+    
+    if (!node || typeof node.id !== 'string') {
+      console.log(`[Validation] Failed: node ${i} has invalid id:`, typeof node?.id);
+      return false;
+    }
+    if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+      console.log(`[Validation] Failed: node ${i} has invalid position:`, node.position);
+      return false;
+    }
+    if (!node.data || typeof node.data.label !== 'string') {
+      console.log(`[Validation] Failed: node ${i} has invalid data:`, node.data);
+      return false;
+    }
+    if (idSet.has(node.id)) {
+      console.log(`[Validation] Failed: duplicate node id: ${node.id}`);
+      return false;
+    }
     idSet.add(node.id);
   }
-  for (const e of g.edges) {
+  
+  for (let i = 0; i < g.edges.length; i++) {
+    const e = g.edges[i];
     const edge = e as FlowEdge;
-    if (!edge || typeof edge.id !== 'string' || typeof edge.source !== 'string' || typeof edge.target !== 'string') return false;
+    console.log(`[Validation] Checking edge ${i}:`, JSON.stringify(edge, null, 2));
+    
+    if (!edge || typeof edge.id !== 'string' || typeof edge.source !== 'string' || typeof edge.target !== 'string') {
+      console.log(`[Validation] Failed: edge ${i} has invalid properties:`, {
+        id: typeof edge?.id,
+        source: typeof edge?.source,
+        target: typeof edge?.target
+      });
+      return false;
+    }
   }
+  
+  console.log('[Validation] All checks passed!');
   return true;
 }
 
@@ -332,62 +397,122 @@ async function maybeGenerateDiagram(
   const wantsDiagram = /\b(visualize|diagram|draw|show.*diagram|mermaid|flow|graph)\b/i.test(message);
   if (!force && !wantsDiagram) return undefined;
   const engineOrder: Array<'reactflow' | 'mermaid'> = Array.isArray(preferredEngines) && preferredEngines.length
-    ? Array.from(new Set(preferredEngines.concat(['reactflow', 'mermaid'] as const))) as Array<'reactflow' | 'mermaid'>
-    : ['reactflow', 'mermaid'];
+    ? Array.from(new Set(preferredEngines.concat(['mermaid', 'reactflow'] as const))) as Array<'reactflow' | 'mermaid'>
+    : ['mermaid', 'reactflow'];
 
-  const rfPrompt = `You will output a React Flow graph JSON that visualizes the algorithm discussed.
-STRICT OUTPUT FORMAT: Return JSON only with this schema:
-{ "reactflow": { "nodes": [{ "id": "n1", "type": "default", "data": { "label": "Start" }, "position": { "x": 0, "y": 0 } }], "edges": [{ "id": "e1", "source": "n1", "target": "n2", "label": "next" }] } }
-Rules:
-- Max 40 nodes.
-- Keep labels concise; no code in labels.
-- Provide reasonable positions (x,y in pixels).
-- Node ids and edge ids must be unique strings.
-- No HTML in labels.
+  const rfPrompt = `Create a React Flow diagram that visualizes the algorithm step-by-step with meaningful progression.
 
-Context:
-Problem: ${problemDescription}
-Recent conversation:\n${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
-Current user request: ${message}`;
+OUTPUT FORMAT (copy structure exactly):
+{
+  "reactflow": {
+    "nodes": [
+      {"id": "n1", "type": "default", "data": {"label": "Initialize variables"}, "position": {"x": 100, "y": 50}},
+      {"id": "n2", "type": "default", "data": {"label": "Check condition"}, "position": {"x": 100, "y": 150}},
+      {"id": "n3", "type": "default", "data": {"label": "Process step"}, "position": {"x": 100, "y": 250}}
+    ],
+    "edges": [
+      {"id": "e1", "source": "n1", "target": "n2"},
+      {"id": "e2", "source": "n2", "target": "n3"}
+    ]
+  }
+}
+
+REQUIREMENTS:
+- Create 6-10 nodes showing algorithm flow
+- Include key algorithmic concepts: initialization, loops, conditions, updates
+- For data structures: show operations like "compare", "merge", "split", "traverse"
+- For search algorithms: show "check condition", "update bounds", "found/not found"
+- For dynamic programming: show "base case", "recurrence", "memoize"
+- For sorting: show "partition", "merge", "swap"
+- Use decision branches for conditional logic (spread horizontally +200px)
+- Show meaningful progression that teaches the approach
+- Space vertically +100px, horizontally +200px for branches
+- Node labels max 25 characters, clear and educational
+- Simple IDs: n1, n2, n3, etc.
+
+Problem context: ${problemDescription}
+User request: ${message}
+Conversation context: ${conversationHistory.slice(-3).map(m => m.content).join(' ').substring(0, 300)}
+
+Create an educational algorithm visualization:`;
 
   // Attempt functions
   const tryReactFlow = async (): Promise<{ ok: true; diagram: { engine: 'reactflow'; graph: FlowGraph } } | { ok: false; reason: string }> => {
     let raw = '';
     try {
       raw = (await llmJson(rfPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+      console.log('[React Flow] Raw AI response:', raw.substring(0, 500) + (raw.length > 500 ? '...' : ''));
     } catch (e) {
+      console.log('[React Flow] llmJson failed, trying llmText:', e);
       try {
         raw = (await llmText(rfPrompt, { temperature: 0.2, maxTokens: 700 })).trim();
+        console.log('[React Flow] Raw AI response from llmText:', raw.substring(0, 500) + (raw.length > 500 ? '...' : ''));
       } catch (e2) {
+        console.log('[React Flow] Both llmJson and llmText failed:', e2);
         return { ok: false, reason: `Responses+fallback failed: ${(e2 as Error)?.message || 'unknown error'}` };
       }
     }
-    if (!raw) return { ok: false, reason: 'Empty response for reactflow JSON' };
+    if (!raw) {
+      console.log('[React Flow] Empty response');
+      return { ok: false, reason: 'Empty response for reactflow JSON' };
+    }
     try {
-      const parsed = JSON.parse(raw);
+      // Clean the response to extract JSON
+      let cleanJson = raw.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanJson.startsWith('```')) {
+        cleanJson = cleanJson.replace(/^```(?:json)?/m, '').replace(/```$/m, '').trim();
+      }
+      
+      // Try to find JSON object boundaries
+      const jsonStart = cleanJson.indexOf('{');
+      const jsonEnd = cleanJson.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+      }
+      
+      console.log('[React Flow] Cleaned JSON:', cleanJson);
+      
+      const parsed = JSON.parse(cleanJson);
+      console.log('[React Flow] Parsed JSON:', JSON.stringify(parsed, null, 2));
       const rf = (parsed && parsed.reactflow) ? parsed.reactflow : undefined;
-      if (!rf) return { ok: false, reason: 'Missing reactflow key in JSON' };
+      if (!rf) {
+        console.log('[React Flow] Missing reactflow key in parsed JSON');
+        return { ok: false, reason: 'Missing reactflow key in JSON' };
+      }
+      console.log('[React Flow] Found reactflow data:', JSON.stringify(rf, null, 2));
       if (validateFlowGraph(rf)) {
+        console.log('[React Flow] Validation passed, returning diagram');
         return { ok: true, diagram: { engine: 'reactflow', graph: rf } };
       }
+      console.log('[React Flow] Schema validation failed');
       return { ok: false, reason: 'Schema validation failed' };
     } catch (parseErr) {
+      console.log('[React Flow] JSON parse error:', parseErr, 'Raw:', raw);
       return { ok: false, reason: `Invalid JSON: ${(parseErr as Error)?.message || 'parse error'}` };
     }
   };
 
-  const mermaidPrompt = `You will output a Mermaid diagram that visualizes the algorithm discussed.
-STRICT OUTPUT FORMAT: Return JSON only (no markdown, no prose) with this schema: { "mermaid": "<diagram>" }
-Rules for the diagram:
-- Use flowchart LR unless another type is clearly better.
-- Keep under 50 nodes.
-- Avoid htmlLabels and raw HTML.
-- Use concise node labels.
+  const mermaidPrompt = `Output ONLY a JSON with a simple Mermaid flowchart. Use this exact format:
 
-Context:
-Problem: ${problemDescription}
-Recent conversation:\n${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
-Current user request: ${message}`;
+{
+  "mermaid": "flowchart TD\\n    A[Start] --> B[Compare]\\n    B --> C[Choose smaller]\\n    C --> D[End]"
+}
+
+RULES:
+- Use "flowchart TD" syntax only
+- Maximum 8 nodes for simplicity  
+- Node labels must be simple text in brackets: [Text here]
+- Use --> for arrows
+- No special characters except spaces and hyphens in labels
+- Each line must end with \\n
+- Keep labels under 15 characters
+
+For: ${problemDescription.split('.')[0]}
+User request: ${message}
+
+Output only the JSON:`;
 
   const tryMermaid = async (): Promise<{ ok: true; diagram: { engine: 'mermaid'; code: string } } | { ok: false; reason: string }> => {
     let mermaidRaw = '';
@@ -428,16 +553,23 @@ Current user request: ${message}`;
   const tried: Array<'reactflow' | 'mermaid'> = [];
   const debug: { reactflow?: { ok: boolean; reason?: string }; mermaid?: { ok: boolean; reason?: string } } = {};
 
+  console.log('[Diagram Generation] Engine order:', engineOrder);
+  
   for (const engine of engineOrder) {
+    console.log(`[Diagram Generation] Trying engine: ${engine}`);
     if (engine === 'reactflow') {
+      // Temporarily disable React Flow - use Mermaid only for now
       tried.push('reactflow');
-      const rf = await tryReactFlow();
-      if (rf.ok) return rf.diagram;
-      debug.reactflow = { ok: false, reason: rf.reason };
+      console.log('[Diagram Generation] React Flow disabled, skipping');
+      debug.reactflow = { ok: false, reason: 'React Flow temporarily disabled' };
     } else if (engine === 'mermaid') {
       tried.push('mermaid');
       const mm = await tryMermaid();
-      if (mm.ok) return mm.diagram;
+      if (mm.ok) {
+        console.log('[Diagram Generation] Mermaid succeeded');
+        return mm.diagram;
+      }
+      console.log('[Diagram Generation] Mermaid failed:', mm.reason);
       debug.mermaid = { ok: false, reason: mm.reason };
     }
   }
@@ -760,9 +892,55 @@ serve(async (req) => {
     console.log(`[ai-chat] Model selection: model=${configuredModel} | api=${useResponsesApi ? 'Responses' : 'Chat'} | source=${modelSource}`);
     // Parse request body
     const body: RequestBody = await req.json();
-    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases, diagram: diagramRequested, preferredEngines } = body;
+    const { message, problemDescription, conversationHistory, action, code, snippet, cursorPosition, testCases, diagram: diagramRequested, preferredEngines, sessionId, userId } = body;
 
-    // Validate required fields
+    // Clear chat action
+    if (req.method === 'POST' && action === 'clear_chat') {
+      if (!sessionId || !userId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing sessionId or userId for clear_chat action' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        // Delete all messages for this session
+        const { error: messagesError } = await supabaseAdmin
+          .from('ai_chat_messages')
+          .delete()
+          .eq('session_id', sessionId);
+
+        if (messagesError) {
+          console.error('Error deleting messages:', messagesError);
+          throw messagesError;
+        }
+
+        // Delete the session itself
+        const { error: sessionError } = await supabaseAdmin
+          .from('ai_chat_sessions')
+          .delete()
+          .eq('id', sessionId)
+          .eq('user_id', userId);
+
+        if (sessionError) {
+          console.error('Error deleting session:', sessionError);
+          throw sessionError;
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, message: 'Chat cleared successfully' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Error clearing chat:', error);
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Failed to clear chat' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Validate required fields for normal chat operations
     if (!message || !problemDescription) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: message, problemDescription' }),
