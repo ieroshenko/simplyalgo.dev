@@ -1,31 +1,55 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import CodeEditor from '@/components/CodeEditor';
-import AIChat from '@/components/AIChat';
-import Notes from '@/components/Notes';
-import { ArrowLeft, Star, StarOff, Copy, Check, X, Clock } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useProblems } from '@/hooks/useProblems';
-import { useUserStats } from '@/hooks/useUserStats';
-import { UserAttemptsService } from '@/services/userAttempts';
-import { TestRunnerService } from '@/services/testRunner';
-import { TestCase, TestResult, CodeSnippet } from '@/types';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { toast } from 'sonner';
-import Timer from '@/components/Timer';
-import { supabase } from '@/integrations/supabase/client';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import CodeEditor from "@/components/CodeEditor";
+import AIChat from "@/components/AIChat";
+import Notes from "@/components/Notes";
+import {
+  ArrowLeft,
+  Star,
+  StarOff,
+  Copy,
+  Check,
+  X,
+  Clock,
+  Maximize2,
+} from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useProblems } from "@/hooks/useProblems";
+import { useUserStats } from "@/hooks/useUserStats";
+import { useSubmissions } from "@/hooks/useSubmissions";
+import { pythonSolutions } from "@/data/pythonSolutions";
+import { UserAttemptsService } from "@/services/userAttempts";
+import { TestRunnerService } from "@/services/testRunner";
+import { TestCase, TestResult, CodeSnippet } from "@/types";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
+import Timer from "@/components/Timer";
+import { supabase } from "@/integrations/supabase/client";
+import Editor from "@monaco-editor/react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const ProblemSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
+  const { problems, toggleStar, loading, error, refetch } = useProblems(
+    user?.id,
+  );
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
-  const [activeTab, setActiveTab] = useState('question');
-  const [code, setCode] = useState('');
+  const [activeTab, setActiveTab] = useState("question");
+  const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const codeEditorRef = useRef<{
@@ -34,20 +58,23 @@ const ProblemSolver = () => {
     getPosition: () => { lineNumber: number; column: number } | null;
     setPosition: (pos: { lineNumber: number; column: number }) => void;
     focus: () => void;
-    deltaDecorations: (oldDecorations: string[], newDecorations: unknown[]) => string[];
+    deltaDecorations: (
+      oldDecorations: string[],
+      newDecorations: unknown[],
+    ) => string[];
   } | null>(null);
-  
+
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
-    const saved = localStorage.getItem('showLeftPanel');
+    const saved = localStorage.getItem("showLeftPanel");
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [showBottomPanel, setShowBottomPanel] = useState(() => {
-    const saved = localStorage.getItem('showBottomPanel');
+    const saved = localStorage.getItem("showBottomPanel");
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [showRightPanel, setShowRightPanel] = useState(() => {
-    const saved = localStorage.getItem('showRightPanel');
+    const saved = localStorage.getItem("showRightPanel");
     return saved !== null ? JSON.parse(saved) : true;
   });
 
@@ -55,19 +82,19 @@ const ProblemSolver = () => {
   const toggleLeftPanel = useCallback(() => {
     const newValue = !showLeftPanel;
     setShowLeftPanel(newValue);
-    localStorage.setItem('showLeftPanel', JSON.stringify(newValue));
+    localStorage.setItem("showLeftPanel", JSON.stringify(newValue));
   }, [showLeftPanel]);
 
   const toggleBottomPanel = useCallback(() => {
     const newValue = !showBottomPanel;
     setShowBottomPanel(newValue);
-    localStorage.setItem('showBottomPanel', JSON.stringify(newValue));
+    localStorage.setItem("showBottomPanel", JSON.stringify(newValue));
   }, [showBottomPanel]);
 
   const toggleRightPanel = useCallback(() => {
     const newValue = !showRightPanel;
     setShowRightPanel(newValue);
-    localStorage.setItem('showRightPanel', JSON.stringify(newValue));
+    localStorage.setItem("showRightPanel", JSON.stringify(newValue));
   }, [showRightPanel]);
 
   // Keyboard shortcuts - moved to top with other hooks
@@ -76,15 +103,15 @@ const ProblemSolver = () => {
       // Only trigger if Ctrl is pressed and prevent default browser behavior
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
-          case 'b':
+          case "b":
             e.preventDefault();
             toggleLeftPanel();
             break;
-          case 'j':
+          case "j":
             e.preventDefault();
             toggleBottomPanel();
             break;
-          case 'l':
+          case "l":
             e.preventDefault();
             toggleRightPanel();
             break;
@@ -95,16 +122,74 @@ const ProblemSolver = () => {
     };
 
     // Add global event listener
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     // Cleanup on unmount
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [showLeftPanel, showBottomPanel, showRightPanel, toggleLeftPanel, toggleBottomPanel, toggleRightPanel]);
-  
-  const problem = problems.find(p => p.id === problemId);
-  
+  }, [
+    showLeftPanel,
+    showBottomPanel,
+    showRightPanel,
+    toggleLeftPanel,
+    toggleBottomPanel,
+    toggleRightPanel,
+  ]);
+
+  const problem = problems.find((p) => p.id === problemId);
+  const {
+    submissions,
+    loading: subsLoading,
+    error: subsError,
+  } = useSubmissions(user?.id, problem?.id);
+
+  const solutions = problem ? pythonSolutions[problem.id] || [] : [];
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const formatRelativeTime = (isoDate: string) => {
+    const now = new Date();
+    const then = new Date(isoDate);
+    const diffMs = now.getTime() - then.getTime();
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
+    return then.toLocaleDateString();
+  };
+
+  // Track which submission is expanded (accordion-style)
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<
+    string | null
+  >(null);
+  const toggleSubmission = (id: string) => {
+    setExpandedSubmissionId((prev) => (prev === id ? null : id));
+  };
+
+  // Fullscreen viewer state
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [fullscreenCode, setFullscreenCode] = useState("");
+  const [fullscreenLang, setFullscreenLang] = useState("python");
+  const [fullscreenTitle, setFullscreenTitle] = useState("Code");
+  const openFullscreen = (code: string, lang: string, title: string) => {
+    setFullscreenCode(code);
+    setFullscreenLang((lang || "python").toLowerCase());
+    setFullscreenTitle(title);
+    setFullscreenOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -112,13 +197,17 @@ const ProblemSolver = () => {
       </div>
     );
   }
-  
+
   if (!problem) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Problem not found</h1>
-          <Button onClick={() => navigate('/leetcode')}>Back to Problems</Button>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            Problem not found
+          </h1>
+          <Button onClick={() => navigate("/leetcode")}>
+            Back to Problems
+          </Button>
         </div>
       </div>
     );
@@ -126,10 +215,14 @@ const ProblemSolver = () => {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Easy': return 'bg-success text-success-foreground';
-      case 'Medium': return 'bg-accent text-accent-foreground';
-      case 'Hard': return 'bg-destructive text-destructive-foreground';
-      default: return 'bg-muted text-muted-foreground';
+      case "Easy":
+        return "bg-success text-success-foreground";
+      case "Medium":
+        return "bg-accent text-accent-foreground";
+      case "Hard":
+        return "bg-destructive text-destructive-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -138,11 +231,11 @@ const ProblemSolver = () => {
   };
 
   const handleInsertCodeSnippet = async (snippet: CodeSnippet) => {
-    console.log('🔧 Inserting code snippet:', snippet);
-    
+    console.log("🔧 Inserting code snippet:", snippet);
+
     if (!codeEditorRef.current) {
-      console.error('❌ Code editor ref is not available');
-      toast.error('Code editor not ready');
+      console.error("❌ Code editor ref is not available");
+      toast.error("Code editor not ready");
       return;
     }
 
@@ -150,104 +243,135 @@ const ProblemSolver = () => {
       const editor = codeEditorRef.current;
       const currentCode = editor.getValue(); // Get live code from Monaco
       const position = editor.getPosition();
-      
+
       const cursorPosition = {
         line: position?.lineNumber ? position.lineNumber - 1 : 0,
-        column: position?.column || 0
+        column: position?.column || 0,
       };
-      
-      console.log('📍 Current state:', {
+
+      console.log("📍 Current state:", {
         cursorPosition,
         currentCodeLength: currentCode.length,
-        snippetType: snippet.insertionHint?.type
+        snippetType: snippet.insertionHint?.type,
       });
 
       // Always prefer backend GPT-guided insertion for precise placement
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
       try {
-        const { data, error } = await supabase.functions.invoke('ai-chat', {
+        const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
-            action: 'insert_snippet',
+            action: "insert_snippet",
             code: currentCode,
             snippet,
             cursorPosition,
             problemDescription: problem.description,
-            message: '[snippet insertion request]',
-            conversationHistory: []
-          }
+            message: "[snippet insertion request]",
+            conversationHistory: [],
+          },
         });
         if (error) throw error;
-        if (data && typeof data.newCode === 'string') {
+        if (data && typeof data.newCode === "string") {
           newCodeFromBackend = data.newCode;
-          insertedAtLine = typeof data.insertedAtLine === 'number' ? data.insertedAtLine : undefined;
-          console.log('🧠 Backend insertion result:', { insertedAtLine });
+          insertedAtLine =
+            typeof data.insertedAtLine === "number"
+              ? data.insertedAtLine
+              : undefined;
+          console.log("🧠 Backend insertion result:", { insertedAtLine });
         }
       } catch (e) {
-        console.warn('Backend insert_snippet failed, falling back to local:', e);
+        console.warn(
+          "Backend insert_snippet failed, falling back to local:",
+          e,
+        );
       }
 
       if (!newCodeFromBackend) {
-        toast.error('AI placement failed. Please try again.');
+        toast.error("AI placement failed. Please try again.");
         return;
       }
 
-      const result: { newCode: string; newCursorPosition: { line: number; column: number } } = {
+      const result: {
+        newCode: string;
+        newCursorPosition: { line: number; column: number };
+      } = {
         newCode: newCodeFromBackend,
         newCursorPosition: {
-          line: typeof insertedAtLine === 'number' && insertedAtLine >= 0
-            ? insertedAtLine + (snippet.code.split('\n').length - 1)
-            : cursorPosition.line,
-          column: 0
-        }
+          line:
+            typeof insertedAtLine === "number" && insertedAtLine >= 0
+              ? insertedAtLine + (snippet.code.split("\n").length - 1)
+              : cursorPosition.line,
+          column: 0,
+        },
       };
-      console.log('✨ Insertion result:', result);
-      
+      console.log("✨ Insertion result:", result);
+
       // Use Monaco's setValue to update the editor directly
       editor.setValue(result.newCode);
-      
+
       // Update our React state to stay in sync
       setCode(result.newCode);
-      
+
       // Set cursor position after a brief delay
       setTimeout(() => {
         const newPosition = {
           lineNumber: result.newCursorPosition.line + 1,
-          column: result.newCursorPosition.column + 1
+          column: result.newCursorPosition.column + 1,
         };
-        
+
         editor.setPosition(newPosition);
         editor.focus();
-        
+
         // Add temporary highlight
-        const monaco = (window as unknown as { monaco?: { Range: new (startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number) => unknown } }).monaco;
-        const linesAdded = snippet.code.split('\n').length;
-        const startLine = Math.max(1, result.newCursorPosition.line - linesAdded + 2);
+        const monaco = (
+          window as unknown as {
+            monaco?: {
+              Range: new (
+                startLineNumber: number,
+                startColumn: number,
+                endLineNumber: number,
+                endColumn: number,
+              ) => unknown;
+            };
+          }
+        ).monaco;
+        const linesAdded = snippet.code.split("\n").length;
+        const startLine = Math.max(
+          1,
+          result.newCursorPosition.line - linesAdded + 2,
+        );
         const endLine = startLine + linesAdded - 1;
         const startColumn = 1;
         const endColumn = result.newCursorPosition.column + 1;
         const highlightRange = monaco?.Range
           ? new monaco.Range(startLine, startColumn, endLine, endColumn)
           : undefined;
-        const decorations = editor.deltaDecorations([], highlightRange ? [{
-          range: highlightRange,
-          options: {
-            className: 'inserted-code-highlight'
-          }
-        }] : []);
-        
+        const decorations = editor.deltaDecorations(
+          [],
+          highlightRange
+            ? [
+                {
+                  range: highlightRange,
+                  options: {
+                    className: "inserted-code-highlight",
+                  },
+                },
+              ]
+            : [],
+        );
+
         // Remove highlight after 2 seconds
         setTimeout(() => {
           editor.deltaDecorations(decorations, []);
         }, 2000);
-        
-        console.log('✅ Code insertion completed with highlighting');
+
+        console.log("✅ Code insertion completed with highlighting");
       }, 50);
 
-      toast.success('Code snippet inserted successfully!');
+      toast.success("Code snippet inserted successfully!");
     } catch (error) {
-      console.error('❌ Failed to insert code snippet:', error);
-      toast.error('Failed to insert code snippet');
+      console.error("❌ Failed to insert code snippet:", error);
+      toast.error("Failed to insert code snippet");
     }
   };
 
@@ -259,25 +383,32 @@ const ProblemSolver = () => {
     try {
       await UserAttemptsService.saveDraft(user.id, problem.id, code);
       const response = await TestRunnerService.runCode({
-        language: 'python',
+        language: "python",
         code: code,
         testCases: problem.testCases,
-        problemId: problem.id
+        problemId: problem.id,
       });
       setTestResults(response.results);
 
-      const passedCount = response.results.filter(r => r.passed).length;
+      const passedCount = response.results.filter((r) => r.passed).length;
       const totalCount = response.results.length;
 
       if (passedCount === totalCount) {
-        toast.success('All tests passed! 🎉');
-        await UserAttemptsService.markProblemSolved(user.id, problem.id, code, response.results);
-        await handleProblemSolved(problem.difficulty as 'Easy' | 'Medium' | 'Hard');
+        toast.success("All tests passed! 🎉");
+        await UserAttemptsService.markProblemSolved(
+          user.id,
+          problem.id,
+          code,
+          response.results,
+        );
+        await handleProblemSolved(
+          problem.difficulty as "Easy" | "Medium" | "Hard",
+        );
       } else {
         toast.error(`${passedCount}/${totalCount} test cases passed`);
       }
     } catch (error) {
-      toast.error('Failed to run code');
+      toast.error("Failed to run code");
     } finally {
       setIsRunning(false);
     }
@@ -285,45 +416,56 @@ const ProblemSolver = () => {
 
   const handleSubmit = async () => {
     if (!user?.id) return;
-    
+
     try {
       await UserAttemptsService.submitCode(user.id, problem.id, code);
-      toast.success('Solution submitted successfully!');
+      toast.success("Solution submitted successfully!");
     } catch (error) {
-      toast.error('Failed to submit solution');
+      toast.error("Failed to submit solution");
     }
   };
 
   const handleToggleStar = async () => {
     if (!user?.id) return;
-    
+
     try {
       await toggleStar(problem.id);
-      toast.success(problem.isStarred ? 'Removed from favorites' : 'Added to favorites');
+      toast.success(
+        problem.isStarred ? "Removed from favorites" : "Added to favorites",
+      );
     } catch (error) {
-      toast.error('Failed to update favorites');
+      toast.error("Failed to update favorites");
     }
   };
 
-  const handleProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard') => {
+  const handleProblemSolved = async (
+    difficulty: "Easy" | "Medium" | "Hard",
+  ) => {
     if (!problemId) return;
     await updateStatsOnProblemSolved(difficulty, problemId);
     refetch();
   };
 
-
   const renderValue = (value: unknown): string => {
-    if (value === null || value === undefined) return 'null';
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    if (typeof value === 'string') {
+    if (value === null || value === undefined) return "null";
+    if (typeof value === "number" || typeof value === "boolean")
+      return String(value);
+    if (typeof value === "string") {
       // If it looks like JSON, render compact one-line JSON
       const trimmed = value.trim();
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))){
-        try { return JSON.stringify(JSON.parse(trimmed)); } catch { return value; }
+      if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+      ) {
+        try {
+          return JSON.stringify(JSON.parse(trimmed));
+        } catch {
+          return value;
+        }
       }
       return value;
     }
-    if (typeof value === 'object') {
+    if (typeof value === "object") {
       try {
         // Compact one-line JSON for arrays/objects to match Expected/Your Output style
         return JSON.stringify(value as Record<string, unknown>);
@@ -340,16 +482,18 @@ const ProblemSolver = () => {
       <div className="border-b border-border bg-background p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
-              onClick={() => navigate('/leetcode')}
+              onClick={() => navigate("/leetcode")}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
             <div className="flex items-center space-x-3">
-              <h1 className="text-xl font-bold text-foreground">{problem.title}</h1>
+              <h1 className="text-xl font-bold text-foreground">
+                {problem.title}
+              </h1>
               <Badge className={getDifficultyColor(problem.difficulty)}>
                 {problem.difficulty}
               </Badge>
@@ -358,7 +502,7 @@ const ProblemSolver = () => {
               </Badge>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Timer />
             <Button
@@ -384,28 +528,49 @@ const ProblemSolver = () => {
           <>
             <ResizablePanel defaultSize={35} minSize={25}>
               <div className="h-full flex flex-col">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="flex-1 flex flex-col"
+                >
                   <div className="border-b border-border">
                     <TabsList className="grid w-full grid-cols-4 bg-transparent h-12 px-6">
-                      <TabsTrigger value="question" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                      <TabsTrigger
+                        value="question"
+                        className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                      >
                         Question
                       </TabsTrigger>
-                      <TabsTrigger value="solution" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                      <TabsTrigger
+                        value="solution"
+                        className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                      >
                         Solution
                       </TabsTrigger>
-                      <TabsTrigger value="submissions" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                      <TabsTrigger
+                        value="submissions"
+                        className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                      >
                         Submissions
                       </TabsTrigger>
-                      <TabsTrigger value="notes" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                      <TabsTrigger
+                        value="notes"
+                        className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                      >
                         Notes
                       </TabsTrigger>
                     </TabsList>
                   </div>
 
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    <TabsContent value="question" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
+                    <TabsContent
+                      value="question"
+                      className="p-6 space-y-6 m-0 h-full overflow-y-auto"
+                    >
                       <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">Problem Description</h2>
+                        <h2 className="text-lg font-semibold text-foreground mb-4">
+                          Problem Description
+                        </h2>
                         <div className="prose prose-sm max-w-none text-muted-foreground">
                           <p>{problem.description}</p>
                         </div>
@@ -413,26 +578,38 @@ const ProblemSolver = () => {
 
                       {problem.examples && problem.examples.length > 0 && (
                         <div>
-                          <h3 className="text-md font-semibold text-foreground mb-3">Examples</h3>
+                          <h3 className="text-md font-semibold text-foreground mb-3">
+                            Examples
+                          </h3>
                           <div className="space-y-4">
                             {problem.examples.map((example, index) => (
-                              <div key={index} className="bg-muted/50 p-4 rounded-lg">
+                              <div
+                                key={index}
+                                className="bg-muted/50 p-4 rounded-lg"
+                              >
                                 <div className="space-y-2 font-mono text-sm">
                                   <div>
-                                    <span className="font-semibold">Input:</span>
+                                    <span className="font-semibold">
+                                      Input:
+                                    </span>
                                     <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-{renderValue(example.input)}
+                                      {renderValue(example.input)}
                                     </pre>
                                   </div>
                                   <div>
-                                    <span className="font-semibold">Output:</span>
+                                    <span className="font-semibold">
+                                      Output:
+                                    </span>
                                     <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-{renderValue(example.output)}
+                                      {renderValue(example.output)}
                                     </pre>
                                   </div>
                                   {example.explanation && (
                                     <div>
-                                      <span className="font-semibold">Explanation:</span> {example.explanation}
+                                      <span className="font-semibold">
+                                        Explanation:
+                                      </span>{" "}
+                                      {example.explanation}
                                     </div>
                                   )}
                                 </div>
@@ -443,103 +620,223 @@ const ProblemSolver = () => {
                       )}
                     </TabsContent>
 
-                    <TabsContent value="solution" className="p-6 space-y-6 m-0 h-full overflow-y-auto">
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">1. Brute Force</h2>
-                        <div className="bg-muted rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex space-x-2">
-                              <Button variant="default" size="sm">Python</Button>
-                              <Button variant="outline" size="sm">Java</Button>
-                              <Button variant="outline" size="sm">C++</Button>
+                    <TabsContent
+                      value="solution"
+                      className="p-6 space-y-6 m-0 h-full overflow-y-auto"
+                    >
+                      {solutions.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          No curated solutions yet.
+                        </div>
+                      ) : (
+                        solutions.map((sol, idx) => (
+                          <div key={idx}>
+                            <h2 className="text-lg font-semibold text-foreground mb-4">
+                              {idx + 1}. {sol.title}
+                            </h2>
+                            <div className="bg-muted rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex space-x-2">
+                                  <Button variant="default" size="sm">
+                                    Python
+                                  </Button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      openFullscreen(
+                                        sol.code,
+                                        "python",
+                                        `${problem.title} — ${sol.title}`,
+                                      )
+                                    }
+                                  >
+                                    <Maximize2 className="w-4 h-4 mr-1" />{" "}
+                                    Maximize
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopy(sol.code)}
+                                  >
+                                    <Copy className="w-4 h-4 mr-1" />
+                                    Copy
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="border rounded overflow-hidden">
+                                <Editor
+                                  height="42vh"
+                                  defaultLanguage="python"
+                                  value={sol.code}
+                                  theme="light"
+                                  options={{
+                                    readOnly: true,
+                                    minimap: { enabled: false },
+                                    lineNumbers: "off",
+                                    folding: false,
+                                    scrollBeyondLastLine: false,
+                                    renderLineHighlight: "none",
+                                    fontSize: 15,
+                                    wordWrap: "on",
+                                  }}
+                                />
+                              </div>
                             </div>
-                            <Button variant="outline" size="sm">
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy
-                            </Button>
+                            <div className="mt-4">
+                              <h3 className="font-semibold text-foreground mb-2">
+                                Time & Space Complexity
+                              </h3>
+                              <ul className="text-sm text-muted-foreground space-y-1">
+                                <li>
+                                  • Time complexity: {sol.complexity.time}
+                                </li>
+                                <li>
+                                  • Space complexity: {sol.complexity.space}
+                                </li>
+                              </ul>
+                              {sol.explanation && (
+                                <p className="text-sm text-muted-foreground mt-2">
+                                  {sol.explanation}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <pre className="text-sm bg-background p-4 rounded border overflow-x-auto">
-                            <code>{`def twoSum(self, nums: List[int], target: int) -> List[int]:
-    for i in range(len(nums)):
-        for j in range(i + 1, len(nums)):
-            if nums[i] + nums[j] == target:
-                return [i, j]
-    return []`}</code>
-                          </pre>
-                        </div>
-                        
-                        <div className="mt-4">
-                          <h3 className="font-semibold text-foreground mb-2">Time & Space Complexity</h3>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Time complexity: O(n²)</li>
-                            <li>• Space complexity: O(1)</li>
-                          </ul>
-                        </div>
-                      </div>
+                        ))
+                      )}
+                    </TabsContent>
 
+                    <TabsContent
+                      value="submissions"
+                      className="p-6 m-0 h-full overflow-y-auto"
+                    >
                       <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">2. Hash Map</h2>
-                        <div className="bg-muted rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex space-x-2">
-                              <Button variant="default" size="sm">Python</Button>
-                              <Button variant="outline" size="sm">Java</Button>
-                              <Button variant="outline" size="sm">C++</Button>
-                            </div>
-                            <Button variant="outline" size="sm">
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy
-                            </Button>
+                        <h2 className="text-lg font-semibold text-foreground mb-4">
+                          Submissions
+                        </h2>
+                        {subsLoading && (
+                          <div className="text-sm text-muted-foreground">
+                            Loading submissions...
                           </div>
-                          <pre className="text-sm bg-background p-4 rounded border overflow-x-auto">
-                            <code>{`def twoSum(self, nums: List[int], target: int) -> List[int]:
-    hashmap = {}
-    for i, num in enumerate(nums):
-        complement = target - num
-        if complement in hashmap:
-            return [hashmap[complement], i]
-        hashmap[num] = i
-    return []`}</code>
-                          </pre>
-                        </div>
-                        
-                        <div className="mt-4">
-                          <h3 className="font-semibold text-foreground mb-2">Time & Space Complexity</h3>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Time complexity: O(n)</li>
-                            <li>• Space complexity: O(n)</li>
-                          </ul>
-                        </div>
+                        )}
+                        {!subsLoading && subsError && (
+                          <div className="text-sm text-red-600">
+                            {subsError}
+                          </div>
+                        )}
+                        {!subsLoading &&
+                          !subsError &&
+                          submissions.length === 0 && (
+                            <div className="text-sm text-muted-foreground">
+                              No submissions yet.
+                            </div>
+                          )}
+                        {!subsLoading &&
+                          !subsError &&
+                          submissions.length > 0 && (
+                            <div className="space-y-3">
+                              {submissions.map((s) => (
+                                <div
+                                  key={s.id}
+                                  className="bg-muted/50 rounded-lg border border-border"
+                                >
+                                  {/* Row header */}
+                                  <button
+                                    onClick={() => toggleSubmission(s.id)}
+                                    className="w-full flex items-center justify-between p-3 hover:bg-muted/70 transition-colors"
+                                  >
+                                    <div className="flex items-center space-x-3 text-left">
+                                      <span
+                                        className="text-sm font-medium"
+                                        style={{
+                                          color:
+                                            s.status === "passed"
+                                              ? "#388e3c"
+                                              : s.status === "failed"
+                                                ? "#d32f2f"
+                                                : "#555",
+                                        }}
+                                      >
+                                        {s.status === "passed"
+                                          ? "Accepted"
+                                          : s.status.charAt(0).toUpperCase() +
+                                            s.status.slice(1)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                      <span>{s.language || "Python"}</span>
+                                      <span>
+                                        {formatRelativeTime(s.created_at)}
+                                      </span>
+                                    </div>
+                                  </button>
+                                  {/* Expanded code viewer */}
+                                  {expandedSubmissionId === s.id && (
+                                    <div className="px-3 pb-3">
+                                      <div className="bg-background border rounded">
+                                        <div className="flex items-center justify-between px-3 py-2 border-b">
+                                          <div className="text-xs text-muted-foreground">
+                                            {s.language || "Python"}
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                openFullscreen(
+                                                  s.code,
+                                                  s.language || "python",
+                                                  `${problem.title} — Submission`,
+                                                )
+                                              }
+                                            >
+                                              <Maximize2 className="w-4 h-4 mr-1" />{" "}
+                                              Maximize
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => handleCopy(s.code)}
+                                            >
+                                              <Copy className="w-4 h-4 mr-1" />{" "}
+                                              Copy
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        <Editor
+                                          height="50vh"
+                                          defaultLanguage={(
+                                            s.language || "python"
+                                          ).toLowerCase()}
+                                          value={s.code}
+                                          theme="light"
+                                          options={{
+                                            readOnly: true,
+                                            minimap: { enabled: false },
+                                            lineNumbers: "off",
+                                            folding: false,
+                                            scrollBeyondLastLine: false,
+                                            renderLineHighlight: "none",
+                                            fontSize: 15,
+                                            wordWrap: "on",
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="submissions" className="p-6 m-0 h-full overflow-y-auto">
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">Submissions</h2>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
-                            </div>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Python</span>
-                              <span>2 minutes ago</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-sm font-medium" style={{color: '#388e3c'}}>Accepted</span>
-                            </div>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Python</span>
-                              <span>5 minutes ago</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="notes" className="p-6 m-0 h-full overflow-y-auto flex flex-col">
+                    <TabsContent
+                      value="notes"
+                      className="p-6 m-0 h-full overflow-y-auto flex flex-col"
+                    >
                       <Notes problemId={problemId} />
                     </TabsContent>
                   </div>
@@ -551,12 +848,21 @@ const ProblemSolver = () => {
         )}
 
         {/* Middle Panel - Code Editor & Test Results */}
-        <ResizablePanel 
-          defaultSize={showLeftPanel && showRightPanel ? 40 : showLeftPanel || showRightPanel ? 60 : 100} 
+        <ResizablePanel
+          defaultSize={
+            showLeftPanel && showRightPanel
+              ? 40
+              : showLeftPanel || showRightPanel
+                ? 60
+                : 100
+          }
           minSize={30}
         >
           <ResizablePanelGroup direction="vertical">
-            <ResizablePanel defaultSize={showBottomPanel ? 65 : 100} minSize={40}>
+            <ResizablePanel
+              defaultSize={showBottomPanel ? 65 : 100}
+              minSize={40}
+            >
               <CodeEditor
                 initialCode={problem.functionSignature}
                 problemId={problem.id}
@@ -574,7 +880,9 @@ const ProblemSolver = () => {
                   <div className="h-full bg-background border-t border-border flex flex-col">
                     {testResults.length === 0 ? (
                       <div className="p-4">
-                        <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
+                        <div className="text-sm font-medium text-foreground mb-3">
+                          Test Results
+                        </div>
                         <div className="font-mono text-sm text-muted-foreground">
                           Click "Run" to test your code...
                         </div>
@@ -582,16 +890,23 @@ const ProblemSolver = () => {
                     ) : (
                       <Tabs defaultValue="0" className="flex flex-col h-full">
                         <div className="px-4 pt-4 pb-2">
-                          <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
-                          <TabsList className="grid h-10 bg-muted p-1 text-muted-foreground" style={{ gridTemplateColumns: `repeat(${testResults.length}, minmax(0, 1fr))` }}>
+                          <div className="text-sm font-medium text-foreground mb-3">
+                            Test Results
+                          </div>
+                          <TabsList
+                            className="grid h-10 bg-muted p-1 text-muted-foreground"
+                            style={{
+                              gridTemplateColumns: `repeat(${testResults.length}, minmax(0, 1fr))`,
+                            }}
+                          >
                             {testResults.map((result, index) => (
-                              <TabsTrigger 
+                              <TabsTrigger
                                 key={index}
                                 value={index.toString()}
                                 className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all ${
                                   result.passed
-                                    ? 'data-[state=active]:bg-green-100 data-[state=active]:text-green-800 dark:data-[state=active]:bg-green-900/20 dark:data-[state=active]:text-green-400'
-                                    : 'data-[state=active]:bg-red-100 data-[state=active]:text-red-800 dark:data-[state=active]:bg-red-900/20 dark:data-[state=active]:text-red-400'
+                                    ? "data-[state=active]:bg-green-100 data-[state=active]:text-green-800 dark:data-[state=active]:bg-green-900/20 dark:data-[state=active]:text-green-400"
+                                    : "data-[state=active]:bg-red-100 data-[state=active]:text-red-800 dark:data-[state=active]:bg-red-900/20 dark:data-[state=active]:text-red-400"
                                 }`}
                               >
                                 {result.passed ? (
@@ -604,19 +919,21 @@ const ProblemSolver = () => {
                             ))}
                           </TabsList>
                         </div>
-                        
+
                         <div className="flex-1 overflow-hidden px-4 pb-4">
                           {testResults.map((result, index) => (
-                            <TabsContent 
+                            <TabsContent
                               key={index}
                               value={index.toString()}
                               className="h-full overflow-y-auto mt-0"
                             >
-                              <div className={`p-4 rounded-lg border-2 h-full ${
-                                result.passed 
-                                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                                  : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-                              }`}>
+                              <div
+                                className={`p-4 rounded-lg border-2 h-full ${
+                                  result.passed
+                                    ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                                    : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                                }`}
+                              >
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center space-x-3">
                                     {result.passed ? (
@@ -627,14 +944,16 @@ const ProblemSolver = () => {
                                     <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                                       Test Case {index + 1}
                                     </span>
-                                    <Badge 
+                                    <Badge
                                       className={`text-xs font-semibold px-3 py-1 ${
-                                        result.passed 
-                                          ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600' 
-                                          : 'bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600'
+                                        result.passed
+                                          ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                                          : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
                                       }`}
                                     >
-                                      {result.passed ? '✅ PASSED' : '❌ FAILED'}
+                                      {result.passed
+                                        ? "✅ PASSED"
+                                        : "❌ FAILED"}
                                     </Badge>
                                   </div>
                                   {result.time && (
@@ -644,35 +963,52 @@ const ProblemSolver = () => {
                                     </div>
                                   )}
                                 </div>
-                                
+
                                 <div className="space-y-4">
                                   <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Input:</div>
-                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">{renderValue(result.input)}</pre>
+                                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                      Input:
+                                    </div>
+                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
+                                      {renderValue(result.input)}
+                                    </pre>
                                   </div>
-                                  
+
                                   <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Expected Output:</div>
-                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">{renderValue(result.expected)}</pre>
+                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                        Expected Output:
+                                      </div>
+                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
+                                        {renderValue(result.expected)}
+                                      </pre>
                                     </div>
-                                    
+
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Your Output:</div>
-                                      <pre className={`text-sm font-mono whitespace-pre overflow-x-auto ${
-                                        result.passed 
-                                          ? 'text-green-700 dark:text-green-300' 
-                                          : 'text-red-700 dark:text-red-300'
-                                      }`}>
-                                        {renderValue(result.actual) || 'No output'}
+                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                        Your Output:
+                                      </div>
+                                      <pre
+                                        className={`text-sm font-mono whitespace-pre overflow-x-auto ${
+                                          result.passed
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-red-700 dark:text-red-300"
+                                        }`}
+                                      >
+                                        {renderValue(result.actual) ||
+                                          "No output"}
                                       </pre>
                                     </div>
                                   </div>
-                                  
+
                                   {result.stderr && (
                                     <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-800">
-                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Error:</div>
-                                      <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">{result.stderr}</pre>
+                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
+                                        Error:
+                                      </div>
+                                      <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+                                        {result.stderr}
+                                      </pre>
                                     </div>
                                   )}
                                 </div>
@@ -688,28 +1024,57 @@ const ProblemSolver = () => {
             )}
           </ResizablePanelGroup>
         </ResizablePanel>
-        
+
         {/* Right Panel - AI Chat */}
         {showRightPanel && (
           <>
             <ResizableHandle withHandle />
-            <ResizablePanel 
+            <ResizablePanel
               defaultSize={25}
               minSize={20}
               onResize={(size) => {
-                localStorage.setItem('ai-chat-width', String(size));
+                localStorage.setItem("ai-chat-width", String(size));
               }}
             >
-              <AIChat 
+              <AIChat
                 problemId={problem.id}
                 problemDescription={problem.description}
                 onInsertCodeSnippet={handleInsertCodeSnippet}
                 problemTestCases={problem.testCases}
+                problem={problem}
               />
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
+      {/* Full-screen code viewer */}
+      <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
+        <DialogContent className="max-w-[90vw] p-0">
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <DialogTitle className="text-base">{fullscreenTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="px-4 pb-4">
+            <div className="border rounded">
+              <Editor
+                height="80vh"
+                defaultLanguage={fullscreenLang}
+                value={fullscreenCode}
+                theme="light"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  lineNumbers: "on",
+                  folding: true,
+                  scrollBeyondLastLine: false,
+                  renderLineHighlight: "none",
+                  fontSize: 15,
+                  wordWrap: "off",
+                }}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
