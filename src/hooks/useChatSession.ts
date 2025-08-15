@@ -1,8 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChatMessage, ChatSession, CodeSnippet } from '@/types';
+import { ChatMessage, ChatSession, CodeSnippet, FlowGraph } from '@/types';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+
+// --- Diagram payload helper & types ---
+type DiagramPayload =
+  | { engine: 'mermaid'; code: string; title?: string }
+  | { engine: 'reactflow'; graph: FlowGraph; title?: string };
+
+type MaybeMermaid = { engine?: unknown; code?: unknown; title?: unknown } | null | undefined;
+type MaybeReactflow = { engine?: unknown; graph?: { nodes?: unknown; edges?: unknown } | unknown; title?: unknown } | null | undefined;
+
+const isMermaidDiagram = (d: unknown): d is { engine: 'mermaid'; code: string; title?: string } => {
+  const m = d as MaybeMermaid;
+  return !!m && m.engine === 'mermaid' && typeof m.code === 'string';
+};
+
+const isReactflowDiagram = (
+  d: unknown
+): d is { engine: 'reactflow'; graph: { nodes: unknown[]; edges: unknown[] }; title?: string } => {
+  const r = d as MaybeReactflow;
+  const hasGraph = !!r && typeof r === 'object' && 'graph' in (r as object);
+  const graph = hasGraph ? (r as { graph: unknown }).graph as { nodes?: unknown; edges?: unknown } : undefined;
+  const hasEngine = !!r && typeof r === 'object' && 'engine' in (r as object);
+  const engine = hasEngine ? (r as { engine: unknown }).engine : undefined;
+  return (
+    engine === 'reactflow' &&
+    !!graph &&
+    Array.isArray(graph.nodes) &&
+    Array.isArray(graph.edges)
+  );
+};
+
+const getDiagramPayload = (diagram: unknown): DiagramPayload | undefined => {
+  if (isMermaidDiagram(diagram)) {
+    return { engine: 'mermaid', code: diagram.code, title: diagram.title };
+  }
+  if (isReactflowDiagram(diagram)) {
+    const g = diagram.graph as unknown as FlowGraph;
+    const t = diagram.title as string | undefined;
+    return { engine: 'reactflow', graph: g, title: t };
+  }
+  return undefined;
+};
 
 // --- Code snippet dedup helpers ---
 const normalizeSnippet = (s: CodeSnippet): string => {
@@ -122,7 +163,15 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
 
       if (messagesError) throw messagesError;
 
-      const formattedMessages: ChatMessage[] = sessionMessages.map(msg => ({
+      type DbMessage = {
+        id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        created_at: string;
+        session_id: string;
+        code_snippets?: CodeSnippet[] | null;
+      };
+      const formattedMessages: ChatMessage[] = (sessionMessages as DbMessage[]).map((msg) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
@@ -177,7 +226,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
   }, [session, toast]);
 
   // Send message to AI and save both user and AI messages
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, options?: { action?: 'diagram' }) => {
     if (!content.trim() || !session || isTyping) return;
 
     const userMessage: ChatMessage = {
@@ -208,7 +257,8 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
           message: content,
           problemDescription,
           conversationHistory,
-          testCases: problemTestCases
+          testCases: problemTestCases,
+          diagram: options?.action === 'diagram'
         }
       });
 
@@ -244,7 +294,9 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         content: aiResponseContent,
         timestamp: new Date(),
         sessionId: session.id,
-        codeSnippets: dedupedSnippets
+        codeSnippets: dedupedSnippets,
+        diagram: getDiagramPayload(data?.diagram),
+        suggestDiagram: typeof data.suggestDiagram === 'boolean' ? data.suggestDiagram : undefined
       };
 
       // Add AI response to UI
@@ -270,15 +322,21 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
     if (!session) return;
 
     try {
-      // Delete all messages for this session
-      const { error } = await supabase
-        .from('ai_chat_messages')
-        .delete()
-        .eq('session_id', session.id);
+      // Call edge function to clear chat (messages + session)
+      const { error, data } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          action: 'clear_chat',
+          sessionId: session.id,
+          userId: user?.id,
+        },
+      });
 
-      if (error) throw error;
+      if (error || (data && data.ok === false)) {
+        throw error || new Error('Failed to clear chat');
+      }
 
       setMessages([]);
+      setSession(null);
       
       toast({
         title: "Success",
@@ -293,12 +351,59 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         variant: "destructive"
       });
     }
-  }, [session, toast]);
+  }, [session, user?.id, toast]);
 
   // Initialize session on mount
   useEffect(() => {
     initializeSession();
   }, [initializeSession]);
+
+  // Generate diagram without posting a user message
+  const requestDiagram = useCallback(async (sourceText: string) => {
+    if (!session || isTyping) return;
+    setIsTyping(true);
+    try {
+      const conversationHistory = messages.map(msg => ({ role: msg.role, content: msg.content }));
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: sourceText,
+          problemDescription,
+          conversationHistory,
+          diagram: true,
+          preferredEngines: ['reactflow', 'mermaid']
+        }
+      });
+      if (error) throw error;
+
+      const diagramPayload = getDiagramPayload(data?.diagram ?? data);
+
+      if (!diagramPayload) {
+        toast({ title: 'No diagram', description: 'The model did not return a diagram for this request.' });
+        return;
+      }
+
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        sessionId: session.id,
+        diagram: diagramPayload
+      };
+
+      setMessages(prev => [...prev, aiResponse]);
+      await saveMessage(aiResponse);
+    } catch (error) {
+      console.error('Error generating diagram:', error);
+      toast({
+        title: 'Diagram error',
+        description: 'Failed to generate diagram. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsTyping(false);
+    }
+  }, [session, isTyping, messages, problemDescription, saveMessage, toast]);
 
   return {
     session,
@@ -306,6 +411,7 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
     loading,
     isTyping,
     sendMessage,
-    clearConversation
+    clearConversation,
+    requestDiagram
   };
 };

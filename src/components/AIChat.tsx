@@ -1,16 +1,21 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Trash2, Loader2, Mic, MicOff } from 'lucide-react';
+import { Send, Bot, User, Trash2, Loader2, Mic, MicOff, ChartNetwork as DiagramIcon, Maximize2, Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+// Using a lightweight custom fullscreen overlay instead of Radix Dialog to avoid MIME issues in some dev setups
 import { useChatSession } from '@/hooks/useChatSession';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import TextareaAutosize from 'react-textarea-autosize';
 import { CodeSnippet } from '@/types';
+import Mermaid from '@/components/diagram/Mermaid';
+import FlowCanvas from '@/components/diagram/FlowCanvas';
+import type { FlowGraph } from '@/types';
 import CodeSnippetButton from '@/components/CodeSnippetButton';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { CanvasContainer } from '@/components/canvas';
 
 interface AIChatProps {
   problemId: string;
@@ -22,40 +27,23 @@ interface AIChatProps {
 const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // Function to clean mathematical notation in message content
-  const cleanMathNotation = (content: string): string => {
-    if (typeof content !== 'string') return String(content);
-    
-    // Guard: don't process content that contains backticks (code blocks/inline code)
-    if (/`/.test(content)) {
-      return content;
-    }
-    
-    return content
-      // Clean LaTeX notation
-      .replace(/\\cdot/g, '·')
-      .replace(/\\log/g, 'log')
-      .replace(/\\times/g, '×')
-      .replace(/\\le/g, '≤')
-      .replace(/\\ge/g, '≥')
-      .replace(/\\ne/g, '≠')
-      .replace(/\\infty/g, '∞')
-      // Clean up escaped parentheses
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      // Remove extra backslashes
-      .replace(/\s*\\\s*/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
+  type ActiveDiagram = { engine: 'mermaid'; code: string } | { engine: 'reactflow'; graph: FlowGraph };
+  const [isDiagramOpen, setIsDiagramOpen] = useState(false);
+  const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(null);
+  const [hiddenVisualizeForIds, setHiddenVisualizeForIds] = useState<Set<string>>(new Set());
+  
+  // Canvas state
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [canvasCode, setCanvasCode] = useState('');
+  const [canvasTitle, setCanvasTitle] = useState('Interactive Component');
   const { 
     session, 
     messages, 
     loading, 
     isTyping, 
     sendMessage, 
-    clearConversation 
+    clearConversation,
+    requestDiagram,
   } = useChatSession({ problemId, problemDescription, problemTestCases });
 
   // Speech-to-text functionality
@@ -91,6 +79,214 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleVisualize = async (sourceMessageContent: string, messageId: string) => {
+    // Request a diagram separately without adding a user message bubble
+    setHiddenVisualizeForIds(prev => new Set(prev).add(messageId));
+    await requestDiagram(sourceMessageContent);
+  };
+
+  const handleGenerateComponent = async (messageContent: string) => {
+    // For now, let's create a sample component - later we'll integrate with AI
+    const sampleCode = `function AlgorithmVisualizer() {
+  const [values, setValues] = useState([64, 34, 25, 12, 22, 11, 90]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(500);
+
+  const sortSteps = useMemo(() => {
+    const arr = [...values];
+    const steps = [{ array: [...arr], comparing: [], swapping: [] }];
+    
+    // Bubble sort with step tracking
+    for (let i = 0; i < arr.length - 1; i++) {
+      for (let j = 0; j < arr.length - i - 1; j++) {
+        steps.push({ array: [...arr], comparing: [j, j + 1], swapping: [] });
+        if (arr[j] > arr[j + 1]) {
+          [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+          steps.push({ array: [...arr], comparing: [], swapping: [j, j + 1] });
+        }
+      }
+    }
+    return steps;
+  }, [values]);
+
+  useEffect(() => {
+    let timer;
+    if (isPlaying && currentStep < sortSteps.length - 1) {
+      timer = setTimeout(() => setCurrentStep(s => s + 1), speed);
+    } else if (currentStep >= sortSteps.length - 1) {
+      setIsPlaying(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isPlaying, currentStep, speed, sortSteps.length]);
+
+  const reset = () => {
+    setCurrentStep(0);
+    setIsPlaying(false);
+  };
+
+  const randomize = () => {
+    const newValues = Array.from({ length: 7 }, () => Math.floor(Math.random() * 100) + 1);
+    setValues(newValues);
+    reset();
+  };
+
+  const currentStepData = sortSteps[currentStep] || sortSteps[0];
+
+  return React.createElement('div', {
+    className: "w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-8"
+  },
+    React.createElement('div', {
+      className: "max-w-4xl mx-auto space-y-6"
+    },
+      React.createElement(Card, {},
+        React.createElement(CardHeader, {},
+          React.createElement(CardTitle, {
+            className: "flex items-center gap-2"
+          },
+            React.createElement(CircleHelp, { className: "h-5 w-5" }),
+            "Bubble Sort Visualizer"
+          )
+        ),
+        React.createElement(CardContent, {
+          className: "space-y-6"
+        },
+          // Array Visualization
+          React.createElement('div', {
+            className: "flex items-end justify-center gap-2 h-64 p-4"
+          },
+            React.createElement(AnimatePresence, {},
+              currentStepData.array.map((value, index) =>
+                React.createElement(motion.div, {
+                  key: \`\${index}-\${value}\`,
+                  layout: true,
+                  initial: { scale: 0.8, opacity: 0 },
+                  animate: { 
+                    scale: 1, 
+                    opacity: 1,
+                    backgroundColor: currentStepData.comparing.includes(index) 
+                      ? '#fbbf24' 
+                      : currentStepData.swapping.includes(index) 
+                      ? '#ef4444' 
+                      : '#3b82f6'
+                  },
+                  exit: { scale: 0.8, opacity: 0 },
+                  className: "flex flex-col items-center"
+                },
+                  React.createElement('div', {
+                    className: "text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300"
+                  }, value),
+                  React.createElement(motion.div, {
+                    className: "w-12 rounded-t-lg",
+                    style: { 
+                      height: \`\${(value / Math.max(...values)) * 200}px\`,
+                      backgroundColor: currentStepData.comparing.includes(index) 
+                        ? '#fbbf24' 
+                        : currentStepData.swapping.includes(index) 
+                        ? '#ef4444' 
+                        : '#3b82f6'
+                    },
+                    animate: {
+                      scale: currentStepData.comparing.includes(index) || currentStepData.swapping.includes(index) ? 1.1 : 1
+                    }
+                  })
+                )
+              )
+            )
+          ),
+          
+          // Controls
+          React.createElement('div', {
+            className: "flex items-center justify-between"
+          },
+            React.createElement('div', {
+              className: "flex items-center gap-2"
+            },
+              React.createElement(Button, {
+                onClick: () => setCurrentStep(Math.max(0, currentStep - 1)),
+                disabled: currentStep === 0
+              }, "Previous"),
+              React.createElement(Button, {
+                onClick: () => setIsPlaying(!isPlaying),
+                disabled: currentStep >= sortSteps.length - 1
+              },
+                isPlaying ? React.createElement(Pause, { className: "h-4 w-4" }) : React.createElement(Play, { className: "h-4 w-4" }),
+                isPlaying ? 'Pause' : 'Play'
+              ),
+              React.createElement(Button, {
+                onClick: () => setCurrentStep(Math.min(sortSteps.length - 1, currentStep + 1)),
+                disabled: currentStep >= sortSteps.length - 1
+              }, "Next")
+            ),
+            
+            React.createElement('div', {
+              className: "flex items-center gap-2"
+            },
+              React.createElement(Button, {
+                onClick: reset,
+                variant: "outline"
+              },
+                React.createElement(RotateCcw, { className: "h-4 w-4 mr-2" }),
+                "Reset"
+              ),
+              React.createElement(Button, {
+                onClick: randomize,
+                variant: "outline"
+              },
+                React.createElement(Shuffle, { className: "h-4 w-4 mr-2" }),
+                "Randomize"
+              )
+            )
+          ),
+
+          // Speed Control
+          React.createElement('div', {
+            className: "flex items-center gap-4"
+          },
+            React.createElement(Label, {}, "Speed"),
+            React.createElement(Slider, {
+              value: [speed],
+              onValueChange: (value) => setSpeed(value[0]),
+              max: 1000,
+              min: 100,
+              step: 100,
+              className: "flex-1"
+            }),
+            React.createElement('span', {
+              className: "text-sm text-gray-600 dark:text-gray-400 w-16"
+            }, \`\${speed}ms\`)
+          ),
+
+          // Step Info
+          React.createElement('div', {
+            className: "text-center text-sm text-gray-600 dark:text-gray-400"
+          },
+            \`Step \${currentStep + 1} of \${sortSteps.length}\`,
+            currentStepData.comparing.length > 0 && React.createElement('span', {
+              className: "ml-2"
+            }, \`Comparing positions \${currentStepData.comparing.join(' and ')}\`),
+            currentStepData.swapping.length > 0 && React.createElement('span', {
+              className: "ml-2"
+            }, \`Swapping positions \${currentStepData.swapping.join(' and ')}\`)
+          )
+        )
+      )
+    )
+  );
+}
+
+return AlgorithmVisualizer;`;
+
+    setCanvasCode(sampleCode);
+    setCanvasTitle('Algorithm Visualizer');
+    setIsCanvasOpen(true);
+  };
+
+  const openDiagramDialog = (diagram: ActiveDiagram) => {
+    setActiveDiagram(diagram);
+    setIsDiagramOpen(true);
   };
 
   const toggleMicrophone = async () => {
@@ -186,22 +382,22 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                       <div className="flex-1 min-w-0">
                         <div className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
                           message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
+                            ? 'border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15'
+                            : 'border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15'
                         }`}>
                           {message.role === 'user' ? (
                             <p className="text-sm whitespace-pre-wrap break-words text-left">{message.content}</p>
                           ) : (
-                            <div className="text-sm prose prose-sm max-w-none">
+                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                               <ReactMarkdown
                                 components={{
-                                  code({inline, className, children, ...props}: {
-                                    inline?: boolean;
-                                    className?: string;
-                                    children?: React.ReactNode;
-                                    [key: string]: unknown;
-                                  }) {
+                                  code({inline, className, children, ...props}: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                                     const match = /language-(\w+)/.exec(className || '');
+                                    if (!inline && match && match[1] === 'mermaid') {
+                                      return (
+                                        <Mermaid chart={String(children)} />
+                                      );
+                                    }
                                     return !inline && match ? (
                                       <SyntaxHighlighter
                                         style={vscDarkPlus}
@@ -218,58 +414,100 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                       </code>
                                     );
                                   },
-                                  p: ({children}) => (
-                                    <p className="mb-2 last:mb-0 leading-relaxed text-left">
-                                      {children}
-                                    </p>
-                                  ),
-                                  ul: ({children}) => (
-                                    <ul className="list-disc list-inside mb-3 space-y-1 pl-2">
-                                      {children}
-                                    </ul>
-                                  ),
-                                  ol: ({children}) => (
-                                    <ol className="list-decimal mb-3 pl-4">
-                                      {children}
-                                    </ol>
-                                  ),
-                                  li: ({children}) => (
-                                    <li className="mb-1 text-left leading-relaxed">
-                                      {children}
-                                    </li>
-                                  ),
-                                  strong: ({children}) => (
-                                    <strong className="font-semibold text-foreground">{children}</strong>
-                                  ),
-                                  em: ({children}) => (
-                                    <em className="italic text-muted-foreground">{children}</em>
-                                  ),
-                                  h1: ({children}) => (
-                                    <h1 className="text-lg font-bold mb-3 mt-4 text-left first:mt-0">{children}</h1>
-                                  ),
-                                  h2: ({children}) => (
-                                    <h2 className="text-base font-bold mb-2 mt-3 text-left first:mt-0">{children}</h2>
-                                  ),
-                                  h3: ({children}) => (
-                                    <h3 className="text-sm font-bold mb-2 mt-2 text-left first:mt-0">{children}</h3>
-                                  ),
-                                  blockquote: ({children}) => (
-                                    <blockquote className="border-l-4 border-primary pl-4 py-2 my-3 bg-muted/30 italic rounded-r-md">
-                                      {children}
-                                    </blockquote>
+                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({children}) => <ul className="list-disc list-outside pl-5 mb-2">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside pl-5 mb-2">{children}</ol>,
+                                  li: ({children}: { children?: React.ReactNode }) => (
+                                    <li className="mb-1">{children}</li>
                                   ),
                                 }}
                               >
-                                {cleanMathNotation(message.content)}
+                                {message.content}
                               </ReactMarkdown>
                             </div>
                           )}
                         </div>
+
+                        {/* Mermaid diagram bubble if attached as structured payload */}
+                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'mermaid'; code: string } }).diagram?.engine === 'mermaid' && (
+                          <div className="mt-3">
+                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">Mermaid</span></div>
+                                <button
+                                  type="button"
+                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => openDiagramDialog({ engine: 'mermaid', code: (message as unknown as { diagram: { code: string } }).diagram.code })}
+                                  title="View full screen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  Expand
+                                </button>
+                              </div>
+                              <Mermaid chart={(message as unknown as { diagram: { code: string } }).diagram.code} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* React Flow diagram bubble if attached */}
+                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'reactflow'; graph: FlowGraph } }).diagram?.engine === 'reactflow' && (
+                          <div className="mt-3">
+                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">React Flow</span></div>
+                                <button
+                                  type="button"
+                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => openDiagramDialog({ engine: 'reactflow', graph: (message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph })}
+                                  title="View full screen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  Expand
+                                </button>
+                              </div>
+                              <FlowCanvas graph={(message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph} />
+                            </div>
+                          </div>
+                        )}
                         
-                        {/* Code Snippet Buttons for AI messages */}
-                        {message.role === 'assistant' && message.codeSnippets && message.codeSnippets.length > 0 && (
+                        {/* Actions: Visualize button and code snippets */}
+                        {message.role === 'assistant' && (
                           <div className="mt-3 space-y-3">
-                            {message.codeSnippets.map((snippet) => (
+                            {(() => {
+                              const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+                              const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
+                              const hasDiagram = Boolean((message as unknown as { diagram?: unknown }).diagram);
+                              const shouldShow = !hasDiagram && (userAsked || (message as unknown as { suggestDiagram?: boolean }).suggestDiagram === true) && !hiddenVisualizeForIds.has(message.id);
+                              return shouldShow ? (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                    onClick={() => handleVisualize(message.content, message.id)}
+                                    title="Ask the AI to generate a diagram"
+                                  >
+                                    <DiagramIcon className="w-4 h-4" />
+                                    <span className="text-sm">Visualize</span>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                    onClick={() => handleGenerateComponent(message.content)}
+                                    title="Generate an interactive component demo"
+                                  >
+                                    <Sparkles className="w-4 h-4" />
+                                    <span className="text-sm">Interactive Demo</span>
+                                  </Button>
+                                </div>
+                              ) : null;
+                            })()}
+                            {message.codeSnippets && message.codeSnippets.length > 0 && (
+                              <div className="space-y-3">
+                                {message.codeSnippets.map((snippet) => (
                               <div 
                                 key={snippet.id} 
                                 className="bg-card border rounded-lg p-4 shadow-sm"
@@ -311,7 +549,9 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                                   </p>
                                 )}
                               </div>
-                            ))}
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -330,7 +570,7 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
                       <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <Bot className="w-4 h-4 text-primary-foreground" />
                       </div>
-                      <div className="bg-secondary text-foreground p-3 rounded-lg">
+                              <div className="bg-secondary text-foreground p-3 rounded-lg">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -407,6 +647,32 @@ const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTes
           </Button>
         </div>
       </div>
+      {isDiagramOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setIsDiagramOpen(false)} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vh] bg-background border rounded-lg shadow-lg p-4 overflow-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">Diagram</div>
+              <Button size="sm" variant="ghost" onClick={() => setIsDiagramOpen(false)}>Close</Button>
+            </div>
+            {activeDiagram && (
+              activeDiagram.engine === 'mermaid' ? (
+                <Mermaid chart={activeDiagram.code} />
+              ) : (
+                <FlowCanvas graph={activeDiagram.graph} height="80vh" />
+              )
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Canvas Modal for Interactive Components */}
+      <CanvasContainer
+        isOpen={isCanvasOpen}
+        onClose={() => setIsCanvasOpen(false)}
+        initialCode={canvasCode}
+        title={canvasTitle}
+      />
     </Card>
   );
 };
