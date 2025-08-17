@@ -562,7 +562,7 @@ const ProblemSolver = () => {
                     </TabsList>
                   </div>
 
-                  <div className="flex-1 min-h-0 overflow-hidden">
+                  <div className="flex-1 min-h-0 overflow-y-auto">
                     <TabsContent
                       value="question"
                       className="p-6 space-y-6 m-0 h-full overflow-y-auto"
@@ -668,7 +668,7 @@ const ProblemSolver = () => {
                               </div>
                               <div className="border rounded overflow-hidden">
                                 <Editor
-                                  height="42vh"
+                                  height="400px"
                                   defaultLanguage="python"
                                   value={sol.code}
                                   theme="light"
