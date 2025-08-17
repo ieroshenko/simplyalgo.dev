@@ -89,9 +89,10 @@ interface UseChatSessionProps {
   problemId: string;
   problemDescription: string;
   problemTestCases?: unknown[];
+  currentCode?: string;
 }
 
-export const useChatSession = ({ problemId, problemDescription, problemTestCases }: UseChatSessionProps) => {
+export const useChatSession = ({ problemId, problemDescription, problemTestCases, currentCode }: UseChatSessionProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [session, setSession] = useState<ChatSession | null>(null);
@@ -170,6 +171,8 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         created_at: string;
         session_id: string;
         code_snippets?: CodeSnippet[] | null;
+        diagram?: unknown | null;
+        suggest_diagram?: boolean | null;
       };
       const formattedMessages: ChatMessage[] = (sessionMessages as DbMessage[]).map((msg) => ({
         id: msg.id,
@@ -177,7 +180,9 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         content: msg.content,
         timestamp: new Date(msg.created_at),
         sessionId: msg.session_id,
-        codeSnippets: msg.code_snippets || undefined
+        codeSnippets: msg.code_snippets || undefined,
+        diagram: getDiagramPayload(msg.diagram),
+        suggestDiagram: typeof msg.suggest_diagram === 'boolean' ? msg.suggest_diagram : undefined
       }));
 
       setMessages(formattedMessages);
@@ -204,7 +209,9 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
           session_id: session.id,
           role: message.role,
           content: message.content,
-          code_snippets: message.codeSnippets || null
+          code_snippets: message.codeSnippets || null,
+          diagram: message.diagram ? message.diagram : null,
+          suggest_diagram: typeof message.suggestDiagram === 'boolean' ? message.suggestDiagram : null
         });
 
       if (error) throw error;
@@ -258,7 +265,8 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
           problemDescription,
           conversationHistory,
           testCases: problemTestCases,
-          diagram: options?.action === 'diagram'
+          diagram: options?.action === 'diagram',
+          currentCode: currentCode
         }
       });
 
@@ -322,6 +330,10 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
     if (!session) return;
 
     try {
+      // Enter loading state to block UI interactions during reset
+      setLoading(true);
+      setIsTyping(false);
+
       // Call edge function to clear chat (messages + session)
       const { error, data } = await supabase.functions.invoke('ai-chat', {
         body: {
@@ -335,9 +347,13 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         throw error || new Error('Failed to clear chat');
       }
 
+      // Reset local state
       setMessages([]);
       setSession(null);
-      
+
+      // Immediately create a fresh session so sendMessage can proceed without page reload
+      await initializeSession();
+
       toast({
         title: "Success",
         description: "Conversation cleared successfully."
@@ -350,8 +366,10 @@ export const useChatSession = ({ problemId, problemDescription, problemTestCases
         description: "Failed to clear conversation. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-  }, [session, user?.id, toast]);
+  }, [session, user?.id, toast, initializeSession]);
 
   // Initialize session on mount
   useEffect(() => {

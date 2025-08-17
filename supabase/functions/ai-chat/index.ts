@@ -20,6 +20,93 @@ interface CodeSnippet {
   };
 }
 
+/**
+ * Lightweight sanitizer to fix common TSX issues in generated components before returning to client.
+ * - Removes stray markdown fences
+ * - Fixes dangling nullish-coalescing operators like `v[0] ??` -> `v[0] ?? 1`
+ * - Normalizes Slider onValueChange to handle array/scalar safely
+ * - Attempts to balance common unmatched parens/brackets at end of lines
+ */
+function sanitizeGeneratedTsx(input: string): string {
+  let code = input || "";
+
+  // 1) Strip markdown fences if any
+  code = code.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "");
+
+  // 2) Fix dangling nullish coalescing at end of expression or before comma/paren/pipe
+  // Examples seen: `setSpeed(v[0] ?? |` or `setSpeed(v[0] ?? )`
+  code = code.replace(/\?\?\s*(\)|,|\||\n)/g, "?? 1$1");
+
+  // 3) Specific hardening for Slider onValueChange: ensure defaults and numeric cast
+  // onValueChange={(v) => setSpeed(v[0] ?? 1)} or when v is scalar
+  code = code.replace(
+    /onValueChange=\{\(v\)\s*=>\s*setSpeed\(([^)]*)\)\)\}/g,
+    (m) => m, // no-op if already in a different shape
+  );
+  // Generic normalization for common patterns `setSpeed(v[0] ?? 1)` or `setSpeed(v ?? 1)`
+  code = code.replace(
+    /onValueChange=\{\(v\)\s*=>\s*setSpeed\(([^)]*)\)\s*\}/g,
+    (_m, inner) => {
+      const safe = `Number((Array.isArray(v) ? v[0] : v) ?? 1)`;
+      return `onValueChange={(v) => setSpeed(${safe})}`;
+    },
+  );
+
+  // 4) Try to repair simple unmatched parentheses at line ends like `(... ?? 1` without closing )
+  code = code.replace(/(setSpeed\([^\n]*)$/gm, (line) => {
+    const opens = (line.match(/\(/g) || []).length;
+    const closes = (line.match(/\)/g) || []).length;
+    if (opens > closes) return line + ")";
+    return line;
+  });
+
+  // 5) Fix incomplete JSX attribute assignments like `values={list |` or `values={list}`
+  // Replace dangling pipes at end of JSX attribute values
+  code = code.replace(/=\{([^}]*)\s*\|\s*$/gm, "={$1}");
+  
+  // 6) Fix unclosed JSX attribute braces like `values={list` (missing closing brace)
+  code = code.replace(/=\{([^}\n]*?)$/gm, (match, content) => {
+    // Only fix if it looks like an incomplete JSX attribute (no closing brace on same line)
+    if (content && !content.includes('}')) {
+      return `={${content}}`;
+    }
+    return match;
+  });
+
+  // 7) Fix malformed template literals or incomplete expressions in JSX
+  code = code.replace(/\{[^}]*\|[^}]*\}/g, (match) => {
+    // Remove stray pipes inside JSX expressions that might break syntax
+    return match.replace(/\|/g, '');
+  });
+
+  // 8) Clean up any remaining stray pipes at end of lines
+  code = code.replace(/\s*\|\s*$/gm, '');
+
+  // 9) Handle truncated JSX components at the end of the code
+  // Look for incomplete JSX tags like `<ComponentName` or `<ComponentName values={prop`
+  const lines = code.split('\n');
+  let lastLine = lines[lines.length - 1].trim();
+  
+  // If the last line looks like an incomplete JSX tag, remove it
+  if (lastLine.match(/^\s*<[A-Z]\w*[^>]*$/) || 
+      lastLine.includes('values={') && !lastLine.includes('}')) {
+    lines.pop(); // Remove the incomplete line
+    code = lines.join('\n');
+  }
+
+  // 10) Ensure the component ends properly with export or return statement
+  if (!code.trim().endsWith('}') && !code.trim().endsWith(';')) {
+    // If code doesn't end properly, try to add a closing brace
+    const openBraces = (code.match(/\{/g) || []).length;
+    const closeBraces = (code.match(/\}/g) || []).length;
+    if (openBraces > closeBraces) {
+      code += '\n}'.repeat(openBraces - closeBraces);
+    }
+  }
+
+  return code;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -41,6 +128,8 @@ interface RequestBody {
   cursorPosition?: { line: number; column: number };
   // Optional problem test cases to condition the tutor (will be executed on Judge0)
   testCases?: unknown[];
+  // Current code in the editor for context-aware responses
+  currentCode?: string;
   // For clear_chat action
   sessionId?: string;
   userId?: string;
@@ -103,6 +192,12 @@ const modelSource = Deno.env.get("OPENAI_MODEL")
   ? "OPENAI_MODEL env set"
   : "defaulted to o3-mini (no OPENAI_MODEL)";
 const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
+
+// Diagram engine preference - set DIAGRAM_ENGINE=reactflow or mermaid
+const preferredDiagramEngine = (Deno.env.get("DIAGRAM_ENGINE") || "reactflow").toLowerCase().trim();
+const validEngines = ["reactflow", "mermaid"];
+const diagramEngine = validEngines.includes(preferredDiagramEngine) ? preferredDiagramEngine : "reactflow";
+console.log(`[ai-chat] Diagram engine: ${diagramEngine} (${Deno.env.get("DIAGRAM_ENGINE") ? "env configured" : "defaulted"})`);
 
 // ---- Responses API helpers ----
 type ResponsesApiRequest = {
@@ -363,11 +458,19 @@ async function generateConversationResponse(
   problemDescription: string,
   conversationHistory: ChatMessage[],
   testCases?: unknown[],
+  currentCode?: string,
 ): Promise<string> {
   const serializedTests =
     Array.isArray(testCases) && testCases.length > 0
       ? JSON.stringify(testCases)
       : undefined;
+
+  // Determine if we should allow code in the reply - be more liberal for explicit requests
+  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
+  const explicitCodeRequest = /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
+  const codeKeywords = /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
+  const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
+
   const conversationPrompt = `
 You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
 
@@ -383,6 +486,8 @@ ${problemDescription}
 
 ${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
 
+${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
@@ -390,25 +495,37 @@ CURRENT STUDENT MESSAGE:
 "${message}"
 
 Your role:
-1. Provide helpful, educational guidance without giving away the complete solution.
-2. Ask probing questions to help students think through the problem.
-3. Explain concepts clearly and encourage good coding practices.
-4. Give hints and suggestions when students are stuck.
-5. Celebrate progress and provide constructive feedback.
+1. Coach with a Socratic style, but be helpful when students need code examples.
+2. Ask ONE concise question (<= 25 words) to guide their thinking.
+3. Provide helpful hints when students are stuck or ask for guidance.
+4. Keep tone friendly and educational.
 
-Important constraints:
-- Do NOT provide code (no code blocks, no pseudo-code) unless the student explicitly requests code or has shared their own code to review.
-- If the student hasn't attempted an answer yet, respond with a clarifying question or a high-level hint (one at a time). Avoid revealing algorithmic answers prematurely.
-- Prefer guiding the student to articulate their approach, constraints, and test cases before moving towards implementation details.
-- If code is explicitly requested or provided, keep responses minimal and focused on the student's context (still avoid full solutions unless explicitly asked).
+Code policy (conditional):
+- allowCode = ${allowCode}
+- If allowCode = false: Use questions and conceptual hints only.
+- If allowCode = true and student explicitly requests code: 
+  * CRITICAL: Only provide incremental code snippets, NEVER complete solutions
+  * Analyze what's already in their editor and provide ONLY the next 1-3 lines they need
+  * If they have an empty function, provide just the first variable declaration or setup
+  * If they have setup code, provide just the next logical step (loop, condition, etc.)
+  * If they have partial logic, provide just the missing piece to complete that step
+  * NEVER provide full algorithm implementations - break it into tiny incremental steps
+  * Each snippet should be 1-5 lines maximum and build on their existing code
 
-Respond naturally and conversationally. Focus on teaching and guiding rather than just providing answers.
+Output format:
+- Lead with a guiding question or brief explanation
+- Provide helpful hints as needed
+- If code is warranted and allowCode=true, include properly formatted code:
+\`\`\`python
+# Clear, educational code example
+# With proper indentation and comments
+\`\`\`
 `;
 
   const systemGuidance =
-    "You are a helpful coding tutor. Be encouraging and educational. IMPORTANT: Do not provide code (no code blocks, no pseudo-code) unless the student explicitly asks for code or has shared code to review. Prefer questions and high-level hints first. The student's code is auto-run on Judge0 with official tests; avoid asking them to run tests or provide test cases. Only after a likely-correct solution, ask one follow-up on time/space complexity.";
+    "You are a helpful Socratic coding tutor. Guide students with questions and provide educational code examples when requested. When allowCode=true and students ask for code help, provide clear, well-formatted Python examples that teach concepts. Balance Socratic questioning with practical code assistance.";
   const combined = `${systemGuidance}\n\n${conversationPrompt}`;
-  const text = await llmText(combined, { temperature: 0.7, maxTokens: 500 });
+  const text = await llmText(combined, { temperature: 0.3, maxTokens: 600 });
   return text || "I'm sorry, I couldn't generate a response. Please try again.";
 }
 
@@ -540,12 +657,14 @@ async function maybeGenerateDiagram(
       message,
     );
   if (!force && !wantsDiagram) return undefined;
+  // Use configured diagram engine preference
+  const defaultOrder: Array<"reactflow" | "mermaid"> = 
+    diagramEngine === "reactflow" ? ["reactflow", "mermaid"] : ["mermaid", "reactflow"];
+  
   const engineOrder: Array<"reactflow" | "mermaid"> =
     Array.isArray(preferredEngines) && preferredEngines.length
-      ? (Array.from(
-          new Set(preferredEngines.concat(["mermaid", "reactflow"] as const)),
-        ) as Array<"reactflow" | "mermaid">)
-      : ["mermaid", "reactflow"];
+      ? (Array.from(new Set(preferredEngines.concat(defaultOrder))) as Array<"reactflow" | "mermaid">)
+      : defaultOrder;
 
   const rfPrompt = `Create a React Flow diagram that visualizes the algorithm step-by-step with meaningful progression.
 
@@ -752,13 +871,14 @@ Output only the JSON:`;
   for (const engine of engineOrder) {
     console.log(`[Diagram Generation] Trying engine: ${engine}`);
     if (engine === "reactflow") {
-      // Temporarily disable React Flow - use Mermaid only for now
       tried.push("reactflow");
-      console.log("[Diagram Generation] React Flow disabled, skipping");
-      debug.reactflow = {
-        ok: false,
-        reason: "React Flow temporarily disabled",
-      };
+      const rf = await tryReactFlow();
+      if (rf.ok) {
+        console.log("[Diagram Generation] React Flow succeeded");
+        return rf.diagram;
+      }
+      console.log("[Diagram Generation] React Flow failed:", rf.reason);
+      debug.reactflow = { ok: false, reason: rf.reason };
     } else if (engine === "mermaid") {
       tried.push("mermaid");
       const mm = await tryMermaid();
@@ -805,43 +925,52 @@ async function analyzeCodeSnippets(
   conversationHistory: ChatMessage[],
   problemDescription: string,
   testCases?: unknown[],
+  currentCode?: string,
 ): Promise<CodeSnippet[]> {
-  // Only analyze if message clearly indicates code intent
-  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
-  const explicitAsk =
-    /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(
-      message,
-    );
-  // Don't auto-trigger on vague code-like text; rely on explicit ask or explicit code
-  const looksLikeCode = false;
-  const lastAssistant =
-    (conversationHistory || [])
-      .slice()
-      .reverse()
-      .find((m) => m.role === "assistant")
-      ?.content?.trim() || "";
-  const assistantJustAskedQuestion = /\?\s*$/.test(lastAssistant);
+  // Check if this is an AI response by looking at conversation history
+  const isAIResponse = conversationHistory.length > 0 && 
+    conversationHistory[conversationHistory.length - 1]?.role === "user";
+  
+  console.log(`[CodeSnippets] Analysis context: isAIResponse=${isAIResponse}, conversationLength=${conversationHistory.length}, lastRole=${conversationHistory.length > 0 ? conversationHistory[conversationHistory.length - 1]?.role : 'none'}`);
 
-  const allowAnalysis = hasExplicitCode || explicitAsk;
-  if (!allowAnalysis || (assistantJustAskedQuestion && !hasExplicitCode)) {
-    return [];
+  // For AI responses, only analyze if there are clear code blocks
+  if (isAIResponse) {
+    const hasCodeBlocks = /```[\s\S]*?```/m.test(message);
+    if (!hasCodeBlocks) {
+      return [];
+    }
+  } else {
+    // For user messages, use original logic: only analyze if clear intent
+    const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
+    const explicitAsk = /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(message);
+    
+    // Don't auto-trigger on vague code-like text; rely on explicit ask or explicit code
+    const lastAssistant = (conversationHistory || []).slice().reverse().find(m => m.role === 'assistant')?.content?.trim() || '';
+    const assistantJustAskedQuestion = /\?\s*$/.test(lastAssistant);
+
+    const allowAnalysis = hasExplicitCode || explicitAsk;
+    if (!allowAnalysis || (assistantJustAskedQuestion && !hasExplicitCode)) {
+      return [];
+    }
   }
 
   const analysisPrompt = `
-You are an expert coding tutor analyzing student code for a LeetCode-style problem.
+You are an expert coding tutor analyzing ${isAIResponse ? 'AI assistant code' : 'student code'} for a LeetCode-style problem.
 
 PROBLEM CONTEXT:
 ${problemDescription}
 
 ${Array.isArray(testCases) && testCases.length > 0 ? `PROBLEM TEST CASES (JSON):\n${JSON.stringify(testCases)}\n` : ""}
 
+${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
-CURRENT STUDENT MESSAGE:
+CURRENT ${isAIResponse ? 'AI ASSISTANT' : 'STUDENT'} MESSAGE:
 "${message}"
 
-TASK: Analyze the student's message for any code snippets that could be added to their code editor. Look for:
+TASK: Analyze the ${isAIResponse ? 'AI assistant\'s response' : 'student\'s message'} for any code snippets that could be added to their code editor. Look for:
 
 1. **Code in backticks or code blocks** - Extract and validate syntax
 2. **Variable declarations mentioned** - e.g., "I need counter = Counter(word)"
@@ -854,6 +983,8 @@ VALIDATION CRITERIA:
 - Logically appropriate for this specific problem
 - Uses correct variable names from problem context
 - Follows good coding practices
+- PROPER INDENTATION: Use 4 spaces for each indentation level
+- CLEAN FORMATTING: Remove unnecessary whitespace, ensure consistent spacing
 
 INSERTION INTELLIGENCE:
 - **Imports**: Place at top of file, after existing imports
@@ -861,10 +992,19 @@ INSERTION INTELLIGENCE:
 - **Functions**: Place at module level with proper spacing
 - **Statements**: Maintain proper indentation and control flow
 - **Algorithm patterns**: Provide foundational setup code
+- **Code Formatting**: Ensure proper Python indentation (4 spaces per level), clean line breaks
 
 STRICT AVOIDANCE:
 - Do NOT propose incomplete control-flow headers without body (e.g., "for s in strs:", "if x:") unless the user explicitly asked for that exact header.
 - Prefer concrete, context-safe statements (e.g., d[key].append(strs[i])) over scaffolding.
+
+SPECIAL RULES FOR AI RESPONSES:
+- If analyzing AI assistant responses, be VERY selective - only extract 1-2 most relevant snippets
+- Only suggest code that is NOT already present in the current file
+- Focus on the immediate next step the student needs, not all possible improvements
+- Ignore explanatory code examples - only extract actionable additions
+- Skip code that duplicates existing logic or variables
+- Prefer missing pieces over alternative implementations
 
 RESPONSE FORMAT (JSON only, no markdown):
 {
@@ -966,12 +1106,15 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
     );
 
     const normalizedMessage = message.replace(/\s+/g, " ").toLowerCase();
-    const validated = codeSnippets
-      .filter(
-        (snippet) =>
-          snippet.code && snippet.code.trim().length > 0 && snippet.isValidated,
-      )
-      .filter((snippet) => {
+    console.log(`[CodeSnippets] Processing ${codeSnippets.length} raw snippets through validation`);
+    
+    const initialFiltered = codeSnippets.filter(
+      (snippet) =>
+        snippet.code && snippet.code.trim().length > 0 && snippet.isValidated,
+    );
+    console.log(`[CodeSnippets] After basic validation: ${initialFiltered.length} snippets`);
+    
+    const validated = initialFiltered.filter((snippet, index) => {
         const code = snippet.code.trim();
         const lower = code.replace(/\s+/g, " ").toLowerCase();
         const lineCount = code.split("\n").length;
@@ -984,10 +1127,22 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
           snippet.insertionHint?.type === "import" ||
           snippet.insertionHint?.type === "variable" ||
           snippet.insertionHint?.type === "statement";
-        const allowedByPolicy =
-          (hasExplicitCode || explicitAsk) &&
-          (appearsInUserText || isSimpleType);
-        return allowedByPolicy && !isControlFlow && !tooLong;
+        
+        // For AI responses, be very liberal with validation
+        let passes;
+        if (isAIResponse) {
+          // For AI responses: almost always allow if reasonable length
+          const reasonableLength = code.length <= 2000 && lineCount <= 50;
+          passes = reasonableLength && code.trim().length > 0; // Very permissive for AI
+        } else {
+          // Original strict validation for user messages
+          const allowedByPolicy = (appearsInUserText || isSimpleType);
+          passes = allowedByPolicy && !isControlFlow && !tooLong;
+        }
+        
+        console.log(`[CodeSnippets] Snippet ${index}: type=${snippet.insertionHint?.type}, code="${code.substring(0, 100)}...", codeLength=${code.length}, lineCount=${lineCount}, passes=${passes}, isAI=${isAIResponse}, reasons: controlFlow=${isControlFlow}, tooLong=${tooLong}, appearsInUserText=${appearsInUserText}, isSimpleType=${isSimpleType}, reasonableLength=${isAIResponse ? (code.length <= 2000 && lineCount <= 50) : 'N/A'}`);
+        
+        return passes;
       });
 
     // Dedupe within the same response
@@ -1061,40 +1216,31 @@ async function insertSnippetSmart(
     );
   }
 
-  const placementPrompt = `You will choose where to insert a SHORT code snippet into a Python file.
+  const placementPrompt = `Analyze this Python code and determine the best place to insert a code snippet.
 
-PROBLEM CONTEXT:
-${problemDescription}
-
-CURRENT FILE (Python):
+CURRENT FILE:
 ---BEGIN FILE---
 ${code}
 ---END FILE---
 
-SNIPPET TO INSERT (language=${snippet.language}, type=${snippet.insertionHint?.type || "statement"}, scope=${snippet.insertionHint?.scope || "function"}):
+SNIPPET TO INSERT:
 ---BEGIN SNIPPET---
 ${snippet.code}
 ---END SNIPPET---
 
-CURSOR POSITION (0-based line, column): ${cursorPosition ? `${cursorPosition.line},${cursorPosition.column}` : "null"}
+Find the most logical place for this snippet. Consider code flow, variable scope, and algorithm structure.
 
-Task:
-- Determine the 0-based line index where the FIRST line of the snippet should be inserted.
-- Provide an indentation string (spaces or tabs) appropriate for that location. Do NOT include any other code.
-- If the exact snippet (normalized whitespace) already exists, set insertAtLine to -1.
-- If insertion is ambiguous, prefer placing inside the active function near the cursor when provided.
-
-Output strictly as JSON (no markdown):
+Output JSON:
 {
-  "insertAtLine": <number>,
-  "indentation": "<indent string>",
-  "rationale": "<brief explanation>"
+  "insertAtLine": <0-based line number>,
+  "indentation": "<spaces for proper indentation>",
+  "rationale": "<brief reason>"
 }`;
 
   console.log(
-    "[ai-chat] insert_snippet using model=gpt-4o-mini (placement-only)",
+    "[ai-chat] insert_snippet using main model for smart placement",
   );
-  const raw = await llmJsonFast(placementPrompt, { maxTokens: 500 });
+  const raw = await llmJson(placementPrompt, { maxTokens: 500 });
   let insertAtLine: number | undefined;
   let indent: string | undefined;
   let rationale: string | undefined;
@@ -1181,7 +1327,9 @@ ${ex.explanation ? `Explanation: ${ex.explanation}` : ""}`,
 4. Use Framer Motion for smooth animations (import { motion, AnimatePresence } from 'framer-motion')
 5. Use Tailwind CSS for styling with dark mode support
 6. Include step descriptions and current algorithm state
-7. Use these UI components from our design system:
+7. Focus on essential features - avoid overly complex nested components or excessive helper functions
+8. Keep the main component structure clean and readable
+9. Use these UI components from our design system:
    - Button from '@/components/ui/button'
    - Card, CardContent, CardHeader, CardTitle from '@/components/ui/card'
    - Slider from '@/components/ui/slider'
@@ -1201,10 +1349,17 @@ Return ONLY the complete React component code, no explanations or markdown forma
   try {
     const componentCode = await llmText(prompt, {
       temperature: 0.7,
-      maxTokens: 4000,
+      maxTokens: 8000, // Increased to prevent truncation of complex components
     });
 
     // Clean up the response to ensure it's just the component code
+    try {
+      console.log(
+        `[generateVisualizationComponent] Prompt length: ${prompt.length} chars | descriptionLen=${problem.description?.length || 0} | examples=${Array.isArray(problem.examples) ? problem.examples.length : 0}`,
+      );
+    } catch (_) {
+      // noop
+    }
     const cleanedCode = componentCode
       .replace(/```typescript/g, "")
       .replace(/```tsx/g, "")
@@ -1213,16 +1368,37 @@ Return ONLY the complete React component code, no explanations or markdown forma
       .replace(/```/g, "")
       .trim();
 
-    console.log(
-      `[generateVisualizationComponent] Generated component for ${problem.title} (${cleanedCode.length} chars)`,
-    );
+    // TEMPORARILY DISABLED: Skip sanitization to see raw GPT output
+    const finalCode = cleanedCode; // sanitizeGeneratedTsx(cleanedCode);
+
+    // Check if component was truncated and log for debugging
+    const wasTruncated = cleanedCode.includes('....[truncated]') || 
+                        !cleanedCode.trim().endsWith('}') && !cleanedCode.trim().endsWith(';');
+    
+    if (wasTruncated) {
+      console.warn(`[generateVisualizationComponent] Component appears truncated for ${problem.title} (${cleanedCode.length} chars)`);
+    }
+    
+    try {
+      console.log(
+        `[generateVisualizationComponent] Generated component for ${problem.title} (${cleanedCode.length} chars) - Truncated: ${wasTruncated}\n--- CODE START ---\n${cleanedCode.slice(0, 500)}\n--- CODE END (last 300 chars) ---\n${cleanedCode.slice(-300)}\n-------------------`,
+      );
+    } catch (e) {
+      console.warn("[generateVisualizationComponent] Preview logging failed:", e);
+    }
 
     return {
-      code: cleanedCode,
+      code: finalCode,
       title: `${problem.title} Visualizer`,
     };
   } catch (error) {
-    console.error("[generateVisualizationComponent] Error:", error);
+    // Include small snippet of componentCode if available for debugging
+    try {
+      const maybeStr = (error as unknown as { message?: string })?.message;
+      console.error("[generateVisualizationComponent] Error:", maybeStr || error);
+    } catch (_) {
+      console.error("[generateVisualizationComponent] Error (raw):", error);
+    }
     throw error;
   }
 }
@@ -1282,6 +1458,7 @@ serve(async (req) => {
       snippet,
       cursorPosition,
       testCases,
+      currentCode,
       diagram: diagramRequested,
       preferredEngines,
       sessionId,
@@ -1358,8 +1535,31 @@ serve(async (req) => {
       }
 
       try {
+        // Debug: summarize incoming payload
+        try {
+          console.log("[generate_visualization] Payload summary:", {
+            title: problem.title,
+            descriptionLen: problem.description?.length || 0,
+            examples: Array.isArray(problem.examples) ? problem.examples.length : 0,
+            category: problem.category,
+            difficulty: problem.difficulty,
+            hasFunctionSignature: !!problem.functionSignature,
+          });
+        } catch (_) {
+          // noop
+        }
         const visualizationComponent =
           await generateVisualizationComponent(problem);
+
+        // Debug: log preview of generated code
+        try {
+          const code = visualizationComponent?.code || "";
+          console.log(
+            `[generate_visualization] Generated code length=${code.length} | title="${visualizationComponent?.title || ""}"\n--- SERVER CODE START ---\n${code.slice(0, 400)}\n--- SERVER CODE END (last 250) ---\n${code.slice(-250)}\n-----------------------------------`,
+          );
+        } catch (e) {
+          console.warn("[generate_visualization] Failed to log code preview:", e);
+        }
 
         return new Response(
           JSON.stringify({
@@ -1442,18 +1642,20 @@ serve(async (req) => {
     }
 
     // Default chat behavior: generate conversation + analyze snippets + opportunistic diagram
-    const [conversationResponse, codeSnippets, diagram] = await Promise.all([
+    const [conversationResponse, userCodeSnippets, diagram] = await Promise.all([
       generateConversationResponse(
         message,
         problemDescription,
         conversationHistory || [],
         testCases,
+        currentCode,
       ),
       analyzeCodeSnippets(
         message,
         conversationHistory || [],
         problemDescription,
         testCases,
+        currentCode,
       ),
       maybeGenerateDiagram(
         message,
@@ -1463,6 +1665,14 @@ serve(async (req) => {
         preferredEngines,
       ),
     ]);
+
+    // Skip AI response analysis - code blocks now have direct "Add to Editor" buttons
+    const aiCodeSnippets: CodeSnippet[] = [];
+    console.log(`[Main] Skipping AI response analysis - using direct code block buttons instead`);
+
+    // Combine code snippets from user message and AI response
+    const codeSnippets = [...userCodeSnippets, ...aiCodeSnippets];
+    console.log(`[Main] Combined snippets: user=${userCodeSnippets.length}, ai=${aiCodeSnippets.length}, total=${codeSnippets.length}`);
 
     // Heuristic: suggest diagram if user mentions visualization OR problem classes where visuals help
     const userAskedForDiagram =

@@ -1042,6 +1042,7 @@ const ProblemSolver = () => {
                 onInsertCodeSnippet={handleInsertCodeSnippet}
                 problemTestCases={problem.testCases}
                 problem={problem}
+                currentCode={code}
               />
             </ResizablePanel>
           </>

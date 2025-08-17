@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useRef, ErrorInfo } from 'react';
+import React, { useState, useEffect, useRef, ErrorInfo, useCallback } from 'react';
 import { transform } from '@babel/standalone';
-import { motion } from 'framer-motion';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, RefreshCw, AlertCircle, Pause, Play, RotateCcw, StepForward, Shuffle, CircleHelp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Error Boundary Component
 class ComponentErrorBoundary extends React.Component<
   { children: React.ReactNode; onError: (error: Error, errorInfo: ErrorInfo) => void },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: any) {
+  constructor(props: { children: React.ReactNode; onError: (error: Error, errorInfo: ErrorInfo) => void }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -62,24 +66,45 @@ export default function ComponentCompiler({ code, onError, className }: Componen
   const [isCompiling, setIsCompiling] = useState(false);
   const mountRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!code.trim()) {
-      setCompiledComponent(null);
-      setCompileError(null);
-      return;
-    }
-
-    compileComponent(code);
-  }, [code]);
-
-  const compileComponent = async (sourceCode: string) => {
+  const compileComponent = useCallback(async (sourceCode: string) => {
     setIsCompiling(true);
     setCompileError(null);
 
     try {
-      // Transform the component code with Babel
-      const transformed = transform(sourceCode, {
-        presets: ['react', 'typescript'],
+      // Pre-process the code to replace imports with direct assignments
+      let processedCode = sourceCode;
+      
+      // Remove all import statements and replace with direct usage
+      processedCode = processedCode.replace(
+        /import\s+.*?from\s+['"]react['"];?/g, 
+        '// React hooks available as parameters'
+      );
+      processedCode = processedCode.replace(
+        /import\s+.*?from\s+['"]framer-motion['"];?/g,
+        '// Framer Motion available as parameters'
+      );
+      processedCode = processedCode.replace(
+        /import\s+.*?from\s+['"]@\/components\/ui\/.*?['"];?/g,
+        '// UI components available as parameters'
+      );
+      processedCode = processedCode.replace(
+        /import\s+.*?from\s+['"]lucide-react['"];?/g,
+        '// Lucide icons available as parameters'
+      );
+      
+      // Remove export default and just return the component
+      processedCode = processedCode.replace(
+        /export\s+default\s+/,
+        'return '
+      );
+      // Transform the processed code with Babel
+      const transformed = transform(processedCode, {
+        filename: 'InteractiveComponent.tsx',
+        sourceType: 'script', // Use script instead of module to avoid import issues
+        presets: [
+          ['typescript', { isTSX: true, allExtensions: true }],
+          ['react', { runtime: 'automatic' }],
+        ],
         plugins: ['proposal-class-properties'],
       });
 
@@ -117,12 +142,13 @@ export default function ComponentCompiler({ code, onError, className }: Componen
         'Shuffle',
         'CircleHelp',
         `
+        const exports = {};
+        const module = { exports };
         ${transformed.code}
         
         // Return the default export or the last declared component
-        if (typeof exports !== 'undefined' && exports.default) {
-          return exports.default;
-        }
+        if (module.exports && module.exports.default) return module.exports.default;
+        if (exports && (exports as any).default) return (exports as any).default;
         
         // Find the last function/class declaration that looks like a component
         const componentMatch = \`${sourceCode}\`.match(/(?:export\\s+default\\s+)?(?:function|class|const)\\s+(\\w+)/g);
@@ -138,22 +164,6 @@ export default function ComponentCompiler({ code, onError, className }: Componen
 
       // Import all the dependencies the component might need
       const { useState, useEffect, useRef, useMemo, useCallback } = React;
-      const { motion, AnimatePresence } = await import('framer-motion');
-      const { Button } = await import('@/components/ui/button');
-      const { Card, CardContent, CardHeader, CardTitle } = await import('@/components/ui/card');
-      const { Input } = await import('@/components/ui/input');
-      const { Label } = await import('@/components/ui/label');
-      const { Slider } = await import('@/components/ui/slider');
-      const { Tabs, TabsContent, TabsList, TabsTrigger } = await import('@/components/ui/tabs');
-      const { 
-        AlertCircle, 
-        Pause, 
-        Play, 
-        RotateCcw, 
-        StepForward, 
-        Shuffle, 
-        CircleHelp 
-      } = await import('lucide-react');
 
       // Execute the function to get the component
       const Component = componentFunction(
@@ -196,10 +206,29 @@ export default function ComponentCompiler({ code, onError, className }: Componen
       setCompileError(errorMessage);
       onError?.(errorMessage);
       console.error('Component compilation error:', error);
+      // Debug preview of the source code to help fix issues like unterminated strings
+      try {
+        const previewStart = sourceCode.slice(0, 500);
+        const previewEnd = sourceCode.slice(-300);
+        console.debug('[ComponentCompiler] Source code preview:', { length: sourceCode.length, previewStart, previewEnd });
+      } catch (previewErr) {
+        // Avoid throwing from logging path; capture minimal context
+        console.debug('[ComponentCompiler] Failed to log source preview:', previewErr);
+      }
     } finally {
       setIsCompiling(false);
     }
-  };
+  }, [onError]);
+
+  useEffect(() => {
+    if (!code.trim()) {
+      setCompiledComponent(null);
+      setCompileError(null);
+      return;
+    }
+
+    compileComponent(code);
+  }, [code, compileComponent]);
 
   const handleComponentError = (error: Error, errorInfo: ErrorInfo) => {
     const errorMessage = `Runtime Error: ${error.message}`;

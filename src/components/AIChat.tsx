@@ -9,7 +9,6 @@ import {
   Loader2,
   Mic,
   MicOff,
-  ChartNetwork as DiagramIcon,
   Maximize2,
   Sparkles,
 } from "lucide-react";
@@ -27,7 +26,8 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { CanvasContainer } from "@/components/canvas";
-import { fallbackVisualization } from "@/components/fallbacks/visualizationFallback";
+import { supabase } from "@/integrations/supabase/client";
+// Removed complex visualization import - using direct component now
 
 interface AIChatProps {
   problemId: string;
@@ -35,6 +35,7 @@ interface AIChatProps {
   onInsertCodeSnippet?: (snippet: CodeSnippet) => void;
   problemTestCases?: unknown[];
   problem?: Problem;
+  currentCode?: string;
 }
 
 const AIChat = ({
@@ -43,6 +44,7 @@ const AIChat = ({
   onInsertCodeSnippet,
   problemTestCases,
   problem,
+  currentCode,
 }: AIChatProps) => {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -53,13 +55,11 @@ const AIChat = ({
   const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(
     null,
   );
-  const [hiddenVisualizeForIds, setHiddenVisualizeForIds] = useState<
-    Set<string>
-  >(new Set());
+  // Track message IDs we've already auto-requested diagrams for (avoid loops)
+  const autoRequestedRef = useRef<Set<string>>(new Set());
 
   // Canvas state
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
-  const [canvasCode, setCanvasCode] = useState("");
   const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
   const {
     session,
@@ -69,7 +69,7 @@ const AIChat = ({
     sendMessage,
     clearConversation,
     requestDiagram,
-  } = useChatSession({ problemId, problemDescription, problemTestCases });
+  } = useChatSession({ problemId, problemDescription, problemTestCases, currentCode });
 
   // Speech-to-text functionality
   const {
@@ -105,72 +105,52 @@ const AIChat = ({
     }
   };
 
-  const handleVisualize = async (
-    sourceMessageContent: string,
-    messageId: string,
-  ) => {
-    // Request a diagram separately without adding a user message bubble
-    setHiddenVisualizeForIds((prev) => new Set(prev).add(messageId));
-    await requestDiagram(sourceMessageContent);
-  };
+  // Auto-request diagrams when conditions are met; no manual Visualize button
+  useEffect(() => {
+    if (!messages.length) return;
+    // If any assistant message already has a diagram, do not auto-request again on reload
+    const anyDiagramExists = messages.some(
+      (m) => m.role === "assistant" && Boolean((m as unknown as { diagram?: unknown }).diagram),
+    );
+    if (anyDiagramExists) return;
+
+    // Only consider the latest assistant message for auto-request
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
+    const hasDiagram = Boolean((lastAssistant as unknown as { diagram?: unknown }).diagram);
+    const assistantSuggests =
+      (lastAssistant as unknown as { suggestDiagram?: boolean }).suggestDiagram === true;
+    const id = lastAssistant.id;
+    const shouldRequest = !hasDiagram && (userAsked || assistantSuggests) && !autoRequestedRef.current.has(id);
+    if (shouldRequest) {
+      autoRequestedRef.current.add(id);
+      requestDiagram(lastAssistant.content);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  // Reset auto diagram request tracker when conversation is cleared
+  useEffect(() => {
+    if (messages.length === 0) {
+      autoRequestedRef.current = new Set();
+    }
+  }, [messages.length]);
 
   const handleGenerateComponent = async (messageContent: string) => {
     if (!problem) {
       console.error(
-        "No problem context available for visualization generation",
+        "No problem context available for visualization",
       );
       return;
     }
 
-    try {
-      setIsCanvasOpen(false); // Close any existing canvas
-
-      // Request GPT-generated visualization component
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            action: "generate_visualization",
-            problem: {
-              title: problem.title,
-              description: problem.description,
-              examples: problem.examples,
-              category: problem.category,
-              difficulty: problem.difficulty,
-              functionSignature: problem.functionSignature,
-            },
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (data.visualizationComponent) {
-        setCanvasCode(data.visualizationComponent.code);
-        setCanvasTitle(data.visualizationComponent.title);
-        setIsCanvasOpen(true);
-      } else {
-        console.error("No visualization component returned from API");
-        // Fallback to hardcoded component
-        generateFallbackComponent();
-      }
-    } catch (error) {
-      console.error("Error generating visualization component:", error);
-      // Fallback to hardcoded component
-      generateFallbackComponent();
-    }
-  };
-
-  const generateFallbackComponent = () => {
-    // Use the extracted fallback visualization
-    setCanvasCode(fallbackVisualization.code);
-    setCanvasTitle(fallbackVisualization.title);
+    // Simply open the modal with our direct component
+    setCanvasTitle(`${problem.title} - Interactive Demo`);
     setIsCanvasOpen(true);
+    console.debug("[InteractiveDemo] Opening visualization for:", problem.title);
   };
 
   const openDiagramDialog = (diagram: ActiveDiagram) => {
@@ -318,15 +298,43 @@ const AIChat = ({
                                       );
                                     }
                                     return !inline && match ? (
-                                      <SyntaxHighlighter
-                                        style={vscDarkPlus}
-                                        language={match[1]}
-                                        PreTag="div"
-                                        className="rounded-md !mt-2 !mb-2"
-                                        {...props}
-                                      >
-                                        {String(children).replace(/\n$/, "")}
-                                      </SyntaxHighlighter>
+                                      <div className="relative group">
+                                        <SyntaxHighlighter
+                                          style={vscDarkPlus}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          className="rounded-md !mt-2 !mb-2"
+                                          {...props}
+                                        >
+                                          {String(children).replace(/\n$/, "")}
+                                        </SyntaxHighlighter>
+                                        {match[1] === "python" && onInsertCodeSnippet && (
+                                          <button
+                                            onClick={() => {
+                                              const codeContent = String(children).replace(/\n$/, "");
+                                              const snippet: CodeSnippet = {
+                                                id: `direct-${Date.now()}`,
+                                                code: codeContent,
+                                                language: "python",
+                                                isValidated: true,
+                                                insertionType: "smart",
+                                                insertionHint: {
+                                                  type: "statement",
+                                                  scope: "function",
+                                                  description: "Code snippet from AI response"
+                                                }
+                                              };
+                                              onInsertCodeSnippet(snippet);
+                                            }}
+                                            className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1"
+                                          >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Add to Editor
+                                          </button>
+                                        )}
+                                      </div>
                                     ) : (
                                       <code
                                         className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono"
@@ -362,13 +370,12 @@ const AIChat = ({
                           )}
                         </div>
 
-                        {/* Mermaid diagram bubble if attached as structured payload */}
-                        {message.role === "assistant" &&
-                          (
-                            message as unknown as {
-                              diagram?: { engine: "mermaid"; code: string };
-                            }
-                          ).diagram?.engine === "mermaid" && (
+                        {/* Mermaid diagram bubble - uses DB-attached diagram */}
+                        {message.role === "assistant" && (() => {
+                          const attached = (message as unknown as { diagram?: { engine: "mermaid"; code: string } | { engine: "reactflow"; graph: FlowGraph } }).diagram;
+                          const diag: { engine: "mermaid"; code: string } | null = attached && attached.engine === "mermaid" ? (attached as { engine: "mermaid"; code: string }) : null;
+                          if (!diag) return null;
+                          return (
                             <div className="mt-3">
                               <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
@@ -384,11 +391,7 @@ const AIChat = ({
                                     onClick={() =>
                                       openDiagramDialog({
                                         engine: "mermaid",
-                                        code: (
-                                          message as unknown as {
-                                            diagram: { code: string };
-                                          }
-                                        ).diagram.code,
+                                        code: diag.code,
                                       })
                                     }
                                     title="View full screen"
@@ -398,28 +401,19 @@ const AIChat = ({
                                   </button>
                                 </div>
                                 <Mermaid
-                                  chart={
-                                    (
-                                      message as unknown as {
-                                        diagram: { code: string };
-                                      }
-                                    ).diagram.code
-                                  }
+                                  chart={diag.code}
                                 />
                               </div>
                             </div>
-                          )}
+                          );
+                        })()}
 
-                        {/* React Flow diagram bubble if attached */}
-                        {message.role === "assistant" &&
-                          (
-                            message as unknown as {
-                              diagram?: {
-                                engine: "reactflow";
-                                graph: FlowGraph;
-                              };
-                            }
-                          ).diagram?.engine === "reactflow" && (
+                        {/* React Flow diagram bubble - uses DB-attached diagram */}
+                        {message.role === "assistant" && (() => {
+                          const attached = (message as unknown as { diagram?: { engine: "mermaid"; code: string } | { engine: "reactflow"; graph: FlowGraph } }).diagram;
+                          const diag: { engine: "reactflow"; graph: FlowGraph } | null = attached && attached.engine === "reactflow" ? (attached as { engine: "reactflow"; graph: FlowGraph }) : null;
+                          if (!diag) return null;
+                          return (
                             <div className="mt-3">
                               <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
@@ -435,11 +429,7 @@ const AIChat = ({
                                     onClick={() =>
                                       openDiagramDialog({
                                         engine: "reactflow",
-                                        graph: (
-                                          message as unknown as {
-                                            diagram: { graph: FlowGraph };
-                                          }
-                                        ).diagram.graph,
+                                        graph: diag.graph,
                                       })
                                     }
                                     title="View full screen"
@@ -449,129 +439,78 @@ const AIChat = ({
                                   </button>
                                 </div>
                                 <FlowCanvas
-                                  graph={
-                                    (
-                                      message as unknown as {
-                                        diagram: { graph: FlowGraph };
-                                      }
-                                    ).diagram.graph
-                                  }
+                                  graph={diag.graph}
                                 />
                               </div>
                             </div>
-                          )}
+                          );
+                        })()}
 
-                        {/* Actions: Visualize button and code snippets */}
-                        {message.role === "assistant" && (
+                        {/* Action: Interactive Demo button only when a diagram exists */}
+                        {message.role === "assistant" && Boolean((message as unknown as { diagram?: unknown }).diagram) && (
+                          <div className="mt-3">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                onClick={() => handleGenerateComponent(message.content)}
+                                title="Generate an interactive component demo"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                <span className="text-sm">Interactive Demo</span>
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Code snippets: render whenever present on assistant messages */}
+                        {message.role === "assistant" && message.codeSnippets && message.codeSnippets.length > 0 && (
                           <div className="mt-3 space-y-3">
-                            {(() => {
-                              const lastUserMsg =
-                                [...messages]
-                                  .reverse()
-                                  .find((m) => m.role === "user")?.content ||
-                                "";
-                              const userAsked =
-                                /(visualize|diagram|draw|flowchart|mermaid)/i.test(
-                                  lastUserMsg,
-                                );
-                              const hasDiagram = Boolean(
-                                (message as unknown as { diagram?: unknown })
-                                  .diagram,
-                              );
-                              const shouldShow =
-                                !hasDiagram &&
-                                (userAsked ||
-                                  (
-                                    message as unknown as {
-                                      suggestDiagram?: boolean;
-                                    }
-                                  ).suggestDiagram === true) &&
-                                !hiddenVisualizeForIds.has(message.id);
-                              return shouldShow ? (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                    onClick={() =>
-                                      handleVisualize(
-                                        message.content,
-                                        message.id,
-                                      )
-                                    }
-                                    title="Ask the AI to generate a diagram"
-                                  >
-                                    <DiagramIcon className="w-4 h-4" />
-                                    <span className="text-sm">Visualize</span>
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                    onClick={() =>
-                                      handleGenerateComponent(message.content)
-                                    }
-                                    title="Generate an interactive component demo"
-                                  >
-                                    <Sparkles className="w-4 h-4" />
-                                    <span className="text-sm">
-                                      Interactive Demo
+                            {message.codeSnippets.map((snippet) => (
+                              <div
+                                key={snippet.id}
+                                className="bg-card border rounded-lg p-4 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                      {snippet.insertionHint?.type || "Code"}
                                     </span>
-                                  </Button>
+                                  </div>
+                                  {onInsertCodeSnippet && (
+                                    <CodeSnippetButton
+                                      snippet={snippet}
+                                      onInsert={onInsertCodeSnippet}
+                                      className="shadow-sm"
+                                    />
+                                  )}
                                 </div>
-                              ) : null;
-                            })()}
-                            {message.codeSnippets &&
-                              message.codeSnippets.length > 0 && (
-                                <div className="space-y-3">
-                                  {message.codeSnippets.map((snippet) => (
-                                    <div
-                                      key={snippet.id}
-                                      className="bg-card border rounded-lg p-4 shadow-sm"
-                                    >
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            {snippet.insertionHint?.type ||
-                                              "Code"}
-                                          </span>
-                                        </div>
-                                        {onInsertCodeSnippet && (
-                                          <CodeSnippetButton
-                                            snippet={snippet}
-                                            onInsert={onInsertCodeSnippet}
-                                            className="shadow-sm"
-                                          />
-                                        )}
-                                      </div>
 
-                                      <div className="bg-slate-900 rounded-md p-3 mb-3">
-                                        <SyntaxHighlighter
-                                          language={snippet.language}
-                                          style={vscDarkPlus}
-                                          customStyle={{
-                                            margin: 0,
-                                            padding: 0,
-                                            background: "transparent",
-                                            fontSize: "0.8rem",
-                                          }}
-                                        >
-                                          {snippet.code}
-                                        </SyntaxHighlighter>
-                                      </div>
-
-                                      {snippet.insertionHint?.description && (
-                                        <p className="text-xs text-muted-foreground">
-                                          {snippet.insertionHint.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
+                                <div className="bg-slate-900 rounded-md p-3 mb-3">
+                                  <SyntaxHighlighter
+                                    language={snippet.language}
+                                    style={vscDarkPlus}
+                                    customStyle={{
+                                      margin: 0,
+                                      padding: 0,
+                                      background: "transparent",
+                                      fontSize: "0.8rem",
+                                    }}
+                                  >
+                                    {snippet.code}
+                                  </SyntaxHighlighter>
                                 </div>
-                              )}
+
+                                {snippet.insertionHint?.description && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {snippet.insertionHint.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
 
@@ -587,10 +526,10 @@ const AIChat = ({
                 {isTyping && (
                   <div className="flex justify-start">
                     <div className="flex space-x-2 max-w-[80%]">
-                      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                        <Bot className="w-4 h-4" />
                       </div>
-                      <div className="bg-secondary text-foreground p-3 rounded-lg">
+                      <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                           <div
@@ -717,7 +656,6 @@ const AIChat = ({
       <CanvasContainer
         isOpen={isCanvasOpen}
         onClose={() => setIsCanvasOpen(false)}
-        initialCode={canvasCode}
         title={canvasTitle}
       />
     </Card>
