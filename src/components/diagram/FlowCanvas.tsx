@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
-import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
-import 'reactflow/dist/style.css';
+import React, { useMemo } from "react";
+import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
+import "reactflow/dist/style.css";
 
-import type { FlowGraph } from '@/types';
+import type { FlowGraph } from "@/types";
 
 type Props = {
   graph: FlowGraph;
@@ -11,13 +11,27 @@ type Props = {
   height?: number | string;
 };
 
-export default function FlowCanvas({ graph, className, caption, height = '20rem' }: Props) {
-  const nodes = useMemo(() => Array.isArray(graph?.nodes) ? graph.nodes : [], [graph]);
-  const edges = useMemo(() => Array.isArray(graph?.edges) ? graph.edges : [], [graph]);
+export default function FlowCanvas({
+  graph,
+  className,
+  caption,
+  height = "20rem",
+}: Props) {
+  const nodes = useMemo(
+    () => (Array.isArray(graph?.nodes) ? graph.nodes : []),
+    [graph],
+  );
+  const edges = useMemo(
+    () => (Array.isArray(graph?.edges) ? graph.edges : []),
+    [graph],
+  );
 
   return (
     <figure className={className}>
-      <div className="rounded-lg overflow-hidden border border-accent/30 bg-background" style={{ height }}>
+      <div
+        className="rounded-lg overflow-hidden border border-accent/30 bg-background"
+        style={{ height }}
+      >
         <ReactFlow nodes={nodes} edges={edges} fitView>
           <MiniMap />
           <Controls />
@@ -25,10 +39,10 @@ export default function FlowCanvas({ graph, className, caption, height = '20rem'
         </ReactFlow>
       </div>
       {caption ? (
-        <figcaption className="mt-2 text-xs text-muted-foreground">{caption}</figcaption>
+        <figcaption className="mt-2 text-xs text-muted-foreground">
+          {caption}
+        </figcaption>
       ) : null}
     </figure>
   );
 }
-
-

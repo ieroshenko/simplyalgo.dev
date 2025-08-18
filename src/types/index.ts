@@ -16,9 +16,9 @@ export interface TestResult {
 export interface Problem {
   id: string;
   title: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: "Easy" | "Medium" | "Hard";
   category: string;
-  status: 'solved' | 'attempted' | 'not-started';
+  status: "solved" | "attempted" | "not-started";
   isStarred: boolean;
   description: string;
   functionSignature: string;
@@ -47,36 +47,54 @@ export interface CodeSnippet {
   code: string;
   language: string;
   isValidated: boolean;
-  insertionType: 'smart' | 'cursor' | 'append' | 'prepend' | 'replace';
+  insertionType: "smart" | "cursor" | "append" | "prepend" | "replace";
   insertionHint?: {
-    type: 'import' | 'variable' | 'function' | 'statement' | 'class';
-    scope: 'global' | 'function' | 'class';
+    type: "import" | "variable" | "function" | "statement" | "class";
+    scope: "global" | "function" | "class";
     description: string;
   };
 }
 
 // React Flow diagram types (declarative, safe to render on client)
-export interface FlowNodePosition { x: number; y: number }
-export interface FlowNodeData { label: string }
-export interface FlowNode { id: string; type?: string; data: FlowNodeData; position: FlowNodePosition }
-export interface FlowEdge { id: string; source: string; target: string; label?: string }
-export interface FlowGraph { nodes: FlowNode[]; edges: FlowEdge[] }
+export interface FlowNodePosition {
+  x: number;
+  y: number;
+}
+export interface FlowNodeData {
+  label: string;
+}
+export interface FlowNode {
+  id: string;
+  type?: string;
+  data: FlowNodeData;
+  position: FlowNodePosition;
+}
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+export interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sessionId?: string;
   codeSnippets?: CodeSnippet[];
   diagram?:
     | {
-        engine: 'mermaid';
+        engine: "mermaid";
         code: string; // raw mermaid DSL
         title?: string;
       }
     | {
-        engine: 'reactflow';
+        engine: "reactflow";
         graph: FlowGraph;
         title?: string;
       };

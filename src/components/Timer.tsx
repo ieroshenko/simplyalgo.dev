@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  Timer as TimerIcon, 
-  Play, 
-  Pause, 
+} from "@/components/ui/dropdown-menu";
+import {
+  Timer as TimerIcon,
+  Play,
+  Pause,
   RotateCcw,
   Clock,
-  WatchIcon
-} from 'lucide-react';
-import { useTimer, TimerMode } from '@/hooks/useTimer';
+  WatchIcon,
+} from "lucide-react";
+import { useTimer, TimerMode } from "@/hooks/useTimer";
 
 const Timer = () => {
   const {
@@ -27,7 +27,7 @@ const Timer = () => {
     pause,
     reset,
     switchMode,
-    setTimerDuration
+    setTimerDuration,
   } = useTimer();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -36,10 +36,10 @@ const Timer = () => {
     switchMode(newMode);
   };
 
-  const updateTimerDuration = (field: 'hours' | 'minutes', value: number) => {
-    setTimerDuration(prev => ({
+  const updateTimerDuration = (field: "hours" | "minutes", value: number) => {
+    setTimerDuration((prev) => ({
       ...prev,
-      [field]: Math.max(0, Math.min(field === 'hours' ? 23 : 59, value))
+      [field]: Math.max(0, Math.min(field === "hours" ? 23 : 59, value)),
     }));
   };
 
@@ -50,13 +50,13 @@ const Timer = () => {
           variant="ghost"
           size="sm"
           className={`text-muted-foreground hover:text-foreground ${
-            isRunning ? 'bg-primary/10 text-primary' : ''
+            isRunning ? "bg-primary/10 text-primary" : ""
           }`}
         >
           {isRunning ? (
             <div className="flex items-center space-x-1">
               <span className="text-xs font-mono">
-                {mode === 'stopwatch' ? '' : '⏱'}
+                {mode === "stopwatch" ? "" : "⏱"}
               </span>
               <span className="text-xs font-mono min-w-[45px]">
                 {formatTime(time)}
@@ -74,18 +74,18 @@ const Timer = () => {
             {/* Mode Selection */}
             <div className="flex gap-2">
               <Button
-                variant={mode === 'stopwatch' ? 'default' : 'outline'}
+                variant={mode === "stopwatch" ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleModeSwitch('stopwatch')}
+                onClick={() => handleModeSwitch("stopwatch")}
                 className="flex-1"
               >
                 <WatchIcon className="w-4 h-4 mr-2" />
                 Stopwatch
               </Button>
               <Button
-                variant={mode === 'timer' ? 'default' : 'outline'}
+                variant={mode === "timer" ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleModeSwitch('timer')}
+                onClick={() => handleModeSwitch("timer")}
                 className="flex-1"
               >
                 <Clock className="w-4 h-4 mr-2" />
@@ -94,13 +94,18 @@ const Timer = () => {
             </div>
 
             {/* Timer Duration Settings (only for timer mode) */}
-            {mode === 'timer' && (
+            {mode === "timer" && (
               <div className="flex items-center justify-center gap-2 p-4 bg-secondary/50 rounded-lg">
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
                     value={timerDuration.hours}
-                    onChange={(e) => updateTimerDuration('hours', parseInt(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateTimerDuration(
+                        "hours",
+                        parseInt(e.target.value) || 0,
+                      )
+                    }
                     className="w-12 text-center bg-background border border-border rounded px-1 py-1 text-sm"
                     min="0"
                     max="23"
@@ -112,7 +117,12 @@ const Timer = () => {
                   <input
                     type="number"
                     value={timerDuration.minutes}
-                    onChange={(e) => updateTimerDuration('minutes', parseInt(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateTimerDuration(
+                        "minutes",
+                        parseInt(e.target.value) || 0,
+                      )
+                    }
                     className="w-12 text-center bg-background border border-border rounded px-1 py-1 text-sm"
                     min="0"
                     max="59"
@@ -136,14 +146,14 @@ const Timer = () => {
                 variant="outline"
                 size="sm"
                 onClick={isRunning ? pause : start}
-                disabled={mode === 'timer' && time === 0 && !isRunning}
+                disabled={mode === "timer" && time === 0 && !isRunning}
               >
                 {isRunning ? (
                   <Pause className="w-4 h-4 mr-2" />
                 ) : (
                   <Play className="w-4 h-4 mr-2" />
                 )}
-                {isRunning ? 'Pause' : 'Start'}
+                {isRunning ? "Pause" : "Start"}
               </Button>
               <Button
                 variant="outline"
@@ -157,7 +167,7 @@ const Timer = () => {
             </div>
 
             {/* Status */}
-            {mode === 'timer' && time === 0 && !isRunning && (
+            {mode === "timer" && time === 0 && !isRunning && (
               <div className="text-center text-sm text-muted-foreground">
                 Set duration and click start
               </div>

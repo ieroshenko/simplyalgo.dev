@@ -1,20 +1,42 @@
-import React, { useState, useEffect, useRef, ErrorInfo, useCallback } from 'react';
-import { transform } from '@babel/standalone';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, RefreshCw, AlertCircle, Pause, Play, RotateCcw, StepForward, Shuffle, CircleHelp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  ErrorInfo,
+  useCallback,
+} from "react";
+import { transform } from "@babel/standalone";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertTriangle,
+  RefreshCw,
+  AlertCircle,
+  Pause,
+  Play,
+  RotateCcw,
+  StepForward,
+  Shuffle,
+  CircleHelp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Error Boundary Component
 class ComponentErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError: (error: Error, errorInfo: ErrorInfo) => void },
+  {
+    children: React.ReactNode;
+    onError: (error: Error, errorInfo: ErrorInfo) => void;
+  },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: { children: React.ReactNode; onError: (error: Error, errorInfo: ErrorInfo) => void }) {
+  constructor(props: {
+    children: React.ReactNode;
+    onError: (error: Error, errorInfo: ErrorInfo) => void;
+  }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -36,7 +58,8 @@ class ComponentErrorBoundary extends React.Component<
             Component Error
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            {this.state.error?.message || 'Something went wrong while rendering the component'}
+            {this.state.error?.message ||
+              "Something went wrong while rendering the component"}
           </p>
           <Button
             onClick={() => this.setState({ hasError: false, error: undefined })}
@@ -60,88 +83,91 @@ interface ComponentCompilerProps {
   className?: string;
 }
 
-export default function ComponentCompiler({ code, onError, className }: ComponentCompilerProps) {
-  const [CompiledComponent, setCompiledComponent] = useState<React.ComponentType | null>(null);
+export default function ComponentCompiler({
+  code,
+  onError,
+  className,
+}: ComponentCompilerProps) {
+  const [CompiledComponent, setCompiledComponent] =
+    useState<React.ComponentType | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
   const mountRef = useRef<HTMLDivElement>(null);
 
-  const compileComponent = useCallback(async (sourceCode: string) => {
-    setIsCompiling(true);
-    setCompileError(null);
+  const compileComponent = useCallback(
+    async (sourceCode: string) => {
+      setIsCompiling(true);
+      setCompileError(null);
 
-    try {
-      // Pre-process the code to replace imports with direct assignments
-      let processedCode = sourceCode;
-      
-      // Remove all import statements and replace with direct usage
-      processedCode = processedCode.replace(
-        /import\s+.*?from\s+['"]react['"];?/g, 
-        '// React hooks available as parameters'
-      );
-      processedCode = processedCode.replace(
-        /import\s+.*?from\s+['"]framer-motion['"];?/g,
-        '// Framer Motion available as parameters'
-      );
-      processedCode = processedCode.replace(
-        /import\s+.*?from\s+['"]@\/components\/ui\/.*?['"];?/g,
-        '// UI components available as parameters'
-      );
-      processedCode = processedCode.replace(
-        /import\s+.*?from\s+['"]lucide-react['"];?/g,
-        '// Lucide icons available as parameters'
-      );
-      
-      // Remove export default and just return the component
-      processedCode = processedCode.replace(
-        /export\s+default\s+/,
-        'return '
-      );
-      // Transform the processed code with Babel
-      const transformed = transform(processedCode, {
-        filename: 'InteractiveComponent.tsx',
-        sourceType: 'script', // Use script instead of module to avoid import issues
-        presets: [
-          ['typescript', { isTSX: true, allExtensions: true }],
-          ['react', { runtime: 'automatic' }],
-        ],
-        plugins: ['proposal-class-properties'],
-      });
+      try {
+        // Pre-process the code to replace imports with direct assignments
+        let processedCode = sourceCode;
 
-      if (!transformed.code) {
-        throw new Error('Failed to transform component code');
-      }
+        // Remove all import statements and replace with direct usage
+        processedCode = processedCode.replace(
+          /import\s+.*?from\s+['"]react['"];?/g,
+          "// React hooks available as parameters",
+        );
+        processedCode = processedCode.replace(
+          /import\s+.*?from\s+['"]framer-motion['"];?/g,
+          "// Framer Motion available as parameters",
+        );
+        processedCode = processedCode.replace(
+          /import\s+.*?from\s+['"]@\/components\/ui\/.*?['"];?/g,
+          "// UI components available as parameters",
+        );
+        processedCode = processedCode.replace(
+          /import\s+.*?from\s+['"]lucide-react['"];?/g,
+          "// Lucide icons available as parameters",
+        );
 
-      // Create a function that returns the component
-      const componentFunction = new Function(
-        'React',
-        'useState',
-        'useEffect',
-        'useRef',
-        'useMemo',
-        'useCallback',
-        'motion',
-        'AnimatePresence',
-        'Button',
-        'Card',
-        'CardContent',
-        'CardHeader',
-        'CardTitle',
-        'Input',
-        'Label',
-        'Slider',
-        'Tabs',
-        'TabsContent',
-        'TabsList',
-        'TabsTrigger',
-        'AlertCircle',
-        'Pause',
-        'Play',
-        'RotateCcw',
-        'StepForward',
-        'Shuffle',
-        'CircleHelp',
-        `
+        // Remove export default and just return the component
+        processedCode = processedCode.replace(/export\s+default\s+/, "return ");
+        // Transform the processed code with Babel
+        const transformed = transform(processedCode, {
+          filename: "InteractiveComponent.tsx",
+          sourceType: "script", // Use script instead of module to avoid import issues
+          presets: [
+            ["typescript", { isTSX: true, allExtensions: true }],
+            ["react", { runtime: "automatic" }],
+          ],
+          plugins: ["proposal-class-properties"],
+        });
+
+        if (!transformed.code) {
+          throw new Error("Failed to transform component code");
+        }
+
+        // Create a function that returns the component
+        const componentFunction = new Function(
+          "React",
+          "useState",
+          "useEffect",
+          "useRef",
+          "useMemo",
+          "useCallback",
+          "motion",
+          "AnimatePresence",
+          "Button",
+          "Card",
+          "CardContent",
+          "CardHeader",
+          "CardTitle",
+          "Input",
+          "Label",
+          "Slider",
+          "Tabs",
+          "TabsContent",
+          "TabsList",
+          "TabsTrigger",
+          "AlertCircle",
+          "Pause",
+          "Play",
+          "RotateCcw",
+          "StepForward",
+          "Shuffle",
+          "CircleHelp",
+          `
         const exports = {};
         const module = { exports };
         ${transformed.code}
@@ -159,66 +185,78 @@ export default function ComponentCompiler({ code, onError, className }: Componen
         }
         
         return null;
-        `
-      );
+        `,
+        );
 
-      // Import all the dependencies the component might need
-      const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        // Import all the dependencies the component might need
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-      // Execute the function to get the component
-      const Component = componentFunction(
-        React,
-        useState,
-        useEffect,
-        useRef,
-        useMemo,
-        useCallback,
-        motion,
-        AnimatePresence,
-        Button,
-        Card,
-        CardContent,
-        CardHeader,
-        CardTitle,
-        Input,
-        Label,
-        Slider,
-        Tabs,
-        TabsContent,
-        TabsList,
-        TabsTrigger,
-        AlertCircle,
-        Pause,
-        Play,
-        RotateCcw,
-        StepForward,
-        Shuffle,
-        CircleHelp
-      );
+        // Execute the function to get the component
+        const Component = componentFunction(
+          React,
+          useState,
+          useEffect,
+          useRef,
+          useMemo,
+          useCallback,
+          motion,
+          AnimatePresence,
+          Button,
+          Card,
+          CardContent,
+          CardHeader,
+          CardTitle,
+          Input,
+          Label,
+          Slider,
+          Tabs,
+          TabsContent,
+          TabsList,
+          TabsTrigger,
+          AlertCircle,
+          Pause,
+          Play,
+          RotateCcw,
+          StepForward,
+          Shuffle,
+          CircleHelp,
+        );
 
-      if (typeof Component !== 'function') {
-        throw new Error('Compiled code did not return a valid React component');
+        if (typeof Component !== "function") {
+          throw new Error(
+            "Compiled code did not return a valid React component",
+          );
+        }
+
+        setCompiledComponent(() => Component);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown compilation error";
+        setCompileError(errorMessage);
+        onError?.(errorMessage);
+        console.error("Component compilation error:", error);
+        // Debug preview of the source code to help fix issues like unterminated strings
+        try {
+          const previewStart = sourceCode.slice(0, 500);
+          const previewEnd = sourceCode.slice(-300);
+          console.debug("[ComponentCompiler] Source code preview:", {
+            length: sourceCode.length,
+            previewStart,
+            previewEnd,
+          });
+        } catch (previewErr) {
+          // Avoid throwing from logging path; capture minimal context
+          console.debug(
+            "[ComponentCompiler] Failed to log source preview:",
+            previewErr,
+          );
+        }
+      } finally {
+        setIsCompiling(false);
       }
-
-      setCompiledComponent(() => Component);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown compilation error';
-      setCompileError(errorMessage);
-      onError?.(errorMessage);
-      console.error('Component compilation error:', error);
-      // Debug preview of the source code to help fix issues like unterminated strings
-      try {
-        const previewStart = sourceCode.slice(0, 500);
-        const previewEnd = sourceCode.slice(-300);
-        console.debug('[ComponentCompiler] Source code preview:', { length: sourceCode.length, previewStart, previewEnd });
-      } catch (previewErr) {
-        // Avoid throwing from logging path; capture minimal context
-        console.debug('[ComponentCompiler] Failed to log source preview:', previewErr);
-      }
-    } finally {
-      setIsCompiling(false);
-    }
-  }, [onError]);
+    },
+    [onError],
+  );
 
   useEffect(() => {
     if (!code.trim()) {
@@ -234,7 +272,7 @@ export default function ComponentCompiler({ code, onError, className }: Componen
     const errorMessage = `Runtime Error: ${error.message}`;
     setCompileError(errorMessage);
     onError?.(errorMessage);
-    console.error('Component runtime error:', error, errorInfo);
+    console.error("Component runtime error:", error, errorInfo);
   };
 
   if (isCompiling) {
@@ -245,7 +283,9 @@ export default function ComponentCompiler({ code, onError, className }: Componen
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           className="h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"
         />
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Compiling component...</span>
+        <span className="ml-3 text-gray-600 dark:text-gray-400">
+          Compiling component...
+        </span>
       </div>
     );
   }
@@ -272,7 +312,9 @@ export default function ComponentCompiler({ code, onError, className }: Componen
 
   if (!CompiledComponent) {
     return (
-      <div className={`flex items-center justify-center h-64 text-gray-500 ${className}`}>
+      <div
+        className={`flex items-center justify-center h-64 text-gray-500 ${className}`}
+      >
         No component to display
       </div>
     );

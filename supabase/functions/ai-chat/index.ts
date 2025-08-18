@@ -63,11 +63,11 @@ function sanitizeGeneratedTsx(input: string): string {
   // 5) Fix incomplete JSX attribute assignments like `values={list |` or `values={list}`
   // Replace dangling pipes at end of JSX attribute values
   code = code.replace(/=\{([^}]*)\s*\|\s*$/gm, "={$1}");
-  
+
   // 6) Fix unclosed JSX attribute braces like `values={list` (missing closing brace)
   code = code.replace(/=\{([^}\n]*?)$/gm, (match, content) => {
     // Only fix if it looks like an incomplete JSX attribute (no closing brace on same line)
-    if (content && !content.includes('}')) {
+    if (content && !content.includes("}")) {
       return `={${content}}`;
     }
     return match;
@@ -76,31 +76,33 @@ function sanitizeGeneratedTsx(input: string): string {
   // 7) Fix malformed template literals or incomplete expressions in JSX
   code = code.replace(/\{[^}]*\|[^}]*\}/g, (match) => {
     // Remove stray pipes inside JSX expressions that might break syntax
-    return match.replace(/\|/g, '');
+    return match.replace(/\|/g, "");
   });
 
   // 8) Clean up any remaining stray pipes at end of lines
-  code = code.replace(/\s*\|\s*$/gm, '');
+  code = code.replace(/\s*\|\s*$/gm, "");
 
   // 9) Handle truncated JSX components at the end of the code
   // Look for incomplete JSX tags like `<ComponentName` or `<ComponentName values={prop`
-  const lines = code.split('\n');
+  const lines = code.split("\n");
   let lastLine = lines[lines.length - 1].trim();
-  
+
   // If the last line looks like an incomplete JSX tag, remove it
-  if (lastLine.match(/^\s*<[A-Z]\w*[^>]*$/) || 
-      lastLine.includes('values={') && !lastLine.includes('}')) {
+  if (
+    lastLine.match(/^\s*<[A-Z]\w*[^>]*$/) ||
+    (lastLine.includes("values={") && !lastLine.includes("}"))
+  ) {
     lines.pop(); // Remove the incomplete line
-    code = lines.join('\n');
+    code = lines.join("\n");
   }
 
   // 10) Ensure the component ends properly with export or return statement
-  if (!code.trim().endsWith('}') && !code.trim().endsWith(';')) {
+  if (!code.trim().endsWith("}") && !code.trim().endsWith(";")) {
     // If code doesn't end properly, try to add a closing brace
     const openBraces = (code.match(/\{/g) || []).length;
     const closeBraces = (code.match(/\}/g) || []).length;
     if (openBraces > closeBraces) {
-      code += '\n}'.repeat(openBraces - closeBraces);
+      code += "\n}".repeat(openBraces - closeBraces);
     }
   }
 
@@ -194,10 +196,16 @@ const modelSource = Deno.env.get("OPENAI_MODEL")
 const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
 // Diagram engine preference - set DIAGRAM_ENGINE=reactflow or mermaid
-const preferredDiagramEngine = (Deno.env.get("DIAGRAM_ENGINE") || "reactflow").toLowerCase().trim();
+const preferredDiagramEngine = (Deno.env.get("DIAGRAM_ENGINE") || "reactflow")
+  .toLowerCase()
+  .trim();
 const validEngines = ["reactflow", "mermaid"];
-const diagramEngine = validEngines.includes(preferredDiagramEngine) ? preferredDiagramEngine : "reactflow";
-console.log(`[ai-chat] Diagram engine: ${diagramEngine} (${Deno.env.get("DIAGRAM_ENGINE") ? "env configured" : "defaulted"})`);
+const diagramEngine = validEngines.includes(preferredDiagramEngine)
+  ? preferredDiagramEngine
+  : "reactflow";
+console.log(
+  `[ai-chat] Diagram engine: ${diagramEngine} (${Deno.env.get("DIAGRAM_ENGINE") ? "env configured" : "defaulted"})`,
+);
 
 // ---- Responses API helpers ----
 type ResponsesApiRequest = {
@@ -467,8 +475,14 @@ async function generateConversationResponse(
 
   // Determine if we should allow code in the reply - be more liberal for explicit requests
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
-  const explicitCodeRequest = /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
-  const codeKeywords = /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
+  const explicitCodeRequest =
+    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(
+      message,
+    );
+  const codeKeywords =
+    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(
+      message,
+    );
   const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
 
   const conversationPrompt = `
@@ -658,12 +672,16 @@ async function maybeGenerateDiagram(
     );
   if (!force && !wantsDiagram) return undefined;
   // Use configured diagram engine preference
-  const defaultOrder: Array<"reactflow" | "mermaid"> = 
-    diagramEngine === "reactflow" ? ["reactflow", "mermaid"] : ["mermaid", "reactflow"];
-  
+  const defaultOrder: Array<"reactflow" | "mermaid"> =
+    diagramEngine === "reactflow"
+      ? ["reactflow", "mermaid"]
+      : ["mermaid", "reactflow"];
+
   const engineOrder: Array<"reactflow" | "mermaid"> =
     Array.isArray(preferredEngines) && preferredEngines.length
-      ? (Array.from(new Set(preferredEngines.concat(defaultOrder))) as Array<"reactflow" | "mermaid">)
+      ? (Array.from(new Set(preferredEngines.concat(defaultOrder))) as Array<
+          "reactflow" | "mermaid"
+        >)
       : defaultOrder;
 
   const rfPrompt = `Create a React Flow diagram that visualizes the algorithm step-by-step with meaningful progression.
@@ -928,10 +946,13 @@ async function analyzeCodeSnippets(
   currentCode?: string,
 ): Promise<CodeSnippet[]> {
   // Check if this is an AI response by looking at conversation history
-  const isAIResponse = conversationHistory.length > 0 && 
+  const isAIResponse =
+    conversationHistory.length > 0 &&
     conversationHistory[conversationHistory.length - 1]?.role === "user";
-  
-  console.log(`[CodeSnippets] Analysis context: isAIResponse=${isAIResponse}, conversationLength=${conversationHistory.length}, lastRole=${conversationHistory.length > 0 ? conversationHistory[conversationHistory.length - 1]?.role : 'none'}`);
+
+  console.log(
+    `[CodeSnippets] Analysis context: isAIResponse=${isAIResponse}, conversationLength=${conversationHistory.length}, lastRole=${conversationHistory.length > 0 ? conversationHistory[conversationHistory.length - 1]?.role : "none"}`,
+  );
 
   // For AI responses, only analyze if there are clear code blocks
   if (isAIResponse) {
@@ -942,10 +963,18 @@ async function analyzeCodeSnippets(
   } else {
     // For user messages, use original logic: only analyze if clear intent
     const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
-    const explicitAsk = /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(message);
-    
+    const explicitAsk =
+      /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(
+        message,
+      );
+
     // Don't auto-trigger on vague code-like text; rely on explicit ask or explicit code
-    const lastAssistant = (conversationHistory || []).slice().reverse().find(m => m.role === 'assistant')?.content?.trim() || '';
+    const lastAssistant =
+      (conversationHistory || [])
+        .slice()
+        .reverse()
+        .find((m) => m.role === "assistant")
+        ?.content?.trim() || "";
     const assistantJustAskedQuestion = /\?\s*$/.test(lastAssistant);
 
     const allowAnalysis = hasExplicitCode || explicitAsk;
@@ -955,7 +984,7 @@ async function analyzeCodeSnippets(
   }
 
   const analysisPrompt = `
-You are an expert coding tutor analyzing ${isAIResponse ? 'AI assistant code' : 'student code'} for a LeetCode-style problem.
+You are an expert coding tutor analyzing ${isAIResponse ? "AI assistant code" : "student code"} for a LeetCode-style problem.
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -967,10 +996,10 @@ ${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
-CURRENT ${isAIResponse ? 'AI ASSISTANT' : 'STUDENT'} MESSAGE:
+CURRENT ${isAIResponse ? "AI ASSISTANT" : "STUDENT"} MESSAGE:
 "${message}"
 
-TASK: Analyze the ${isAIResponse ? 'AI assistant\'s response' : 'student\'s message'} for any code snippets that could be added to their code editor. Look for:
+TASK: Analyze the ${isAIResponse ? "AI assistant's response" : "student's message"} for any code snippets that could be added to their code editor. Look for:
 
 1. **Code in backticks or code blocks** - Extract and validate syntax
 2. **Variable declarations mentioned** - e.g., "I need counter = Counter(word)"
@@ -1106,44 +1135,50 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
     );
 
     const normalizedMessage = message.replace(/\s+/g, " ").toLowerCase();
-    console.log(`[CodeSnippets] Processing ${codeSnippets.length} raw snippets through validation`);
-    
+    console.log(
+      `[CodeSnippets] Processing ${codeSnippets.length} raw snippets through validation`,
+    );
+
     const initialFiltered = codeSnippets.filter(
       (snippet) =>
         snippet.code && snippet.code.trim().length > 0 && snippet.isValidated,
     );
-    console.log(`[CodeSnippets] After basic validation: ${initialFiltered.length} snippets`);
-    
+    console.log(
+      `[CodeSnippets] After basic validation: ${initialFiltered.length} snippets`,
+    );
+
     const validated = initialFiltered.filter((snippet, index) => {
-        const code = snippet.code.trim();
-        const lower = code.replace(/\s+/g, " ").toLowerCase();
-        const lineCount = code.split("\n").length;
-        const isControlFlow =
-          /(^|\n)\s*(if|for|while)\b/.test(code) ||
-          /(^|\n)\s*(class|def)\b/.test(code);
-        const tooLong = code.length > 200 || lineCount > 3;
-        const appearsInUserText = normalizedMessage.includes(lower);
-        const isSimpleType =
-          snippet.insertionHint?.type === "import" ||
-          snippet.insertionHint?.type === "variable" ||
-          snippet.insertionHint?.type === "statement";
-        
-        // For AI responses, be very liberal with validation
-        let passes;
-        if (isAIResponse) {
-          // For AI responses: almost always allow if reasonable length
-          const reasonableLength = code.length <= 2000 && lineCount <= 50;
-          passes = reasonableLength && code.trim().length > 0; // Very permissive for AI
-        } else {
-          // Original strict validation for user messages
-          const allowedByPolicy = (appearsInUserText || isSimpleType);
-          passes = allowedByPolicy && !isControlFlow && !tooLong;
-        }
-        
-        console.log(`[CodeSnippets] Snippet ${index}: type=${snippet.insertionHint?.type}, code="${code.substring(0, 100)}...", codeLength=${code.length}, lineCount=${lineCount}, passes=${passes}, isAI=${isAIResponse}, reasons: controlFlow=${isControlFlow}, tooLong=${tooLong}, appearsInUserText=${appearsInUserText}, isSimpleType=${isSimpleType}, reasonableLength=${isAIResponse ? (code.length <= 2000 && lineCount <= 50) : 'N/A'}`);
-        
-        return passes;
-      });
+      const code = snippet.code.trim();
+      const lower = code.replace(/\s+/g, " ").toLowerCase();
+      const lineCount = code.split("\n").length;
+      const isControlFlow =
+        /(^|\n)\s*(if|for|while)\b/.test(code) ||
+        /(^|\n)\s*(class|def)\b/.test(code);
+      const tooLong = code.length > 200 || lineCount > 3;
+      const appearsInUserText = normalizedMessage.includes(lower);
+      const isSimpleType =
+        snippet.insertionHint?.type === "import" ||
+        snippet.insertionHint?.type === "variable" ||
+        snippet.insertionHint?.type === "statement";
+
+      // For AI responses, be very liberal with validation
+      let passes;
+      if (isAIResponse) {
+        // For AI responses: almost always allow if reasonable length
+        const reasonableLength = code.length <= 2000 && lineCount <= 50;
+        passes = reasonableLength && code.trim().length > 0; // Very permissive for AI
+      } else {
+        // Original strict validation for user messages
+        const allowedByPolicy = appearsInUserText || isSimpleType;
+        passes = allowedByPolicy && !isControlFlow && !tooLong;
+      }
+
+      console.log(
+        `[CodeSnippets] Snippet ${index}: type=${snippet.insertionHint?.type}, code="${code.substring(0, 100)}...", codeLength=${code.length}, lineCount=${lineCount}, passes=${passes}, isAI=${isAIResponse}, reasons: controlFlow=${isControlFlow}, tooLong=${tooLong}, appearsInUserText=${appearsInUserText}, isSimpleType=${isSimpleType}, reasonableLength=${isAIResponse ? code.length <= 2000 && lineCount <= 50 : "N/A"}`,
+      );
+
+      return passes;
+    });
 
     // Dedupe within the same response
     const normalize = (s: CodeSnippet) =>
@@ -1237,9 +1272,7 @@ Output JSON:
   "rationale": "<brief reason>"
 }`;
 
-  console.log(
-    "[ai-chat] insert_snippet using main model for smart placement",
-  );
+  console.log("[ai-chat] insert_snippet using main model for smart placement");
   const raw = await llmJson(placementPrompt, { maxTokens: 500 });
   let insertAtLine: number | undefined;
   let indent: string | undefined;
@@ -1372,19 +1405,25 @@ Return ONLY the complete React component code, no explanations or markdown forma
     const finalCode = cleanedCode; // sanitizeGeneratedTsx(cleanedCode);
 
     // Check if component was truncated and log for debugging
-    const wasTruncated = cleanedCode.includes('....[truncated]') || 
-                        !cleanedCode.trim().endsWith('}') && !cleanedCode.trim().endsWith(';');
-    
+    const wasTruncated =
+      cleanedCode.includes("....[truncated]") ||
+      (!cleanedCode.trim().endsWith("}") && !cleanedCode.trim().endsWith(";"));
+
     if (wasTruncated) {
-      console.warn(`[generateVisualizationComponent] Component appears truncated for ${problem.title} (${cleanedCode.length} chars)`);
+      console.warn(
+        `[generateVisualizationComponent] Component appears truncated for ${problem.title} (${cleanedCode.length} chars)`,
+      );
     }
-    
+
     try {
       console.log(
         `[generateVisualizationComponent] Generated component for ${problem.title} (${cleanedCode.length} chars) - Truncated: ${wasTruncated}\n--- CODE START ---\n${cleanedCode.slice(0, 500)}\n--- CODE END (last 300 chars) ---\n${cleanedCode.slice(-300)}\n-------------------`,
       );
     } catch (e) {
-      console.warn("[generateVisualizationComponent] Preview logging failed:", e);
+      console.warn(
+        "[generateVisualizationComponent] Preview logging failed:",
+        e,
+      );
     }
 
     return {
@@ -1395,7 +1434,10 @@ Return ONLY the complete React component code, no explanations or markdown forma
     // Include small snippet of componentCode if available for debugging
     try {
       const maybeStr = (error as unknown as { message?: string })?.message;
-      console.error("[generateVisualizationComponent] Error:", maybeStr || error);
+      console.error(
+        "[generateVisualizationComponent] Error:",
+        maybeStr || error,
+      );
     } catch (_) {
       console.error("[generateVisualizationComponent] Error (raw):", error);
     }
@@ -1540,7 +1582,9 @@ serve(async (req) => {
           console.log("[generate_visualization] Payload summary:", {
             title: problem.title,
             descriptionLen: problem.description?.length || 0,
-            examples: Array.isArray(problem.examples) ? problem.examples.length : 0,
+            examples: Array.isArray(problem.examples)
+              ? problem.examples.length
+              : 0,
             category: problem.category,
             difficulty: problem.difficulty,
             hasFunctionSignature: !!problem.functionSignature,
@@ -1558,7 +1602,10 @@ serve(async (req) => {
             `[generate_visualization] Generated code length=${code.length} | title="${visualizationComponent?.title || ""}"\n--- SERVER CODE START ---\n${code.slice(0, 400)}\n--- SERVER CODE END (last 250) ---\n${code.slice(-250)}\n-----------------------------------`,
           );
         } catch (e) {
-          console.warn("[generate_visualization] Failed to log code preview:", e);
+          console.warn(
+            "[generate_visualization] Failed to log code preview:",
+            e,
+          );
         }
 
         return new Response(
@@ -1642,37 +1689,43 @@ serve(async (req) => {
     }
 
     // Default chat behavior: generate conversation + analyze snippets + opportunistic diagram
-    const [conversationResponse, userCodeSnippets, diagram] = await Promise.all([
-      generateConversationResponse(
-        message,
-        problemDescription,
-        conversationHistory || [],
-        testCases,
-        currentCode,
-      ),
-      analyzeCodeSnippets(
-        message,
-        conversationHistory || [],
-        problemDescription,
-        testCases,
-        currentCode,
-      ),
-      maybeGenerateDiagram(
-        message,
-        problemDescription,
-        conversationHistory || [],
-        false,
-        preferredEngines,
-      ),
-    ]);
+    const [conversationResponse, userCodeSnippets, diagram] = await Promise.all(
+      [
+        generateConversationResponse(
+          message,
+          problemDescription,
+          conversationHistory || [],
+          testCases,
+          currentCode,
+        ),
+        analyzeCodeSnippets(
+          message,
+          conversationHistory || [],
+          problemDescription,
+          testCases,
+          currentCode,
+        ),
+        maybeGenerateDiagram(
+          message,
+          problemDescription,
+          conversationHistory || [],
+          false,
+          preferredEngines,
+        ),
+      ],
+    );
 
     // Skip AI response analysis - code blocks now have direct "Add to Editor" buttons
     const aiCodeSnippets: CodeSnippet[] = [];
-    console.log(`[Main] Skipping AI response analysis - using direct code block buttons instead`);
+    console.log(
+      `[Main] Skipping AI response analysis - using direct code block buttons instead`,
+    );
 
     // Combine code snippets from user message and AI response
     const codeSnippets = [...userCodeSnippets, ...aiCodeSnippets];
-    console.log(`[Main] Combined snippets: user=${userCodeSnippets.length}, ai=${aiCodeSnippets.length}, total=${codeSnippets.length}`);
+    console.log(
+      `[Main] Combined snippets: user=${userCodeSnippets.length}, ai=${aiCodeSnippets.length}, total=${codeSnippets.length}`,
+    );
 
     // Heuristic: suggest diagram if user mentions visualization OR problem classes where visuals help
     const userAskedForDiagram =

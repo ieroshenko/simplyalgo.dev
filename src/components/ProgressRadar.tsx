@@ -1,4 +1,4 @@
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from "@/components/ui/card";
 
 const ProgressRadar = () => {
   // Mock progress data
@@ -6,7 +6,7 @@ const ProgressRadar = () => {
     overall: 75,
     patterns: 80,
     problems: 70,
-    systemDesign: 65
+    systemDesign: 65,
   };
 
   return (
@@ -15,7 +15,10 @@ const ProgressRadar = () => {
         <div className="flex flex-col items-center">
           <div className="relative w-32 h-32 mb-4">
             {/* Outer ring */}
-            <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 144 144">
+            <svg
+              className="w-32 h-32 transform -rotate-90"
+              viewBox="0 0 144 144"
+            >
               {/* Background circle */}
               <circle
                 cx="72"
@@ -34,21 +37,25 @@ const ProgressRadar = () => {
                 strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
-                strokeDasharray={`${(progressData.overall * 4.02)} 402`}
+                strokeDasharray={`${progressData.overall * 4.02} 402`}
                 className="transition-all duration-300"
               />
             </svg>
-            
+
             {/* Center content */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">{progressData.overall}%</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {progressData.overall}%
+                </div>
                 <div className="text-xs text-muted-foreground">Progress</div>
               </div>
             </div>
           </div>
-          
-          <div className="text-lg font-semibold text-foreground mb-2">Progress</div>
+
+          <div className="text-lg font-semibold text-foreground mb-2">
+            Progress
+          </div>
           <div className="text-sm text-muted-foreground text-center">
             Keep pushing forward!
             <br />

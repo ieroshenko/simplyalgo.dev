@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import CodeEditor from "@/components/CodeEditor";
 import AIChat from "@/components/AIChat";
-import Notes from "@/components/Notes";
+import Notes, { NotesHandle } from "@/components/Notes";
 import {
   ArrowLeft,
   Star,
@@ -27,7 +27,7 @@ import { useSubmissions } from "@/hooks/useSubmissions";
 import { pythonSolutions } from "@/data/pythonSolutions";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { TestRunnerService } from "@/services/testRunner";
-import { TestCase, TestResult, CodeSnippet } from "@/types";
+import { TestResult, CodeSnippet } from "@/types";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Timer from "@/components/Timer";
@@ -52,6 +52,7 @@ const ProblemSolver = () => {
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const notesRef = useRef<NotesHandle>(null);
   const codeEditorRef = useRef<{
     getValue: () => string;
     setValue: (value: string) => void;
@@ -136,6 +137,12 @@ const ProblemSolver = () => {
     toggleBottomPanel,
     toggleRightPanel,
   ]);
+
+  useEffect(() => {
+    if (notesRef.current) {
+      notesRef.current.loadNotes();
+    }
+  }, []);
 
   const problem = problems.find((p) => p.id === problemId);
   const {
@@ -565,7 +572,7 @@ const ProblemSolver = () => {
                   <div className="flex-1 min-h-0 overflow-y-auto">
                     <TabsContent
                       value="question"
-                      className="p-6 space-y-6 m-0 h-full overflow-y-auto"
+                      className="p-6 space-y-6 m-0"
                     >
                       <div>
                         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -622,7 +629,7 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="solution"
-                      className="p-6 space-y-6 m-0 h-full overflow-y-auto"
+                      className="p-6 space-y-6 m-0"
                     >
                       {solutions.length === 0 ? (
                         <div className="text-sm text-muted-foreground">
@@ -710,7 +717,7 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="submissions"
-                      className="p-6 m-0 h-full overflow-y-auto"
+                      className="p-6 m-0"
                     >
                       <div>
                         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -800,7 +807,7 @@ const ProblemSolver = () => {
                                               size="sm"
                                               onClick={() => handleCopy(s.code)}
                                             >
-                                              <Copy className="w-4 h-4 mr-1" />{" "}
+                                              <Copy className="w-4 h-4 mr-1" />
                                               Copy
                                             </Button>
                                           </div>
@@ -835,9 +842,9 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="notes"
-                      className="p-6 m-0 h-full overflow-y-auto flex flex-col"
+                      className="p-6 m-0 flex flex-col"
                     >
-                      <Notes problemId={problemId} />
+                      <Notes problemId={problemId} ref={notesRef} />
                     </TabsContent>
                   </div>
                 </Tabs>

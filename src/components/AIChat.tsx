@@ -69,7 +69,12 @@ const AIChat = ({
     sendMessage,
     clearConversation,
     requestDiagram,
-  } = useChatSession({ problemId, problemDescription, problemTestCases, currentCode });
+  } = useChatSession({
+    problemId,
+    problemDescription,
+    problemTestCases,
+    currentCode,
+  });
 
   // Speech-to-text functionality
   const {
@@ -110,21 +115,34 @@ const AIChat = ({
     if (!messages.length) return;
     // If any assistant message already has a diagram, do not auto-request again on reload
     const anyDiagramExists = messages.some(
-      (m) => m.role === "assistant" && Boolean((m as unknown as { diagram?: unknown }).diagram),
+      (m) =>
+        m.role === "assistant" &&
+        Boolean((m as unknown as { diagram?: unknown }).diagram),
     );
     if (anyDiagramExists) return;
 
     // Only consider the latest assistant message for auto-request
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
     if (!lastAssistant) return;
 
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-    const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
-    const hasDiagram = Boolean((lastAssistant as unknown as { diagram?: unknown }).diagram);
+    const lastUserMsg =
+      [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(
+      lastUserMsg,
+    );
+    const hasDiagram = Boolean(
+      (lastAssistant as unknown as { diagram?: unknown }).diagram,
+    );
     const assistantSuggests =
-      (lastAssistant as unknown as { suggestDiagram?: boolean }).suggestDiagram === true;
+      (lastAssistant as unknown as { suggestDiagram?: boolean })
+        .suggestDiagram === true;
     const id = lastAssistant.id;
-    const shouldRequest = !hasDiagram && (userAsked || assistantSuggests) && !autoRequestedRef.current.has(id);
+    const shouldRequest =
+      !hasDiagram &&
+      (userAsked || assistantSuggests) &&
+      !autoRequestedRef.current.has(id);
     if (shouldRequest) {
       autoRequestedRef.current.add(id);
       requestDiagram(lastAssistant.content);
@@ -141,16 +159,17 @@ const AIChat = ({
 
   const handleGenerateComponent = async (messageContent: string) => {
     if (!problem) {
-      console.error(
-        "No problem context available for visualization",
-      );
+      console.error("No problem context available for visualization");
       return;
     }
 
     // Simply open the modal with our direct component
     setCanvasTitle(`${problem.title} - Interactive Demo`);
     setIsCanvasOpen(true);
-    console.debug("[InteractiveDemo] Opening visualization for:", problem.title);
+    console.debug(
+      "[InteractiveDemo] Opening visualization for:",
+      problem.title,
+    );
   };
 
   const openDiagramDialog = (diagram: ActiveDiagram) => {
@@ -308,32 +327,46 @@ const AIChat = ({
                                         >
                                           {String(children).replace(/\n$/, "")}
                                         </SyntaxHighlighter>
-                                        {match[1] === "python" && onInsertCodeSnippet && (
-                                          <button
-                                            onClick={() => {
-                                              const codeContent = String(children).replace(/\n$/, "");
-                                              const snippet: CodeSnippet = {
-                                                id: `direct-${Date.now()}`,
-                                                code: codeContent,
-                                                language: "python",
-                                                isValidated: true,
-                                                insertionType: "smart",
-                                                insertionHint: {
-                                                  type: "statement",
-                                                  scope: "function",
-                                                  description: "Code snippet from AI response"
-                                                }
-                                              };
-                                              onInsertCodeSnippet(snippet);
-                                            }}
-                                            className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1"
-                                          >
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                            </svg>
-                                            Add to Editor
-                                          </button>
-                                        )}
+                                        {match[1] === "python" &&
+                                          onInsertCodeSnippet && (
+                                            <button
+                                              onClick={() => {
+                                                const codeContent = String(
+                                                  children,
+                                                ).replace(/\n$/, "");
+                                                const snippet: CodeSnippet = {
+                                                  id: `direct-${Date.now()}`,
+                                                  code: codeContent,
+                                                  language: "python",
+                                                  isValidated: true,
+                                                  insertionType: "smart",
+                                                  insertionHint: {
+                                                    type: "statement",
+                                                    scope: "function",
+                                                    description:
+                                                      "Code snippet from AI response",
+                                                  },
+                                                };
+                                                onInsertCodeSnippet(snippet);
+                                              }}
+                                              className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1"
+                                            >
+                                              <svg
+                                                className="w-3 h-3"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  strokeWidth={2}
+                                                  d="M12 4v16m8-8H4"
+                                                />
+                                              </svg>
+                                              Add to Editor
+                                            </button>
+                                          )}
                                       </div>
                                     ) : (
                                       <code
@@ -371,148 +404,186 @@ const AIChat = ({
                         </div>
 
                         {/* Mermaid diagram bubble - uses DB-attached diagram */}
-                        {message.role === "assistant" && (() => {
-                          const attached = (message as unknown as { diagram?: { engine: "mermaid"; code: string } | { engine: "reactflow"; graph: FlowGraph } }).diagram;
-                          const diag: { engine: "mermaid"; code: string } | null = attached && attached.engine === "mermaid" ? (attached as { engine: "mermaid"; code: string }) : null;
-                          if (!diag) return null;
-                          return (
-                            <div className="mt-3">
-                              <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-xs text-muted-foreground">
-                                    Diagram{" "}
-                                    <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
-                                      Mermaid
-                                    </span>
+                        {message.role === "assistant" &&
+                          (() => {
+                            const attached = (
+                              message as unknown as {
+                                diagram?:
+                                  | { engine: "mermaid"; code: string }
+                                  | { engine: "reactflow"; graph: FlowGraph };
+                              }
+                            ).diagram;
+                            const diag: {
+                              engine: "mermaid";
+                              code: string;
+                            } | null =
+                              attached && attached.engine === "mermaid"
+                                ? (attached as {
+                                    engine: "mermaid";
+                                    code: string;
+                                  })
+                                : null;
+                            if (!diag) return null;
+                            return (
+                              <div className="mt-3">
+                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-muted-foreground">
+                                      Diagram{" "}
+                                      <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
+                                        Mermaid
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        openDiagramDialog({
+                                          engine: "mermaid",
+                                          code: diag.code,
+                                        })
+                                      }
+                                      title="View full screen"
+                                    >
+                                      <Maximize2 className="w-3.5 h-3.5" />
+                                      Expand
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() =>
-                                      openDiagramDialog({
-                                        engine: "mermaid",
-                                        code: diag.code,
-                                      })
-                                    }
-                                    title="View full screen"
-                                  >
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                    Expand
-                                  </button>
+                                  <Mermaid chart={diag.code} />
                                 </div>
-                                <Mermaid
-                                  chart={diag.code}
-                                />
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
                         {/* React Flow diagram bubble - uses DB-attached diagram */}
-                        {message.role === "assistant" && (() => {
-                          const attached = (message as unknown as { diagram?: { engine: "mermaid"; code: string } | { engine: "reactflow"; graph: FlowGraph } }).diagram;
-                          const diag: { engine: "reactflow"; graph: FlowGraph } | null = attached && attached.engine === "reactflow" ? (attached as { engine: "reactflow"; graph: FlowGraph }) : null;
-                          if (!diag) return null;
-                          return (
-                            <div className="mt-3">
-                              <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-xs text-muted-foreground">
-                                    Diagram{" "}
-                                    <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
-                                      React Flow
-                                    </span>
+                        {message.role === "assistant" &&
+                          (() => {
+                            const attached = (
+                              message as unknown as {
+                                diagram?:
+                                  | { engine: "mermaid"; code: string }
+                                  | { engine: "reactflow"; graph: FlowGraph };
+                              }
+                            ).diagram;
+                            const diag: {
+                              engine: "reactflow";
+                              graph: FlowGraph;
+                            } | null =
+                              attached && attached.engine === "reactflow"
+                                ? (attached as {
+                                    engine: "reactflow";
+                                    graph: FlowGraph;
+                                  })
+                                : null;
+                            if (!diag) return null;
+                            return (
+                              <div className="mt-3">
+                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-muted-foreground">
+                                      Diagram{" "}
+                                      <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
+                                        React Flow
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        openDiagramDialog({
+                                          engine: "reactflow",
+                                          graph: diag.graph,
+                                        })
+                                      }
+                                      title="View full screen"
+                                    >
+                                      <Maximize2 className="w-3.5 h-3.5" />
+                                      Expand
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() =>
-                                      openDiagramDialog({
-                                        engine: "reactflow",
-                                        graph: diag.graph,
-                                      })
-                                    }
-                                    title="View full screen"
-                                  >
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                    Expand
-                                  </button>
+                                  <FlowCanvas graph={diag.graph} />
                                 </div>
-                                <FlowCanvas
-                                  graph={diag.graph}
-                                />
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
                         {/* Action: Interactive Demo button only when a diagram exists */}
-                        {message.role === "assistant" && Boolean((message as unknown as { diagram?: unknown }).diagram) && (
-                          <div className="mt-3">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                onClick={() => handleGenerateComponent(message.content)}
-                                title="Generate an interactive component demo"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                <span className="text-sm">Interactive Demo</span>
-                              </Button>
+                        {message.role === "assistant" &&
+                          Boolean(
+                            (message as unknown as { diagram?: unknown })
+                              .diagram,
+                          ) && (
+                            <div className="mt-3">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                  onClick={() =>
+                                    handleGenerateComponent(message.content)
+                                  }
+                                  title="Generate an interactive component demo"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                  <span className="text-sm">
+                                    Interactive Demo
+                                  </span>
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
                         {/* Code snippets: render whenever present on assistant messages */}
-                        {message.role === "assistant" && message.codeSnippets && message.codeSnippets.length > 0 && (
-                          <div className="mt-3 space-y-3">
-                            {message.codeSnippets.map((snippet) => (
-                              <div
-                                key={snippet.id}
-                                className="bg-card border rounded-lg p-4 shadow-sm"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                      {snippet.insertionHint?.type || "Code"}
-                                    </span>
+                        {message.role === "assistant" &&
+                          message.codeSnippets &&
+                          message.codeSnippets.length > 0 && (
+                            <div className="mt-3 space-y-3">
+                              {message.codeSnippets.map((snippet) => (
+                                <div
+                                  key={snippet.id}
+                                  className="bg-card border rounded-lg p-4 shadow-sm"
+                                >
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        {snippet.insertionHint?.type || "Code"}
+                                      </span>
+                                    </div>
+                                    {onInsertCodeSnippet && (
+                                      <CodeSnippetButton
+                                        snippet={snippet}
+                                        onInsert={onInsertCodeSnippet}
+                                        className="shadow-sm"
+                                      />
+                                    )}
                                   </div>
-                                  {onInsertCodeSnippet && (
-                                    <CodeSnippetButton
-                                      snippet={snippet}
-                                      onInsert={onInsertCodeSnippet}
-                                      className="shadow-sm"
-                                    />
+
+                                  <div className="bg-slate-900 rounded-md p-3 mb-3">
+                                    <SyntaxHighlighter
+                                      language={snippet.language}
+                                      style={vscDarkPlus}
+                                      customStyle={{
+                                        margin: 0,
+                                        padding: 0,
+                                        background: "transparent",
+                                        fontSize: "0.8rem",
+                                      }}
+                                    >
+                                      {snippet.code}
+                                    </SyntaxHighlighter>
+                                  </div>
+
+                                  {snippet.insertionHint?.description && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {snippet.insertionHint.description}
+                                    </p>
                                   )}
                                 </div>
-
-                                <div className="bg-slate-900 rounded-md p-3 mb-3">
-                                  <SyntaxHighlighter
-                                    language={snippet.language}
-                                    style={vscDarkPlus}
-                                    customStyle={{
-                                      margin: 0,
-                                      padding: 0,
-                                      background: "transparent",
-                                      fontSize: "0.8rem",
-                                    }}
-                                  >
-                                    {snippet.code}
-                                  </SyntaxHighlighter>
-                                </div>
-
-                                {snippet.insertionHint?.description && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {snippet.insertionHint.description}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                              ))}
+                            </div>
+                          )}
 
                         {/* Timestamp */}
                         <div className="text-xs text-muted-foreground mt-2 text-left">

@@ -10,7 +10,7 @@ export interface Solution {
 }
 
 export const pythonSolutions: Record<string, Solution[]> = {
-  'two-sum': [
+  "two-sum": [
     {
       title: "Brute Force",
       code: `def twoSum(self, nums: List[int], target: int) -> List[int]:
@@ -20,7 +20,7 @@ export const pythonSolutions: Record<string, Solution[]> = {
                 return [i, j]
     return []`,
       complexity: { time: "O(n²)", space: "O(1)" },
-      explanation: "Check every pair of numbers to see if they sum to target."
+      explanation: "Check every pair of numbers to see if they sum to target.",
     },
     {
       title: "Hash Map (Optimal)",
@@ -33,11 +33,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
         hashmap[num] = i
     return []`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use hash map to store numbers and their indices, check for complement in O(1) time."
-    }
+      explanation:
+        "Use hash map to store numbers and their indices, check for complement in O(1) time.",
+    },
   ],
 
-  'group-anagrams': [
+  "group-anagrams": [
     {
       title: "Sort and Group",
       code: `def groupAnagrams(self, strs: List[str]) -> List[List[str]]:
@@ -51,7 +52,8 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return list(groups.values())`,
       complexity: { time: "O(n × m log m)", space: "O(n × m)" },
-      explanation: "Sort each string to create a key, then group strings with same sorted key. Where n is number of strings and m is maximum length of a string."
+      explanation:
+        "Sort each string to create a key, then group strings with same sorted key. Where n is number of strings and m is maximum length of a string.",
     },
     {
       title: "Character Count (Alternative)",
@@ -70,17 +72,18 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return list(groups.values())`,
       complexity: { time: "O(n × m)", space: "O(n × m)" },
-      explanation: "Use character count array as key instead of sorting. More efficient for longer strings."
-    }
+      explanation:
+        "Use character count array as key instead of sorting. More efficient for longer strings.",
+    },
   ],
 
-  'valid-anagram': [
+  "valid-anagram": [
     {
       title: "Sorting",
       code: `def isAnagram(self, s: str, t: str) -> bool:
     return sorted(s) == sorted(t)`,
       complexity: { time: "O(n log n)", space: "O(n)" },
-      explanation: "Sort both strings and compare if they're equal."
+      explanation: "Sort both strings and compare if they're equal.",
     },
     {
       title: "Character Count (Optimal)",
@@ -91,11 +94,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
     from collections import Counter
     return Counter(s) == Counter(t)`,
       complexity: { time: "O(n)", space: "O(1)" },
-      explanation: "Count characters in both strings and compare the counts. Space is O(1) since we only have 26 possible lowercase letters."
-    }
+      explanation:
+        "Count characters in both strings and compare the counts. Space is O(1) since we only have 26 possible lowercase letters.",
+    },
   ],
 
-  'valid-parentheses': [
+  "valid-parentheses": [
     {
       title: "Stack",
       code: `def isValid(self, s: str) -> bool:
@@ -113,11 +117,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return not stack`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use stack to track opening brackets and match with closing brackets. Return true only if all brackets are properly matched."
-    }
+      explanation:
+        "Use stack to track opening brackets and match with closing brackets. Return true only if all brackets are properly matched.",
+    },
   ],
 
-  'top-k-frequent-elements': [
+  "top-k-frequent-elements": [
     {
       title: "Counter + Heap",
       code: `def topKFrequent(self, nums: List[int], k: int) -> List[int]:
@@ -130,7 +135,8 @@ export const pythonSolutions: Record<string, Solution[]> = {
     # Use heap to get top k frequent
     return heapq.nlargest(k, counter.keys(), key=counter.get)`,
       complexity: { time: "O(n log k)", space: "O(n)" },
-      explanation: "Count frequencies, then use heap to efficiently get top k elements."
+      explanation:
+        "Count frequencies, then use heap to efficiently get top k elements.",
     },
     {
       title: "Bucket Sort (Optimal)",
@@ -155,7 +161,8 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return result`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use bucket sort approach with frequency as bucket index. Optimal O(n) time complexity."
-    }
-  ]
+      explanation:
+        "Use bucket sort approach with frequency as bucket index. Optimal O(n) time complexity.",
+    },
+  ],
 };

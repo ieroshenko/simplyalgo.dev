@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Problem {
   id: string;
   title: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: "Easy" | "Medium" | "Hard";
   category: string;
-  status: 'solved' | 'attempted' | 'not-started';
+  status: "solved" | "attempted" | "not-started";
   isStarred: boolean;
   description: string;
   functionSignature: string;
@@ -45,9 +45,7 @@ export const useProblems = (userId?: string) => {
   const fetchProblems = async () => {
     try {
       // Fetch problems with category names and user attempt data
-      const query = supabase
-        .from('problems')
-        .select(`
+      const query = supabase.from("problems").select(`
           *,
           categories!inner(name, color),
           test_cases(input, expected_output)
@@ -63,22 +61,24 @@ export const useProblems = (userId?: string) => {
 
       if (userId) {
         const { data: attemptsData } = await supabase
-          .from('user_problem_attempts')
-          .select('problem_id, status')
-          .eq('user_id', userId);
+          .from("user_problem_attempts")
+          .select("problem_id, status")
+          .eq("user_id", userId);
 
         const { data: starsData } = await supabase
-          .from('user_starred_problems')
-          .select('problem_id')
-          .eq('user_id', userId);
+          .from("user_starred_problems")
+          .select("problem_id")
+          .eq("user_id", userId);
 
         userAttempts = attemptsData || [];
         userStars = starsData || [];
       }
 
       const formattedProblems: Problem[] = problemsData.map((problem: any) => {
-        const attempts = userAttempts.filter(a => a.problem_id === problem.id);
-        const isStarred = userStars.some(s => s.problem_id === problem.id);
+        const attempts = userAttempts.filter(
+          (a) => a.problem_id === problem.id,
+        );
+        const isStarred = userStars.some((s) => s.problem_id === problem.id);
 
         return {
           id: problem.id,
@@ -92,11 +92,11 @@ export const useProblems = (userId?: string) => {
           examples: problem.examples || [],
           testCases: problem.test_cases.map((tc: any) => ({
             input: tc.input,
-            expected: tc.expected_output
+            expected: tc.expected_output,
           })),
           likes: problem.likes,
           dislikes: problem.dislikes,
-          acceptanceRate: problem.acceptance_rate
+          acceptanceRate: problem.acceptance_rate,
         };
       });
 
@@ -109,19 +109,21 @@ export const useProblems = (userId?: string) => {
   const fetchCategories = async () => {
     try {
       const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order');
+        .from("categories")
+        .select("*")
+        .order("sort_order");
 
       if (categoriesError) throw categoriesError;
 
       // Calculate solved/total for each category
-      const formattedCategories: Category[] = categoriesData.map((category: any) => ({
-        name: category.name,
-        solved: 0, // TODO: Calculate from user attempts
-        total: 0,  // TODO: Calculate from problems count
-        color: category.color
-      }));
+      const formattedCategories: Category[] = categoriesData.map(
+        (category: any) => ({
+          name: category.name,
+          solved: 0, // TODO: Calculate from user attempts
+          total: 0, // TODO: Calculate from problems count
+          color: category.color,
+        }),
+      );
 
       setCategories(formattedCategories);
     } catch (err: any) {
@@ -131,44 +133,48 @@ export const useProblems = (userId?: string) => {
     }
   };
 
-  const getStatus = (attempts: any[]): 'solved' | 'attempted' | 'not-started' => {
-    if (!attempts || attempts.length === 0) return 'not-started';
-    
-    const hasPassed = attempts.some(attempt => attempt.status === 'passed');
-    if (hasPassed) return 'solved';
-    
-    return 'attempted';
+  const getStatus = (
+    attempts: any[],
+  ): "solved" | "attempted" | "not-started" => {
+    if (!attempts || attempts.length === 0) return "not-started";
+
+    const hasPassed = attempts.some((attempt) => attempt.status === "passed");
+    if (hasPassed) return "solved";
+
+    return "attempted";
   };
 
   const toggleStar = async (problemId: string) => {
     if (!userId) return;
-    
+
     try {
-      const problem = problems.find(p => p.id === problemId);
+      const problem = problems.find((p) => p.id === problemId);
       if (!problem) return;
-      
+
       if (problem.isStarred) {
         // Remove star
         const { error } = await supabase
-          .from('user_starred_problems')
+          .from("user_starred_problems")
           .delete()
-          .eq('user_id', userId)
-          .eq('problem_id', problemId);
-        
+          .eq("user_id", userId)
+          .eq("problem_id", problemId);
+
         if (error) throw error;
       } else {
         // Add star
         const { error } = await supabase
-          .from('user_starred_problems')
+          .from("user_starred_problems")
           .insert({ user_id: userId, problem_id: problemId });
-        
+
         if (error) throw error;
       }
-      
+
       // Update local state
-      setProblems(prev => prev.map(p => 
-        p.id === problemId ? { ...p, isStarred: !p.isStarred } : p
-      ));
+      setProblems((prev) =>
+        prev.map((p) =>
+          p.id === problemId ? { ...p, isStarred: !p.isStarred } : p,
+        ),
+      );
     } catch (err: any) {
       throw new Error(err.message);
     }
@@ -183,6 +189,6 @@ export const useProblems = (userId?: string) => {
     refetch: () => {
       fetchProblems();
       fetchCategories();
-    }
+    },
   };
 };
