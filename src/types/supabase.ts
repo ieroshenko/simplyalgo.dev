@@ -4,466 +4,469 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
+  | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
-  }
+    PostgrestVersion: "12.2.12 (cd3cf9e)";
+  };
   public: {
     Tables: {
       ai_chat_messages: {
         Row: {
-          code_snippets: Json | null
-          content: string
-          created_at: string
-          diagram: Json | null
-          id: string
-          role: string
-          session_id: string
-          suggest_diagram: boolean | null
-        }
+          code_snippets: Json | null;
+          content: string;
+          created_at: string;
+          diagram: Json | null;
+          id: string;
+          role: string;
+          session_id: string;
+          suggest_diagram: boolean | null;
+        };
         Insert: {
-          code_snippets?: Json | null
-          content: string
-          created_at?: string
-          diagram?: Json | null
-          id?: string
-          role: string
-          session_id: string
-          suggest_diagram?: boolean | null
-        }
+          code_snippets?: Json | null;
+          content: string;
+          created_at?: string;
+          diagram?: Json | null;
+          id?: string;
+          role: string;
+          session_id: string;
+          suggest_diagram?: boolean | null;
+        };
         Update: {
-          code_snippets?: Json | null
-          content?: string
-          created_at?: string
-          diagram?: Json | null
-          id?: string
-          role?: string
-          session_id?: string
-          suggest_diagram?: boolean | null
-        }
+          code_snippets?: Json | null;
+          content?: string;
+          created_at?: string;
+          diagram?: Json | null;
+          id?: string;
+          role?: string;
+          session_id?: string;
+          suggest_diagram?: boolean | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "ai_chat_messages_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "ai_chat_sessions"
-            referencedColumns: ["id"]
+            foreignKeyName: "ai_chat_messages_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_chat_sessions";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       ai_chat_sessions: {
         Row: {
-          created_at: string
-          id: string
-          problem_id: string | null
-          title: string | null
-          updated_at: string
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          problem_id: string | null;
+          title: string | null;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          problem_id?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          problem_id?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          problem_id?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          problem_id?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "ai_chat_sessions_problem_id_fkey"
-            columns: ["problem_id"]
-            isOneToOne: false
-            referencedRelation: "problems"
-            referencedColumns: ["id"]
+            foreignKeyName: "ai_chat_sessions_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       categories: {
         Row: {
-          color: string
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          sort_order: number | null
-          updated_at: string
-        }
+          color: string;
+          created_at: string;
+          description: string | null;
+          id: string;
+          name: string;
+          sort_order: number | null;
+          updated_at: string;
+        };
         Insert: {
-          color: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          sort_order?: number | null
-          updated_at?: string
-        }
+          color: string;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name: string;
+          sort_order?: number | null;
+          updated_at?: string;
+        };
         Update: {
-          color?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          sort_order?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          color?: string;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          sort_order?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notes: {
         Row: {
-          content: string | null
-          created_at: string | null
-          id: string
-          problem_id: string
-          updated_at: string | null
-          user_id: string
-        }
+          content: string | null;
+          created_at: string | null;
+          id: string;
+          problem_id: string;
+          updated_at: string | null;
+          user_id: string;
+        };
         Insert: {
-          content?: string | null
-          created_at?: string | null
-          id?: string
-          problem_id: string
-          updated_at?: string | null
-          user_id: string
-        }
+          content?: string | null;
+          created_at?: string | null;
+          id?: string;
+          problem_id: string;
+          updated_at?: string | null;
+          user_id: string;
+        };
         Update: {
-          content?: string | null
-          created_at?: string | null
-          id?: string
-          problem_id?: string
-          updated_at?: string | null
-          user_id?: string
-        }
+          content?: string | null;
+          created_at?: string | null;
+          id?: string;
+          problem_id?: string;
+          updated_at?: string | null;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "notes_problem_id_fkey"
-            columns: ["problem_id"]
-            isOneToOne: false
-            referencedRelation: "problems"
-            referencedColumns: ["id"]
+            foreignKeyName: "notes_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       problems: {
         Row: {
-          acceptance_rate: number | null
-          category_id: string
-          constraints: Json
-          created_at: string
-          description: string
-          difficulty: Database["public"]["Enums"]["difficulty_level"]
-          dislikes: number | null
-          examples: Json
-          function_signature: string
-          hints: Json
-          id: string
-          likes: number | null
-          title: string
-          updated_at: string
-        }
+          acceptance_rate: number | null;
+          category_id: string;
+          constraints: Json;
+          created_at: string;
+          description: string;
+          difficulty: Database["public"]["Enums"]["difficulty_level"];
+          dislikes: number | null;
+          examples: Json;
+          function_signature: string;
+          hints: Json;
+          id: string;
+          likes: number | null;
+          title: string;
+          updated_at: string;
+        };
         Insert: {
-          acceptance_rate?: number | null
-          category_id: string
-          constraints?: Json
-          created_at?: string
-          description: string
-          difficulty: Database["public"]["Enums"]["difficulty_level"]
-          dislikes?: number | null
-          examples?: Json
-          function_signature: string
-          hints?: Json
-          id: string
-          likes?: number | null
-          title: string
-          updated_at?: string
-        }
+          acceptance_rate?: number | null;
+          category_id: string;
+          constraints?: Json;
+          created_at?: string;
+          description: string;
+          difficulty: Database["public"]["Enums"]["difficulty_level"];
+          dislikes?: number | null;
+          examples?: Json;
+          function_signature: string;
+          hints?: Json;
+          id: string;
+          likes?: number | null;
+          title: string;
+          updated_at?: string;
+        };
         Update: {
-          acceptance_rate?: number | null
-          category_id?: string
-          constraints?: Json
-          created_at?: string
-          description?: string
-          difficulty?: Database["public"]["Enums"]["difficulty_level"]
-          dislikes?: number | null
-          examples?: Json
-          function_signature?: string
-          hints?: Json
-          id?: string
-          likes?: number | null
-          title?: string
-          updated_at?: string
-        }
+          acceptance_rate?: number | null;
+          category_id?: string;
+          constraints?: Json;
+          created_at?: string;
+          description?: string;
+          difficulty?: Database["public"]["Enums"]["difficulty_level"];
+          dislikes?: number | null;
+          examples?: Json;
+          function_signature?: string;
+          hints?: Json;
+          id?: string;
+          likes?: number | null;
+          title?: string;
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "problems_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
+            foreignKeyName: "problems_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       test_cases: {
         Row: {
-          created_at: string
-          expected_json: Json | null
-          expected_output: string
-          explanation: string | null
-          id: string
-          input: string
-          input_json: Json | null
-          is_example: boolean | null
-          problem_id: string
-        }
+          created_at: string;
+          expected_json: Json | null;
+          expected_output: string;
+          explanation: string | null;
+          id: string;
+          input: string;
+          input_json: Json | null;
+          is_example: boolean | null;
+          problem_id: string;
+        };
         Insert: {
-          created_at?: string
-          expected_json?: Json | null
-          expected_output: string
-          explanation?: string | null
-          id?: string
-          input: string
-          input_json?: Json | null
-          is_example?: boolean | null
-          problem_id: string
-        }
+          created_at?: string;
+          expected_json?: Json | null;
+          expected_output: string;
+          explanation?: string | null;
+          id?: string;
+          input: string;
+          input_json?: Json | null;
+          is_example?: boolean | null;
+          problem_id: string;
+        };
         Update: {
-          created_at?: string
-          expected_json?: Json | null
-          expected_output?: string
-          explanation?: string | null
-          id?: string
-          input?: string
-          input_json?: Json | null
-          is_example?: boolean | null
-          problem_id?: string
-        }
+          created_at?: string;
+          expected_json?: Json | null;
+          expected_output?: string;
+          explanation?: string | null;
+          id?: string;
+          input?: string;
+          input_json?: Json | null;
+          is_example?: boolean | null;
+          problem_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "test_cases_problem_id_fkey"
-            columns: ["problem_id"]
-            isOneToOne: false
-            referencedRelation: "problems"
-            referencedColumns: ["id"]
+            foreignKeyName: "test_cases_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       user_problem_attempts: {
         Row: {
-          code: string | null
-          created_at: string
-          execution_time: number | null
-          id: string
-          language: string | null
-          memory_usage: number | null
-          problem_id: string
-          status: Database["public"]["Enums"]["attempt_status"] | null
-          test_results: Json | null
-          updated_at: string
-          user_id: string
-        }
+          code: string | null;
+          created_at: string;
+          execution_time: number | null;
+          id: string;
+          language: string | null;
+          memory_usage: number | null;
+          problem_id: string;
+          status: Database["public"]["Enums"]["attempt_status"] | null;
+          test_results: Json | null;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          code?: string | null
-          created_at?: string
-          execution_time?: number | null
-          id?: string
-          language?: string | null
-          memory_usage?: number | null
-          problem_id: string
-          status?: Database["public"]["Enums"]["attempt_status"] | null
-          test_results?: Json | null
-          updated_at?: string
-          user_id: string
-        }
+          code?: string | null;
+          created_at?: string;
+          execution_time?: number | null;
+          id?: string;
+          language?: string | null;
+          memory_usage?: number | null;
+          problem_id: string;
+          status?: Database["public"]["Enums"]["attempt_status"] | null;
+          test_results?: Json | null;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          code?: string | null
-          created_at?: string
-          execution_time?: number | null
-          id?: string
-          language?: string | null
-          memory_usage?: number | null
-          problem_id?: string
-          status?: Database["public"]["Enums"]["attempt_status"] | null
-          test_results?: Json | null
-          updated_at?: string
-          user_id?: string
-        }
+          code?: string | null;
+          created_at?: string;
+          execution_time?: number | null;
+          id?: string;
+          language?: string | null;
+          memory_usage?: number | null;
+          problem_id?: string;
+          status?: Database["public"]["Enums"]["attempt_status"] | null;
+          test_results?: Json | null;
+          updated_at?: string;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "user_problem_attempts_problem_id_fkey"
-            columns: ["problem_id"]
-            isOneToOne: false
-            referencedRelation: "problems"
-            referencedColumns: ["id"]
+            foreignKeyName: "user_problem_attempts_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       user_profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          email: string | null
-          id: string
-          name: string | null
-          updated_at: string
-          user_id: string
-        }
+          avatar_url: string | null;
+          created_at: string;
+          email: string | null;
+          id: string;
+          name: string | null;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          name?: string | null
-          updated_at?: string
-          user_id: string
-        }
+          avatar_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          name?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          avatar_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_starred_problems: {
         Row: {
-          created_at: string
-          id: string
-          problem_id: string
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          problem_id: string;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          problem_id: string
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          problem_id: string;
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          problem_id?: string
-          user_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          problem_id?: string;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "user_starred_problems_problem_id_fkey"
-            columns: ["problem_id"]
-            isOneToOne: false
-            referencedRelation: "problems"
-            referencedColumns: ["id"]
+            foreignKeyName: "user_starred_problems_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       user_statistics: {
         Row: {
-          ai_sessions: number | null
-          created_at: string
-          current_streak: number | null
-          easy_solved: number | null
-          hard_solved: number | null
-          id: string
-          last_activity_date: string | null
-          max_streak: number | null
-          medium_solved: number | null
-          total_solved: number | null
-          updated_at: string
-          user_id: string
-        }
+          ai_sessions: number | null;
+          created_at: string;
+          current_streak: number | null;
+          easy_solved: number | null;
+          hard_solved: number | null;
+          id: string;
+          last_activity_date: string | null;
+          max_streak: number | null;
+          medium_solved: number | null;
+          total_solved: number | null;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          ai_sessions?: number | null
-          created_at?: string
-          current_streak?: number | null
-          easy_solved?: number | null
-          hard_solved?: number | null
-          id?: string
-          last_activity_date?: string | null
-          max_streak?: number | null
-          medium_solved?: number | null
-          total_solved?: number | null
-          updated_at?: string
-          user_id: string
-        }
+          ai_sessions?: number | null;
+          created_at?: string;
+          current_streak?: number | null;
+          easy_solved?: number | null;
+          hard_solved?: number | null;
+          id?: string;
+          last_activity_date?: string | null;
+          max_streak?: number | null;
+          medium_solved?: number | null;
+          total_solved?: number | null;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          ai_sessions?: number | null
-          created_at?: string
-          current_streak?: number | null
-          easy_solved?: number | null
-          hard_solved?: number | null
-          id?: string
-          last_activity_date?: string | null
-          max_streak?: number | null
-          medium_solved?: number | null
-          total_solved?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
+          ai_sessions?: number | null;
+          created_at?: string;
+          current_streak?: number | null;
+          easy_solved?: number | null;
+          hard_solved?: number | null;
+          id?: string;
+          last_activity_date?: string | null;
+          max_streak?: number | null;
+          medium_solved?: number | null;
+          total_solved?: number | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
       backfill_json_test_cases: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
       migrate_test_case_to_json: {
         Args: {
-          expected_text: string
-          input_text: string
-          problem_signature: string
-        }
+          expected_text: string;
+          input_text: string;
+          problem_signature: string;
+        };
         Returns: {
-          expected_json: Json
-          input_json: Json
-        }[]
-      }
-    }
+          expected_json: Json;
+          input_json: Json;
+        }[];
+      };
+    };
     Enums: {
-      attempt_status: "pending" | "passed" | "failed" | "error"
-      difficulty_level: "Easy" | "Medium" | "Hard"
-      problem_status: "solved" | "attempted" | "not-started"
-    }
+      attempt_status: "pending" | "passed" | "failed" | "error";
+      difficulty_level: "Easy" | "Medium" | "Hard";
+      problem_status: "solved" | "attempted" | "not-started";
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  "public"
+>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
@@ -471,95 +474,95 @@ export type Tables<
         DefaultSchema["Views"])
     ? (DefaultSchema["Tables"] &
         DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
@@ -569,4 +572,4 @@ export const Constants = {
       problem_status: ["solved", "attempted", "not-started"],
     },
   },
-} as const
+} as const;

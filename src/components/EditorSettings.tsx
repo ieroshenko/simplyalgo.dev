@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,9 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-} from '@/components/ui/dropdown-menu';
-import { Settings, Palette, Keyboard } from 'lucide-react';
-import { EditorTheme, useEditorTheme } from '@/hooks/useEditorTheme';
+} from "@/components/ui/dropdown-menu";
+import { Settings, Palette, Keyboard } from "lucide-react";
+import { EditorTheme, useEditorTheme } from "@/hooks/useEditorTheme";
 
 interface EditorSettingsProps {
   currentTheme: EditorTheme;
@@ -22,11 +22,11 @@ interface EditorSettingsProps {
   onVimModeChange: (enabled: boolean) => void;
 }
 
-const EditorSettings = ({ 
-  currentTheme, 
-  onThemeChange, 
-  vimMode, 
-  onVimModeChange 
+const EditorSettings = ({
+  currentTheme,
+  onThemeChange,
+  vimMode,
+  onVimModeChange,
 }: EditorSettingsProps) => {
   const { availableThemes } = useEditorTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -47,19 +47,25 @@ const EditorSettings = ({
           <Palette className="w-4 h-4" />
           Editor Theme
         </DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={currentTheme} onValueChange={onThemeChange}>
+        <DropdownMenuRadioGroup
+          value={currentTheme}
+          onValueChange={onThemeChange}
+        >
           {availableThemes.map((theme) => (
             <DropdownMenuRadioItem key={theme.value} value={theme.value}>
               {theme.label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        
+
         <DropdownMenuSeparator />
-        
+
         <div className="p-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="vim-mode" className="flex items-center gap-2 text-sm">
+            <Label
+              htmlFor="vim-mode"
+              className="flex items-center gap-2 text-sm"
+            >
               <Keyboard className="w-4 h-4" />
               Vim Mode
             </Label>

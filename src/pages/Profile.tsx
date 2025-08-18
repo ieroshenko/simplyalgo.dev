@@ -1,10 +1,10 @@
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserStats } from '@/hooks/useUserStats';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Target, Clock, Trophy, Calendar } from 'lucide-react';
-import { useEffect } from 'react';
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserStats } from "@/hooks/useUserStats";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Target, Clock, Trophy, Calendar } from "lucide-react";
+import { useEffect } from "react";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ const Profile = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/');
+      navigate("/");
     }
   }, [user, authLoading, navigate]);
 
@@ -42,17 +42,22 @@ const Profile = () => {
       return profile.avatarUrl;
     }
     // Generate initials avatar as fallback
-    const name = user.user_metadata?.full_name || profile.name || 'User';
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const name = user.user_metadata?.full_name || profile.name || "User";
+    const initials = name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
     return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=200`;
   };
 
   const getUserName = () => {
-    return user.user_metadata?.full_name || profile.name || 'User';
+    return user.user_metadata?.full_name || profile.name || "User";
   };
 
   const getUserEmail = () => {
-    return user.email || profile.email || '';
+    return user.email || profile.email || "";
   };
 
   return (
@@ -63,7 +68,7 @@ const Profile = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/arena')}
+            onClick={() => navigate("/arena")}
             className="hover:bg-secondary"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -82,15 +87,18 @@ const Profile = () => {
               />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold text-foreground mb-2">{getUserName()}</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                {getUserName()}
+              </h2>
               <p className="text-muted-foreground mb-4">{getUserEmail()}</p>
               <div className="flex items-center space-x-4 text-sm">
                 <div className="flex items-center space-x-1">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">
-                    Joined {new Date(user.created_at).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long' 
+                    Joined{" "}
+                    {new Date(user.created_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
                     })}
                   </span>
                 </div>
@@ -107,8 +115,12 @@ const Profile = () => {
                 <Target className="w-6 h-6 text-success-foreground" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-foreground">{stats.totalSolved}</div>
-                <div className="text-sm text-muted-foreground">Total Solved</div>
+                <div className="text-3xl font-bold text-foreground">
+                  {stats.totalSolved}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Total Solved
+                </div>
               </div>
             </div>
           </Card>
@@ -119,8 +131,12 @@ const Profile = () => {
                 <Clock className="w-6 h-6 text-accent-foreground" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-foreground">{stats.streak}</div>
-                <div className="text-sm text-muted-foreground">Current Streak</div>
+                <div className="text-3xl font-bold text-foreground">
+                  {stats.streak}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Current Streak
+                </div>
               </div>
             </div>
           </Card>
@@ -131,7 +147,9 @@ const Profile = () => {
                 <Trophy className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-foreground">{stats.maxStreak}</div>
+                <div className="text-3xl font-bold text-foreground">
+                  {stats.maxStreak}
+                </div>
                 <div className="text-sm text-muted-foreground">Best Streak</div>
               </div>
             </div>
@@ -144,7 +162,10 @@ const Profile = () => {
               </div>
               <div>
                 <div className="text-3xl font-bold text-foreground">
-                  {stats.totalSolved > 0 ? Math.round((stats.totalSolved / 100) * 100) : 0}%
+                  {stats.totalSolved > 0
+                    ? Math.round((stats.totalSolved / 100) * 100)
+                    : 0}
+                  %
                 </div>
                 <div className="text-sm text-muted-foreground">Progress</div>
               </div>
@@ -154,30 +175,44 @@ const Profile = () => {
 
         {/* Problem Breakdown */}
         <Card className="p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-6">Problems Solved by Difficulty</h3>
+          <h3 className="text-xl font-semibold text-foreground mb-6">
+            Problems Solved by Difficulty
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3">
-                <div className="text-2xl font-bold text-green-700">{stats.easySolved}</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {stats.easySolved}
+                </div>
               </div>
               <div className="text-sm font-medium text-green-700">Easy</div>
-              <div className="text-xs text-muted-foreground mt-1">Problems Solved</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Problems Solved
+              </div>
             </div>
-            
+
             <div className="text-center">
               <div className="w-20 h-20 mx-auto bg-yellow-100 rounded-full flex items-center justify-center mb-3">
-                <div className="text-2xl font-bold text-yellow-700">{stats.mediumSolved}</div>
+                <div className="text-2xl font-bold text-yellow-700">
+                  {stats.mediumSolved}
+                </div>
               </div>
               <div className="text-sm font-medium text-yellow-700">Medium</div>
-              <div className="text-xs text-muted-foreground mt-1">Problems Solved</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Problems Solved
+              </div>
             </div>
-            
+
             <div className="text-center">
               <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-3">
-                <div className="text-2xl font-bold text-red-700">{stats.hardSolved}</div>
+                <div className="text-2xl font-bold text-red-700">
+                  {stats.hardSolved}
+                </div>
               </div>
               <div className="text-sm font-medium text-red-700">Hard</div>
-              <div className="text-xs text-muted-foreground mt-1">Problems Solved</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Problems Solved
+              </div>
             </div>
           </div>
         </Card>

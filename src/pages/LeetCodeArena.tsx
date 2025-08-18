@@ -1,41 +1,57 @@
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Sidebar from '@/components/Sidebar';
-import ProblemTable from '@/components/ProblemTable';
-import DataStructureVault from '@/components/DataStructureVault';
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Clock, Target, Search, User, Trophy, Zap, TrendingUp, Code2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useProblems } from '@/hooks/useProblems';
-import { useUserStats } from '@/hooks/useUserStats';
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Sidebar from "@/components/Sidebar";
+import ProblemTable from "@/components/ProblemTable";
+import DataStructureVault from "@/components/DataStructureVault";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Clock,
+  Target,
+  Search,
+  User,
+  Trophy,
+  Zap,
+  TrendingUp,
+  Code2,
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useProblems } from "@/hooks/useProblems";
+import { useUserStats } from "@/hooks/useUserStats";
 
 const LeetCodeArena = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { problems, categories: dbCategories, loading: problemsLoading, refetch: refetchProblems } = useProblems(user?.id);
+  const {
+    problems,
+    categories: dbCategories,
+    loading: problemsLoading,
+    refetch: refetchProblems,
+  } = useProblems(user?.id);
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(() => {
-    // Load selected category from localStorage on initialization
-    const saved = localStorage.getItem('selected-category');
-    return saved || undefined;
-  });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    () => {
+      // Load selected category from localStorage on initialization
+      const saved = localStorage.getItem("selected-category");
+      return saved || undefined;
+    },
+  );
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const categories = ['All', ...dbCategories.map(c => c.name)];
+  const categories = ["All", ...dbCategories.map((c) => c.name)];
 
   // Function to handle category selection with persistence
   const handleCategorySelect = (category: string) => {
-    const categoryValue = category === 'All' ? undefined : category;
+    const categoryValue = category === "All" ? undefined : category;
     setSelectedCategory(categoryValue);
-    
+
     // Persist to localStorage
     if (categoryValue) {
-      localStorage.setItem('selected-category', categoryValue);
+      localStorage.setItem("selected-category", categoryValue);
     } else {
-      localStorage.removeItem('selected-category');
+      localStorage.removeItem("selected-category");
     }
   };
 
@@ -50,13 +66,13 @@ const LeetCodeArena = () => {
       !categories.includes(selectedCategory)
     ) {
       setSelectedCategory(undefined);
-      localStorage.removeItem('selected-category');
+      localStorage.removeItem("selected-category");
     }
   }, [dbCategories, selectedCategory, problemsLoading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/');
+      navigate("/");
     }
   }, [user, authLoading, navigate]);
 
@@ -85,30 +101,35 @@ const LeetCodeArena = () => {
       return profile.avatarUrl;
     }
     // Generate initials avatar as fallback
-    const name = user.user_metadata?.full_name || profile.name || 'User';
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const name = user.user_metadata?.full_name || profile.name || "User";
+    const initials = name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
     return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=80`;
   };
 
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
-      
+
       <div className="flex-1 p-6 space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Leetcode Arena 
+              Leetcode Arena
             </h1>
             <p className="text-muted-foreground mt-1">
               Master coding patterns and solve problems to sharpen your skills
             </p>
           </div>
-          
+
           <Button
             variant="ghost"
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate("/profile")}
             className="flex items-center space-x-3 px-4 py-2 hover:bg-secondary rounded-lg"
           >
             <img
@@ -118,11 +139,9 @@ const LeetCodeArena = () => {
             />
             <div className="text-left">
               <div className="text-sm font-medium text-foreground">
-                {user.user_metadata?.full_name || profile.name || 'User'}
+                {user.user_metadata?.full_name || profile.name || "User"}
               </div>
-              <div className="text-xs text-muted-foreground">
-                View Profile
-              </div>
+              <div className="text-xs text-muted-foreground">View Profile</div>
             </div>
           </Button>
         </div>
@@ -135,8 +154,12 @@ const LeetCodeArena = () => {
                 <Trophy className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-foreground">{stats.totalSolved}</div>
-                <div className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Problems Solved</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {stats.totalSolved}
+                </div>
+                <div className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                  Problems Solved
+                </div>
               </div>
             </div>
           </Card>
@@ -147,8 +170,12 @@ const LeetCodeArena = () => {
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-foreground">{stats.streak}</div>
-                <div className="text-sm text-orange-700 dark:text-orange-300 font-medium">Day Streak</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {stats.streak}
+                </div>
+                <div className="text-sm text-orange-700 dark:text-orange-300 font-medium">
+                  Day Streak
+                </div>
               </div>
             </div>
           </Card>
@@ -164,18 +191,26 @@ const LeetCodeArena = () => {
           <TabsContent value="problems" className="space-y-6">
             {/* Category Filters */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Filter by Category</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Filter by Category
+              </h2>
               <div className="flex flex-wrap gap-2">
                 {categories.map((category) => (
                   <Button
                     key={category}
-                    variant={selectedCategory === category || (category === 'All' && !selectedCategory) ? "default" : "outline"}
+                    variant={
+                      selectedCategory === category ||
+                      (category === "All" && !selectedCategory)
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     onClick={() => handleCategorySelect(category)}
                     className={
-                      selectedCategory === category || (category === 'All' && !selectedCategory)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-secondary'
+                      selectedCategory === category ||
+                      (category === "All" && !selectedCategory)
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-secondary"
                     }
                   >
                     {category}
@@ -201,10 +236,12 @@ const LeetCodeArena = () => {
             {/* Problems Table */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">
-                {selectedCategory ? `${selectedCategory} Problems` : 'All Problems'}
+                {selectedCategory
+                  ? `${selectedCategory} Problems`
+                  : "All Problems"}
               </h2>
-              <ProblemTable 
-                problems={problems} 
+              <ProblemTable
+                problems={problems}
                 filteredCategory={selectedCategory}
                 searchQuery={searchQuery}
               />

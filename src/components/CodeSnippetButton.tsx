@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/button';
-import { CodeSnippet } from '@/types';
-import { Code, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { CodeSnippet } from "@/types";
+import { Code, Plus } from "lucide-react";
+import { useState } from "react";
 
 interface CodeSnippetButtonProps {
   snippet: CodeSnippet;
@@ -9,17 +9,21 @@ interface CodeSnippetButtonProps {
   className?: string;
 }
 
-const CodeSnippetButton = ({ snippet, onInsert, className = '' }: CodeSnippetButtonProps) => {
+const CodeSnippetButton = ({
+  snippet,
+  onInsert,
+  className = "",
+}: CodeSnippetButtonProps) => {
   const [isInserting, setIsInserting] = useState(false);
 
   const handleInsert = async () => {
     if (isInserting) return;
-    
+
     setIsInserting(true);
     try {
       await onInsert(snippet);
     } catch (error) {
-      console.error('Failed to insert code snippet:', error);
+      console.error("Failed to insert code snippet:", error);
     } finally {
       setTimeout(() => {
         setIsInserting(false);
@@ -31,20 +35,20 @@ const CodeSnippetButton = ({ snippet, onInsert, className = '' }: CodeSnippetBut
     if (snippet.insertionHint?.description) {
       return snippet.insertionHint.description;
     }
-    
+
     switch (snippet.insertionHint?.type) {
-      case 'import':
-        return 'Add import at top of file';
-      case 'variable':
-        return 'Add variable declaration';
-      case 'function':
-        return 'Add function definition';
-      case 'statement':
-        return 'Add code statement';
-      case 'class':
-        return 'Add class definition';
+      case "import":
+        return "Add import at top of file";
+      case "variable":
+        return "Add variable declaration";
+      case "function":
+        return "Add function definition";
+      case "statement":
+        return "Add code statement";
+      case "class":
+        return "Add class definition";
       default:
-        return 'Add to editor';
+        return "Add to editor";
     }
   };
 

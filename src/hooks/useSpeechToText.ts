@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { speechRecognitionService } from '@/services/speechRecognition';
+import { useState, useRef, useCallback } from "react";
+import { speechRecognitionService } from "@/services/speechRecognition";
 
 interface SpeechToTextOptions {
   onResult: (transcript: string) => void;
@@ -17,13 +17,15 @@ interface SpeechToTextReturn {
   error: string | null;
 }
 
-export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextReturn => {
+export const useSpeechToText = (
+  options: SpeechToTextOptions,
+): SpeechToTextReturn => {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [hasNativeSupport, setHasNativeSupport] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any>(null);
@@ -32,22 +34,24 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
   // Initialize speech recognition capabilities
   const initializeSpeechRecognition = useCallback(() => {
     // Check for native Web Speech API support
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       setIsSupported(true);
       setHasNativeSupport(true);
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+
       const recognition = recognitionRef.current;
       recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.lang = "en-US";
 
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
-      
+
       recognition.onresult = (event: any) => {
-        let finalTranscript = '';
+        let finalTranscript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
             finalTranscript += event.results[i][0].transcript;
@@ -80,9 +84,9 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
       try {
         recognitionRef.current.start();
       } catch (error) {
-        console.error('Failed to start speech recognition:', error);
-        setError('Failed to start speech recognition');
-        options.onError('Failed to start speech recognition');
+        console.error("Failed to start speech recognition:", error);
+        setError("Failed to start speech recognition");
+        options.onError("Failed to start speech recognition");
       }
     }
   }, [options]);
@@ -90,20 +94,20 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
   // MediaRecorder fallback implementation
   const startMediaRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100
-        } 
+          sampleRate: 44100,
+        },
       });
-      
+
       streamRef.current = stream;
       audioChunksRef.current = [];
 
       const recordingConfig = speechRecognitionService.getRecordingConfig();
       const mediaRecorder = new MediaRecorder(stream, recordingConfig);
-      
+
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -113,19 +117,21 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { 
-          type: mediaRecorder.mimeType 
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType,
         });
-        
+
         setIsListening(false);
         setIsProcessing(true);
         options.onProcessing?.(true);
-        
+
         try {
-          const result = await speechRecognitionService.transcribeAudio(audioBlob);
+          const result =
+            await speechRecognitionService.transcribeAudio(audioBlob);
           options.onResult(result.transcript);
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Transcription failed';
+          const errorMsg =
+            error instanceof Error ? error.message : "Transcription failed";
           setError(errorMsg);
           options.onError(errorMsg);
         } finally {
@@ -135,9 +141,9 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
       };
 
       mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
-        setError('Recording failed');
-        options.onError('Recording failed');
+        console.error("MediaRecorder error:", event);
+        setError("Recording failed");
+        options.onError("Recording failed");
         setIsListening(false);
       };
 
@@ -146,25 +152,24 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
 
       // Auto-stop after 30 seconds
       setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
+        if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
       }, 30000);
-
     } catch (error) {
-      console.error('Failed to start recording:', error);
-      setError('Microphone access denied');
-      options.onError('Microphone access denied');
+      console.error("Failed to start recording:", error);
+      setError("Microphone access denied");
+      options.onError("Microphone access denied");
     }
   }, [options]);
 
   const startListening = useCallback(async () => {
     setError(null);
-    
+
     if (!hasNativeSupport) {
       const supported = initializeSpeechRecognition();
       if (!supported) {
-        const errorMsg = 'Speech recognition not supported in this browser';
+        const errorMsg = "Speech recognition not supported in this browser";
         setError(errorMsg);
         options.onError(errorMsg);
         return;
@@ -175,19 +180,26 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
     if (recognitionRef.current) {
       await startWebSpeechRecognition();
     }
-  }, [hasNativeSupport, initializeSpeechRecognition, startWebSpeechRecognition]);
+  }, [
+    hasNativeSupport,
+    initializeSpeechRecognition,
+    startWebSpeechRecognition,
+  ]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
     }
-    
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
       mediaRecorderRef.current.stop();
     }
 
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
 
@@ -206,6 +218,6 @@ export const useSpeechToText = (options: SpeechToTextOptions): SpeechToTextRetur
     isProcessing,
     startListening,
     stopListening,
-    error
+    error,
   };
 };
