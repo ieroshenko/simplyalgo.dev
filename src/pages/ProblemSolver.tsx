@@ -569,10 +569,10 @@ const ProblemSolver = () => {
                     </TabsList>
                   </div>
 
-                  <div className="flex-1 min-h-0 overflow-y-auto">
+                  <div className="flex-1 min-h-0 overflow-hidden">
                     <TabsContent
                       value="question"
-                      className="p-6 space-y-6 m-0"
+                      className="p-6 space-y-6 m-0 h-full overflow-y-auto"
                     >
                       <div>
                         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -629,7 +629,7 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="solution"
-                      className="p-6 space-y-6 m-0"
+                      className="p-6 space-y-6 m-0 h-full min-h-0 overflow-y-auto"
                     >
                       {solutions.length === 0 ? (
                         <div className="text-sm text-muted-foreground">
@@ -675,12 +675,13 @@ const ProblemSolver = () => {
                               </div>
                               <div className="border rounded overflow-hidden">
                                 <Editor
-                                  height="400px"
+                                  height="50vh"
                                   defaultLanguage="python"
                                   value={sol.code}
                                   theme="light"
                                   options={{
                                     readOnly: true,
+                                    automaticLayout: true,
                                     minimap: { enabled: false },
                                     lineNumbers: "off",
                                     folding: false,
@@ -688,6 +689,7 @@ const ProblemSolver = () => {
                                     renderLineHighlight: "none",
                                     fontSize: 15,
                                     wordWrap: "on",
+                                    automaticLayout: true
                                   }}
                                 />
                               </div>
@@ -717,7 +719,7 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="submissions"
-                      className="p-6 m-0"
+                      className="p-6 m-0 h-full overflow-y-auto"
                     >
                       <div>
                         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -842,7 +844,7 @@ const ProblemSolver = () => {
 
                     <TabsContent
                       value="notes"
-                      className="p-6 m-0 flex flex-col"
+                      className="p-6 m-0 h-full overflow-y-auto flex flex-col"
                     >
                       <Notes problemId={problemId} ref={notesRef} />
                     </TabsContent>

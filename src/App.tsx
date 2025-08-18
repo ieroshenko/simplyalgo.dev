@@ -7,7 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import LeetCodeArena from "./pages/LeetCodeArena";
-import ProblemSolver from "./pages/ProblemSolver";
+import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import DataStructureDetail from "./components/DataStructureDetail";
@@ -72,7 +72,7 @@ const App = () => (
               path="/problem/:problemId"
               element={
                 <ProtectedRoute>
-                  <ProblemSolver />
+                  <ProblemSolverNew />
                 </ProtectedRoute>
               }
             />
