@@ -24,25 +24,73 @@ export interface NotesHandle {
   loadNotes: () => Promise<void>;
 }
 
+interface CachedNotes {
+  content: string;
+  lastSaved: string;
+  timestamp: number;
+  version: number;
+}
+
 const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
   const [content, setContent] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start as false since we load from cache first
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isBackgroundSync, setIsBackgroundSync] = useState(false);
   const { user } = useAuth();
 
-  const characterCount = content.length;
-  const wordCount =
-    content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
-  const maxCharacters = 5000;
+  // Cache management functions
+  const getCacheKey = useCallback(() => {
+    return `notes_${user?.id}_${problemId}`;
+  }, [user?.id, problemId]);
+
+  const loadFromCache = useCallback((): CachedNotes | null => {
+    try {
+      const cached = localStorage.getItem(getCacheKey());
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.warn("Failed to load notes from cache:", error);
+      return null;
+    }
+  }, [getCacheKey]);
+
+  const saveToCache = useCallback((notes: CachedNotes) => {
+    try {
+      localStorage.setItem(getCacheKey(), JSON.stringify(notes));
+    } catch (error) {
+      console.warn("Failed to save notes to cache:", error);
+    }
+  }, [getCacheKey]);
 
   const loadNotes = useCallback(async () => {
-    if (!user || !problemId) {
-      setIsLoading(false);
+    if (!user || !problemId) return;
+
+    // 1. Load from cache immediately for instant display
+    const cached = loadFromCache();
+    if (cached) {
+      setContent(cached.content);
+      setLastSaved(new Date(cached.lastSaved));
+      setHasUnsavedChanges(false);
+      console.log("📝 Loaded notes from cache");
+    }
+
+    // 2. Check if we need to sync from server
+    const shouldSync = !cached || 
+      (Date.now() - cached.timestamp > 5 * 60 * 1000) || // 5 minutes old
+      cached.version === 0; // First time or corrupted cache
+
+    if (!shouldSync) {
+      console.log("📝 Using cached notes, skipping server sync");
       return;
     }
-    setIsLoading(true);
+
+    // 3. Background sync from Supabase
+    setIsBackgroundSync(true);
+    if (!cached) {
+      setIsLoading(true); // Only show loading if no cache
+    }
+
     try {
       const { data, error } = (await supabase
         .from("notes")
@@ -56,17 +104,57 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
       }
 
       if (data) {
-        setContent(data.content || "");
-        setLastSaved(new Date(data.updated_at));
-        setHasUnsavedChanges(false);
+        const serverLastSaved = new Date(data.updated_at || data.created_at);
+        const cachedLastSaved = cached ? new Date(cached.lastSaved) : null;
+
+        // Only update if server version is newer
+        if (!cachedLastSaved || serverLastSaved > cachedLastSaved) {
+          const newContent = data.content || "";
+          setContent(newContent);
+          setLastSaved(serverLastSaved);
+          setHasUnsavedChanges(false);
+
+          // Update cache with server data
+          saveToCache({
+            content: newContent,
+            lastSaved: serverLastSaved.toISOString(),
+            timestamp: Date.now(),
+            version: (cached?.version || 0) + 1
+          });
+
+          console.log("📝 Synced newer notes from server");
+        } else {
+          console.log("📝 Cache is up-to-date, no sync needed");
+        }
+      } else if (!cached) {
+        // No server data and no cache - initialize empty
+        const emptyNotes = {
+          content: "",
+          lastSaved: new Date().toISOString(),
+          timestamp: Date.now(),
+          version: 1
+        };
+        saveToCache(emptyNotes);
+        console.log("📝 No notes found, initialized empty");
       }
     } catch (error) {
-      console.error("Error loading notes:", error);
-      toast.error("Failed to load notes");
+      console.error("Error syncing notes:", error);
+      if (!cached) {
+        toast.error("Failed to load notes");
+      } else {
+        console.log("📝 Using cached notes due to sync error");
+      }
     } finally {
       setIsLoading(false);
+      setIsBackgroundSync(false);
     }
-  }, [user, problemId]);
+  }, [user, problemId, loadFromCache, saveToCache]);
+
+  const characterCount = content.length;
+  const wordCount =
+    content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
+  const maxCharacters = 5000;
+
 
   useImperativeHandle(ref, () => ({
     loadNotes,
@@ -76,6 +164,16 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     async (noteContent: string) => {
       if (!user || !problemId) return;
 
+      // Update cache immediately for instant feedback
+      const now = new Date();
+      const cached = loadFromCache();
+      saveToCache({
+        content: noteContent,
+        lastSaved: now.toISOString(),
+        timestamp: Date.now(),
+        version: (cached?.version || 0) + 1
+      });
+
       setIsSaving(true);
       try {
         const { error } = (await supabase.from("notes").upsert(
@@ -83,7 +181,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
             user_id: user.id,
             problem_id: problemId,
             content: noteContent,
-            updated_at: new Date().toISOString(),
+            updated_at: now.toISOString(),
           },
           {
             onConflict: "user_id, problem_id",
@@ -92,17 +190,24 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
 
         if (error) throw error;
 
-        setLastSaved(new Date());
+        setLastSaved(now);
         setHasUnsavedChanges(false);
         console.log("Notes saved successfully");
       } catch (error) {
         console.error("Error saving notes:", error);
         toast.error("Failed to save notes");
+        
+        // Revert optimistic update on error
+        const revertedCache = loadFromCache();
+        if (revertedCache && revertedCache.content !== noteContent) {
+          setContent(revertedCache.content);
+          setLastSaved(new Date(revertedCache.lastSaved));
+        }
       } finally {
         setIsSaving(false);
       }
     },
-    [user, problemId],
+    [user, problemId, loadFromCache, saveToCache],
   );
 
   const debouncedSave = useCallback(
@@ -119,6 +224,16 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     if (newContent.length <= maxCharacters) {
       setContent(newContent);
       setHasUnsavedChanges(true);
+      
+      // Update local cache immediately for persistence across tab switches
+      const cached = loadFromCache();
+      saveToCache({
+        content: newContent,
+        lastSaved: cached?.lastSaved || new Date().toISOString(),
+        timestamp: Date.now(),
+        version: (cached?.version || 0) + 1
+      });
+      
       debouncedSave(newContent);
     }
   };
@@ -143,9 +258,10 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     }
   };
 
+  // Initialize notes on mount or when user/problemId changes
   useEffect(() => {
     loadNotes();
-  }, [loadNotes]);
+  }, [user?.id, problemId]); // Don't depend on loadNotes to avoid unnecessary re-runs
 
   useEffect(() => {
     return () => {
@@ -200,6 +316,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
               <FileCheck className="w-3 h-3 mr-1" />
               <span className="text-xs font-medium">
                 Saved {lastSaved.toLocaleTimeString()}
+                {isBackgroundSync && " • Syncing..."}
               </span>
             </div>
           )}
