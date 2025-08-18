@@ -15,6 +15,8 @@ export interface Problem {
     output: string;
     explanation?: string;
   }>;
+  // Database: jsonb[] of strings
+  constraints: string[];
   testCases: Array<{
     input: string;
     expected: string;
@@ -22,6 +24,9 @@ export interface Problem {
   likes?: number;
   dislikes?: number;
   acceptanceRate?: number;
+  // New editorial fields
+  recommendedTimeComplexity?: string;
+  recommendedSpaceComplexity?: string;
 }
 
 export interface Category {
@@ -90,6 +95,7 @@ export const useProblems = (userId?: string) => {
           description: problem.description,
           functionSignature: problem.function_signature,
           examples: problem.examples || [],
+          constraints: problem.constraints || [],
           testCases: problem.test_cases.map((tc: any) => ({
             input: tc.input,
             expected: tc.expected_output,
@@ -97,6 +103,8 @@ export const useProblems = (userId?: string) => {
           likes: problem.likes,
           dislikes: problem.dislikes,
           acceptanceRate: problem.acceptance_rate,
+          recommendedTimeComplexity: problem.recommended_time_complexity || undefined,
+          recommendedSpaceComplexity: problem.recommended_space_complexity || undefined,
         };
       });
 
