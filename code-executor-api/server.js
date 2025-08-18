@@ -57,6 +57,7 @@ const SMART_COMPARISON_PROBLEMS = new Set([
   "3sum",
   "combination-sum",
   "generate-parentheses",
+  "top-k-frequent-elements",
   // Add more problems that return arrays where order doesn't matter
 ]);
 

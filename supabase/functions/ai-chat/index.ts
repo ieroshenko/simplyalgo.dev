@@ -686,6 +686,8 @@ async function maybeGenerateDiagram(
 
   const rfPrompt = `Create a React Flow diagram that visualizes the algorithm step-by-step with meaningful progression.
 
+CRITICAL: Output ONLY valid JSON. Start with { and end with }. No markdown fences, no explanation.
+
 OUTPUT FORMAT (copy structure exactly):
 {
   "reactflow": {
@@ -732,7 +734,7 @@ Create an educational algorithm visualization:`;
     let raw = "";
     try {
       raw = (
-        await llmJson(rfPrompt, { temperature: 0.2, maxTokens: 700 })
+        await llmJson(rfPrompt, { temperature: 0.2, maxTokens: 1200 })
       ).trim();
       console.log(
         "[React Flow] Raw AI response:",
@@ -742,7 +744,7 @@ Create an educational algorithm visualization:`;
       console.log("[React Flow] llmJson failed, trying llmText:", e);
       try {
         raw = (
-          await llmText(rfPrompt, { temperature: 0.2, maxTokens: 700 })
+          await llmText(rfPrompt, { temperature: 0.2, maxTokens: 1200 })
         ).trim();
         console.log(
           "[React Flow] Raw AI response from llmText:",
@@ -783,20 +785,22 @@ Create an educational algorithm visualization:`;
 
       const parsed = JSON.parse(cleanJson);
       console.log("[React Flow] Parsed JSON:", JSON.stringify(parsed, null, 2));
-      const rf = parsed && parsed.reactflow ? parsed.reactflow : undefined;
-      if (!rf) {
-        console.log("[React Flow] Missing reactflow key in parsed JSON");
-        return { ok: false, reason: "Missing reactflow key in JSON" };
+      // Accept either { reactflow: { nodes, edges } } or a top-level { nodes, edges }
+      const rfCandidate = (parsed && (parsed.reactflow ?? parsed)) as unknown;
+      const rf = rfCandidate as FlowGraph;
+      if (!rf || typeof rf !== "object") {
+        console.log("[React Flow] No suitable reactflow object found in JSON");
+        return { ok: false, reason: "No reactflow object in JSON" };
       }
       console.log(
-        "[React Flow] Found reactflow data:",
+        "[React Flow] Candidate reactflow data:",
         JSON.stringify(rf, null, 2),
       );
       if (validateFlowGraph(rf)) {
         console.log("[React Flow] Validation passed, returning diagram");
         return { ok: true, diagram: { engine: "reactflow", graph: rf } };
       }
-      console.log("[React Flow] Schema validation failed");
+      console.log("[React Flow] Schema validation failed for candidate");
       return { ok: false, reason: "Schema validation failed" };
     } catch (parseErr) {
       console.log("[React Flow] JSON parse error:", parseErr, "Raw:", raw);

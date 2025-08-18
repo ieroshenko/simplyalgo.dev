@@ -4,6 +4,8 @@ import {
   UserAttempt,
   SupabaseQueryResult,
 } from "@/types/supabase-common";
+import { TestResult } from "@/types";
+import { Json } from "@/integrations/supabase/types";
 
 export class UserAttemptsService {
   // Get the latest attempt for a user and problem
@@ -88,7 +90,7 @@ export class UserAttemptsService {
     userId: string,
     problemId: string,
     code: string,
-    testResults?: Record<string, unknown>[],
+    testResults?: TestResult[],
   ): Promise<UserAttempt | null> {
     const { data, error } = (await supabase
       .from("user_problem_attempts")
@@ -97,7 +99,7 @@ export class UserAttemptsService {
         problem_id: problemId,
         code,
         status: "pending",
-        test_results: testResults || [],
+        test_results: testResults ? (testResults as unknown as Json) : [],
       })
       .select()
       .single()) as SupabaseQueryResult<UserAttempt>;
@@ -115,7 +117,7 @@ export class UserAttemptsService {
     userId: string,
     problemId: string,
     code: string,
-    testResults: Record<string, unknown>[],
+    testResults: TestResult[],
   ): Promise<UserAttempt | null> {
     const { data, error } = (await supabase
       .from("user_problem_attempts")
@@ -124,7 +126,7 @@ export class UserAttemptsService {
         problem_id: problemId,
         code,
         status: "passed",
-        test_results: testResults,
+        test_results: testResults as unknown as Json,
       })
       .select()
       .single()) as SupabaseQueryResult<UserAttempt>;

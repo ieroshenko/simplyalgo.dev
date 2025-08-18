@@ -586,6 +586,37 @@ const ProblemSolverNew = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Constraints */}
+                      <div>
+                        <h3 className="text-md font-semibold text-foreground mb-3">
+                          Constraints
+                        </h3>
+                        {problem.constraints && problem.constraints.length > 0 ? (
+                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                            {problem.constraints.map((c, idx) => (
+                              <li key={idx}>{c}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">—</div>
+                        )}
+                      </div>
+
+                      {/* Recommended Complexity */}
+                      <div>
+                        <h3 className="text-md font-semibold text-foreground mb-3">
+                          Recommended Time & Space Complexity
+                        </h3>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          <li>
+                            • Time: {problem.recommendedTimeComplexity || "—"}
+                          </li>
+                          <li>
+                            • Space: {problem.recommendedSpaceComplexity || "—"}
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   </TabPanel>
 
