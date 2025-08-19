@@ -7,6 +7,8 @@ import {
   Zap,
   Send,
   FileCheck,
+  GraduationCap,
+  Brain,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
@@ -25,6 +27,11 @@ interface CodeEditorProps {
   onSubmit: () => void;
   isRunning: boolean;
   editorRef?: React.MutableRefObject<any>;
+  // Coach Mode props
+  onStartCoaching?: () => void;
+  onStopCoaching?: () => void;
+  isCoachModeActive?: boolean;
+  isCoachingLoading?: boolean;
 }
 
 const CodeEditor = ({
@@ -35,6 +42,10 @@ const CodeEditor = ({
   onSubmit,
   isRunning,
   editorRef: externalEditorRef,
+  onStartCoaching,
+  onStopCoaching,
+  isCoachModeActive = false,
+  isCoachingLoading = false,
 }: CodeEditorProps) => {
   const [code, setCode] = useState(initialCode);
   const [vimMode, setVimMode] = useState(() => {
@@ -175,6 +186,38 @@ const CodeEditor = ({
             vimMode={vimMode}
             onVimModeChange={handleVimModeToggle}
           />
+          
+          {/* Coach Mode Button */}
+          {onStartCoaching && onStopCoaching && (
+            <Button
+              variant={isCoachModeActive ? "default" : "outline"}
+              size="sm"
+              onClick={isCoachModeActive ? onStopCoaching : onStartCoaching}
+              disabled={isCoachingLoading}
+              className={isCoachModeActive 
+                ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg"
+                : "bg-purple-50 hover:bg-purple-100 dark:bg-purple-950 dark:hover:bg-purple-900 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
+              }
+            >
+              {isCoachingLoading ? (
+                <>
+                  <div className="w-4 h-4 mr-1 border border-current/30 border-t-current rounded-full animate-spin" />
+                  Starting...
+                </>
+              ) : isCoachModeActive ? (
+                <>
+                  <Brain className="w-4 h-4 mr-1" />
+                  Stop Coach
+                </>
+              ) : (
+                <>
+                  <GraduationCap className="w-4 h-4 mr-1" />
+                  Coach Mode
+                </>
+              )}
+            </Button>
+          )}
+          
           <Button
             variant="outline"
             size="sm"

@@ -31,6 +31,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Timer from "@/components/Timer";
 import { supabase } from "@/integrations/supabase/client";
+import { useCoaching } from "@/hooks/useCoaching";
+import CoachBubble from "@/components/coaching/CoachBubble";
+import HighlightOverlay from "@/components/coaching/HighlightOverlay";
+import SimpleOverlay from "@/components/coaching/SimpleOverlay";
+import FeedbackOverlay from "@/components/coaching/FeedbackOverlay";
+import CoachProgress from "@/components/coaching/CoachProgress";
 import Editor from "@monaco-editor/react";
 import {
   Dialog,
@@ -113,6 +119,8 @@ const ProblemSolverNew = () => {
       oldDecorations: string[],
       newDecorations: unknown[],
     ) => string[];
+    getScrollTop: () => number;
+    getVisibleRanges: () => unknown[];
   } | null>(null);
 
   // Panel visibility state
@@ -191,6 +199,22 @@ const ProblemSolverNew = () => {
   } = useSubmissions(user?.id, problem?.id);
 
   const solutions = problem ? pythonSolutions[problem.id] || [] : [];
+
+  // Coaching system integration
+  const {
+    coachingState,
+    startCoaching,
+    stopCoaching,
+    submitResponse,
+    cancelInput,
+    skipStep,
+    getElapsedTime,
+  } = useCoaching({
+    problemId: problemId || "",
+    userId: user?.id || "",
+    problemDescription: problem?.description || "",
+    editorRef: codeEditorRef,
+  });
 
   // Track which submission is expanded
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
@@ -857,6 +881,10 @@ const ProblemSolverNew = () => {
                   onRun={handleRun}
                   onSubmit={handleSubmit}
                   isRunning={isRunning}
+                  onStartCoaching={() => startCoaching("beginner")}
+                  onStopCoaching={stopCoaching}
+                  isCoachModeActive={coachingState.isCoachModeActive}
+                  isCoachingLoading={coachingState.isWaitingForResponse}
                 />
               </ResizablePanel>
               {showBottomPanel && (
@@ -1053,6 +1081,33 @@ const ProblemSolverNew = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Coaching Overlays */}
+      {coachingState.isCoachModeActive && coachingState.session && (
+        <>
+          {/* Progress and question now integrated into SimpleOverlay below */}
+          
+          {/* Enhanced Coaching Overlay */}
+          {coachingState.showInputOverlay && coachingState.inputPosition && coachingState.session && (
+            <SimpleOverlay
+              isVisible={true}
+              position={coachingState.inputPosition}
+              placeholder="Type your answer here..."
+              onSubmit={submitResponse}
+              onCancel={cancelInput}
+              isValidating={coachingState.isValidating}
+              maxLength={500}
+              question={coachingState.session.steps[coachingState.session.currentStep]?.question}
+              hint={coachingState.session.steps[coachingState.session.currentStep]?.hint}
+              stepInfo={{
+                current: coachingState.session.currentStep + 1,
+                total: coachingState.session.totalSteps
+              }}
+              elapsedTime={getElapsedTime()}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };

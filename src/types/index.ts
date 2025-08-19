@@ -116,3 +116,56 @@ export interface Category {
   total: number;
   color: string;
 }
+
+// AI Coaching System Types
+export interface CoachHighlightArea {
+  startLine: number;
+  endLine: number;
+  startColumn?: number;
+  endColumn?: number;
+}
+
+export interface CoachStep {
+  id: string;
+  type?: "question" | "code_prompt" | "comment_prompt";
+  question: string;
+  hint?: string; // AI generates single hint
+  expectedKeywords?: string[]; // AI generates this
+  expectedAnswer?: string;
+  highlightArea?: CoachHighlightArea;
+  userResponse?: string;
+  isCompleted: boolean;
+  feedback?: string;
+  hints?: string[];
+  validationCriteria?: string;
+}
+
+export interface CoachSession {
+  id: string;
+  problemId: string;
+  userId: string;
+  isActive: boolean;
+  currentStep: number;
+  steps: CoachStep[];
+  startedAt: Date;
+  completedAt?: Date;
+  totalSteps: number;
+  progressPercent: number;
+  difficulty: "beginner" | "intermediate" | "advanced";
+}
+
+export interface CoachingState {
+  session: CoachSession | null;
+  isCoachModeActive: boolean;
+  currentHighlight: CoachHighlightArea | null;
+  showInputOverlay: boolean;
+  inputPosition: { x: number; y: number } | null;
+  isWaitingForResponse: boolean;
+  isValidating: boolean;
+  feedback: {
+    show: boolean;
+    type: "success" | "error" | "hint" | null;
+    message: string;
+    showConfetti: boolean;
+  };
+}
