@@ -26,8 +26,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { CanvasContainer } from "@/components/canvas";
-import { supabase } from "@/integrations/supabase/client";
-// Removed complex visualization import - using direct component now
+import { hasInteractiveDemo } from "@/components/visualizations/registry";
 
 interface AIChatProps {
   problemId: string;
@@ -507,32 +506,28 @@ const AIChat = ({
                             );
                           })()}
 
-                        {/* Action: Interactive Demo button only when a diagram exists */}
-                        {message.role === "assistant" &&
-                          Boolean(
-                            (message as unknown as { diagram?: unknown })
-                              .diagram,
-                          ) && (
-                            <div className="mt-3">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                  onClick={() =>
-                                    handleGenerateComponent(message.content)
-                                  }
-                                  title="Generate an interactive component demo"
-                                >
-                                  <Sparkles className="w-4 h-4" />
-                                  <span className="text-sm">
-                                    Interactive Demo
-                                  </span>
-                                </Button>
-                              </div>
+                        {/* Action: Interactive Demo button - show only for problems with a registered interactive demo AND message has a diagram */}
+                        {message.role === "assistant" && hasInteractiveDemo(problem?.id) && Boolean((message as unknown as { diagram?: unknown }).diagram) && (
+                          <div className="mt-3">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                onClick={() =>
+                                  handleGenerateComponent(message.content)
+                                }
+                                title="Generate an interactive component demo"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                <span className="text-sm">
+                                  Interactive Demo
+                                </span>
+                              </Button>
                             </div>
-                          )}
+                          </div>
+                        )}
 
                         {/* Code snippets: render whenever present on assistant messages */}
                         {message.role === "assistant" &&
@@ -728,6 +723,7 @@ const AIChat = ({
         isOpen={isCanvasOpen}
         onClose={() => setIsCanvasOpen(false)}
         title={canvasTitle}
+        problemId={problem?.id}
       />
     </Card>
   );
