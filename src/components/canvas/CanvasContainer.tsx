@@ -1,17 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import CanvasModal from "./CanvasModal";
-import MergeSortedListsVisualization from "@/components/visualizations/MergeSortedListsVisualization";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Code2, Eye, Download } from "lucide-react";
+import { getDemoComponent } from "@/components/visualizations/registry";
 
 interface CanvasContainerProps {
   initialCode?: string;
   title?: string;
   isOpen: boolean;
   onClose: () => void;
+  problemId?: string;
 }
 
 export default function CanvasContainer({
@@ -19,13 +15,24 @@ export default function CanvasContainer({
   title = "Interactive Component",
   isOpen,
   onClose,
+  problemId,
 }: CanvasContainerProps) {
   return (
     <CanvasModal isOpen={isOpen} onClose={onClose} title={title}>
       {/* Direct component rendering - no compilation needed */}
       <div className="h-full overflow-auto">
-        <MergeSortedListsVisualization />
+        {(() => {
+          const Demo = getDemoComponent(problemId);
+          if (Demo) return <Demo />;
+          // Placeholder if no registered demo exists
+          return (
+            <div className="w-full h-full flex items-center justify-center p-6 text-sm text-muted-foreground">
+              <>No interactive demo for this problem yet — coming soon.</>
+            </div>
+          );
+        })()}
       </div>
     </CanvasModal>
   );
 }
+
