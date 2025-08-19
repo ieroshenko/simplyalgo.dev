@@ -90,14 +90,21 @@ const ProblemTable = ({
     }
   };
 
-  const filteredProblems = problems.filter((problem) => {
-    const matchesCategory =
-      !filteredCategory || problem.category === filteredCategory;
-    const matchesSearch =
-      !searchQuery ||
-      problem.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredProblems = problems
+    .filter((problem) => {
+      const matchesCategory =
+        !filteredCategory || problem.category === filteredCategory;
+      const matchesSearch =
+        !searchQuery ||
+        problem.title.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      // Sort starred problems first
+      if (a.isStarred && !b.isStarred) return -1;
+      if (!a.isStarred && b.isStarred) return 1;
+      return 0;
+    });
 
   return (
     <Card className="overflow-hidden">

@@ -108,6 +108,8 @@ const ProblemSolverNew = () => {
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [activeTestCase, setActiveTestCase] = useState(0);
+  const [testPanelSize, setTestPanelSize] = useState(100);
   const notesRef = useRef<NotesHandle>(null);
   const codeEditorRef = useRef<{
     getValue: () => string;
@@ -429,6 +431,7 @@ const ProblemSolverNew = () => {
     if (!user?.id) return;
     setIsRunning(true);
     setTestResults([]);
+    setActiveTestCase(0); // Reset to first test case
 
     try {
       await UserAttemptsService.saveDraft(user.id, problem.id, code);
@@ -439,6 +442,7 @@ const ProblemSolverNew = () => {
         problemId: problem.id,
       });
       setTestResults(response.results);
+      setTestPanelSize(150); // Expand test panel when results are received
 
       const passedCount = response.results.filter((r) => r.passed).length;
       const totalCount = response.results.length;
@@ -890,7 +894,7 @@ const ProblemSolverNew = () => {
               {showBottomPanel && (
                 <>
                   <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={35} minSize={20}>
+                  <ResizablePanel defaultSize={testPanelSize} minSize={20}>
                     <div className="h-full bg-background border-t border-border flex flex-col">
                       {testResults.length === 0 ? (
                         <div className="p-4">
@@ -911,10 +915,15 @@ const ProblemSolverNew = () => {
                               {testResults.map((result, index) => (
                                 <button
                                   key={index}
-                                  className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded ${
-                                    result.passed
-                                      ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                                      : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                                  onClick={() => setActiveTestCase(index)}
+                                  className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ${
+                                    activeTestCase === index
+                                      ? result.passed
+                                        ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
+                                        : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
+                                      : result.passed
+                                        ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20"
+                                        : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20"
                                   }`}
                                 >
                                   {result.passed ? (
@@ -928,96 +937,93 @@ const ProblemSolverNew = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 overflow-y-auto px-4 pb-4">
-                            <div className="space-y-4">
-                              {testResults.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className={`p-4 rounded-lg border-2 ${
-                                    result.passed
-                                      ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
-                                      : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center space-x-3">
-                                      {result.passed ? (
-                                        <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
-                                      ) : (
-                                        <X className="w-5 h-5 text-red-600 dark:text-red-400" />
-                                      )}
-                                      <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                        Test Case {index + 1}
-                                      </span>
-                                      <Badge
-                                        className={`text-xs font-semibold px-3 py-1 ${
-                                          result.passed
-                                            ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
-                                            : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
-                                        }`}
-                                      >
-                                        {result.passed ? "✅ PASSED" : "❌ FAILED"}
-                                      </Badge>
-                                    </div>
-                                    {result.time && (
-                                      <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                                        <Clock className="w-4 h-4" />
-                                        <span>{result.time}</span>
-                                      </div>
+                          <div className="flex-1 px-4 pb-4">
+                            {testResults[activeTestCase] && (
+                              <div
+                                className={`p-4 rounded-lg border-2 ${
+                                  testResults[activeTestCase].passed
+                                    ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                                    : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center space-x-3">
+                                    {testResults[activeTestCase].passed ? (
+                                      <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
+                                    ) : (
+                                      <X className="w-5 h-5 text-red-600 dark:text-red-400" />
                                     )}
+                                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                      Test Case {activeTestCase + 1}
+                                    </span>
+                                    <Badge
+                                      className={`text-xs font-semibold px-3 py-1 ${
+                                        testResults[activeTestCase].passed
+                                          ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                                          : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
+                                      }`}
+                                    >
+                                      {testResults[activeTestCase].passed ? "✅ PASSED" : "❌ FAILED"}
+                                    </Badge>
+                                  </div>
+                                  {testResults[activeTestCase].time && (
+                                    <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                                      <Clock className="w-4 h-4" />
+                                      <span>{testResults[activeTestCase].time}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="space-y-4">
+                                  <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
+                                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                      Input:
+                                    </div>
+                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
+                                      {renderValue(testResults[activeTestCase].input)}
+                                    </pre>
                                   </div>
 
-                                  <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
                                       <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                        Input:
+                                        Expected Output:
                                       </div>
                                       <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
-                                        {renderValue(result.input)}
+                                        {renderValue(testResults[activeTestCase].expected)}
                                       </pre>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                        <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                          Expected Output:
-                                        </div>
-                                        <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
-                                          {renderValue(result.expected)}
-                                        </pre>
+                                    <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
+                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                        Your Output:
                                       </div>
-
-                                      <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                        <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                          Your Output:
-                                        </div>
-                                        <pre
-                                          className={`text-sm font-mono whitespace-pre overflow-x-auto ${
-                                            result.passed
-                                              ? "text-green-700 dark:text-green-300"
-                                              : "text-red-700 dark:text-red-300"
-                                          }`}
-                                        >
-                                          {renderValue(result.actual) ||
-                                            "No output"}
-                                        </pre>
-                                      </div>
+                                      <pre
+                                        className={`text-sm font-mono whitespace-pre overflow-x-auto ${
+                                          testResults[activeTestCase].passed
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-red-700 dark:text-red-300"
+                                        }`}
+                                      >
+                                        {renderValue(testResults[activeTestCase].actual) ||
+                                          "No output"}
+                                      </pre>
                                     </div>
-
-                                    {result.stderr && (
-                                      <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-800">
-                                        <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
-                                          Error:
-                                        </div>
-                                        <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
-                                          {result.stderr}
-                                        </pre>
-                                      </div>
-                                    )}
                                   </div>
+
+                                  {testResults[activeTestCase].stderr && (
+                                    <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-800">
+                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
+                                        Error:
+                                      </div>
+                                      <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+                                        {testResults[activeTestCase].stderr}
+                                      </pre>
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
