@@ -116,10 +116,9 @@ interface ChatMessage {
 
 interface RequestBody {
   message?: string;
-  problemDescription?: string;
   conversationHistory?: ChatMessage[];
   // Optional action for smart insertion or clearing chat
-  action?: "insert_snippet" | "clear_chat" | "generate_visualization";
+  action?: "insert_snippet" | "clear_chat" | "generate_visualization" | "generate_coaching_session" | "validate_coaching_response";
   // Optional explicit diagram request
   diagram?: boolean;
   // Preferred engines order for diagram generation
@@ -148,6 +147,12 @@ interface RequestBody {
     difficulty: string;
     functionSignature?: string;
   };
+  // For coaching actions
+  problemId?: string;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+  problemDescription?: string;
+  stepId?: string;
+  userResponse?: string;
 }
 
 interface AIResponse {
@@ -224,7 +229,7 @@ function buildResponsesRequest(
   prompt: string,
   opts: { maxTokens?: number; responseFormat?: "json_object" | undefined },
 ): ResponsesApiRequest {
-  const req: ResponsesApiRequest = {
+  const req: any = {
     model,
     input: prompt,
     max_output_tokens:
@@ -330,19 +335,25 @@ async function llmText(
       `[ai-chat] All Responses API attempts failed; falling back to Chat Completions.`,
     );
   }
-  const chatModel = useResponsesApi ? "gpt-4o-mini" : model;
+  const chatModel = useResponsesApi ? "gpt-5-mini" : model;
   console.log(
     `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? "yes" : "no"})`,
   );
-  const chat = await openai.chat.completions.create({
+  const chatRequestParams: any = {
     model: chatModel,
     messages: [{ role: "user", content: prompt }],
-    temperature: opts.temperature ?? 0.7,
-    max_tokens: opts.maxTokens ?? 500,
+    max_completion_tokens: opts.maxTokens ?? 500,
     response_format: opts.responseFormat
       ? ({ type: opts.responseFormat } as { type: "json_object" })
       : undefined,
-  } as unknown as { choices: Array<{ message?: { content?: string } }> });
+  };
+  
+  // Only add temperature for non-GPT-5 models
+  if (!chatModel.startsWith("gpt-5")) {
+    chatRequestParams.temperature = opts.temperature ?? 0.7;
+  }
+  
+  const chat = await openai.chat.completions.create(chatRequestParams as unknown as { choices: Array<{ message?: { content?: string } }> });
   return chat.choices[0]?.message?.content || "";
 }
 
@@ -364,12 +375,12 @@ async function llmJsonFast(
   prompt: string,
   opts?: { maxTokens?: number },
 ): Promise<string> {
-  // Prefer Responses API for gpt-5-mini, fall back to Chat Completions with gpt-4o-mini
+  // Prefer Responses API for gpt-5-mini, fall back to Chat Completions with gpt-5-mini
   try {
     console.log(
       "[ai-chat] llmJsonFast using Responses API with model=gpt-5-mini",
     );
-    const req: Record<string, unknown> = {
+    const req: any = {
       model: "gpt-5-mini",
       input: prompt,
       max_output_tokens:
@@ -428,14 +439,13 @@ async function llmJsonFast(
     return text;
   } catch (err) {
     console.warn(
-      "[ai-chat] llmJsonFast gpt-5-mini Responses failed; falling back to gpt-4o-mini Chat. Error:",
+      "[ai-chat] llmJsonFast gpt-5-mini Responses failed; falling back to gpt-5-mini Chat. Error:",
       err,
     );
     const chat = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.0,
-      max_tokens: opts?.maxTokens ?? 600,
+      max_completion_tokens: opts?.maxTokens ?? 600,
       response_format: { type: "json_object" } as { type: "json_object" },
     } as unknown as { choices: Array<{ message?: { content?: string } }> });
     return chat.choices[0]?.message?.content || "";
@@ -500,7 +510,7 @@ ${problemDescription}
 
 ${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
 
-${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+${currentCode ? `CURRENT CODE IN EDITOR:\n${"```"}python\n${currentCode}\n${"```"}\n` : ""}
 
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
@@ -530,10 +540,11 @@ Output format:
 - Lead with a guiding question or brief explanation
 - Provide helpful hints as needed
 - If code is warranted and allowCode=true, include properly formatted code:
-\`\`\`python
+${"```"}python
 # Clear, educational code example
 # With proper indentation and comments
-\`\`\`
+${"```"}
+
 `;
 
   const systemGuidance =
@@ -786,7 +797,7 @@ Create an educational algorithm visualization:`;
       const parsed = JSON.parse(cleanJson);
       console.log("[React Flow] Parsed JSON:", JSON.stringify(parsed, null, 2));
       // Accept either { reactflow: { nodes, edges } } or a top-level { nodes, edges }
-      const rfCandidate = (parsed && (parsed.reactflow ?? parsed)) as unknown;
+      const rfCandidate = (parsed && ((parsed as any).reactflow ?? parsed)) as unknown;
       const rf = rfCandidate as FlowGraph;
       if (!rf || typeof rf !== "object") {
         console.log("[React Flow] No suitable reactflow object found in JSON");
@@ -857,8 +868,8 @@ Output only the JSON:`;
     let mermaidCode = "";
     try {
       const parsed = JSON.parse(mermaidRaw);
-      if (parsed && typeof parsed.mermaid === "string") {
-        mermaidCode = String(parsed.mermaid);
+      if (parsed && typeof (parsed as any).mermaid === "string") {
+        mermaidCode = String((parsed as any).mermaid);
       }
     } catch (parseErr) {
       const fence = mermaidRaw.match(/```mermaid([\s\S]*?)```/i);
@@ -995,7 +1006,7 @@ ${problemDescription}
 
 ${Array.isArray(testCases) && testCases.length > 0 ? `PROBLEM TEST CASES (JSON):\n${JSON.stringify(testCases)}\n` : ""}
 
-${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+${currentCode ? `CURRENT CODE IN EDITOR:\n${"```"}python\n${currentCode}\n${"```"}\n` : ""}
 
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
@@ -1450,6 +1461,225 @@ Return ONLY the complete React component code, no explanations or markdown forma
 }
 
 /**
+ * Generate a coaching session with step-by-step guidance
+ */
+async function generateCoachingSession(
+  problemId: string,
+  userId: string,
+  currentCode: string,
+  problemDescription: string,
+  difficulty: "beginner" | "intermediate" | "advanced"
+) {
+  console.log("🎯 [generateCoachingSession] Starting...", { problemId, userId, difficulty });
+  const sessionId = crypto.randomUUID();
+  
+  const prompt = `You are an expert coding coach. Analyze the student's current code and generate a step-by-step coaching session.
+
+Problem: ${problemDescription}
+
+Student's current code (analyze line by line):
+${"```"}python
+${currentCode}
+${"```"}
+
+Difficulty level: ${difficulty}
+
+IMPORTANT: Analyze the actual code structure to provide specific line-by-line guidance. Count the lines carefully and highlight relevant parts of the student's code.
+
+Create 3-5 coaching steps that guide the student through improving their solution. Each step should:
+1. Ask a specific question about their ACTUAL code (not generic questions)
+2. Highlight the EXACT lines from their code that are relevant to the question
+3. Include expected keywords in the student's response
+4. Provide a helpful hint specific to their current implementation
+
+CRITICAL: For highlightArea, use EXACT line numbers from the student's code:
+- If they have only a function signature (1 line), highlight line 1
+- If they have multiple lines, highlight the specific lines relevant to each question
+- startLine and endLine should correspond to actual lines in their code
+- Don't use placeholder numbers like "1-5" for everything
+
+Return ONLY a JSON object with this structure:
+{
+  "sessionId": "${sessionId}",
+  "steps": [
+    {
+      "id": "step-1", 
+      "question": "[Question about their specific code]",
+      "hint": "[Hint specific to what they've written]",
+      "expectedKeywords": ["keyword1", "keyword2"],
+      "highlightArea": {
+        "startLine": [actual line number],
+        "endLine": [actual line number], 
+        "startColumn": 1,
+        "endColumn": 50
+      }
+    }
+  ]
+}
+
+Example: If they only have "def topKFrequent(self, nums, k):" on line 1, then highlight line 1 for that question.
+
+Make each step build on their current progress and guide them toward implementing the missing parts.`;
+
+  console.log("🎯 [generateCoachingSession] Calling OpenAI...");
+  const response = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: prompt }],
+    max_completion_tokens: 1500,
+  });
+  console.log("🎯 [generateCoachingSession] OpenAI response received");
+
+  try {
+    const rawContent = response.choices[0].message.content || "{}";
+    console.log("🎯 [generateCoachingSession] Raw OpenAI content:", rawContent.slice(0, 200) + "...");
+    
+    // Clean the response to remove markdown code fences
+    let cleanContent = rawContent.trim();
+    
+    // Remove markdown code blocks if present
+    if (cleanContent.startsWith("```")) {
+      cleanContent = cleanContent
+        .replace(/^```(?:json)?\n?/m, "")
+        .replace(/```$/m, "")
+        .trim();
+    }
+    
+    console.log("🎯 [generateCoachingSession] Cleaned content:", cleanContent.slice(0, 200) + "...");
+    
+    const sessionData = JSON.parse(cleanContent);
+    console.log("🎯 [generateCoachingSession] Parsed session data:", sessionData);
+    
+    // Validate the session data structure
+    if (!sessionData || !Array.isArray(sessionData.steps)) {
+      console.error("🚨 [generateCoachingSession] Invalid session data structure:", sessionData);
+      throw new Error("AI response does not contain valid coaching steps");
+    }
+    
+    console.log("🎯 [generateCoachingSession] Steps found:", sessionData.steps.length);
+    
+    // Store session in database
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("coaching_sessions")
+        .insert({
+          id: sessionId,
+          user_id: userId,
+          problem_id: problemId,
+          difficulty,
+          total_steps: sessionData.steps?.length || 0,
+          steps: sessionData.steps || [],
+          initial_code: currentCode,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error storing coaching session:", error);
+        // Return session data even if DB storage fails
+        console.warn("Continuing without DB storage - coaching session generated but not persisted");
+      }
+    } catch (dbError) {
+      console.error("Database operation failed:", dbError);
+      console.warn("Continuing without DB storage - coaching session generated but not persisted");
+    }
+
+    return {
+      sessionId,
+      steps: sessionData.steps || [],
+      totalSteps: sessionData.steps?.length || 0,
+      difficulty,
+    };
+  } catch (parseError) {
+    console.error("🚨 [generateCoachingSession] Error parsing coaching session response:", parseError);
+    console.error("🚨 [generateCoachingSession] Content that failed to parse:", cleanContent || rawContent);
+    throw new Error(`Failed to parse coaching session: ${(parseError as Error)?.message}`);
+  }
+}
+
+/**
+ * Validate a student's response to a coaching step
+ */
+async function validateCoachingResponse(
+  sessionId: string,
+  stepId: string,
+  userResponse: string,
+  currentCode: string
+) {
+  // Get the session data
+  const { data: session, error: sessionError } = await supabaseAdmin
+    .from("coaching_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    throw new Error("Session not found");
+  }
+
+  const steps = session.steps as any[];
+  const currentStep = steps.find(step => step.id === stepId);
+  
+  if (!currentStep) {
+    throw new Error("Step not found");
+  }
+
+  const prompt = `You are validating a student's response in a coding coaching session.
+
+Question: ${currentStep.question}
+Hint: ${currentStep.hint}
+Expected keywords: ${currentStep.expectedKeywords?.join(", ") || "N/A"}
+
+Student's response: "${userResponse}"
+
+Current code context:
+${"```"}python
+${currentCode}
+${"```"}
+
+Evaluate if the student's response demonstrates understanding. Return JSON:
+{
+  "isCorrect": boolean,
+  "feedback": "Specific feedback for the student",
+  "nextStep": boolean // true if ready for next step
+}
+
+Be encouraging but accurate in your assessment.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: prompt }],
+    max_completion_tokens: 800,
+  });
+
+  try {
+    const validation = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Update the step in database
+    const updatedSteps = steps.map(step => {
+      if (step.id === stepId) {
+        return {
+          ...step,
+          userResponse,
+          isCompleted: validation.isCorrect,
+          feedback: validation.feedback,
+        };
+      }
+      return step;
+    });
+
+    await supabaseAdmin
+      .from("coaching_sessions")
+      .update({ steps: updatedSteps })
+      .eq("id", sessionId);
+
+    return validation;
+  } catch (parseError) {
+    console.error("Error parsing validation response:", parseError);
+    throw new Error("Failed to parse validation response");
+  }
+}
+
+/**
  * CORS headers for all responses
  */
 const corsHeaders = {
@@ -1470,26 +1700,7 @@ serve(async (req) => {
   }
 
   try {
-    // Validate OpenAI API key and initialize client
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      console.error("OPENAI_API_KEY environment variable is not set");
-      return new Response(
-        JSON.stringify({
-          error: "Server configuration error",
-          message: "OpenAI API key is not configured",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Initialize OpenAI client with the validated key
-    openai = new OpenAI({
-      apiKey: openaiKey,
-    });
+    // OpenAI client already initialized above
     console.log(
       `[ai-chat] Model selection: model=${configuredModel} | api=${useResponsesApi ? "Responses" : "Chat"} | source=${modelSource}`,
     );
@@ -1510,7 +1721,138 @@ serve(async (req) => {
       sessionId,
       userId,
       problem,
+      problemId,
+      difficulty,
+      stepId,
+      userResponse,
     } = body;
+
+    // Validate OpenAI API key and initialize client for all actions
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey) {
+      console.error("OPENAI_API_KEY environment variable is not set");
+      return new Response(
+        JSON.stringify({
+          error: "Server configuration error",
+          message: "OpenAI API key is not configured",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Initialize OpenAI client with the validated key
+    openai = new OpenAI({
+      apiKey: openaiKey,
+    });
+
+    // Generate coaching session action
+    if (req.method === "POST" && action === "generate_coaching_session") {
+      console.log("🎯 [COACHING] Generate session request:", { problemId, userId, hasCurrentCode: !!currentCode, difficulty });
+      
+      if (!problemId || !userId || !currentCode) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing problemId, userId, or currentCode for generate_coaching_session action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      
+      // Ensure we have a problem description for coaching
+      if (!problemDescription) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing problemDescription for generate_coaching_session action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      try {
+        console.log("🎯 [COACHING] Calling generateCoachingSession...");
+        const coachingSession = await generateCoachingSession(
+          problemId,
+          userId,
+          currentCode,
+          problemDescription || "",
+          difficulty || "beginner"
+        );
+        console.log("🎯 [COACHING] Session generated:", coachingSession);
+        
+        return new Response(JSON.stringify(coachingSession), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error("🚨 [COACHING] Error generating coaching session:", error);
+        console.error("🚨 [COACHING] Error stack:", (error as Error)?.stack);
+        console.error("🚨 [COACHING] Error details:", {
+          name: (error as Error)?.name,
+          message: (error as Error)?.message,
+          cause: (error as any)?.cause
+        });
+        
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate coaching session",
+            details: (error as Error)?.message || "Unknown error",
+            errorType: (error as Error)?.name || "UnknownError"
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // Validate coaching response action
+    if (req.method === "POST" && action === "validate_coaching_response") {
+      if (!sessionId || !stepId || !userResponse) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing sessionId, stepId, or userResponse for validate_coaching_response action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      try {
+        const validation = await validateCoachingResponse(
+          sessionId,
+          stepId,
+          userResponse,
+          currentCode || ""
+        );
+        
+        return new Response(JSON.stringify(validation), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error("Error validating coaching response:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to validate coaching response",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
 
     // Clear chat action
     if (req.method === "POST" && action === "clear_chat") {
@@ -1683,7 +2025,7 @@ serve(async (req) => {
       );
       const responseText = diagram
         ? diagram.engine === "mermaid"
-          ? await explainMermaid(diagram.code, problemDescription)
+          ? await explainMermaid((diagram as any).code, problemDescription)
           : "Here is an interactive diagram of the approach."
         : "Unable to create a diagram for this message.";
       const aiResponse: AIResponse = { response: responseText, diagram };
