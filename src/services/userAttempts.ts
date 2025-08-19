@@ -119,6 +119,17 @@ export class UserAttemptsService {
     code: string,
     testResults: TestResult[],
   ): Promise<UserAttempt | null> {
+    // Check if this exact code already exists in accepted submissions
+    const existingSubmissions = await this.getAcceptedSubmissions(userId, problemId);
+    const codeAlreadyExists = existingSubmissions.some(submission => 
+      submission.code.trim() === code.trim()
+    );
+
+    if (codeAlreadyExists) {
+      console.log("Code already exists in accepted submissions, skipping duplicate");
+      return null;
+    }
+
     const { data, error } = (await supabase
       .from("user_problem_attempts")
       .insert({
@@ -243,6 +254,18 @@ export class UserAttemptsService {
       return [];
     }
 
-    return data || [];
+    // Filter out duplicate submissions based on code content
+    const uniqueSubmissions: UserAttempt[] = [];
+    const seenCodes = new Set<string>();
+
+    (data || []).forEach(submission => {
+      const normalizedCode = submission.code.trim();
+      if (!seenCodes.has(normalizedCode)) {
+        seenCodes.add(normalizedCode);
+        uniqueSubmissions.push(submission);
+      }
+    });
+
+    return uniqueSubmissions;
   }
 }
