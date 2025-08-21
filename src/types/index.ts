@@ -154,14 +154,77 @@ export interface CoachSession {
   difficulty: "beginner" | "intermediate" | "advanced";
 }
 
+// Interactive coaching validation interfaces
+export interface CoachingValidationResult {
+  isCorrect: boolean;
+  feedback: string;
+  nextAction: 'insert_and_continue' | 'retry' | 'hint' | 'complete_session';
+  
+  // Analysis details
+  codeAnalysis: {
+    syntax: 'valid' | 'invalid';
+    logic: 'correct' | 'incorrect' | 'partial';
+    efficiency: 'optimal' | 'acceptable' | 'inefficient';
+  };
+  
+  // For successful submissions
+  codeInsertion?: {
+    insertAt: 'cursor' | 'function_body' | 'after_line' | 'before_return';
+    targetLine?: number;
+    indentationLevel?: number;
+  };
+  
+  // Next step generation
+  nextStep?: {
+    question: string;
+    expectedCodeType: 'loop' | 'condition' | 'variable' | 'expression' | 'return' | 'any';
+    hint: string;
+    highlightArea?: CoachHighlightArea;
+  };
+}
+
+export interface CoachingResponse {
+  id: string;
+  sessionId: string;
+  stepNumber: number;
+  question: string;
+  studentResponse: string;
+  submittedCode: string;
+  validationResult: CoachingValidationResult;
+  isCorrect: boolean;
+  createdAt: Date;
+}
+
+export interface InteractiveCoachSession {
+  id: string;
+  problemId: string;
+  userId: string;
+  isActive: boolean;
+  currentStepNumber: number;
+  currentQuestion: string;
+  awaitingSubmission: boolean;
+  isCompleted: boolean;
+  startedAt: Date;
+  completedAt?: Date;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  responses: CoachingResponse[];
+  highlightArea?: {
+    startLine: number;
+    endLine: number;
+    startColumn: number;
+    endColumn: number;
+  };
+}
+
 export interface CoachingState {
-  session: CoachSession | null;
+  session: InteractiveCoachSession | null;
   isCoachModeActive: boolean;
   currentHighlight: CoachHighlightArea | null;
   showInputOverlay: boolean;
   inputPosition: { x: number; y: number } | null;
   isWaitingForResponse: boolean;
   isValidating: boolean;
+  lastValidation: CoachingValidationResult | null;
   feedback: {
     show: boolean;
     type: "success" | "error" | "hint" | null;

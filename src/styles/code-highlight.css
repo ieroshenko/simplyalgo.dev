@@ -4,24 +4,24 @@
     34,
     197,
     94,
-    0.2
-  ) !important; /* green-500 with opacity */
-  border: 1px solid rgba(34, 197, 94, 0.4);
+    0.03
+  ) !important; /* green-500 with very low opacity */
+  border: 1px solid rgba(34, 197, 94, 0.08);
   animation: fadeHighlight 2s ease-out;
 }
 
 .dark .inserted-code-highlight {
-  background-color: rgba(34, 197, 94, 0.15) !important;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background-color: rgba(34, 197, 94, 0.025) !important;
+  border: 1px solid rgba(34, 197, 94, 0.06);
 }
 
 @keyframes fadeHighlight {
   0% {
-    background-color: rgba(34, 197, 94, 0.4);
-    border-color: rgba(34, 197, 94, 0.6);
+    background-color: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.25);
   }
   100% {
-    background-color: rgba(34, 197, 94, 0.1);
-    border-color: rgba(34, 197, 94, 0.2);
+    background-color: rgba(34, 197, 94, 0.04);
+    border-color: rgba(34, 197, 94, 0.08);
   }
 }

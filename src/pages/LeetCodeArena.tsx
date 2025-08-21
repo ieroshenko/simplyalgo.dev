@@ -28,6 +28,7 @@ const LeetCodeArena = () => {
     problems,
     categories: dbCategories,
     loading: problemsLoading,
+    toggleStar,
     refetch: refetchProblems,
   } = useProblems(user?.id);
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
@@ -244,6 +245,7 @@ const LeetCodeArena = () => {
                 problems={problems}
                 filteredCategory={selectedCategory}
                 searchQuery={searchQuery}
+                onToggleStar={toggleStar}
               />
             </div>
           </TabsContent>
