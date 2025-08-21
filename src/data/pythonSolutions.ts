@@ -10,7 +10,7 @@ export interface Solution {
 }
 
 export const pythonSolutions: Record<string, Solution[]> = {
-  'two-sum': [
+  "two-sum": [
     {
       title: "Brute Force",
       code: `def twoSum(self, nums: List[int], target: int) -> List[int]:
@@ -20,7 +20,7 @@ export const pythonSolutions: Record<string, Solution[]> = {
                 return [i, j]
     return []`,
       complexity: { time: "O(n²)", space: "O(1)" },
-      explanation: "Check every pair of numbers to see if they sum to target."
+      explanation: "Check every pair of numbers to see if they sum to target.",
     },
     {
       title: "Hash Map (Optimal)",
@@ -33,11 +33,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
         hashmap[num] = i
     return []`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use hash map to store numbers and their indices, check for complement in O(1) time."
-    }
+      explanation:
+        "Use hash map to store numbers and their indices, check for complement in O(1) time.",
+    },
   ],
 
-  'group-anagrams': [
+  "group-anagrams": [
     {
       title: "Sort and Group",
       code: `def groupAnagrams(self, strs: List[str]) -> List[List[str]]:
@@ -51,7 +52,8 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return list(groups.values())`,
       complexity: { time: "O(n × m log m)", space: "O(n × m)" },
-      explanation: "Sort each string to create a key, then group strings with same sorted key. Where n is number of strings and m is maximum length of a string."
+      explanation:
+        "Sort each string to create a key, then group strings with same sorted key. Where n is number of strings and m is maximum length of a string.",
     },
     {
       title: "Character Count (Alternative)",
@@ -70,17 +72,18 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return list(groups.values())`,
       complexity: { time: "O(n × m)", space: "O(n × m)" },
-      explanation: "Use character count array as key instead of sorting. More efficient for longer strings."
-    }
+      explanation:
+        "Use character count array as key instead of sorting. More efficient for longer strings.",
+    },
   ],
 
-  'valid-anagram': [
+  "valid-anagram": [
     {
       title: "Sorting",
       code: `def isAnagram(self, s: str, t: str) -> bool:
     return sorted(s) == sorted(t)`,
       complexity: { time: "O(n log n)", space: "O(n)" },
-      explanation: "Sort both strings and compare if they're equal."
+      explanation: "Sort both strings and compare if they're equal.",
     },
     {
       title: "Character Count (Optimal)",
@@ -91,11 +94,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
     from collections import Counter
     return Counter(s) == Counter(t)`,
       complexity: { time: "O(n)", space: "O(1)" },
-      explanation: "Count characters in both strings and compare the counts. Space is O(1) since we only have 26 possible lowercase letters."
-    }
+      explanation:
+        "Count characters in both strings and compare the counts. Space is O(1) since we only have 26 possible lowercase letters.",
+    },
   ],
 
-  'valid-parentheses': [
+  "valid-parentheses": [
     {
       title: "Stack",
       code: `def isValid(self, s: str) -> bool:
@@ -113,11 +117,12 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return not stack`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use stack to track opening brackets and match with closing brackets. Return true only if all brackets are properly matched."
-    }
+      explanation:
+        "Use stack to track opening brackets and match with closing brackets. Return true only if all brackets are properly matched.",
+    },
   ],
 
-  'top-k-frequent-elements': [
+  "top-k-frequent-elements": [
     {
       title: "Counter + Heap",
       code: `def topKFrequent(self, nums: List[int], k: int) -> List[int]:
@@ -130,7 +135,8 @@ export const pythonSolutions: Record<string, Solution[]> = {
     # Use heap to get top k frequent
     return heapq.nlargest(k, counter.keys(), key=counter.get)`,
       complexity: { time: "O(n log k)", space: "O(n)" },
-      explanation: "Count frequencies, then use heap to efficiently get top k elements."
+      explanation:
+        "Count frequencies, then use heap to efficiently get top k elements.",
     },
     {
       title: "Bucket Sort (Optimal)",
@@ -155,7 +161,92 @@ export const pythonSolutions: Record<string, Solution[]> = {
     
     return result`,
       complexity: { time: "O(n)", space: "O(n)" },
-      explanation: "Use bucket sort approach with frequency as bucket index. Optimal O(n) time complexity."
+      explanation:
+        "Use bucket sort approach with frequency as bucket index. Optimal O(n) time complexity.",
+    },
+  ],
+
+  "product-of-array-except-self": [
+    {
+      title: "Brute Force",
+      code: `def productExceptSelf(self, nums: List[int]) -> List[int]:
+    n = len(nums)
+    res = [0] * n
+
+    for i in range(n):
+        prod = 1
+        for j in range(n):
+            if i == j:
+                continue
+            prod *= nums[j]
+        res[i] = prod
+    return res`,
+      complexity: { time: "O(n²)", space: "O(1) extra; O(n) output" },
+      explanation: "Multiply all elements except the current index by iterating over the array for every i."
+    },
+    {
+      title: "Division",
+      code: `def productExceptSelf(self, nums: List[int]) -> List[int]:
+    prod, zero_cnt = 1, 0
+    for num in nums:
+        if num:
+            prod *= num
+        else:
+            zero_cnt += 1
+
+    if zero_cnt > 1:
+        return [0] * len(nums)
+
+    res = [0] * len(nums)
+    for i, c in enumerate(nums):
+        if zero_cnt:
+            res[i] = 0 if c else prod
+        else:
+            res[i] = prod // c
+    return res`,
+      complexity: { time: "O(n)", space: "O(1) extra; O(n) output" },
+      explanation: "Compute product of non-zero elements and handle zero cases; otherwise divide total product by current element."
+    },
+    {
+      title: "Prefix & Suffix",
+      code: `def productExceptSelf(self, nums: List[int]) -> List[int]:
+    n = len(nums)
+    res = [0] * n
+    pref = [0] * n
+    suff = [0] * n
+
+    pref[0] = 1
+    for i in range(1, n):
+        pref[i] = nums[i - 1] * pref[i - 1]
+
+    suff[n - 1] = 1
+    for i in range(n - 2, -1, -1):
+        suff[i] = nums[i + 1] * suff[i + 1]
+
+    for i in range(n):
+        res[i] = pref[i] * suff[i]
+    return res`,
+      complexity: { time: "O(n)", space: "O(n)" },
+      explanation: "Precompute prefix products and suffix products, then multiply per index."
+    },
+    {
+      title: "Prefix & Suffix (Optimal)",
+      code: `def productExceptSelf(self, nums: List[int]) -> List[int]:
+    res = [1] * len(nums)
+
+    prefix = 1
+    for i in range(len(nums)):
+        res[i] = prefix
+        prefix *= nums[i]
+
+    postfix = 1
+    for i in range(len(nums) - 1, -1, -1):
+        res[i] *= postfix
+        postfix *= nums[i]
+
+    return res`,
+      complexity: { time: "O(n)", space: "O(1) extra; O(n) output" },
+      explanation: "Carry prefix products in the output array, then multiply by running postfix in reverse to achieve O(1) extra space."
     }
-  ]
+  ],
 };

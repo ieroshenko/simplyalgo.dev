@@ -15,7 +15,11 @@
       "python": "# Array operations\narr = [1, 2, 3, 4, 5]\n# Access\nfirst = arr[0]  # O(1)\n# Insert\narr.append(6)  # O(1) at end\narr.insert(0, 0)  # O(n) at beginning",
       "javascript": "// Array operations\nconst arr = [1, 2, 3, 4, 5];\n// Access\nconst first = arr[0];  // O(1)\n// Insert\narr.push(6);  // O(1) at end\narr.unshift(0);  // O(n) at beginning"
     },
-    "useCases": ["Data storage", "Matrix operations", "Dynamic programming tables"],
+    "useCases": [
+      "Data storage",
+      "Matrix operations",
+      "Dynamic programming tables"
+    ],
     "relatedProblems": ["Two Sum", "Best Time to Buy and Sell Stock"]
   },
   {
@@ -34,7 +38,11 @@
       "python": "class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\n# Create linked list\nhead = ListNode(1)\nhead.next = ListNode(2)",
       "javascript": "class ListNode {\n    constructor(val = 0, next = null) {\n        this.val = val;\n        this.next = next;\n    }\n}\n\n// Create linked list\nconst head = new ListNode(1);\nhead.next = new ListNode(2);"
     },
-    "useCases": ["Dynamic size collections", "Undo functionality", "Music playlists"],
+    "useCases": [
+      "Dynamic size collections",
+      "Undo functionality",
+      "Music playlists"
+    ],
     "relatedProblems": ["Reverse Linked List", "Merge Two Sorted Lists"]
   },
   {
@@ -53,7 +61,11 @@
       "python": "# Stack using list\nstack = []\nstack.append(1)  # push\nstack.append(2)\ntop = stack.pop()  # pop\npeek = stack[-1] if stack else None",
       "javascript": "// Stack using array\nconst stack = [];\nstack.push(1);  // push\nstack.push(2);\nconst top = stack.pop();  // pop\nconst peek = stack[stack.length - 1];"
     },
-    "useCases": ["Function call management", "Undo operations", "Expression evaluation"],
+    "useCases": [
+      "Function call management",
+      "Undo operations",
+      "Expression evaluation"
+    ],
     "relatedProblems": ["Valid Parentheses", "Min Stack"]
   },
   {
@@ -91,8 +103,15 @@
       "python": "from collections import deque\ndq = deque([1, 2, 3])\ndq.appendleft(0)  # add to front\ndq.append(4)      # add to back\nfront = dq.popleft()  # remove from front\nback = dq.pop()       # remove from back",
       "javascript": "// Deque simulation with array\nclass Deque {\n    constructor() { this.items = []; }\n    pushFront(item) { this.items.unshift(item); }\n    pushBack(item) { this.items.push(item); }\n    popFront() { return this.items.shift(); }\n    popBack() { return this.items.pop(); }\n}"
     },
-    "useCases": ["Sliding window problems", "Palindrome checking", "Browser history"],
-    "relatedProblems": ["Sliding Window Maximum", "Shortest Subarray with Sum at Least K"]
+    "useCases": [
+      "Sliding window problems",
+      "Palindrome checking",
+      "Browser history"
+    ],
+    "relatedProblems": [
+      "Sliding Window Maximum",
+      "Shortest Subarray with Sum at Least K"
+    ]
   },
   {
     "slug": "hash-map",
@@ -149,7 +168,10 @@
       "javascript": "// String operations\nconst s = \"hello\";\nconst char = s[0];  // Access\nconst found = s.includes('e');  // Search\nconst substr = s.substring(1, 4);  // Substring\nconst concated = s + \" world\";  // Concatenation"
     },
     "useCases": ["Text processing", "Pattern matching", "Data parsing"],
-    "relatedProblems": ["Longest Substring Without Repeating Characters", "Valid Anagram"]
+    "relatedProblems": [
+      "Longest Substring Without Repeating Characters",
+      "Valid Anagram"
+    ]
   },
   {
     "slug": "binary-tree",
@@ -168,7 +190,10 @@
       "javascript": "class TreeNode {\n    constructor(val = 0, left = null, right = null) {\n        this.val = val;\n        this.left = left;\n        this.right = right;\n    }\n}\n\n// Inorder traversal\nfunction inorder(root) {\n    if (root) {\n        inorder(root.left);\n        console.log(root.val);\n        inorder(root.right);\n    }\n}"
     },
     "useCases": ["File systems", "Expression parsing", "Database indexing"],
-    "relatedProblems": ["Binary Tree Inorder Traversal", "Maximum Depth of Binary Tree"]
+    "relatedProblems": [
+      "Binary Tree Inorder Traversal",
+      "Maximum Depth of Binary Tree"
+    ]
   },
   {
     "slug": "heap",
@@ -187,7 +212,10 @@
       "javascript": "// JavaScript doesn't have built-in heap\n// Using array representation\nclass MinHeap {\n    constructor() {\n        this.heap = [];\n    }\n    \n    insert(val) {\n        this.heap.push(val);\n        this.bubbleUp();\n    }\n    \n    bubbleUp() {\n        let idx = this.heap.length - 1;\n        while (idx > 0) {\n            let parentIdx = Math.floor((idx - 1) / 2);\n            if (this.heap[parentIdx] <= this.heap[idx]) break;\n            [this.heap[parentIdx], this.heap[idx]] = [this.heap[idx], this.heap[parentIdx]];\n            idx = parentIdx;\n        }\n    }\n}"
     },
     "useCases": ["Priority queues", "Dijkstra's algorithm", "Job scheduling"],
-    "relatedProblems": ["Kth Largest Element in an Array", "Merge k Sorted Lists"]
+    "relatedProblems": [
+      "Kth Largest Element in an Array",
+      "Merge k Sorted Lists"
+    ]
   },
   {
     "slug": "graph",
@@ -243,7 +271,11 @@
       "python": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n    \n    def find(self, x):\n        if self.parent[x] != x:\n            self.parent[x] = self.find(self.parent[x])\n        return self.parent[x]\n    \n    def union(self, x, y):\n        px, py = self.find(x), self.find(y)\n        if px == py:\n            return\n        if self.rank[px] < self.rank[py]:\n            self.parent[px] = py\n        elif self.rank[px] > self.rank[py]:\n            self.parent[py] = px\n        else:\n            self.parent[py] = px\n            self.rank[px] += 1",
       "javascript": "class UnionFind {\n    constructor(n) {\n        this.parent = Array.from({length: n}, (_, i) => i);\n        this.rank = new Array(n).fill(0);\n    }\n    \n    find(x) {\n        if (this.parent[x] !== x) {\n            this.parent[x] = this.find(this.parent[x]);\n        }\n        return this.parent[x];\n    }\n    \n    union(x, y) {\n        const px = this.find(x);\n        const py = this.find(y);\n        if (px === py) return;\n        \n        if (this.rank[px] < this.rank[py]) {\n            this.parent[px] = py;\n        } else if (this.rank[px] > this.rank[py]) {\n            this.parent[py] = px;\n        } else {\n            this.parent[py] = px;\n            this.rank[px]++;\n        }\n    }\n}"
     },
-    "useCases": ["Network connectivity", "Image processing", "Kruskal's algorithm"],
+    "useCases": [
+      "Network connectivity",
+      "Image processing",
+      "Kruskal's algorithm"
+    ],
     "relatedProblems": ["Number of Connected Components", "Accounts Merge"]
   },
   {
@@ -281,8 +313,15 @@
       "python": "class PrefixMap:\n    def __init__(self):\n        self.map = {}\n    \n    def insert(self, word, value):\n        self.map[word] = value\n    \n    def search(self, word):\n        return self.map.get(word)\n    \n    def starts_with(self, prefix):\n        result = []\n        for word in self.map:\n            if word.startswith(prefix):\n                result.append((word, self.map[word]))\n        return result",
       "javascript": "class PrefixMap {\n    constructor() {\n        this.map = new Map();\n    }\n    \n    insert(word, value) {\n        this.map.set(word, value);\n    }\n    \n    search(word) {\n        return this.map.get(word);\n    }\n    \n    startsWith(prefix) {\n        const result = [];\n        for (const [word, value] of this.map) {\n            if (word.startsWith(prefix)) {\n                result.push([word, value]);\n            }\n        }\n        return result;\n    }\n}"
     },
-    "useCases": ["Autocomplete systems", "URL routing", "Configuration management"],
-    "relatedProblems": ["Word Search II", "Design Add and Search Words Data Structure"]
+    "useCases": [
+      "Autocomplete systems",
+      "URL routing",
+      "Configuration management"
+    ],
+    "relatedProblems": [
+      "Word Search II",
+      "Design Add and Search Words Data Structure"
+    ]
   },
   {
     "slug": "segment-tree",
@@ -300,8 +339,15 @@
       "python": "class SegmentTree:\n    def __init__(self, arr):\n        self.n = len(arr)\n        self.tree = [0] * (4 * self.n)\n        self.build(arr, 0, 0, self.n - 1)\n    \n    def build(self, arr, node, start, end):\n        if start == end:\n            self.tree[node] = arr[start]\n        else:\n            mid = (start + end) // 2\n            self.build(arr, 2*node+1, start, mid)\n            self.build(arr, 2*node+2, mid+1, end)\n            self.tree[node] = self.tree[2*node+1] + self.tree[2*node+2]\n    \n    def query(self, node, start, end, l, r):\n        if r < start or end < l:\n            return 0\n        if l <= start and end <= r:\n            return self.tree[node]\n        mid = (start + end) // 2\n        left_sum = self.query(2*node+1, start, mid, l, r)\n        right_sum = self.query(2*node+2, mid+1, end, l, r)\n        return left_sum + right_sum",
       "javascript": "class SegmentTree {\n    constructor(arr) {\n        this.n = arr.length;\n        this.tree = new Array(4 * this.n);\n        this.build(arr, 0, 0, this.n - 1);\n    }\n    \n    build(arr, node, start, end) {\n        if (start === end) {\n            this.tree[node] = arr[start];\n        } else {\n            const mid = Math.floor((start + end) / 2);\n            this.build(arr, 2*node+1, start, mid);\n            this.build(arr, 2*node+2, mid+1, end);\n            this.tree[node] = this.tree[2*node+1] + this.tree[2*node+2];\n        }\n    }\n    \n    query(node, start, end, l, r) {\n        if (r < start || end < l) {\n            return 0;\n        }\n        if (l <= start && end <= r) {\n            return this.tree[node];\n        }\n        const mid = Math.floor((start + end) / 2);\n        const leftSum = this.query(2*node+1, start, mid, l, r);\n        const rightSum = this.query(2*node+2, mid+1, end, l, r);\n        return leftSum + rightSum;\n    }\n}"
     },
-    "useCases": ["Range sum queries", "Range minimum/maximum", "Computational geometry"],
-    "relatedProblems": ["Range Sum Query - Mutable", "Count of Smaller Numbers After Self"]
+    "useCases": [
+      "Range sum queries",
+      "Range minimum/maximum",
+      "Computational geometry"
+    ],
+    "relatedProblems": [
+      "Range Sum Query - Mutable",
+      "Count of Smaller Numbers After Self"
+    ]
   },
   {
     "slug": "fenwick-tree",
@@ -320,7 +366,10 @@
       "javascript": "class FenwickTree {\n    constructor(n) {\n        this.n = n;\n        this.tree = new Array(n + 1).fill(0);\n    }\n    \n    update(i, delta) {\n        while (i <= this.n) {\n            this.tree[i] += delta;\n            i += i & (-i);\n        }\n    }\n    \n    query(i) {\n        let result = 0;\n        while (i > 0) {\n            result += this.tree[i];\n            i -= i & (-i);\n        }\n        return result;\n    }\n    \n    rangeQuery(l, r) {\n        return this.query(r) - this.query(l - 1);\n    }\n}"
     },
     "useCases": ["Frequency tables", "Inversion counting", "2D range queries"],
-    "relatedProblems": ["Range Sum Query - Mutable", "Count of Smaller Numbers After Self"]
+    "relatedProblems": [
+      "Range Sum Query - Mutable",
+      "Count of Smaller Numbers After Self"
+    ]
   },
   {
     "slug": "suffix-tree",
@@ -357,8 +406,15 @@
       "python": "class AVLNode:\n    def __init__(self, val):\n        self.val = val\n        self.left = None\n        self.right = None\n        self.height = 1\n\nclass AVLTree:\n    def get_height(self, node):\n        if not node:\n            return 0\n        return node.height\n    \n    def get_balance(self, node):\n        if not node:\n            return 0\n        return self.get_height(node.left) - self.get_height(node.right)\n    \n    def rotate_right(self, y):\n        x = y.left\n        T2 = x.right\n        x.right = y\n        y.left = T2\n        y.height = 1 + max(self.get_height(y.left), self.get_height(y.right))\n        x.height = 1 + max(self.get_height(x.left), self.get_height(x.right))\n        return x",
       "javascript": "class AVLNode {\n    constructor(val) {\n        this.val = val;\n        this.left = null;\n        this.right = null;\n        this.height = 1;\n    }\n}\n\nclass AVLTree {\n    getHeight(node) {\n        return node ? node.height : 0;\n    }\n    \n    getBalance(node) {\n        return node ? this.getHeight(node.left) - this.getHeight(node.right) : 0;\n    }\n    \n    rotateRight(y) {\n        const x = y.left;\n        const T2 = x.right;\n        x.right = y;\n        y.left = T2;\n        y.height = 1 + Math.max(this.getHeight(y.left), this.getHeight(y.right));\n        x.height = 1 + Math.max(this.getHeight(x.left), this.getHeight(x.right));\n        return x;\n    }\n}"
     },
-    "useCases": ["Database indexing", "Memory management", "Graphics applications"],
-    "relatedProblems": ["Binary Search Tree Iterator", "Validate Binary Search Tree"]
+    "useCases": [
+      "Database indexing",
+      "Memory management",
+      "Graphics applications"
+    ],
+    "relatedProblems": [
+      "Binary Search Tree Iterator",
+      "Validate Binary Search Tree"
+    ]
   },
   {
     "slug": "b-tree",

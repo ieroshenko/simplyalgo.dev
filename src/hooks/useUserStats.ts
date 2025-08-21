@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface UserStats {
   totalSolved: number;
@@ -23,11 +23,11 @@ export const useUserStats = (userId?: string) => {
     easySolved: 0,
     mediumSolved: 0,
     hardSolved: 0,
-    maxStreak: 0
+    maxStreak: 0,
   });
   const [profile, setProfile] = useState<UserProfile>({
-    name: 'Guest',
-    email: ''
+    name: "Guest",
+    email: "",
   });
   const [loading, setLoading] = useState(true);
 
@@ -45,24 +45,24 @@ export const useUserStats = (userId?: string) => {
 
     try {
       const { data: statsData, error } = await supabase
-        .from('user_statistics')
-        .select('*')
-        .eq('user_id', userId)
+        .from("user_statistics")
+        .select("*")
+        .eq("user_id", userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
 
       if (statsData) {
         // Validate streak before setting stats
         const validatedStreak = validateCurrentStreak(statsData);
-        
+
         setStats({
           totalSolved: statsData.total_solved || 0,
           streak: validatedStreak,
           easySolved: statsData.easy_solved || 0,
           mediumSolved: statsData.medium_solved || 0,
           hardSolved: statsData.hard_solved || 0,
-          maxStreak: statsData.max_streak || 0
+          maxStreak: statsData.max_streak || 0,
         });
 
         // Update database if streak was broken
@@ -71,7 +71,7 @@ export const useUserStats = (userId?: string) => {
         }
       }
     } catch (err: any) {
-      console.error('Error fetching user stats:', err.message);
+      console.error("Error fetching user stats:", err.message);
     }
   };
 
@@ -80,75 +80,80 @@ export const useUserStats = (userId?: string) => {
 
     try {
       const { data: profileData, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
+        .from("user_profiles")
+        .select("*")
+        .eq("user_id", userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
 
       if (profileData) {
         setProfile({
-          name: profileData.name || 'User',
-          email: profileData.email || '',
-          avatarUrl: profileData.avatar_url
+          name: profileData.name || "User",
+          email: profileData.email || "",
+          avatarUrl: profileData.avatar_url,
         });
       }
     } catch (err: any) {
-      console.error('Error fetching user profile:', err.message);
+      console.error("Error fetching user profile:", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatsOnProblemSolved = async (difficulty: 'Easy' | 'Medium' | 'Hard', problemId: string) => {
+  const updateStatsOnProblemSolved = async (
+    difficulty: "Easy" | "Medium" | "Hard",
+    problemId: string,
+  ) => {
     if (!userId) {
-      console.error('❌ Cannot update stats: No user ID');
+      console.error("❌ Cannot update stats: No user ID");
       return;
     }
 
-    console.log('📊 Starting stats update for difficulty:', difficulty);
-    console.log('🔍 User ID:', userId);
-    console.log('🎯 Problem ID:', problemId);
+    console.log("📊 Starting stats update for difficulty:", difficulty);
+    console.log("🔍 User ID:", userId);
+    console.log("🎯 Problem ID:", problemId);
 
     try {
       // First check if user has already solved this problem before
       const { data: previousSolves, error: solvesError } = await supabase
-        .from('user_problem_attempts')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('problem_id', problemId)
-        .eq('status', 'passed');
+        .from("user_problem_attempts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("problem_id", problemId)
+        .eq("status", "passed");
 
       if (solvesError) throw solvesError;
 
       const isFirstTimeSolving = !previousSolves || previousSolves.length === 0;
-      console.log('🎯 Is first time solving this problem:', isFirstTimeSolving);
+      console.log("🎯 Is first time solving this problem:", isFirstTimeSolving);
 
       if (!isFirstTimeSolving) {
-        console.log('⏭️ User has already solved this problem before, skipping stats update');
+        console.log(
+          "⏭️ User has already solved this problem before, skipping stats update",
+        );
         return;
       }
 
       // Get current stats
       const { data: currentStats, error: fetchError } = await supabase
-        .from('user_statistics')
-        .select('*')
-        .eq('user_id', userId)
+        .from("user_statistics")
+        .select("*")
+        .eq("user_id", userId)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+      if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
 
-      console.log('📈 Current stats from DB:', currentStats);
+      console.log("📈 Current stats from DB:", currentStats);
 
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const lastActivityDate = currentStats?.last_activity_date?.split('T')[0];
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+      const lastActivityDate = currentStats?.last_activity_date?.split("T")[0];
       const currentStreak = currentStats?.current_streak || 0;
-      
-      console.log('📅 Today:', today);
-      console.log('📅 Last activity:', lastActivityDate);
-      console.log('🔥 Current streak:', currentStreak);
-      
+
+      console.log("📅 Today:", today);
+      console.log("📅 Last activity:", lastActivityDate);
+      console.log("🔥 Current streak:", currentStreak);
+
       // Calculate new streak
       let newStreak = 1;
       if (lastActivityDate) {
@@ -156,7 +161,7 @@ export const useUserStats = (userId?: string) => {
         const todayDate = new Date(today);
         const diffTime = todayDate.getTime() - lastDate.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays === 0) {
           // Same day, keep current streak
           newStreak = currentStreak;
@@ -168,45 +173,51 @@ export const useUserStats = (userId?: string) => {
       }
 
       // Calculate new totals
-      const newEasySolved = (currentStats?.easy_solved || 0) + (difficulty === 'Easy' ? 1 : 0);
-      const newMediumSolved = (currentStats?.medium_solved || 0) + (difficulty === 'Medium' ? 1 : 0);
-      const newHardSolved = (currentStats?.hard_solved || 0) + (difficulty === 'Hard' ? 1 : 0);
+      const newEasySolved =
+        (currentStats?.easy_solved || 0) + (difficulty === "Easy" ? 1 : 0);
+      const newMediumSolved =
+        (currentStats?.medium_solved || 0) + (difficulty === "Medium" ? 1 : 0);
+      const newHardSolved =
+        (currentStats?.hard_solved || 0) + (difficulty === "Hard" ? 1 : 0);
       const newTotalSolved = newEasySolved + newMediumSolved + newHardSolved;
       const newMaxStreak = Math.max(currentStats?.max_streak || 0, newStreak);
 
-      console.log('🎯 New stats to save:', {
+      console.log("🎯 New stats to save:", {
         newTotalSolved,
         newEasySolved,
         newMediumSolved,
         newHardSolved,
         newStreak,
-        newMaxStreak
+        newMaxStreak,
       });
 
       // Update or insert stats
       const { error: upsertError } = await supabase
-        .from('user_statistics')
-        .upsert({
-          id: currentStats?.id, // Include existing ID if updating
-          user_id: userId,
-          total_solved: newTotalSolved,
-          easy_solved: newEasySolved,
-          medium_solved: newMediumSolved,
-          hard_solved: newHardSolved,
-          current_streak: newStreak,
-          max_streak: newMaxStreak,
-          last_activity_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id' // Use user_id as the conflict resolution key
-        });
+        .from("user_statistics")
+        .upsert(
+          {
+            id: currentStats?.id, // Include existing ID if updating
+            user_id: userId,
+            total_solved: newTotalSolved,
+            easy_solved: newEasySolved,
+            medium_solved: newMediumSolved,
+            hard_solved: newHardSolved,
+            current_streak: newStreak,
+            max_streak: newMaxStreak,
+            last_activity_date: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id", // Use user_id as the conflict resolution key
+          },
+        );
 
       if (upsertError) {
-        console.error('🚨 Upsert error details:', upsertError);
+        console.error("🚨 Upsert error details:", upsertError);
         throw upsertError;
       }
 
-      console.log('✅ Stats successfully saved to database');
+      console.log("✅ Stats successfully saved to database");
 
       // Update local state
       setStats({
@@ -215,19 +226,21 @@ export const useUserStats = (userId?: string) => {
         easySolved: newEasySolved,
         mediumSolved: newMediumSolved,
         hardSolved: newHardSolved,
-        maxStreak: newMaxStreak
+        maxStreak: newMaxStreak,
       });
 
-      console.log('🎊 Local state updated successfully!');
-
+      console.log("🎊 Local state updated successfully!");
     } catch (err) {
-      console.error('❌ Error updating user stats:', err instanceof Error ? err.message : 'Unknown error');
+      console.error(
+        "❌ Error updating user stats:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
     }
   };
 
   const validateCurrentStreak = (statsData: any): number => {
-    const today = new Date().toISOString().split('T')[0];
-    const lastActivityDate = statsData?.last_activity_date?.split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
+    const lastActivityDate = statsData?.last_activity_date?.split("T")[0];
     const currentStreak = statsData?.current_streak || 0;
 
     if (!lastActivityDate) return 0;
@@ -250,14 +263,14 @@ export const useUserStats = (userId?: string) => {
 
     try {
       await supabase
-        .from('user_statistics')
+        .from("user_statistics")
         .update({
           current_streak: newStreak,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('user_id', userId);
+        .eq("user_id", userId);
     } catch (error) {
-      console.error('Error updating streak in database:', error);
+      console.error("Error updating streak in database:", error);
     }
   };
 
@@ -265,6 +278,6 @@ export const useUserStats = (userId?: string) => {
     stats,
     profile,
     loading,
-    updateStatsOnProblemSolved
+    updateStatsOnProblemSolved,
   };
 };

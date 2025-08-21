@@ -1,6 +1,6 @@
 /**
  * Speech Recognition Service
- * 
+ *
  * This service provides a fallback for browsers that don't support Web Speech API.
  * It uses MediaRecorder to capture audio and can be extended to integrate with
  * external speech recognition services like OpenAI Whisper, Google Cloud Speech, etc.
@@ -13,7 +13,7 @@ export interface SpeechRecognitionResult {
 
 export class SpeechRecognitionService {
   private static instance: SpeechRecognitionService;
-  
+
   public static getInstance(): SpeechRecognitionService {
     if (!SpeechRecognitionService.instance) {
       SpeechRecognitionService.instance = new SpeechRecognitionService();
@@ -33,7 +33,7 @@ export class SpeechRecognitionService {
     try {
       // For demo purposes, we'll simulate a transcription service
       // In production, you would send the audioBlob to your chosen service
-      
+
       // Example OpenAI Whisper integration (commented out - requires API key):
       /*
       const formData = new FormData();
@@ -57,20 +57,19 @@ export class SpeechRecognitionService {
 
       // For now, return a placeholder that shows the feature is working
       const audioSize = (audioBlob.size / 1024).toFixed(1);
-      const duration = audioBlob.size > 50000 ? 'several seconds' : 'a moment';
-      
+      const duration = audioBlob.size > 50000 ? "several seconds" : "a moment";
+
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
             transcript: `[Audio recorded (${audioSize}KB, ${duration}) - Connect to speech service for transcription]`,
-            confidence: 0.8
+            confidence: 0.8,
           });
         }, 1500); // Simulate API call delay
       });
-
     } catch (error) {
-      console.error('Transcription error:', error);
-      throw new Error('Failed to transcribe audio');
+      console.error("Transcription error:", error);
+      throw new Error("Failed to transcribe audio");
     }
   }
 
@@ -78,17 +77,19 @@ export class SpeechRecognitionService {
    * Check if audio recording is supported
    */
   isRecordingSupported(): boolean {
-    return !!(navigator.mediaDevices && 
-             navigator.mediaDevices.getUserMedia && 
-             window.MediaRecorder);
+    return !!(
+      navigator.mediaDevices &&
+      navigator.mediaDevices.getUserMedia &&
+      window.MediaRecorder
+    );
   }
 
   /**
    * Get supported audio formats
    */
   getSupportedFormats(): string[] {
-    const formats = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'];
-    return formats.filter(format => MediaRecorder.isTypeSupported(format));
+    const formats = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
+    return formats.filter((format) => MediaRecorder.isTypeSupported(format));
   }
 
   /**
@@ -96,9 +97,10 @@ export class SpeechRecognitionService {
    */
   getRecordingConfig(): MediaRecorderOptions {
     const supportedFormats = this.getSupportedFormats();
-    const preferredFormat = supportedFormats.find(format => 
-      format.includes('webm') || format.includes('mp4')
-    ) || supportedFormats[0];
+    const preferredFormat =
+      supportedFormats.find(
+        (format) => format.includes("webm") || format.includes("mp4"),
+      ) || supportedFormats[0];
 
     return {
       mimeType: preferredFormat,
