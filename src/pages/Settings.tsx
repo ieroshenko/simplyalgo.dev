@@ -1,31 +1,37 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import Sidebar from '@/components/Sidebar';
-import { useTheme } from '@/hooks/useTheme';
-import { Monitor, Moon, Sun, Palette, User, Bell, Shield } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import Sidebar from "@/components/Sidebar";
+import { useTheme } from "@/hooks/useTheme";
+import { Monitor, Moon, Sun, Palette, User, Bell, Shield } from "lucide-react";
 
 const Settings = () => {
   const { theme, setTheme } = useTheme();
 
   const themeOptions = [
     {
-      value: 'light',
-      label: 'Light',
-      description: 'Classic light theme',
+      value: "light",
+      label: "Light",
+      description: "Classic light theme",
       icon: Sun,
     },
     {
-      value: 'dark',
-      label: 'Dark',
-      description: 'Dark theme for better focus',
+      value: "dark",
+      label: "Dark",
+      description: "Dark theme for better focus",
       icon: Moon,
     },
     {
-      value: 'system',
-      label: 'System',
-      description: 'Adapts to your system preference',
+      value: "system",
+      label: "System",
+      description: "Adapts to your system preference",
       icon: Monitor,
     },
   ];
@@ -33,7 +39,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
-      
+
       <div className="flex-1 p-6 space-y-6">
         {/* Header */}
         <div className="space-y-2">
@@ -139,7 +145,8 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <div className="text-sm text-muted-foreground">
-                Privacy and security settings will be available in a future update.
+                Privacy and security settings will be available in a future
+                update.
               </div>
             </CardContent>
           </Card>

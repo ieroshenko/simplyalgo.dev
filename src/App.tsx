@@ -7,7 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import LeetCodeArena from "./pages/LeetCodeArena";
-import ProblemSolver from "./pages/ProblemSolver";
+import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import DataStructureDetail from "./components/DataStructureDetail";
@@ -16,7 +16,7 @@ import { useAuth } from "./hooks/useAuth";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -24,7 +24,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  
+
   return user ? <>{children}</> : <Navigate to="/" replace />;
 };
 
@@ -42,57 +42,84 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Auth />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/leetcode" element={
-            <ProtectedRoute>
-              <LeetCodeArena />
-            </ProtectedRoute>
-          } />
-          <Route path="/arena" element={
-            <ProtectedRoute>
-              <LeetCodeArena />
-            </ProtectedRoute>
-          } />
-          <Route path="/problem/:problemId" element={
-            <ProtectedRoute>
-              <ProblemSolver />
-            </ProtectedRoute>
-          } />
-          <Route path="/leetcode/data-structures/:slug" element={
-            <ProtectedRoute>
-              <DataStructureDetail />
-            </ProtectedRoute>
-          } />
-          <Route path="/progress" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/tutor" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Auth />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leetcode"
+              element={
+                <ProtectedRoute>
+                  <LeetCodeArena />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/arena"
+              element={
+                <ProtectedRoute>
+                  <LeetCodeArena />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/problem/:problemId"
+              element={
+                <ProtectedRoute>
+                  <ProblemSolverNew />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leetcode/data-structures/:slug"
+              element={
+                <ProtectedRoute>
+                  <DataStructureDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/progress"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tutor"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

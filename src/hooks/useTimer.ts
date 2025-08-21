@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
-export type TimerMode = 'stopwatch' | 'timer';
+export type TimerMode = "stopwatch" | "timer";
 
 export const useTimer = () => {
-  const [mode, setMode] = useState<TimerMode>('stopwatch');
+  const [mode, setMode] = useState<TimerMode>("stopwatch");
   const [time, setTime] = useState(0); // seconds
   const [isRunning, setIsRunning] = useState(false);
   const [timerDuration, setTimerDuration] = useState({ hours: 0, minutes: 25 }); // Default 25 min
@@ -13,15 +13,15 @@ export const useTimer = () => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hrs > 0) {
-      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
   const start = useCallback(() => {
-    if (mode === 'timer' && time === 0) {
+    if (mode === "timer" && time === 0) {
       setTime(timerDuration.hours * 3600 + timerDuration.minutes * 60);
     }
     setIsRunning(true);
@@ -33,34 +33,48 @@ export const useTimer = () => {
 
   const reset = useCallback(() => {
     setIsRunning(false);
-    setTime(mode === 'timer' ? timerDuration.hours * 3600 + timerDuration.minutes * 60 : 0);
+    setTime(
+      mode === "timer"
+        ? timerDuration.hours * 3600 + timerDuration.minutes * 60
+        : 0,
+    );
   }, [mode, timerDuration]);
 
-  const switchMode = useCallback((newMode: TimerMode) => {
-    setMode(newMode);
-    setIsRunning(false);
-    setTime(newMode === 'timer' ? timerDuration.hours * 3600 + timerDuration.minutes * 60 : 0);
-  }, [timerDuration]);
+  const switchMode = useCallback(
+    (newMode: TimerMode) => {
+      setMode(newMode);
+      setIsRunning(false);
+      setTime(
+        newMode === "timer"
+          ? timerDuration.hours * 3600 + timerDuration.minutes * 60
+          : 0,
+      );
+    },
+    [timerDuration],
+  );
 
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
-        setTime(prevTime => {
-          const newTime = mode === 'stopwatch' 
-            ? prevTime + 1 
-            : prevTime <= 1 ? 0 : prevTime - 1;
-          
+        setTime((prevTime) => {
+          const newTime =
+            mode === "stopwatch"
+              ? prevTime + 1
+              : prevTime <= 1
+                ? 0
+                : prevTime - 1;
+
           // Update tab title with timer
           const timeStr = formatTime(newTime);
-          const modeIcon = mode === 'stopwatch' ? '▶' : '⏱';
+          const modeIcon = mode === "stopwatch" ? "▶" : "⏱";
           document.title = `${modeIcon} ${timeStr} - LeetCode Arena`;
-          
-          if (mode === 'timer' && newTime <= 0) {
+
+          if (mode === "timer" && newTime <= 0) {
             setIsRunning(false);
             // Reset title when timer ends
-            document.title = 'LeetCode Arena';
+            document.title = "LeetCode Arena";
           }
-          
+
           return newTime;
         });
       }, 1000);
@@ -70,7 +84,7 @@ export const useTimer = () => {
         intervalRef.current = null;
       }
       // Reset title when stopped
-      document.title = 'LeetCode Arena';
+      document.title = "LeetCode Arena";
     }
 
     return () => {
@@ -78,7 +92,7 @@ export const useTimer = () => {
         clearInterval(intervalRef.current);
       }
       // Reset title on cleanup
-      document.title = 'LeetCode Arena';
+      document.title = "LeetCode Arena";
     };
   }, [isRunning, mode, formatTime]);
 
@@ -92,6 +106,6 @@ export const useTimer = () => {
     pause,
     reset,
     switchMode,
-    setTimerDuration
+    setTimerDuration,
   };
 };

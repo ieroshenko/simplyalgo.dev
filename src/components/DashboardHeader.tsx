@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const DashboardHeader = () => {
   const navigate = useNavigate();
@@ -12,8 +12,13 @@ const DashboardHeader = () => {
       return user.user_metadata.avatar_url;
     }
     // Generate initials avatar as fallback
-    const name = user?.user_metadata?.full_name || 'User';
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const name = user?.user_metadata?.full_name || "User";
+    const initials = name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
     return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=80`;
   };
 
@@ -25,10 +30,10 @@ const DashboardHeader = () => {
         </div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
       </div>
-      
+
       <Button
         variant="ghost"
-        onClick={() => navigate('/profile')}
+        onClick={() => navigate("/profile")}
         className="flex items-center space-x-3 px-4 py-2 hover:bg-secondary rounded-lg"
       >
         <img
@@ -38,11 +43,9 @@ const DashboardHeader = () => {
         />
         <div className="text-left">
           <div className="text-sm font-medium text-foreground">
-            {user?.user_metadata?.full_name || 'User'}
+            {user?.user_metadata?.full_name || "User"}
           </div>
-          <div className="text-xs text-muted-foreground">
-            View Profile
-          </div>
+          <div className="text-xs text-muted-foreground">View Profile</div>
         </div>
       </Button>
     </div>

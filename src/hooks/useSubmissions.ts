@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
-import { UserAttemptsService, UserAttempt } from '@/services/userAttempts';
+import { useState, useEffect } from "react";
+import { UserAttemptsService, UserAttempt } from "@/services/userAttempts";
 
-export const useSubmissions = (userId: string | undefined, problemId: string | undefined) => {
+export const useSubmissions = (
+  userId: string | undefined,
+  problemId: string | undefined,
+) => {
   const [submissions, setSubmissions] = useState<UserAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,10 +20,15 @@ export const useSubmissions = (userId: string | undefined, problemId: string | u
       try {
         setLoading(true);
         setError(null);
-        const data = await UserAttemptsService.getAcceptedSubmissions(userId, problemId);
+        const data = await UserAttemptsService.getAcceptedSubmissions(
+          userId,
+          problemId,
+        );
         setSubmissions(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch submissions');
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch submissions",
+        );
         setSubmissions([]);
       } finally {
         setLoading(false);
@@ -32,14 +40,19 @@ export const useSubmissions = (userId: string | undefined, problemId: string | u
 
   const refetch = async () => {
     if (!userId || !problemId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      const data = await UserAttemptsService.getAcceptedSubmissions(userId, problemId);
+      const data = await UserAttemptsService.getAcceptedSubmissions(
+        userId,
+        problemId,
+      );
       setSubmissions(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch submissions');
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch submissions",
+      );
     } finally {
       setLoading(false);
     }

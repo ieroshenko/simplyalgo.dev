@@ -1,7 +1,7 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minimize2, Download, Code2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Minimize2, Download, Code2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CanvasModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ export default function CanvasModal({
   children,
   componentCode,
   onDownload,
-  onViewCode
+  onViewCode,
 }: CanvasModalProps) {
   if (!isOpen) return null;
 
@@ -62,11 +62,11 @@ export default function CanvasModal({
                   whileTap={{ scale: 0.9 }}
                 />
               </div>
-              
+
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {title}
               </h2>
-              
+
               <div className="flex items-center gap-2">
                 {onViewCode && (
                   <Button

@@ -1,287 +1,174 @@
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Trash2, Loader2, Mic, MicOff, ChartNetwork as DiagramIcon, Maximize2, Sparkles } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Send,
+  Bot,
+  User,
+  Trash2,
+  Loader2,
+  Mic,
+  MicOff,
+  Maximize2,
+  Sparkles,
+} from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 // Using a lightweight custom fullscreen overlay instead of Radix Dialog to avoid MIME issues in some dev setups
-import { useChatSession } from '@/hooks/useChatSession';
-import { useSpeechToText } from '@/hooks/useSpeechToText';
-import TextareaAutosize from 'react-textarea-autosize';
-import { CodeSnippet } from '@/types';
-import Mermaid from '@/components/diagram/Mermaid';
-import FlowCanvas from '@/components/diagram/FlowCanvas';
-import type { FlowGraph } from '@/types';
-import CodeSnippetButton from '@/components/CodeSnippetButton';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { CanvasContainer } from '@/components/canvas';
+import { useChatSession } from "@/hooks/useChatSession";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
+import TextareaAutosize from "react-textarea-autosize";
+import { CodeSnippet, Problem } from "@/types";
+import Mermaid from "@/components/diagram/Mermaid";
+import FlowCanvas from "@/components/diagram/FlowCanvas";
+import type { FlowGraph } from "@/types";
+import CodeSnippetButton from "@/components/CodeSnippetButton";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { CanvasContainer } from "@/components/canvas";
+import { hasInteractiveDemo } from "@/components/visualizations/registry";
 
 interface AIChatProps {
   problemId: string;
   problemDescription: string;
   onInsertCodeSnippet?: (snippet: CodeSnippet) => void;
   problemTestCases?: unknown[];
+  problem?: Problem;
+  currentCode?: string;
 }
 
-const AIChat = ({ problemId, problemDescription, onInsertCodeSnippet, problemTestCases }: AIChatProps) => {
-  const [input, setInput] = useState('');
+const AIChat = ({
+  problemId,
+  problemDescription,
+  onInsertCodeSnippet,
+  problemTestCases,
+  problem,
+  currentCode,
+}: AIChatProps) => {
+  const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  type ActiveDiagram = { engine: 'mermaid'; code: string } | { engine: 'reactflow'; graph: FlowGraph };
+  type ActiveDiagram =
+    | { engine: "mermaid"; code: string }
+    | { engine: "reactflow"; graph: FlowGraph };
   const [isDiagramOpen, setIsDiagramOpen] = useState(false);
-  const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(null);
-  const [hiddenVisualizeForIds, setHiddenVisualizeForIds] = useState<Set<string>>(new Set());
-  
+  const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(
+    null,
+  );
+  // Track message IDs we've already auto-requested diagrams for (avoid loops)
+  const autoRequestedRef = useRef<Set<string>>(new Set());
+
   // Canvas state
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
-  const [canvasCode, setCanvasCode] = useState('');
-  const [canvasTitle, setCanvasTitle] = useState('Interactive Component');
-  const { 
-    session, 
-    messages, 
-    loading, 
-    isTyping, 
-    sendMessage, 
+  const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
+  const {
+    session,
+    messages,
+    loading,
+    isTyping,
+    sendMessage,
     clearConversation,
     requestDiagram,
-  } = useChatSession({ problemId, problemDescription, problemTestCases });
+  } = useChatSession({
+    problemId,
+    problemDescription,
+    problemTestCases,
+    currentCode,
+  });
 
   // Speech-to-text functionality
-  const { 
-    isListening, 
+  const {
+    isListening,
     isSupported: speechSupported,
     hasNativeSupport,
     isProcessing,
-    startListening, 
-    stopListening, 
-    error: speechError 
+    startListening,
+    stopListening,
+    error: speechError,
   } = useSpeechToText({
     onResult: (transcript) => {
-      setInput(prev => {
+      setInput((prev) => {
         const currentText = prev.trim();
         return currentText ? `${currentText} ${transcript}` : transcript;
       });
     },
     onError: (error) => {
-      console.error('Speech recognition error:', error);
-    }
+      console.error("Speech recognition error:", error);
+    },
   });
-
 
   const handleSend = async () => {
     if (!input.trim()) return;
     await sendMessage(input);
-    setInput('');
+    setInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const handleVisualize = async (sourceMessageContent: string, messageId: string) => {
-    // Request a diagram separately without adding a user message bubble
-    setHiddenVisualizeForIds(prev => new Set(prev).add(messageId));
-    await requestDiagram(sourceMessageContent);
-  };
+  // Auto-request diagrams when conditions are met; no manual Visualize button
+  useEffect(() => {
+    if (!messages.length) return;
+    // If any assistant message already has a diagram, do not auto-request again on reload
+    const anyDiagramExists = messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        Boolean((m as unknown as { diagram?: unknown }).diagram),
+    );
+    if (anyDiagramExists) return;
+
+    // Only consider the latest assistant message for auto-request
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+
+    const lastUserMsg =
+      [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(
+      lastUserMsg,
+    );
+    const hasDiagram = Boolean(
+      (lastAssistant as unknown as { diagram?: unknown }).diagram,
+    );
+    const assistantSuggests =
+      (lastAssistant as unknown as { suggestDiagram?: boolean })
+        .suggestDiagram === true;
+    const id = lastAssistant.id;
+    const shouldRequest =
+      !hasDiagram &&
+      (userAsked || assistantSuggests) &&
+      !autoRequestedRef.current.has(id);
+    if (shouldRequest) {
+      autoRequestedRef.current.add(id);
+      requestDiagram(lastAssistant.content);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  // Reset auto diagram request tracker when conversation is cleared
+  useEffect(() => {
+    if (messages.length === 0) {
+      autoRequestedRef.current = new Set();
+    }
+  }, [messages.length]);
 
   const handleGenerateComponent = async (messageContent: string) => {
-    // For now, let's create a sample component - later we'll integrate with AI
-    const sampleCode = `function AlgorithmVisualizer() {
-  const [values, setValues] = useState([64, 34, 25, 12, 22, 11, 90]);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(500);
-
-  const sortSteps = useMemo(() => {
-    const arr = [...values];
-    const steps = [{ array: [...arr], comparing: [], swapping: [] }];
-    
-    // Bubble sort with step tracking
-    for (let i = 0; i < arr.length - 1; i++) {
-      for (let j = 0; j < arr.length - i - 1; j++) {
-        steps.push({ array: [...arr], comparing: [j, j + 1], swapping: [] });
-        if (arr[j] > arr[j + 1]) {
-          [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-          steps.push({ array: [...arr], comparing: [], swapping: [j, j + 1] });
-        }
-      }
+    if (!problem) {
+      console.error("No problem context available for visualization");
+      return;
     }
-    return steps;
-  }, [values]);
 
-  useEffect(() => {
-    let timer;
-    if (isPlaying && currentStep < sortSteps.length - 1) {
-      timer = setTimeout(() => setCurrentStep(s => s + 1), speed);
-    } else if (currentStep >= sortSteps.length - 1) {
-      setIsPlaying(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isPlaying, currentStep, speed, sortSteps.length]);
-
-  const reset = () => {
-    setCurrentStep(0);
-    setIsPlaying(false);
-  };
-
-  const randomize = () => {
-    const newValues = Array.from({ length: 7 }, () => Math.floor(Math.random() * 100) + 1);
-    setValues(newValues);
-    reset();
-  };
-
-  const currentStepData = sortSteps[currentStep] || sortSteps[0];
-
-  return React.createElement('div', {
-    className: "w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-8"
-  },
-    React.createElement('div', {
-      className: "max-w-4xl mx-auto space-y-6"
-    },
-      React.createElement(Card, {},
-        React.createElement(CardHeader, {},
-          React.createElement(CardTitle, {
-            className: "flex items-center gap-2"
-          },
-            React.createElement(CircleHelp, { className: "h-5 w-5" }),
-            "Bubble Sort Visualizer"
-          )
-        ),
-        React.createElement(CardContent, {
-          className: "space-y-6"
-        },
-          // Array Visualization
-          React.createElement('div', {
-            className: "flex items-end justify-center gap-2 h-64 p-4"
-          },
-            React.createElement(AnimatePresence, {},
-              currentStepData.array.map((value, index) =>
-                React.createElement(motion.div, {
-                  key: \`\${index}-\${value}\`,
-                  layout: true,
-                  initial: { scale: 0.8, opacity: 0 },
-                  animate: { 
-                    scale: 1, 
-                    opacity: 1,
-                    backgroundColor: currentStepData.comparing.includes(index) 
-                      ? '#fbbf24' 
-                      : currentStepData.swapping.includes(index) 
-                      ? '#ef4444' 
-                      : '#3b82f6'
-                  },
-                  exit: { scale: 0.8, opacity: 0 },
-                  className: "flex flex-col items-center"
-                },
-                  React.createElement('div', {
-                    className: "text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300"
-                  }, value),
-                  React.createElement(motion.div, {
-                    className: "w-12 rounded-t-lg",
-                    style: { 
-                      height: \`\${(value / Math.max(...values)) * 200}px\`,
-                      backgroundColor: currentStepData.comparing.includes(index) 
-                        ? '#fbbf24' 
-                        : currentStepData.swapping.includes(index) 
-                        ? '#ef4444' 
-                        : '#3b82f6'
-                    },
-                    animate: {
-                      scale: currentStepData.comparing.includes(index) || currentStepData.swapping.includes(index) ? 1.1 : 1
-                    }
-                  })
-                )
-              )
-            )
-          ),
-          
-          // Controls
-          React.createElement('div', {
-            className: "flex items-center justify-between"
-          },
-            React.createElement('div', {
-              className: "flex items-center gap-2"
-            },
-              React.createElement(Button, {
-                onClick: () => setCurrentStep(Math.max(0, currentStep - 1)),
-                disabled: currentStep === 0
-              }, "Previous"),
-              React.createElement(Button, {
-                onClick: () => setIsPlaying(!isPlaying),
-                disabled: currentStep >= sortSteps.length - 1
-              },
-                isPlaying ? React.createElement(Pause, { className: "h-4 w-4" }) : React.createElement(Play, { className: "h-4 w-4" }),
-                isPlaying ? 'Pause' : 'Play'
-              ),
-              React.createElement(Button, {
-                onClick: () => setCurrentStep(Math.min(sortSteps.length - 1, currentStep + 1)),
-                disabled: currentStep >= sortSteps.length - 1
-              }, "Next")
-            ),
-            
-            React.createElement('div', {
-              className: "flex items-center gap-2"
-            },
-              React.createElement(Button, {
-                onClick: reset,
-                variant: "outline"
-              },
-                React.createElement(RotateCcw, { className: "h-4 w-4 mr-2" }),
-                "Reset"
-              ),
-              React.createElement(Button, {
-                onClick: randomize,
-                variant: "outline"
-              },
-                React.createElement(Shuffle, { className: "h-4 w-4 mr-2" }),
-                "Randomize"
-              )
-            )
-          ),
-
-          // Speed Control
-          React.createElement('div', {
-            className: "flex items-center gap-4"
-          },
-            React.createElement(Label, {}, "Speed"),
-            React.createElement(Slider, {
-              value: [speed],
-              onValueChange: (value) => setSpeed(value[0]),
-              max: 1000,
-              min: 100,
-              step: 100,
-              className: "flex-1"
-            }),
-            React.createElement('span', {
-              className: "text-sm text-gray-600 dark:text-gray-400 w-16"
-            }, \`\${speed}ms\`)
-          ),
-
-          // Step Info
-          React.createElement('div', {
-            className: "text-center text-sm text-gray-600 dark:text-gray-400"
-          },
-            \`Step \${currentStep + 1} of \${sortSteps.length}\`,
-            currentStepData.comparing.length > 0 && React.createElement('span', {
-              className: "ml-2"
-            }, \`Comparing positions \${currentStepData.comparing.join(' and ')}\`),
-            currentStepData.swapping.length > 0 && React.createElement('span', {
-              className: "ml-2"
-            }, \`Swapping positions \${currentStepData.swapping.join(' and ')}\`)
-          )
-        )
-      )
-    )
-  );
-}
-
-return AlgorithmVisualizer;`;
-
-    setCanvasCode(sampleCode);
-    setCanvasTitle('Algorithm Visualizer');
+    // Simply open the modal with our direct component
+    setCanvasTitle(`${problem.title} - Interactive Demo`);
     setIsCanvasOpen(true);
+    console.debug(
+      "[InteractiveDemo] Opening visualization for:",
+      problem.title,
+    );
   };
 
   const openDiagramDialog = (diagram: ActiveDiagram) => {
@@ -302,7 +189,9 @@ return AlgorithmVisualizer;`;
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollElement = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      );
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
@@ -310,7 +199,10 @@ return AlgorithmVisualizer;`;
   }, [messages]);
 
   const formatTime = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return timestamp.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -324,7 +216,7 @@ return AlgorithmVisualizer;`;
           <div>
             <div className="font-medium text-foreground">AI Coach</div>
             <div className="text-xs text-muted-foreground">
-              {loading ? 'Loading chat...' : session ? 'Chat loaded' : 'Online'}
+              {loading ? "Loading chat..." : session ? "Chat loaded" : "Online"}
             </div>
           </div>
         </div>
@@ -356,70 +248,152 @@ return AlgorithmVisualizer;`;
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-sm">Start a conversation with your AI coach!</p>
-                    <p className="text-xs mt-1">Ask questions about the problem or get hints.</p>
+                    <p className="text-sm">
+                      Start a conversation with your AI coach!
+                    </p>
+                    <p className="text-xs mt-1">
+                      Ask questions about the problem or get hints.
+                    </p>
                   </div>
                 </div>
               )}
-              <div className={messages.length === 0 ? '' : 'flex-1 space-y-4'}>
+              <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message) => (
                   <div key={message.id} className="mb-6">
                     <div className="flex items-start gap-3">
                       {/* Avatar */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        message.role === 'user' 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'bg-accent text-accent-foreground'
-                      }`}>
-                        {message.role === 'user' ? (
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-accent text-accent-foreground"
+                        }`}
+                      >
+                        {message.role === "user" ? (
                           <User className="w-4 h-4" />
                         ) : (
                           <Bot className="w-4 h-4" />
                         )}
                       </div>
-                      
+
                       {/* Message Content */}
                       <div className="flex-1 min-w-0">
-                        <div className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
-                          message.role === 'user'
-                            ? 'border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15'
-                            : 'border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15'
-                        }`}>
-                          {message.role === 'user' ? (
-                            <p className="text-sm whitespace-pre-wrap break-words text-left">{message.content}</p>
+                        <div
+                          className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
+                            message.role === "user"
+                              ? "border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15"
+                              : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
+                          }`}
+                        >
+                          {message.role === "user" ? (
+                            <p className="text-sm whitespace-pre-wrap break-words text-left">
+                              {message.content}
+                            </p>
                           ) : (
                             <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                               <ReactMarkdown
                                 components={{
-                                  code({inline, className, children, ...props}: { inline?: boolean; className?: string; children?: React.ReactNode }) {
-                                    const match = /language-(\w+)/.exec(className || '');
-                                    if (!inline && match && match[1] === 'mermaid') {
+                                  code({
+                                    inline,
+                                    className,
+                                    children,
+                                    ...props
+                                  }: {
+                                    inline?: boolean;
+                                    className?: string;
+                                    children?: React.ReactNode;
+                                  }) {
+                                    const match = /language-(\w+)/.exec(
+                                      className || "",
+                                    );
+                                    if (
+                                      !inline &&
+                                      match &&
+                                      match[1] === "mermaid"
+                                    ) {
                                       return (
                                         <Mermaid chart={String(children)} />
                                       );
                                     }
                                     return !inline && match ? (
-                                      <SyntaxHighlighter
-                                        style={vscDarkPlus}
-                                        language={match[1]}
-                                        PreTag="div"
-                                        className="rounded-md !mt-2 !mb-2"
+                                      <div className="relative group">
+                                        <SyntaxHighlighter
+                                          style={vscDarkPlus}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          className="rounded-md !mt-2 !mb-2"
+                                          {...props}
+                                        >
+                                          {String(children).replace(/\n$/, "")}
+                                        </SyntaxHighlighter>
+                                        {match[1] === "python" &&
+                                          onInsertCodeSnippet && (
+                                            <button
+                                              onClick={() => {
+                                                const codeContent = String(
+                                                  children,
+                                                ).replace(/\n$/, "");
+                                                const snippet: CodeSnippet = {
+                                                  id: `direct-${Date.now()}`,
+                                                  code: codeContent,
+                                                  language: "python",
+                                                  isValidated: true,
+                                                  insertionType: "smart",
+                                                  insertionHint: {
+                                                    type: "statement",
+                                                    scope: "function",
+                                                    description:
+                                                      "Code snippet from AI response",
+                                                  },
+                                                };
+                                                onInsertCodeSnippet(snippet);
+                                              }}
+                                              className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1"
+                                            >
+                                              <svg
+                                                className="w-3 h-3"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  strokeWidth={2}
+                                                  d="M12 4v16m8-8H4"
+                                                />
+                                              </svg>
+                                              Add to Editor
+                                            </button>
+                                          )}
+                                      </div>
+                                    ) : (
+                                      <code
+                                        className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono"
                                         {...props}
                                       >
-                                        {String(children).replace(/\n$/, '')}
-                                      </SyntaxHighlighter>
-                                    ) : (
-                                      <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono" {...props}>
                                         {children}
                                       </code>
                                     );
                                   },
-                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({children}) => <ul className="list-disc list-outside pl-5 mb-2">{children}</ul>,
-                                  ol: ({children}) => <ol className="list-decimal list-outside pl-5 mb-2">{children}</ol>,
-                                  li: ({children}: { children?: React.ReactNode }) => (
-                                    <li className="mb-1">{children}</li>
+                                  p: ({ children }) => (
+                                    <p className="mb-2 last:mb-0">{children}</p>
                                   ),
+                                  ul: ({ children }) => (
+                                    <ul className="list-disc list-outside pl-5 mb-2">
+                                      {children}
+                                    </ul>
+                                  ),
+                                  ol: ({ children }) => (
+                                    <ol className="list-decimal list-outside pl-5 mb-2">
+                                      {children}
+                                    </ol>
+                                  ),
+                                  li: ({
+                                    children,
+                                  }: {
+                                    children?: React.ReactNode;
+                                  }) => <li className="mb-1">{children}</li>,
                                 }}
                               >
                                 {message.content}
@@ -428,133 +402,184 @@ return AlgorithmVisualizer;`;
                           )}
                         </div>
 
-                        {/* Mermaid diagram bubble if attached as structured payload */}
-                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'mermaid'; code: string } }).diagram?.engine === 'mermaid' && (
-                          <div className="mt-3">
-                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">Mermaid</span></div>
-                                <button
-                                  type="button"
-                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                  onClick={() => openDiagramDialog({ engine: 'mermaid', code: (message as unknown as { diagram: { code: string } }).diagram.code })}
-                                  title="View full screen"
-                                >
-                                  <Maximize2 className="w-3.5 h-3.5" />
-                                  Expand
-                                </button>
+                        {/* Mermaid diagram bubble - uses DB-attached diagram */}
+                        {message.role === "assistant" &&
+                          (() => {
+                            const attached = (
+                              message as unknown as {
+                                diagram?:
+                                  | { engine: "mermaid"; code: string }
+                                  | { engine: "reactflow"; graph: FlowGraph };
+                              }
+                            ).diagram;
+                            const diag: {
+                              engine: "mermaid";
+                              code: string;
+                            } | null =
+                              attached && attached.engine === "mermaid"
+                                ? (attached as {
+                                    engine: "mermaid";
+                                    code: string;
+                                  })
+                                : null;
+                            if (!diag) return null;
+                            return (
+                              <div className="mt-3">
+                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-muted-foreground">
+                                      Diagram{" "}
+                                      <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
+                                        Mermaid
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        openDiagramDialog({
+                                          engine: "mermaid",
+                                          code: diag.code,
+                                        })
+                                      }
+                                      title="View full screen"
+                                    >
+                                      <Maximize2 className="w-3.5 h-3.5" />
+                                      Expand
+                                    </button>
+                                  </div>
+                                  <Mermaid chart={diag.code} />
+                                </div>
                               </div>
-                              <Mermaid chart={(message as unknown as { diagram: { code: string } }).diagram.code} />
+                            );
+                          })()}
+
+                        {/* React Flow diagram bubble - uses DB-attached diagram */}
+                        {message.role === "assistant" &&
+                          (() => {
+                            const attached = (
+                              message as unknown as {
+                                diagram?:
+                                  | { engine: "mermaid"; code: string }
+                                  | { engine: "reactflow"; graph: FlowGraph };
+                              }
+                            ).diagram;
+                            const diag: {
+                              engine: "reactflow";
+                              graph: FlowGraph;
+                            } | null =
+                              attached && attached.engine === "reactflow"
+                                ? (attached as {
+                                    engine: "reactflow";
+                                    graph: FlowGraph;
+                                  })
+                                : null;
+                            if (!diag) return null;
+                            return (
+                              <div className="mt-3">
+                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-muted-foreground">
+                                      Diagram{" "}
+                                      <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">
+                                        React Flow
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        openDiagramDialog({
+                                          engine: "reactflow",
+                                          graph: diag.graph,
+                                        })
+                                      }
+                                      title="View full screen"
+                                    >
+                                      <Maximize2 className="w-3.5 h-3.5" />
+                                      Expand
+                                    </button>
+                                  </div>
+                                  <FlowCanvas graph={diag.graph} />
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                        {/* Action: Interactive Demo button - show only for problems with a registered interactive demo AND message has a diagram */}
+                        {message.role === "assistant" && hasInteractiveDemo(problem?.id) && Boolean((message as unknown as { diagram?: unknown }).diagram) && (
+                          <div className="mt-3">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                onClick={() =>
+                                  handleGenerateComponent(message.content)
+                                }
+                                title="Generate an interactive component demo"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                <span className="text-sm">
+                                  Interactive Demo
+                                </span>
+                              </Button>
                             </div>
                           </div>
                         )}
 
-                        {/* React Flow diagram bubble if attached */}
-                        {message.role === 'assistant' && (message as unknown as { diagram?: { engine: 'reactflow'; graph: FlowGraph } }).diagram?.engine === 'reactflow' && (
-                          <div className="mt-3">
-                            <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs text-muted-foreground">Diagram <span className="ml-1 inline-block px-1.5 py-0.5 rounded border border-accent/40 text-[10px] uppercase tracking-wide">React Flow</span></div>
-                                <button
-                                  type="button"
-                                  className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                  onClick={() => openDiagramDialog({ engine: 'reactflow', graph: (message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph })}
-                                  title="View full screen"
+                        {/* Code snippets: render whenever present on assistant messages */}
+                        {message.role === "assistant" &&
+                          message.codeSnippets &&
+                          message.codeSnippets.length > 0 && (
+                            <div className="mt-3 space-y-3">
+                              {message.codeSnippets.map((snippet) => (
+                                <div
+                                  key={snippet.id}
+                                  className="bg-card border rounded-lg p-4 shadow-sm"
                                 >
-                                  <Maximize2 className="w-3.5 h-3.5" />
-                                  Expand
-                                </button>
-                              </div>
-                              <FlowCanvas graph={(message as unknown as { diagram: { graph: FlowGraph } }).diagram.graph} />
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Actions: Visualize button and code snippets */}
-                        {message.role === 'assistant' && (
-                          <div className="mt-3 space-y-3">
-                            {(() => {
-                              const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
-                              const userAsked = /(visualize|diagram|draw|flowchart|mermaid)/i.test(lastUserMsg);
-                              const hasDiagram = Boolean((message as unknown as { diagram?: unknown }).diagram);
-                              const shouldShow = !hasDiagram && (userAsked || (message as unknown as { suggestDiagram?: boolean }).suggestDiagram === true) && !hiddenVisualizeForIds.has(message.id);
-                              return shouldShow ? (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                    onClick={() => handleVisualize(message.content, message.id)}
-                                    title="Ask the AI to generate a diagram"
-                                  >
-                                    <DiagramIcon className="w-4 h-4" />
-                                    <span className="text-sm">Visualize</span>
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
-                                    onClick={() => handleGenerateComponent(message.content)}
-                                    title="Generate an interactive component demo"
-                                  >
-                                    <Sparkles className="w-4 h-4" />
-                                    <span className="text-sm">Interactive Demo</span>
-                                  </Button>
-                                </div>
-                              ) : null;
-                            })()}
-                            {message.codeSnippets && message.codeSnippets.length > 0 && (
-                              <div className="space-y-3">
-                                {message.codeSnippets.map((snippet) => (
-                              <div 
-                                key={snippet.id} 
-                                className="bg-card border rounded-lg p-4 shadow-sm"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                      {snippet.insertionHint?.type || 'Code'}
-                                    </span>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        {snippet.insertionHint?.type || "Code"}
+                                      </span>
+                                    </div>
+                                    {onInsertCodeSnippet && (
+                                      <CodeSnippetButton
+                                        snippet={snippet}
+                                        onInsert={onInsertCodeSnippet}
+                                        className="shadow-sm"
+                                      />
+                                    )}
                                   </div>
-                                  {onInsertCodeSnippet && (
-                                    <CodeSnippetButton
-                                      snippet={snippet}
-                                      onInsert={onInsertCodeSnippet}
-                                      className="shadow-sm"
-                                    />
+
+                                  <div className="bg-slate-900 rounded-md p-3 mb-3">
+                                    <SyntaxHighlighter
+                                      language={snippet.language}
+                                      style={vscDarkPlus}
+                                      customStyle={{
+                                        margin: 0,
+                                        padding: 0,
+                                        background: "transparent",
+                                        fontSize: "0.8rem",
+                                      }}
+                                    >
+                                      {snippet.code}
+                                    </SyntaxHighlighter>
+                                  </div>
+
+                                  {snippet.insertionHint?.description && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {snippet.insertionHint.description}
+                                    </p>
                                   )}
                                 </div>
-                                
-                                <div className="bg-slate-900 rounded-md p-3 mb-3">
-                                  <SyntaxHighlighter
-                                    language={snippet.language}
-                                    style={vscDarkPlus}
-                                    customStyle={{
-                                      margin: 0,
-                                      padding: 0,
-                                      background: 'transparent',
-                                      fontSize: '0.8rem',
-                                    }}
-                                  >
-                                    {snippet.code}
-                                  </SyntaxHighlighter>
-                                </div>
-                                
-                                {snippet.insertionHint?.description && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {snippet.insertionHint.description}
-                                  </p>
-                                )}
-                              </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
+                              ))}
+                            </div>
+                          )}
+
                         {/* Timestamp */}
                         <div className="text-xs text-muted-foreground mt-2 text-left">
                           {formatTime(message.timestamp)}
@@ -563,18 +588,24 @@ return AlgorithmVisualizer;`;
                     </div>
                   </div>
                 ))}
-                
+
                 {isTyping && (
                   <div className="flex justify-start">
                     <div className="flex space-x-2 max-w-[80%]">
-                      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                        <Bot className="w-4 h-4" />
                       </div>
-                              <div className="bg-secondary text-foreground p-3 rounded-lg">
+                      <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <div
+                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
                         </div>
                       </div>
                     </div>
@@ -595,13 +626,15 @@ return AlgorithmVisualizer;`;
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                isListening ? "🎤 Listening..." : 
-                isProcessing ? "🔄 Processing audio..." :
-                "Ask your AI coach anything..."
+                isListening
+                  ? "🎤 Listening..."
+                  : isProcessing
+                    ? "🔄 Processing audio..."
+                    : "Ask your AI coach anything..."
               }
               disabled={loading || isTyping}
               className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                hasNativeSupport ? 'pr-10' : 'pr-3'
+                hasNativeSupport ? "pr-10" : "pr-3"
               }`}
               minRows={1}
               maxRows={6}
@@ -612,11 +645,19 @@ return AlgorithmVisualizer;`;
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
                 className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${
-                  isListening ? 'text-red-500 animate-pulse' : 
-                  isProcessing ? 'text-blue-500' :
-                  'text-gray-500 hover:text-gray-700'
+                  isListening
+                    ? "text-red-500 animate-pulse"
+                    : isProcessing
+                      ? "text-blue-500"
+                      : "text-gray-500 hover:text-gray-700"
                 }`}
-                title={isListening ? 'Stop listening' : isProcessing ? 'Processing...' : 'Start voice input'}
+                title={
+                  isListening
+                    ? "Stop listening"
+                    : isProcessing
+                      ? "Processing..."
+                      : "Start voice input"
+                }
               >
                 {isListening ? (
                   <MicOff className="w-4 h-4" />
@@ -628,13 +669,16 @@ return AlgorithmVisualizer;`;
               </button>
             )}
             {speechError && (
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-xs text-red-500 opacity-80" title={speechError}>
+              <div
+                className="absolute right-8 top-1/2 -translate-y-1/2 text-xs text-red-500 opacity-80"
+                title={speechError}
+              >
                 ⚠️
               </div>
             )}
           </div>
-          <Button 
-            onClick={handleSend} 
+          <Button
+            onClick={handleSend}
             disabled={!input.trim() || isTyping || loading}
             size="sm"
             className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 px-4"
@@ -649,29 +693,37 @@ return AlgorithmVisualizer;`;
       </div>
       {isDiagramOpen && (
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/80" onClick={() => setIsDiagramOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={() => setIsDiagramOpen(false)}
+          />
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vh] bg-background border rounded-lg shadow-lg p-4 overflow-auto">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium">Diagram</div>
-              <Button size="sm" variant="ghost" onClick={() => setIsDiagramOpen(false)}>Close</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsDiagramOpen(false)}
+              >
+                Close
+              </Button>
             </div>
-            {activeDiagram && (
-              activeDiagram.engine === 'mermaid' ? (
+            {activeDiagram &&
+              (activeDiagram.engine === "mermaid" ? (
                 <Mermaid chart={activeDiagram.code} />
               ) : (
                 <FlowCanvas graph={activeDiagram.graph} height="80vh" />
-              )
-            )}
+              ))}
           </div>
         </div>
       )}
-      
+
       {/* Canvas Modal for Interactive Components */}
       <CanvasContainer
         isOpen={isCanvasOpen}
         onClose={() => setIsCanvasOpen(false)}
-        initialCode={canvasCode}
         title={canvasTitle}
+        problemId={problem?.id}
       />
     </Card>
   );

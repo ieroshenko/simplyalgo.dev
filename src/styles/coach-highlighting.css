@@ -1,0 +1,232 @@
+/* AI Coaching System Highlighting Styles */
+
+/* Coach highlight area - blue highlighting as shown in mockup */
+.coach-highlight-area {
+  background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500 with opacity */
+  border: 2px solid rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+  animation: coachHighlightPulse 2s ease-in-out infinite;
+}
+
+.dark .coach-highlight-area {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Subtle pulsing animation to draw attention */
+@keyframes coachHighlightPulse {
+  0%, 100% {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.7);
+  }
+}
+
+@keyframes coachHighlightPulseDark {
+  0%, 100% {
+    background-color: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
+}
+
+.dark .coach-highlight-area {
+  animation: coachHighlightPulseDark 2s ease-in-out infinite;
+}
+
+/* Input overlay container */
+.coach-input-overlay {
+  position: fixed;
+  z-index: 1000;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.dark .coach-input-overlay {
+  background: #1f2937;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Input textarea */
+.coach-input-textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 200px;
+  padding: 12px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+}
+
+.coach-input-textarea::placeholder {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.dark .coach-input-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Input overlay actions */
+.coach-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dark .coach-input-actions {
+  border-top-color: #374151;
+}
+
+/* Coach bubble positioning */
+.coach-bubble {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 320px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  z-index: 1001;
+  animation: coachBubbleSlideIn 0.3s ease-out;
+}
+
+@keyframes coachBubbleSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.coach-bubble-arrow {
+  position: absolute;
+  bottom: -8px;
+  right: 30px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #3b82f6;
+}
+
+/* Coach progress indicator */
+.coach-progress {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dark .coach-progress {
+  background: #1f2937;
+  border-color: #374151;
+  color: white;
+}
+
+.coach-progress-bar {
+  width: 120px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dark .coach-progress-bar {
+  background: #374151;
+}
+
+.coach-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  transition: width 0.3s ease;
+}
+
+/* Coach mode button in toolbar */
+.coach-mode-button {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coach-mode-button:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.coach-mode-button.active {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.coach-mode-button.active:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .coach-bubble {
+    top: 10px;
+    right: 10px;
+    max-width: 280px;
+    font-size: 14px;
+  }
+  
+  .coach-progress {
+    top: 10px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .coach-progress-bar {
+    width: 80px;
+    height: 4px;
+  }
+  
+  .coach-input-overlay {
+    min-width: 250px;
+    max-width: 90vw;
+  }
+}

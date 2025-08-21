@@ -1,3 +1,6 @@
+/* Import custom styles - must come first */
+@import './styles/coach-highlighting.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
