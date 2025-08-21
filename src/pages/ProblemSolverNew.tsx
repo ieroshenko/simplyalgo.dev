@@ -208,6 +208,7 @@ const ProblemSolverNew = () => {
     startCoaching,
     stopCoaching,
     submitResponse,
+    submitCoachingCode, // New interactive coaching submission
     cancelInput,
     skipStep,
     getElapsedTime,
@@ -216,6 +217,22 @@ const ProblemSolverNew = () => {
     userId: user?.id || "",
     problemDescription: problem?.description || "",
     editorRef: codeEditorRef,
+    onCodeInsert: async (code: string) => {
+      // Wrap the code string in a CodeSnippet for the existing handler
+      const snippet: CodeSnippet = {
+        id: `coaching-${Date.now()}`,
+        code,
+        language: "python",
+        isValidated: true,
+        insertionType: "smart",
+        insertionHint: {
+          type: "statement",
+          scope: "function", 
+          description: "AI coaching generated code"
+        }
+      };
+      await handleInsertCodeSnippet(snippet);
+    },
   });
 
   // Track which submission is expanded
@@ -1098,18 +1115,38 @@ const ProblemSolverNew = () => {
             <SimpleOverlay
               isVisible={true}
               position={coachingState.inputPosition}
-              placeholder="Type your answer here..."
-              onSubmit={submitResponse}
+              onValidateCode={() => {
+                // Get code from the highlighted area in the main editor
+                const editor = codeEditorRef.current;
+                if (!editor) {
+                  console.error("Editor not available for code validation");
+                  return;
+                }
+                
+                // Get the current code from the editor
+                const currentCode = editor.getValue();
+                console.log("Validating code from editor:", currentCode);
+                
+                // Submit the current editor code for validation
+                submitCoachingCode(currentCode, "Code validation from highlighted area");
+              }}
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
-              maxLength={500}
-              question={coachingState.session.steps[coachingState.session.currentStep]?.question}
-              hint={coachingState.session.steps[coachingState.session.currentStep]?.hint}
-              stepInfo={{
-                current: coachingState.session.currentStep + 1,
-                total: coachingState.session.totalSteps
+              question={coachingState.session.currentQuestion}
+              hint={coachingState.lastValidation?.nextStep?.hint || "Think about the next logical step in your solution"}
+              validationResult={coachingState.lastValidation ? {
+                isCorrect: coachingState.lastValidation.isCorrect,
+                feedback: coachingState.lastValidation.feedback,
+                nextStep: coachingState.lastValidation.nextStep
+              } : null}
+              hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
+              onExitCoach={() => {
+                console.log("Exiting coach mode due to AI service error");
+                stopCoaching();
               }}
-              elapsedTime={getElapsedTime()}
+              highlightedLine={coachingState.session.highlightArea?.startLine}
+              editorHeight={600}
+              editorRef={codeEditorRef}
             />
           )}
         </>

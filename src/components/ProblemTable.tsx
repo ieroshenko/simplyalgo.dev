@@ -36,12 +36,14 @@ interface ProblemTableProps {
   problems: Problem[];
   filteredCategory?: string;
   searchQuery?: string;
+  onToggleStar?: (problemId: string) => void;
 }
 
 const ProblemTable = ({
   problems,
   filteredCategory,
   searchQuery,
+  onToggleStar,
 }: ProblemTableProps) => {
   const navigate = useNavigate();
 
@@ -144,12 +146,17 @@ const ProblemTable = ({
                 >
                   <td className="px-4 py-3">{getStatusIcon(problem.status)}</td>
                   <td className="px-4 py-3">
-                    <button className="hover:scale-110 transition-transform">
-                      {problem.isStarred ? (
-                        <Sparkles className="w-4 h-4 text-amber-500 fill-current" />
-                      ) : (
-                        <Star className="w-4 h-4 text-muted-foreground hover:text-amber-500" />
-                      )}
+                    <button 
+                      className="hover:scale-110 transition-transform"
+                      onClick={() => onToggleStar?.(problem.id)}
+                    >
+                      <Star 
+                        className={`w-4 h-4 transition-colors ${
+                          problem.isStarred 
+                            ? "text-amber-500 fill-amber-500" 
+                            : "text-muted-foreground hover:text-amber-500"
+                        }`} 
+                      />
                     </button>
                   </td>
                   <td className="px-4 py-3">
