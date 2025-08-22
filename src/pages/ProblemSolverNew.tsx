@@ -31,7 +31,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Timer from "@/components/Timer";
 import { supabase } from "@/integrations/supabase/client";
-import { useCoaching } from "@/hooks/useCoaching";
+import { insertCodeSnippet } from "@/utils/codeInsertion";
+import { useCoachingNew } from "@/hooks/useCoachingNew";
 import CoachBubble from "@/components/coaching/CoachBubble";
 import HighlightOverlay from "@/components/coaching/HighlightOverlay";
 import SimpleOverlay from "@/components/coaching/SimpleOverlay";
@@ -207,14 +208,13 @@ const ProblemSolverNew = () => {
     coachingState,
     startCoaching,
     stopCoaching,
-    submitResponse,
-    submitCoachingCode, // New interactive coaching submission
+    submitCoachingCode,
+    insertCorrectCode,
     cancelInput,
-    skipStep,
-    getElapsedTime,
-  } = useCoaching({
+    closeFeedback,
+  } = useCoachingNew({
     problemId: problemId || "",
-    userId: user?.id || "",
+    userId: user?.id || "anonymous",
     problemDescription: problem?.description || "",
     editorRef: codeEditorRef,
     onCodeInsert: async (code: string) => {
@@ -364,35 +364,46 @@ const ProblemSolverNew = () => {
         column: position?.column || 0,
       };
 
-      // Always prefer backend GPT-guided insertion for precise placement
+      // Skip backend AI call for coaching-validated snippets
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
-      try {
-        const { data, error } = await supabase.functions.invoke("ai-chat", {
-          body: {
-            action: "insert_snippet",
-            code: currentCode,
-            snippet,
-            cursorPosition,
-            problemDescription: problem.description,
-            message: "[snippet insertion request]",
-            conversationHistory: [],
-          },
-        });
-        if (error) throw error;
-        if (data && typeof data.newCode === "string") {
-          newCodeFromBackend = data.newCode;
-          insertedAtLine =
-            typeof data.insertedAtLine === "number"
-              ? data.insertedAtLine
-              : undefined;
+      
+      if (!snippet.isValidated) {
+        // Only use backend GPT-guided insertion for non-coaching snippets
+        try {
+          const { data, error } = await supabase.functions.invoke("ai-chat", {
+            body: {
+              action: "insert_snippet",
+              code: currentCode,
+              snippet,
+              cursorPosition,
+              problemDescription: problem.description,
+              message: "[snippet insertion request]",
+              conversationHistory: [],
+            },
+          });
+          if (error) throw error;
+          if (data && typeof data.newCode === "string") {
+            newCodeFromBackend = data.newCode;
+            insertedAtLine =
+              typeof data.insertedAtLine === "number"
+                ? data.insertedAtLine
+                : undefined;
+          }
+        } catch (e) {
+          console.warn("Backend insert_snippet failed:", e);
         }
-      } catch (e) {
-        console.warn("Backend insert_snippet failed:", e);
+      }
+
+      // For coaching-validated snippets, use direct insertion
+      if (snippet.isValidated || !newCodeFromBackend) {
+        const result = insertCodeSnippet(currentCode, snippet);
+        newCodeFromBackend = result.newCode;
+        insertedAtLine = result.insertedAtLine;
       }
 
       if (!newCodeFromBackend) {
-        toast.error("AI placement failed. Please try again.");
+        toast.error("Code insertion failed. Please try again.");
         return;
       }
 
@@ -712,7 +723,7 @@ const ProblemSolverNew = () => {
                               </div>
                               <div className="border rounded overflow-hidden">
                                 <Editor
-                                  height="400px"
+                                  height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
                                   defaultLanguage="python"
                                   value={sol.code}
                                   theme="light"
@@ -1133,12 +1144,14 @@ const ProblemSolverNew = () => {
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
               question={coachingState.session.currentQuestion}
-              hint={coachingState.lastValidation?.nextStep?.hint || "Think about the next logical step in your solution"}
+              hint={coachingState.session.currentHint || coachingState.lastValidation?.nextStep?.hint}
               validationResult={coachingState.lastValidation ? {
                 isCorrect: coachingState.lastValidation.isCorrect,
                 feedback: coachingState.lastValidation.feedback,
+                codeToAdd: coachingState.lastValidation.codeToAdd,
                 nextStep: coachingState.lastValidation.nextStep
               } : null}
+              onInsertCorrectCode={insertCorrectCode}
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
                 console.log("Exiting coach mode due to AI service error");
