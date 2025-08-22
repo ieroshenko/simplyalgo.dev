@@ -159,9 +159,10 @@ export interface CoachingValidationResult {
   isCorrect: boolean;
   feedback: string;
   nextAction: 'insert_and_continue' | 'retry' | 'hint' | 'complete_session';
+  codeToAdd?: string; // Corrected code to insert when student's code is wrong
   
   // Analysis details
-  codeAnalysis: {
+  codeAnalysis?: {
     syntax: 'valid' | 'invalid';
     logic: 'correct' | 'incorrect' | 'partial';
     efficiency: 'optimal' | 'acceptable' | 'inefficient';
@@ -177,7 +178,7 @@ export interface CoachingValidationResult {
   // Next step generation
   nextStep?: {
     question: string;
-    expectedCodeType: 'loop' | 'condition' | 'variable' | 'expression' | 'return' | 'any';
+    expectedCodeType?: 'loop' | 'condition' | 'variable' | 'expression' | 'return' | 'any';
     hint: string;
     highlightArea?: CoachHighlightArea;
   };
@@ -202,6 +203,7 @@ export interface InteractiveCoachSession {
   isActive: boolean;
   currentStepNumber: number;
   currentQuestion: string;
+  currentHint?: string;
   awaitingSubmission: boolean;
   isCompleted: boolean;
   startedAt: Date;

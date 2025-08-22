@@ -5,10 +5,10 @@ import { ResponsesApiRequest, ResponsesApiResponse } from "./types.ts";
 declare const Deno: { env: { get(name: string): string | undefined } };
 
 // Model configuration
-export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "o3-mini").trim();
+export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5").trim();
 export const modelSource = Deno.env.get("OPENAI_MODEL")
   ? "OPENAI_MODEL env set"
-  : "defaulted to o3-mini (no OPENAI_MODEL)";
+  : "defaulted to gpt-5 (no OPENAI_MODEL)";
 export const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
 // OpenAI client instance

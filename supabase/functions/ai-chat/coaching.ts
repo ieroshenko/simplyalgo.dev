@@ -32,57 +32,158 @@ export async function startInteractiveCoaching(
   console.log("🎯 [startInteractiveCoaching] Starting...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  // Generate first coaching question
-  const firstStep = await generateNextCoachingStep(sessionId, currentCode, problemDescription, difficulty);
-  
-  // Validate the generated step
-  if (!firstStep || !firstStep.question) {
-    console.error("🚨 [startInteractiveCoaching] Invalid step generated:", firstStep);
-    throw new Error("Failed to generate valid coaching step");
-  }
-  
-  console.log("✅ [startInteractiveCoaching] Generated step:", firstStep);
+  // Analyze current code to determine correct line numbers
+  const codeLines = (currentCode || "def countBits(self, n: int) -> List[int]:").split('\n');
+  const nextLineNumber = Math.max(2, codeLines.length + 1); // Start from line 2 (after function signature) or after existing code
   
   // Store session in database
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("coaching_sessions")
-      .insert({
-        id: sessionId,
-        user_id: userId,
-        problem_id: problemId,
-        difficulty,
-        current_step_number: 1,
-        current_question: firstStep.question,
-        awaiting_submission: true,
-        is_completed: false,
-        session_state: 'active',
-        initial_code: currentCode,
-        total_steps: 0, // Will be updated as we progress
-        steps: [] // No longer using pre-generated steps
-      })
-      .select()
-      .single();
+  const { error: sessionError } = await supabaseAdmin
+    .from("coaching_sessions")
+    .insert({
+      id: sessionId,
+      user_id: userId,
+      problem_id: problemId,
+      difficulty: difficulty || "beginner",
+      total_steps: 5, // Estimated total steps for the problem
+      current_step_number: 1,
+      is_active: true,
+      started_at: new Date().toISOString(),
+      initial_code: currentCode,
+    });
 
-    if (error) {
-      console.error("Error creating coaching session:", error);
-      throw new Error("Failed to create coaching session");
+  if (sessionError) {
+    console.error("🚨 [startInteractiveCoaching] Database error:", sessionError);
+    throw new Error("Failed to create coaching session");
+  }
+
+  // Generate first coaching step using AI
+  const prompt = `You are an expert coding coach for LeetCode problem: ${problemId}.
+
+Problem: ${problemDescription}
+Current code:
+\`\`\`python
+${currentCode || "def countBits(self, n: int) -> List[int]:"}
+\`\`\`
+
+Difficulty level: ${difficulty}
+
+Analyze the current code and determine what the student needs to implement next. Look at what they already have and guide them to the next logical step.
+
+IMPORTANT CONTEXT:
+- The function signature, imports, and test cases are handled automatically by the Judge0 system
+- Focus ONLY on the algorithm implementation and problem-solving steps
+- Do NOT mention function signatures, imports, or test cases in your guidance
+- The student only needs to focus on the core logic inside the function body
+
+COACHING GUIDELINES:
+- Carefully examine the existing code to see what's already implemented
+- If they already have a result array (like "res = [0] * (n + 1)"), don't ask them to create it again
+- Guide them to the next missing piece (like adding a loop, implementing the bit counting logic, etc.)
+- Reference the correct line number where they should add code: line ${nextLineNumber}
+- Generate SPECIFIC and ACTIONABLE questions and hints based on the actual code analysis
+- Don't use generic placeholder text - be specific about what they need to implement
+- Focus on algorithm logic, not boilerplate code
+
+Return a JSON object with:
+- A specific question about what algorithm step to implement next
+- A concrete hint that guides them to the solution logic
+- The correct highlight area for where they should add code
+
+Required JSON format:
+{
+  "question": "[Specific question about what algorithm step to implement next based on current code]",
+  "hint": "[Specific actionable hint - mention exact code patterns, variable names, or logic they should implement]",
+  "highlightArea": {
+    "startLine": ${nextLineNumber},
+    "startColumn": 1,
+    "endLine": ${nextLineNumber},
+    "endColumn": 1
+  },
+  "difficulty": "${difficulty}",
+  "currentStepNumber": 1,
+  "awaitingSubmission": true,
+  "isCompleted": false
+}
+
+Examples of good questions/hints (focus on algorithm, not boilerplate):
+- Question: "What data structure should you create to store the bit counts for numbers 0 to n?"
+- Hint: "Create a list called 'result' with size n+1, initialized with zeros: result = [0] * (n + 1)"
+
+- Question: "How will you iterate through all numbers from 0 to n to calculate their bit counts?"
+- Hint: "Use a for loop: for i in range(n + 1): to process each number"
+
+- Question: "What's the most efficient way to count the number of 1's in a number's binary representation?"
+- Hint: "You can use bin(i).count('1') to count the 1's in the binary representation of number i"
+
+Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
+
+  try {
+    console.log("🎯 [startInteractiveCoaching] Initializing OpenAI...");
+    const openai = getOpenAI();
+    
+    console.log("🎯 [startInteractiveCoaching] Making API call...");
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 800,
+      temperature: 0.7,
+    });
+
+    console.log("🎯 [startInteractiveCoaching] API call successful");
+
+    const rawContent = response.choices[0].message.content || "{}";
+    let cleanContent = rawContent.trim();
+    
+    console.log("🎯 [startInteractiveCoaching] Raw AI response:", rawContent);
+    
+    if (cleanContent.startsWith("```")) {
+      cleanContent = cleanContent
+        .replace(/^```(?:json)?\n?/m, "")
+        .replace(/```$/m, "")
+        .trim();
     }
 
-    console.log("✅ [startInteractiveCoaching] Session created successfully");
+    console.log("🎯 [startInteractiveCoaching] Cleaned response:", cleanContent);
+    
+    if (!cleanContent || cleanContent === "{}") {
+      console.error("🚨 [startInteractiveCoaching] Empty response from AI");
+      throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
+    }
+    
+    const stepData = JSON.parse(cleanContent);
+    console.log("🎯 [startInteractiveCoaching] Parsed step data:", stepData);
+    
+    // Validate required fields
+    if (!stepData.question || !stepData.highlightArea) {
+      console.error("🚨 [startInteractiveCoaching] Missing required fields:", stepData);
+      throw new Error("Invalid coaching step data");
+    }
+    
+    // Store the initial step
+    await supabaseAdmin
+      .from("coaching_responses")
+      .insert({
+        session_id: sessionId,
+        step_number: 1,
+        ai_question: stepData.question,
+        ai_hint: stepData.hint,
+        highlight_area: stepData.highlightArea,
+        created_at: new Date().toISOString(),
+      });
+    
     return {
       sessionId,
-      question: firstStep.question,
-      hint: firstStep.hint,
-      highlightArea: firstStep.highlightArea,
-      difficulty,
+      question: stepData.question,
+      hint: stepData.hint,
+      highlightArea: stepData.highlightArea,
+      difficulty: stepData.difficulty || difficulty,
       currentStepNumber: 1,
       awaitingSubmission: true,
-      isCompleted: false
+      isCompleted: false,
     };
-  } catch (dbError) {
-    console.error("Database operation failed:", dbError);
-    throw new Error("Failed to store coaching session");
+  } catch (error) {
+    console.error("🚨 [startInteractiveCoaching] Error:", error);
+    throw error;
   }
 }
 
@@ -280,11 +381,18 @@ Be encouraging but accurate. Help them learn through discovery.`;
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini", 
       messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 1000,
+      max_completion_tokens: 1500,
       // GPT-5 doesn't support temperature, top_p, etc.
     });
 
     console.log("🎯 [validateCoachingSubmission] API call successful");
+
+    // Check if response was truncated due to token limit
+    const finishReason = response.choices[0].finish_reason;
+    if (finishReason === "length") {
+      console.error("🚨 [validateCoachingSubmission] Response truncated due to token limit");
+      throw new Error("AI_RESPONSE_TRUNCATED: Response was truncated. Please try with shorter code or simpler validation.");
+    }
 
     const rawContent = response.choices[0].message.content || "{}";
     let cleanContent = rawContent.trim();

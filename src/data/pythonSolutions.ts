@@ -249,4 +249,65 @@ export const pythonSolutions: Record<string, Solution[]> = {
       explanation: "Carry prefix products in the output array, then multiply by running postfix in reverse to achieve O(1) extra space."
     }
   ],
+
+  "counting-bits": [
+    {
+      title: "Bit Manipulation - I",
+      code: `def countBits(self, n: int) -> List[int]:
+    res = []
+    for num in range(n + 1):
+        one = 0
+        for i in range(32):
+            if num & (1 << i):
+                one += 1
+        res.append(one)
+    return res`,
+      complexity: { time: "O(n log n)", space: "O(1) extra; O(n) output" },
+      explanation: "For each number, check all 32 bits to count the number of 1s by using bit shifting and AND operations."
+    },
+    {
+      title: "Bit Manipulation - II",
+      code: `def countBits(self, n: int) -> List[int]:
+    res = [0] * (n + 1)
+    for i in range(1, n + 1):
+        num = i
+        while num != 0:
+            res[i] += 1
+            num &= (num - 1)
+    return res`,
+      complexity: { time: "O(n log n)", space: "O(1) extra; O(n) output" },
+      explanation: "Use the bit trick num & (num - 1) to remove the rightmost 1 bit. Count how many times we can do this operation."
+    },
+    {
+      title: "In-Built Function",
+      code: `def countBits(self, n: int) -> List[int]:
+    return [bin(i).count('1') for i in range(n + 1)]`,
+      complexity: { time: "O(n log n)", space: "O(1) extra; O(n) output" },
+      explanation: "Convert each number to binary string and count the '1' characters. Simple but not the most efficient approach."
+    },
+    {
+      title: "Bit Manipulation (DP)",
+      code: `def countBits(self, n: int) -> List[int]:
+    dp = [0] * (n + 1)
+    offset = 1
+
+    for i in range(1, n + 1):
+        if offset * 2 == i:
+            offset = i
+        dp[i] = 1 + dp[i - offset]
+    return dp`,
+      complexity: { time: "O(n)", space: "O(1) extra; O(n) output" },
+      explanation: "Use dynamic programming with offset pattern. Each power of 2 starts a new pattern where dp[i] = 1 + dp[i - offset]."
+    },
+    {
+      title: "Bit Manipulation (Optimal)",
+      code: `def countBits(self, n: int) -> List[int]:
+    dp = [0] * (n + 1)
+    for i in range(n + 1):
+        dp[i] = dp[i >> 1] + (i & 1)
+    return dp`,
+      complexity: { time: "O(n)", space: "O(1) extra; O(n) output" },
+      explanation: "Optimal DP solution: dp[i] = dp[i//2] + (i%2). The number of 1s in i equals the number of 1s in i//2 plus 1 if i is odd."
+    }
+  ],
 };

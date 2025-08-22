@@ -1,9 +1,9 @@
 /* AI Coaching System Highlighting Styles */
 
-/* Coach highlight area - blue highlighting as shown in mockup */
+/* Coach highlight area - lighter blue highlighting */
 .coach-highlight-area {
-  background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500 with opacity */
-  border: 2px solid rgba(59, 130, 246, 0.5);
+  background-color: rgba(59, 130, 246, 0.08) !important; /* much lighter blue */
+  border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 4px;
   animation: coachHighlightPulse 2s ease-in-out infinite;
 }
@@ -16,12 +16,12 @@
 /* Subtle pulsing animation to draw attention */
 @keyframes coachHighlightPulse {
   0%, 100% {
-    background-color: rgba(59, 130, 246, 0.2);
-    border-color: rgba(59, 130, 246, 0.5);
+    background-color: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.25);
   }
   50% {
-    background-color: rgba(59, 130, 246, 0.3);
-    border-color: rgba(59, 130, 246, 0.7);
+    background-color: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.35);
   }
 }
 

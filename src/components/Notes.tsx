@@ -97,7 +97,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
         .select("*")
         .eq("user_id", user.id)
         .eq("problem_id", problemId)
-        .single()) as SupabaseQueryResult<NotesData>;
+        .maybeSingle()) as SupabaseQueryResult<NotesData>;
 
       if (error && error.code !== "PGRST116") {
         throw error;
