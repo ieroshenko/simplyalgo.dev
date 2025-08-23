@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { CoachingState, CoachStep, CoachHighlightArea, InteractiveCoachSession } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCodeSnippet } from "@/utils/codeInsertion";
+import { smartInsertCode } from "@/utils/smartCodeInsertion";
 
 interface UseCoachingProps {
   problemId: string;
@@ -51,7 +52,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           range: {
             startLineNumber: highlightArea.startLine,
             startColumn: 1,
-            endLineNumber: highlightArea.endLine,
+            endLineNumber: highlightArea.startLine, // Only highlight single line, not range
             endColumn: 1000
           },
           options: {
@@ -212,6 +213,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     setCoachingState(prev => ({
       ...prev,
       isValidating: true,
+      isWaitingForResponse: true,
       showInputOverlay: false,
     }));
 
@@ -235,6 +237,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       setCoachingState(prev => ({
         ...prev,
         isValidating: false,
+        isWaitingForResponse: false,
       }));
 
       if (data.isCorrect && data.nextAction === "insert_and_continue") {
@@ -337,6 +340,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       setCoachingState(prev => ({
         ...prev,
         isValidating: false,
+        isWaitingForResponse: false,
         feedback: {
           show: true,
           type: "error", 
@@ -376,28 +380,49 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         editorRef.current.setValue(result.newCode);
       }
 
-      // Show next step after insertion
+      // Clear validation and advance to next step
       setCoachingState(prev => ({
         ...prev,
         showInputOverlay: false,
         lastValidation: undefined,
       }));
 
-      const validation = coachingState.lastValidation;
-      if (validation?.nextStep) {
-        setTimeout(() => {
-          showInteractiveQuestion({
-            question: validation.nextStep.question,
-            hint: validation.nextStep.hint,
-            highlightArea: validation.nextStep.highlightArea,
-          });
+      // Generate next coaching step after successful insertion
+      if (coachingState.session && editorRef.current) {
+        const updatedCode = editorRef.current.getValue();
+        setTimeout(async () => {
+          try {
+            // Call backend to generate next step based on updated code
+            const { data, error } = await supabase.functions.invoke("ai-chat", {
+              body: {
+                action: "generate_next_coaching_step",
+                sessionId: coachingState.session.id,
+                currentCode: updatedCode,
+                previousResponse: "Code inserted successfully",
+                problemDescription: "Current problem",
+                difficulty: coachingState.session.difficulty
+              },
+            });
+            
+            if (error) throw error;
+            
+            if (data?.question) {
+              showInteractiveQuestion({
+                question: data.question,
+                hint: data.hint,
+                highlightArea: data.highlightArea,
+              });
+            }
+          } catch (error) {
+            console.error("Failed to generate next step:", error);
+          }
         }, 1500);
       }
 
     } catch (error) {
       console.error("🚨 [INSERT CODE] Error:", error);
     }
-  }, [coachingState.lastValidation, onCodeInsert, editorRef, showInteractiveQuestion]);
+  }, [coachingState.lastValidation, coachingState.session, onCodeInsert, editorRef, showInteractiveQuestion]);
 
   // Stop coaching session
   const stopCoaching = useCallback(() => {

@@ -105,15 +105,17 @@ Required JSON format:
   "isCompleted": false
 }
 
-Examples of good questions/hints (focus on algorithm, not boilerplate):
-- Question: "What data structure should you create to store the bit counts for numbers 0 to n?"
-- Hint: "Create a list called 'result' with size n+1, initialized with zeros: result = [0] * (n + 1)"
+Examples of good Socratic questions/hints (guide discovery, don't give solutions):
+- Question: "What data structure would be appropriate to store results for each number from 0 to n?"
+- Hint: "Think about what type of collection can hold multiple values and allows access by index"
 
-- Question: "How will you iterate through all numbers from 0 to n to calculate their bit counts?"
-- Hint: "Use a for loop: for i in range(n + 1): to process each number"
+- Question: "How would you systematically process each number from 0 to n?"
+- Hint: "What Python construct allows you to repeat an operation for a sequence of numbers?"
 
-- Question: "What's the most efficient way to count the number of 1's in a number's binary representation?"
-- Hint: "You can use bin(i).count('1') to count the 1's in the binary representation of number i"
+- Question: "What approach could you use to count bits in a number's binary representation?"
+- Hint: "Consider what Python functions might help convert numbers to different representations"
+
+CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions that help them think through the problem step by step.
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
 
@@ -355,6 +357,8 @@ The student has written code in the highlighted area and is asking for validatio
 4. If correct, acknowledge their progress and suggest the next step
 5. If incorrect, provide specific feedback and guidance
 
+CRITICAL: Before providing "codeToAdd", check if that exact code already exists in their current editor code. If the code they need is already present, DO NOT include "codeToAdd" - instead guide them to the next step.
+
 Return a JSON object with this exact structure:
 {
   "isCorrect": boolean,
@@ -368,7 +372,7 @@ Return a JSON object with this exact structure:
       "description": "string - what area of code to focus on next"
     }
   },
-  "codeToAdd": "string - if their approach is correct, any additional code to add (optional)"
+  "codeToAdd": "string - ONLY if they need NEW code that doesn't already exist in their editor. If the code already exists, omit this field entirely."
 }
 
 Be encouraging but accurate. Help them learn through discovery.`;
@@ -635,3 +639,4 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     throw new Error(`Failed to parse coaching session: ${(parseError as Error)?.message}`);
   }
 }
+

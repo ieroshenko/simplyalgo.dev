@@ -1,6 +1,51 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Minimize2, Move, Check, ChevronDown, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useRef, useEffect } from 'react';
+import { Button } from '../ui/button';
+import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle } from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+// Blurred hint component with click-to-reveal
+const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
+  const [isRevealed, setIsRevealed] = useState(false);
+
+  return (
+    <div 
+      className="relative cursor-pointer"
+      onClick={() => setIsRevealed(!isRevealed)}
+      style={{ 
+        fontSize: "12px", 
+        color: "#6b7280",
+        padding: "6px 10px",
+        backgroundColor: "rgba(59, 130, 246, 0.08)",
+        borderRadius: "6px",
+        borderLeft: "3px solid rgba(59, 130, 246, 0.3)"
+      }}
+    >
+      <div className="flex items-center gap-2">
+        {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+        <span className="text-xs font-medium">
+          {isRevealed ? 'Hide Hint' : 'Click to reveal hint'}
+        </span>
+      </div>
+      {isRevealed && (
+        <div className="mt-2 text-gray-700 dark:text-gray-300">
+          💡 {hint}
+        </div>
+      )}
+      {!isRevealed && (
+        <div 
+          className="mt-2 select-none"
+          style={{
+            filter: 'blur(4px)',
+            color: '#9ca3af',
+            fontSize: '11px'
+          }}
+        >
+          This hint will help guide you to the solution...
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface SimpleOverlayProps {
   isVisible: boolean;
@@ -8,6 +53,7 @@ interface SimpleOverlayProps {
   onValidateCode: () => void;
   onCancel: () => void;
   onExitCoach?: () => void;
+  onFinishCoaching?: () => void;
   onInsertCorrectCode?: () => void; // New prop for inserting correct code
   isValidating?: boolean;
   hasError?: boolean;
@@ -42,6 +88,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   onValidateCode,
   onCancel,
   onExitCoach,
+  onFinishCoaching,
   onInsertCorrectCode,
   isValidating = false,
   hasError = false,
@@ -288,19 +335,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 {question}
               </div>
               {hint && !validationResult && (
-                <div 
-                  style={{ 
-                    fontSize: "12px", 
-                    color: "#6b7280",
-                    padding: "6px 10px",
-                    backgroundColor: "rgba(59, 130, 246, 0.08)",
-                    borderRadius: "6px",
-                    borderLeft: "3px solid rgba(59, 130, 246, 0.3)"
-                  }}
-                  className="dark:text-gray-400 dark:bg-blue-500/10"
-                >
-                  💡 {hint}
-                </div>
+                <BlurredHintComponent hint={hint} />
               )}
             </div>
           )}
@@ -340,6 +375,20 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                           💡 {validationResult.nextStep.hint}
                         </div>
                       )}
+                      {validationResult.feedback.includes('faster') || validationResult.feedback.includes('efficient') || validationResult.feedback.includes('O(n)') ? (
+                        <Button
+                          onClick={() => {
+                            // TODO: Start optimization coaching session
+                            console.log('Starting optimization coaching...');
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Learn Optimization
+                        </Button>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -408,12 +457,28 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         >
           {validationResult?.isCorrect ? (
             <Button
-              onClick={onCancel}
+              onClick={() => {
+                // Trigger confetti animation
+                confetti({
+                  particleCount: 100,
+                  spread: 70,
+                  origin: { y: 0.6 }
+                });
+                
+                // Wait a moment then finish coaching
+                setTimeout(() => {
+                  if (onFinishCoaching) {
+                    onFinishCoaching();
+                  } else {
+                    onCancel();
+                  }
+                }, 1000);
+              }}
               size="sm"
               className="bg-green-600/90 hover:bg-green-700/90 text-white backdrop-blur-sm shadow-md px-6"
             >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Continue
+              <Sparkles className="w-4 h-4 mr-2" />
+              Finish
             </Button>
           ) : validationResult && !validationResult.isCorrect ? (
             <div className="flex gap-2">

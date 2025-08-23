@@ -17,7 +17,8 @@ import {
 } from "./openai-utils.ts";
 import { 
   startInteractiveCoaching, 
-  validateCoachingSubmission 
+  validateCoachingSubmission,
+  generateNextCoachingStep 
 } from "./coaching.ts";
 import { 
   maybeGenerateDiagram, 
@@ -248,6 +249,49 @@ serve(async (req) => {
             error: "Failed to validate coaching submission",
             details: errorMessage,
             errorType: (error as Error)?.name || "UnknownError"
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // Generate next coaching step action
+    if (req.method === "POST" && action === "generate_next_coaching_step") {
+      const { sessionId, currentCode, previousResponse, problemDescription, difficulty } = body;
+      
+      if (!sessionId || !currentCode) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing sessionId or currentCode for generate_next_coaching_step action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      try {
+        const nextStep = await generateNextCoachingStep(
+          sessionId,
+          currentCode,
+          previousResponse || "",
+          problemDescription || "",
+          difficulty || "medium"
+        );
+        
+        return new Response(JSON.stringify(nextStep), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error("Error generating next coaching step:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate next coaching step",
+            details: (error as Error)?.message,
           }),
           {
             status: 500,
