@@ -35,28 +35,8 @@ export async function startInteractiveCoaching(
   // Analyze current code to determine correct line numbers
   const codeLines = (currentCode || "def countBits(self, n: int) -> List[int]:").split('\n');
   const nextLineNumber = Math.max(2, codeLines.length + 1); // Start from line 2 (after function signature) or after existing code
-  
-  // Store session in database
-  const { error: sessionError } = await supabaseAdmin
-    .from("coaching_sessions")
-    .insert({
-      id: sessionId,
-      user_id: userId,
-      problem_id: problemId,
-      difficulty: difficulty || "beginner",
-      total_steps: 5, // Estimated total steps for the problem
-      current_step_number: 1,
-      is_active: true,
-      started_at: new Date().toISOString(),
-      initial_code: currentCode,
-    });
 
-  if (sessionError) {
-    console.error("🚨 [startInteractiveCoaching] Database error:", sessionError);
-    throw new Error("Failed to create coaching session");
-  }
-
-  // Generate first coaching step using AI
+  // Generate first coaching step using AI BEFORE creating database session
   const prompt = `You are an expert coding coach for LeetCode problem: ${problemId}.
 
 Problem: ${problemDescription}
@@ -119,6 +99,7 @@ CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions t
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
 
+  let stepData;
   try {
     console.log("🎯 [startInteractiveCoaching] Initializing OpenAI...");
     const openai = getOpenAI();
@@ -152,13 +133,41 @@ Be encouraging and guide them step by step with specific, actionable advice focu
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
     
-    const stepData = JSON.parse(cleanContent);
+    stepData = JSON.parse(cleanContent);
     console.log("🎯 [startInteractiveCoaching] Parsed step data:", stepData);
     
     // Validate required fields
     if (!stepData.question || !stepData.highlightArea) {
       console.error("🚨 [startInteractiveCoaching] Missing required fields:", stepData);
       throw new Error("Invalid coaching step data");
+    }
+  } catch (error) {
+    console.error("🚨 [startInteractiveCoaching] AI generation failed:", error);
+    throw error;
+  }
+
+  // Only create database session AFTER successful AI step generation
+  try {
+    console.log("🎯 [startInteractiveCoaching] Creating database session...");
+    const { error: sessionError } = await supabaseAdmin
+      .from("coaching_sessions")
+      .insert({
+        id: sessionId,
+        user_id: userId,
+        problem_id: problemId,
+        difficulty: difficulty || "beginner",
+        total_steps: 5, // Estimated total steps for the problem
+        current_step_number: 1,
+        current_question: stepData.question,
+        is_active: true,
+        awaiting_submission: true,
+        started_at: new Date().toISOString(),
+        initial_code: currentCode,
+      });
+
+    if (sessionError) {
+      console.error("🚨 [startInteractiveCoaching] Database error:", sessionError);
+      throw new Error("Failed to create coaching session");
     }
     
     // Store the initial step
@@ -173,6 +182,8 @@ Be encouraging and guide them step by step with specific, actionable advice focu
         created_at: new Date().toISOString(),
       });
     
+    console.log("🎯 [startInteractiveCoaching] Session created successfully");
+    
     return {
       sessionId,
       question: stepData.question,
@@ -183,9 +194,9 @@ Be encouraging and guide them step by step with specific, actionable advice focu
       awaitingSubmission: true,
       isCompleted: false,
     };
-  } catch (error) {
-    console.error("🚨 [startInteractiveCoaching] Error:", error);
-    throw error;
+  } catch (dbError) {
+    console.error("🚨 [startInteractiveCoaching] Database operation failed:", dbError);
+    throw new Error("Failed to create coaching session");
   }
 }
 
