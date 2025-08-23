@@ -37,6 +37,7 @@ import { insertCodeSnippet } from "@/utils/codeInsertion";
 import { smartInsertCode } from "@/utils/smartCodeInsertion";
 import { useCoachingNew } from "@/hooks/useCoachingNew";
 import { useTheme } from "@/hooks/useTheme";
+import { useEditorTheme } from "@/hooks/useEditorTheme";
 import CoachBubble from "@/components/coaching/CoachBubble";
 import HighlightOverlay from "@/components/coaching/HighlightOverlay";
 import SimpleOverlay from "@/components/coaching/SimpleOverlay";
@@ -111,6 +112,7 @@ const ProblemSolverNew = () => {
   const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const { theme, setTheme, isDark } = useTheme();
+  const { currentTheme } = useEditorTheme();
   const [activeTab, setActiveTab] = useState("question");
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -766,7 +768,7 @@ const ProblemSolverNew = () => {
                                   height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
                                   defaultLanguage="python"
                                   value={sol.code}
-                                  theme="light"
+                                  theme={currentTheme}
                                   options={{
                                     readOnly: true,
                                     minimap: { enabled: false },
@@ -897,7 +899,7 @@ const ProblemSolverNew = () => {
                                           s.language || "python"
                                         ).toLowerCase()}
                                         value={s.code}
-                                        theme="light"
+                                        theme={currentTheme}
                                         options={{
                                           readOnly: true,
                                           minimap: { enabled: false },
