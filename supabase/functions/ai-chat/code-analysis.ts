@@ -1,4 +1,4 @@
-import { llmText, llmJson } from "./openai-utils.ts";
+import { llmText, llmJson, llmJsonFast } from "./openai-utils.ts";
 import { CodeSnippet, ChatMessage } from "./types.ts";
 
 /**
@@ -496,7 +496,7 @@ export async function insertSnippetSmart(
     );
   }
 
-  const placementPrompt = `Analyze this Python code and determine the best place to insert a code snippet.
+  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them.
 
 CURRENT FILE:
 ---BEGIN FILE---
@@ -508,13 +508,21 @@ SNIPPET TO INSERT:
 ${snippet.code}
 ---END SNIPPET---
 
-Find the most logical place for this snippet. Consider code flow, variable scope, and algorithm structure.
+IMPORTANT RULES:
+1. If the snippet code already exists in the current file, return insertAtLine: -1
+2. Find the most logical place to insert this snippet considering:
+   - Code flow and algorithm structure
+   - Variable scope and dependencies
+   - Function boundaries
+   - Proper indentation context
+3. The snippet should be inserted as new lines, not replace existing code
+4. Consider if this is part of an algorithm implementation inside a function
 
 Output JSON:
 {
-  "insertAtLine": <0-based line number>,
+  "insertAtLine": <0-based line number, or -1 if code already exists>,
   "indentation": "<spaces for proper indentation>",
-  "rationale": "<brief reason>"
+  "rationale": "<brief reason for placement or why skipped>"
 }`;
 
   console.log("[ai-chat] insert_snippet using main model for smart placement");

@@ -80,7 +80,7 @@ A comprehensive LeetCode-style coding platform built with React, TypeScript, and
 #### Backend Infrastructure
 
 - **Supabase Edge Function**: `supabase/functions/ai-chat/index.ts`
-  - OpenAI GPT-4o-mini integration
+  - OpenAI gpt-5-mini integration
   - Parallel processing of conversation and code analysis
   - Structured prompts for intelligent code validation
   - CORS handling and comprehensive error management

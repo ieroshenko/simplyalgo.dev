@@ -66,41 +66,58 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Modern Coding Platform Dark Theme (LeetCode/NeetCode style) */
+    --background: 220 13% 9%; /* #0f1419 - Very dark blue-gray background */
+    --foreground: 0 0% 95%; /* #f2f2f2 - Light foreground text */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 13% 11%; /* #1a1e23 - Slightly lighter than background */
+    --card-foreground: 0 0% 95%; /* #f2f2f2 */
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 13% 11%; /* #1a1e23 */
+    --popover-foreground: 0 0% 95%; /* #f2f2f2 */
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 210 100% 60%; /* #3b82f6 - Blue primary color */
+    --primary-foreground: 0 0% 100%; /* #ffffff */
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 13% 16%; /* #262a30 - Darker secondary */
+    --secondary-foreground: 0 0% 95%; /* #f2f2f2 */
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 13% 16%; /* #262a30 - Muted background */
+    --muted-foreground: 0 0% 60%; /* #999999 - Muted text */
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 142 71% 45%; /* #22c55e - Green accent (success color) */
+    --accent-foreground: 0 0% 100%; /* #ffffff */
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 142 71% 45%; /* #22c55e - Green for success */
+    --success-foreground: 0 0% 100%; /* #ffffff */
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --destructive: 0 84% 60%; /* #ef4444 - Red for errors */
+    --destructive-foreground: 0 0% 100%; /* #ffffff */
+
+    --border: 220 13% 20%; /* #2f343a - Border color */
+    --input: 220 13% 16%; /* #262a30 - Input background */
+    --ring: 210 100% 60%; /* #3b82f6 - Focus ring */
+    
+    /* Sidebar colors */
+    --sidebar-background: 220 13% 9%; /* #0f1419 - Same as main background */
+    --sidebar-foreground: 0 0% 95%; /* #f2f2f2 */
+    --sidebar-primary: 210 100% 60%; /* #3b82f6 - Blue */
+    --sidebar-primary-foreground: 0 0% 100%; /* #ffffff */
+    --sidebar-accent: 220 13% 11%; /* #1a1e23 - Accent background */
+    --sidebar-accent-foreground: 0 0% 95%; /* #f2f2f2 */
+    --sidebar-border: 220 13% 20%; /* #2f343a - Border */
+    --sidebar-ring: 210 100% 60%; /* #3b82f6 - Blue */
+
+    /* Profile header */
+    --profile-header: 220 13% 11%; /* #1a1e23 */
+    --profile-header-foreground: 0 0% 95%; /* #f2f2f2 */
+
+    /* Additional accent colors for coding platforms */
+    --code-yellow: 48 96% 53%; /* #fbbf24 - Warning/yellow */
+    --code-orange: 25 95% 53%; /* #f97316 - Orange accent */
+    --code-red: 0 84% 60%; /* #ef4444 - Error red */
+    --code-green: 142 71% 45%; /* #22c55e - Success green */
+    --code-purple: 262 83% 58%; /* #8b5cf6 - Purple accent */
   }
 }
 

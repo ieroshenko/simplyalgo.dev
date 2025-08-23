@@ -115,17 +115,20 @@ export const useUserStats = (userId?: string) => {
     console.log("🎯 Problem ID:", problemId);
 
     try {
-      // First check if user has already solved this problem before
+      // First check if user has already solved this problem before (excluding the current solve)
       const { data: previousSolves, error: solvesError } = await supabase
         .from("user_problem_attempts")
-        .select("id")
+        .select("id, created_at")
         .eq("user_id", userId)
         .eq("problem_id", problemId)
-        .eq("status", "passed");
+        .eq("status", "passed")
+        .order("created_at", { ascending: false });
 
       if (solvesError) throw solvesError;
 
-      const isFirstTimeSolving = !previousSolves || previousSolves.length === 0;
+      // Check if there are multiple solves (more than just the current one)
+      const isFirstTimeSolving = !previousSolves || previousSolves.length <= 1;
+      console.log("🎯 Previous solves count:", previousSolves?.length || 0);
       console.log("🎯 Is first time solving this problem:", isFirstTimeSolving);
 
       if (!isFirstTimeSolving) {
