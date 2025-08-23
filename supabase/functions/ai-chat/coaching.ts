@@ -37,7 +37,14 @@ export async function startInteractiveCoaching(
   const nextLineNumber = Math.max(2, codeLines.length + 1); // Start from line 2 (after function signature) or after existing code
 
   // Generate first coaching step using AI BEFORE creating database session
-  const prompt = `You are an expert coding coach for LeetCode problem: ${problemId}.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+
+CRITICAL EXECUTION CONTEXT:
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
+- Students ONLY implement the core algorithm logic inside the function body
+- NEVER mention function signatures, imports, or test case handling
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
 
 Problem: ${problemDescription}
 Current code:
@@ -47,22 +54,19 @@ ${currentCode || "def countBits(self, n: int) -> List[int]:"}
 
 Difficulty level: ${difficulty}
 
-Analyze the current code and determine what the student needs to implement next. Look at what they already have and guide them to the next logical step.
+COACHING APPROACH:
+- Analyze ONLY the algorithm logic and implementation
+- Guide them through the problem-solving approach step by step
+- Focus on data structures, loops, conditions, and algorithmic thinking
+- Reference line ${nextLineNumber} for where they should add algorithm code
+- Be specific about algorithmic steps, not boilerplate code
 
-IMPORTANT CONTEXT:
-- The function signature, imports, and test cases are handled automatically by the Judge0 system
-- Focus ONLY on the algorithm implementation and problem-solving steps
-- Do NOT mention function signatures, imports, or test cases in your guidance
-- The student only needs to focus on the core logic inside the function body
-
-COACHING GUIDELINES:
-- Carefully examine the existing code to see what's already implemented
-- If they already have a result array (like "res = [0] * (n + 1)"), don't ask them to create it again
-- Guide them to the next missing piece (like adding a loop, implementing the bit counting logic, etc.)
-- Reference the correct line number where they should add code: line ${nextLineNumber}
-- Generate SPECIFIC and ACTIONABLE questions and hints based on the actual code analysis
-- Don't use generic placeholder text - be specific about what they need to implement
-- Focus on algorithm logic, not boilerplate code
+ALGORITHM-FOCUSED GUIDELINES:
+- Examine existing algorithm implementation (ignore signatures)
+- If they have data structures initialized, guide to the next algorithmic step
+- Focus on core logic: iteration patterns, bit manipulation, counting, etc.
+- Ask about algorithmic approach, not code formatting or imports
+- Help them think through the problem-solving process
 
 Return a JSON object with:
 - A specific question about what algorithm step to implement next
@@ -212,14 +216,14 @@ export async function generateNextCoachingStep(
 ): Promise<CoachingStep> {
   console.log("🎯 [generateNextCoachingStep] Generating step...");
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform. Generate a single, targeted coaching question.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
 
-CODING ENVIRONMENT CONTEXT:
-- This is an online coding platform similar to LeetCode
-- Students write Python code that gets executed with Judge0 (automatic test runner)
-- All necessary imports (List, Optional, etc.) are handled automatically by the judge system
-- Students only need to implement the algorithm logic inside the function body
-- The platform tests their code against multiple test cases automatically
+CRITICAL EXECUTION CONTEXT:
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
+- Students ONLY implement the core algorithm logic inside the function body
+- NEVER mention function signatures, imports, or test case handling in questions
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
 
 PROBLEM: ${problemDescription}
 
@@ -232,24 +236,24 @@ ${previousResponse ? `PREVIOUS STUDENT RESPONSE: ${previousResponse}` : ''}
 
 STUDENT PROGRESS ANALYSIS:
 ${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student has empty editor or only function signature. They need guidance on algorithm approach and implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their current logic for correctness, efficiency, and next steps."}
+  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
-COACHING STRATEGY:
-1. If code is empty/minimal: Focus on problem understanding, algorithm approach, and first implementation steps
-2. If code exists: Analyze current implementation, identify issues, and guide improvements  
-3. Ask ONE specific question that helps them write 1-3 lines of code (not the whole solution)
-4. Guide them to discover solutions rather than giving direct answers
+ALGORITHM-FOCUSED COACHING STRATEGY:
+1. If code is minimal: Focus on algorithm approach and first implementation steps  
+2. If code exists: Analyze algorithm logic, identify issues, and guide algorithmic improvements
+3. Ask ONE specific question about algorithm logic that helps them write 1-3 lines of core code
+4. Guide algorithmic discovery rather than giving direct code solutions
 
-QUESTION REQUIREMENTS:
-- Ask about SPECIFIC next steps: "What data structure would store your results?" or "How would you iterate through the array?"
-- Focus on writing small incremental code pieces
-- Reference their ACTUAL code with specific line numbers if they have code
-- Include helpful hints that guide discovery
+QUESTION REQUIREMENTS (ALGORITHM-FOCUSED):
+- Ask about SPECIFIC algorithmic steps: "What data structure would store your results?" or "How would you process each number?"
+- Focus on core algorithm logic: loops, conditions, data manipulation
+- Reference their ACTUAL algorithm implementation with specific line numbers
+- Include hints that guide algorithmic discovery, not boilerplate code
 
-FOR HIGHLIGHTING: Use EXACT line numbers from their code, or line 1 if they only have function signature
+FOR HIGHLIGHTING: Use EXACT line numbers from their algorithm code (ignore function signature lines)
 
 Return ONLY a JSON object with this structure:
 {
@@ -349,7 +353,14 @@ export async function validateCoachingSubmission(
     throw new Error("Coaching session not found");
   }
 
-  const prompt = `You are an expert coding coach. Validate a student's code submission and provide feedback.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+
+CRITICAL EXECUTION CONTEXT:
+- This code will be executed on Judge0 servers (like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY by the platform
+- Students ONLY need to implement the core algorithm logic inside the function body
+- DO NOT mention function signatures, imports, or test case handling in your feedback
+- Focus ONLY on algorithm correctness and implementation logic
 
 Current Problem: ${session.problemDescription}
 
@@ -358,35 +369,41 @@ Student's Current Code:
 ${currentEditorCode}
 \`\`\`
 
-Student's Response/Explanation: "${studentResponse}"
+${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area" 
+  ? `Student's Explanation: "${studentResponse}"
 
-The student has written code in the highlighted area and is asking for validation. Analyze their current code implementation:
+` : ""}VALIDATION FOCUS:
+1. Analyze ONLY the algorithm logic and implementation approach
+2. Check for logical errors in the problem-solving approach  
+3. Verify variable usage, loops, and data manipulation
+4. Ignore any missing imports or function signature issues (platform handles these)
+5. Focus on whether their core algorithm will produce correct results
 
-1. Check if the code logic is correct for solving the problem
-2. Look for syntax errors, logical errors, or missing components
-3. Determine if they're on the right track or need guidance
-4. If correct, acknowledge their progress and suggest the next step
-5. If incorrect, provide specific feedback and guidance
+FEEDBACK GUIDELINES:
+- Comment ONLY on algorithm logic, not boilerplate code
+- If they use built-in functions like bin(), count(), range() - that's perfectly fine
+- Focus on algorithm correctness: loops, conditions, data structures, return logic
+- Be specific about what algorithmic step needs improvement
 
 CRITICAL: Before providing "codeToAdd", check if that exact code already exists in their current editor code. If the code they need is already present, DO NOT include "codeToAdd" - instead guide them to the next step.
 
 Return a JSON object with this exact structure:
 {
   "isCorrect": boolean,
-  "feedback": "string - specific feedback about their code implementation",
+  "feedback": "string - specific feedback about ALGORITHM LOGIC ONLY (not imports/signatures)",
   "nextStep": {
-    "question": "string - next coaching question to guide them",
-    "hint": "string - helpful hint for the next step",
+    "question": "string - next algorithmic coaching question to guide them",
+    "hint": "string - algorithmic hint for the next step",
     "highlightArea": {
       "startLine": number,
       "endLine": number,
-      "description": "string - what area of code to focus on next"
+      "description": "string - what algorithmic area to focus on next"
     }
   },
-  "codeToAdd": "string - ONLY if they need NEW code that doesn't already exist in their editor. If the code already exists, omit this field entirely."
+  "codeToAdd": "string - ONLY if they need NEW algorithmic code that doesn't exist. Focus on core logic, not boilerplate."
 }
 
-Be encouraging but accurate. Help them learn through discovery.`;
+Remember: Judge0 handles all execution setup. Focus purely on helping them implement the correct algorithm.`;
 
   try {
     console.log("🎯 [validateCoachingSubmission] Initializing OpenAI...");
@@ -501,14 +518,14 @@ export async function generateCoachingSession(
   console.log("🎯 [generateCoachingSession] Starting...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform. Analyze the student's current progress and generate targeted coaching steps.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
 
-CODING ENVIRONMENT CONTEXT:
-- This is an online coding platform similar to LeetCode
-- Students write Python code that gets executed with Judge0 (automatic test runner)
-- All necessary imports (List, Optional, etc.) are handled automatically by the judge system
-- Students only need to implement the algorithm logic inside the function body
-- The platform tests their code against multiple test cases automatically
+CRITICAL EXECUTION CONTEXT:
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
+- Students ONLY implement the core algorithm logic inside the function body
+- NEVER mention function signatures, imports, or test case handling in questions
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
 
 PROBLEM: ${problemDescription}
 
@@ -519,28 +536,28 @@ ${"```"}
 
 STUDENT PROGRESS ANALYSIS:
 ${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student has empty editor or only function signature. They need guidance on algorithm approach and implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their current logic for correctness, efficiency, and next steps."}
+  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
-COACHING STRATEGY:
-1. If code is empty/minimal: Focus on problem understanding, algorithm approach, and first implementation steps
-2. If code exists: Analyze current implementation, identify issues, and guide improvements
-3. Always provide specific, actionable steps that build on their current progress
-4. Ask questions that help them discover solutions rather than giving direct answers
+ALGORITHM-FOCUSED COACHING STRATEGY:
+1. If code is minimal: Focus on algorithm approach and first implementation steps
+2. If code exists: Analyze algorithm logic, identify issues, and guide algorithmic improvements  
+3. Always provide specific, actionable steps that build on their current algorithm progress
+4. Ask questions about algorithm logic that help them discover solutions
 
-Create 3-5 coaching steps that guide the student through improving their solution. Each step should:
-1. Ask a specific question about their ACTUAL code (not generic questions)
-2. Highlight the EXACT lines from their code that are relevant to the question
-3. Include expected keywords in the student's response
-4. Provide a helpful hint specific to their current implementation
+Create 3-5 algorithm-focused coaching steps that guide the student through improving their solution. Each step should:
+1. Ask a specific question about their ACTUAL algorithm implementation (not generic questions)
+2. Highlight the EXACT lines from their algorithm code that are relevant to the question
+3. Include expected algorithmic keywords in the student's response  
+4. Provide a helpful hint specific to their current algorithm implementation
 
-CRITICAL: For highlightArea, use EXACT line numbers from the student's code:
-- If they have only a function signature (1 line), highlight line 1
-- If they have multiple lines, highlight the specific lines relevant to each question
-- startLine and endLine should correspond to actual lines in their code
-- Don't use placeholder numbers like "1-5" for everything
+CRITICAL: For highlightArea, use EXACT line numbers from the student's algorithm code:
+- Focus on lines containing algorithm logic (skip function signature lines)
+- If they have algorithm code, highlight the specific algorithmic lines relevant to each question
+- startLine and endLine should correspond to actual algorithm implementation lines
+- Don't highlight boilerplate code or function signatures
 
 Return ONLY a JSON object with this structure:
 {
@@ -548,12 +565,12 @@ Return ONLY a JSON object with this structure:
   "steps": [
     {
       "id": "step-1", 
-      "question": "[Question about their specific code]",
-      "hint": "[Hint specific to what they've written]",
-      "expectedKeywords": ["keyword1", "keyword2"],
+      "question": "[Question about their specific algorithm implementation]",
+      "hint": "[Algorithmic hint specific to what they've implemented]",
+      "expectedKeywords": ["algorithm_keyword1", "logic_keyword2"],
       "highlightArea": {
-        "startLine": [actual line number],
-        "endLine": [actual line number], 
+        "startLine": [actual algorithm line number],
+        "endLine": [actual algorithm line number], 
         "startColumn": 1,
         "endColumn": 50
       }
@@ -561,9 +578,7 @@ Return ONLY a JSON object with this structure:
   ]
 }
 
-Example: If they only have "def topKFrequent(self, nums, k):" on line 1, then highlight line 1 for that question.
-
-Make each step build on their current progress and guide them toward implementing the missing parts.
+Make each step build on their current algorithm progress and guide them toward implementing the missing algorithmic pieces. Focus on algorithm logic, data structures, and problem-solving approach.
 
 IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, reasoning, or markdown formatting. The response should be valid JSON that can be parsed directly.`;
 

@@ -1168,7 +1168,7 @@ const ProblemSolverNew = () => {
             <SimpleOverlay
               isVisible={true}
               position={coachingState.inputPosition}
-              onValidateCode={() => {
+              onValidateCode={(explanation) => {
                 // Get code from the highlighted area in the main editor
                 const editor = codeEditorRef.current;
                 if (!editor) {
@@ -1180,8 +1180,8 @@ const ProblemSolverNew = () => {
                 const currentCode = editor.getValue();
                 console.log("Validating code from editor:", currentCode);
                 
-                // Submit the current editor code for validation
-                submitCoachingCode(currentCode, "Code validation from highlighted area");
+                // Submit the current editor code for validation with optional explanation
+                submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
               }}
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
@@ -1212,6 +1212,17 @@ const ProblemSolverNew = () => {
       {coachingState.isWaitingForResponse && (
         <LoadingSpinner 
           message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."} 
+        />
+      )}
+
+      {/* Feedback Overlay for coaching errors/success */}
+      {coachingState.feedback.show && (
+        <FeedbackOverlay
+          isVisible={coachingState.feedback.show}
+          type={coachingState.feedback.type || "hint"}
+          message={coachingState.feedback.message}
+          onClose={closeFeedback}
+          showConfetti={coachingState.feedback.showConfetti}
         />
       )}
     </div>
