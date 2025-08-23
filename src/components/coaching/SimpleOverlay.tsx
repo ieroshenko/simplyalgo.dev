@@ -50,7 +50,7 @@ const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
 interface SimpleOverlayProps {
   isVisible: boolean;
   position: { x: number; y: number };
-  onValidateCode: () => void;
+  onValidateCode: (explanation?: string) => void;
   onCancel: () => void;
   onExitCoach?: () => void;
   onFinishCoaching?: () => void;
@@ -104,6 +104,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [customPosition, setCustomPosition] = useState<{ x: number; y: number } | null>(null);
+  const [studentExplanation, setStudentExplanation] = useState("");
+  const [showTextInput, setShowTextInput] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
 
@@ -112,13 +114,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     if (!isVisible) {
       setIsMinimized(false);
       setCustomPosition(null);
+      setStudentExplanation("");
+      setShowTextInput(false);
     }
   }, [isVisible]);
 
 
 
   const handleValidate = () => {
-    onValidateCode();
+    onValidateCode(studentExplanation);
   };
 
 
@@ -399,8 +403,34 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {/* Instructions section */}
           {!validationResult && !isValidating && (
             <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30">
-              <div className="text-sm text-gray-600 dark:text-gray-300">
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                 Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
+              </div>
+              
+              {/* Optional explanation input */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowTextInput(!showTextInput)}
+                  className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                >
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showTextInput ? 'rotate-180' : ''}`} />
+                  {showTextInput ? 'Hide explanation' : 'Add explanation (optional)'}
+                </button>
+                
+                {showTextInput && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={studentExplanation}
+                      onChange={(e) => setStudentExplanation(e.target.value)}
+                      placeholder="Explain what you're trying to do or what you're stuck on... (e.g., 'I can't figure out how to loop through this' or 'Not sure about the algorithm approach')"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      rows={3}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      💡 This helps the AI coach provide more targeted feedback
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

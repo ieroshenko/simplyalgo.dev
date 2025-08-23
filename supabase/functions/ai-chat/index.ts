@@ -423,7 +423,7 @@ serve(async (req) => {
       }
 
       try {
-        const result = await insertSnippetSmart(code, snippet, cursorPosition);
+        const result = await insertSnippetSmart(code, snippet, problemDescription || "", cursorPosition);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

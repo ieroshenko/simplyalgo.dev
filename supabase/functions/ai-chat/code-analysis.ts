@@ -518,6 +518,10 @@ IMPORTANT RULES:
 3. The snippet should be inserted as new lines, not replace existing code
 4. Consider if this is part of an algorithm implementation inside a function
 
+MERGE CLEANUP:
+- If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
+- If both bin(i).count('1') and DP relation (res[i] = res[i >> 1] + (i & 1)) implementations are present for the same function, keep only one consistent implementation based on continuity with surrounding code. Prefer DP if both appear.
+
 Output JSON:
 {
   "insertAtLine": <0-based line number, or -1 if code already exists>,
@@ -562,8 +566,38 @@ Output JSON:
     return contextIndent + line;
   });
 
-  const newLines = [...lines];
+  let newLines = [...lines];
   newLines.splice(safeInsertLine, 0, ...indentedSnippet);
+
+  // Simple deterministic cleanup: if we inserted a return within a function, strip trivial unreachable duplicates after it
+  try {
+    // Find the function start above insertion (Python-style `def`)
+    let funcStart = -1;
+    for (let i = safeInsertLine; i >= 0; i--) {
+      if (/^\s*def\s+\w+\s*\(/.test(newLines[i])) { funcStart = i; break; }
+    }
+    if (funcStart !== -1) {
+      // Find the first return line inside function after insertion
+      let firstReturn = -1;
+      for (let i = safeInsertLine; i < newLines.length; i++) {
+        if (/^\s*return\b/.test(newLines[i])) { firstReturn = i; break; }
+      }
+      if (firstReturn !== -1) {
+        // If there are simple computed lines after return like alternate loops or extra return, trim trailing duplicate block
+        // Heuristic: if following lines include `for i in range` or another `return res`, drop them
+        const tail = newLines.slice(firstReturn + 1);
+        const hasAltLoop = tail.some(l => /for\s+i\s+in\s+range\s*\(/.test(l));
+        const hasSecondReturn = tail.some(l => /^\s*return\b/.test(l));
+        if (hasAltLoop || hasSecondReturn) {
+          // keep only up to firstReturn
+          newLines = newLines.slice(0, firstReturn + 1);
+        }
+      }
+    }
+  } catch (_) {
+    // non-fatal cleanup error; ignore
+  }
+
   const newCode = newLines.join("\n");
   return { newCode, insertedAtLine: safeInsertLine, rationale };
 }
