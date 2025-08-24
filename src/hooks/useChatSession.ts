@@ -123,6 +123,19 @@ export const useChatSession = ({
   const [loading, setLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
 
+  // Context tracking for Responses API optimization
+  const [contextState, setContextState] = useState<{
+    responseId: string | null;
+    contextInitialized: boolean;
+    lastCodeSnapshot: string;
+    sessionId: string | null;
+  }>({
+    responseId: null,
+    contextInitialized: false,
+    lastCodeSnapshot: '',
+    sessionId: null,
+  });
+
   // Find or create session
   const initializeSession = useCallback(async () => {
     if (!user?.id) return;
@@ -177,6 +190,13 @@ export const useChatSession = ({
       }
 
       setSession(currentSession);
+
+      // Update context state with session ID
+      setContextState(prev => ({
+        ...prev,
+        sessionId: currentSession.id,
+        lastCodeSnapshot: currentCode || '',
+      }));
 
       // Load messages for this session
       const { data: sessionMessages, error: messagesError } = await supabase
@@ -290,7 +310,10 @@ export const useChatSession = ({
           content: msg.content,
         }));
 
-        // Call AI function
+        // Check if code has significantly changed (for context optimization)
+        const codeChanged = contextState.lastCodeSnapshot !== (currentCode || '');
+
+        // Call AI function with context tracking
         const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
             message: content,
@@ -299,10 +322,25 @@ export const useChatSession = ({
             testCases: problemTestCases,
             diagram: options?.action === "diagram",
             currentCode: currentCode,
+            // Context tracking for token optimization
+            sessionId: contextState.sessionId,
+            previousResponseId: contextState.responseId,
+            codeChanged,
+            forceNewContext: codeChanged,
           },
         });
 
         if (error) throw error;
+
+        // Update context state with new response ID
+        if (data.responseId) {
+          setContextState(prev => ({
+            ...prev,
+            responseId: data.responseId,
+            contextInitialized: true,
+            lastCodeSnapshot: currentCode || '',
+          }));
+        }
 
         // Parse AI response with code snippets from LLM analysis
         const aiResponseContent = data.response;
@@ -311,14 +349,14 @@ export const useChatSession = ({
             ? data.codeSnippets
             : undefined;
 
-        // Gate snippet visibility: only when user explicitly asks for code or pasted code
+        // Gate snippet visibility: allow when user explicitly asks for code OR AI naturally provides code blocks
         const lastUserMsg = content;
         const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(lastUserMsg);
         const explicitAsk =
           /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(
             lastUserMsg,
           );
-        const allowSnippets = hasExplicitCode || explicitAsk;
+        const allowSnippets = hasExplicitCode || explicitAsk || (rawSnippets && rawSnippets.length > 0);
 
         // Dedupe snippets against entire session and within this response
         let dedupedSnippets = allowSnippets
@@ -405,9 +443,15 @@ export const useChatSession = ({
         throw error || new Error("Failed to clear chat");
       }
 
-      // Reset local state
+      // Reset local state and context
       setMessages([]);
       setSession(null);
+      setContextState({
+        responseId: null,
+        contextInitialized: false,
+        lastCodeSnapshot: '',
+        sessionId: null,
+      });
 
       // Immediately create a fresh session so sendMessage can proceed without page reload
       await initializeSession();
