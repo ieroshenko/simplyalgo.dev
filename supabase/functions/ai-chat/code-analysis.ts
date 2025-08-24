@@ -1,5 +1,5 @@
-import { llmText, llmJson, llmJsonFast } from "./openai-utils.ts";
-import { CodeSnippet, ChatMessage } from "./types.ts";
+import { llmText, llmJson, llmJsonFast, llmWithSessionContext } from "./openai-utils.ts";
+import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
 
 /**
  * Lightweight sanitizer to fix common TSX issues in generated components before returning to client.
@@ -92,6 +92,7 @@ export function sanitizeGeneratedTsx(input: string): string {
 
 /**
  * Main conversation handler - generates AI response for general chat
+ * Now uses context-aware approach to optimize token usage
  */
 export async function generateConversationResponse(
   message: string,
@@ -99,84 +100,156 @@ export async function generateConversationResponse(
   conversationHistory: ChatMessage[],
   testCases?: unknown[],
   currentCode?: string,
+  sessionId?: string, // New parameter for context management
 ): Promise<string> {
-  const serializedTests =
-    Array.isArray(testCases) && testCases.length > 0
-      ? JSON.stringify(testCases)
-      : undefined;
+  // Check if we can use context-aware approach or need to fallback
+  if (!sessionId) {
+    console.log("[chat] No session ID provided, using legacy approach");
+    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+  }
 
-  // Determine if we should allow code in the reply - be more liberal for explicit requests
+  // Use context-aware approach for optimal token usage
+  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
+    ? JSON.stringify(testCases) 
+    : undefined;
+
+  // Analyze message for code request patterns
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
   const explicitCodeRequest =
-    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(
-      message,
-    );
+    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
   const codeKeywords =
-    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(
-      message,
-    );
+    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
   const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
 
-  const conversationPrompt = `
-You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+  let contextualResponse: ContextualResponse;
+  
+  try {
+    // For first message or new session, send comprehensive initial context
+    const isInitialMessage = !conversationHistory || conversationHistory.length === 0;
+    
+    if (isInitialMessage) {
+      // Create comprehensive initial context for the session
+      const initialChatContext = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
 
-TEST EXECUTION CONTEXT:
-- The student's code will be executed automatically on Judge0 against the official test cases.
-- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
-- Do NOT ask about basic Python syntax like colons, indentation, or function definitions.
-- Do NOT ask the student to run tests or provide test cases.
-- Do NOT ask about function scaffolding (e.g., self usage) or basic typing/import boilerplate unless the student explicitly asks.
-- Provide hints first; only provide code if the student requests it or has shared code.
-- Once you believe the student's solution is likely correct, then ask ONE follow-up about time and space complexity.
+EXECUTION ENVIRONMENT:
+- Student code runs automatically on Judge0 against official test cases
+- Judge0 handles all imports (List, Optional, etc.) and Python setup automatically
+- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
+- Code format: Just the function definition (def solution_name():) with implementation
+- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
+- Focus on algorithm logic and problem-solving approach
+
+CODE FORMAT REQUIREMENTS: Always provide pure function implementations only:
+- ✅ Good: def twoSum(nums, target): return []
+- ❌ Bad: from typing import List; class Solution: def twoSum(self, nums: List[int], target: int) -> List[int]:
 
 PROBLEM CONTEXT:
 ${problemDescription}
 
 ${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
+${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
 
+CURRENT STUDENT MESSAGE: "${message}"
+
+Code policy: allowCode = ${allowCode}
+
+Provide educational tutoring response.`;
+
+      contextualResponse = await llmWithSessionContext(
+        sessionId,
+        initialChatContext,
+        'chat',
+        currentCode || '',
+        {
+          temperature: 0.3,
+          maxTokens: 600
+        }
+      );
+      
+    } else {
+      // Continue conversation with minimal context
+      const continuationPrompt = `${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+CONVERSATION HISTORY:
+${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
+
+CURRENT STUDENT MESSAGE: "${message}"
+
+Code policy: allowCode = ${allowCode}
+
+Provide educational tutoring response.`;
+
+      contextualResponse = await llmWithSessionContext(
+        sessionId,
+        continuationPrompt,
+        'chat',
+        currentCode || '',
+        {
+          temperature: 0.3,
+          maxTokens: 600
+        }
+      );
+    }
+
+    console.log(`[chat] Context-aware response generated - Tokens saved: ${contextualResponse.tokensSaved || 0}`);
+    return contextualResponse.content || "I'm sorry, I couldn't generate a response. Please try again.";
+    
+  } catch (error) {
+    console.error("[chat] Context-aware generation failed, falling back to legacy:", error);
+    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+  }
+}
+
+/**
+ * Legacy chat response generation (fallback for when session ID is not available)
+ */
+async function generateLegacyChatResponse(
+  message: string,
+  problemDescription: string,
+  conversationHistory: ChatMessage[],
+  testCases?: unknown[],
+  currentCode?: string,
+): Promise<string> {
+  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
+    ? JSON.stringify(testCases) 
+    : undefined;
+
+  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
+  const explicitCodeRequest =
+    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
+  const codeKeywords =
+    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
+  const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
+
+  const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+
+EXECUTION ENVIRONMENT:
+- Student code runs automatically on Judge0 against official test cases
+- Judge0 handles all imports (List, Optional, etc.) and Python setup automatically
+- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
+- Code format: Just the function definition (def solution_name():) with implementation
+- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
+- Focus on algorithm logic and problem-solving approach
+
+CODE FORMAT REQUIREMENTS: Always provide pure function implementations only:
+- ✅ Good: def twoSum(nums, target): return []
+- ❌ Bad: from typing import List; class Solution: def twoSum(self, nums: List[int], target: int) -> List[int]:
+
+PROBLEM CONTEXT:
+${problemDescription}
+
+${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
 ${currentCode ? `CURRENT CODE IN EDITOR:\n${"```"}python\n${currentCode}\n${"```"}\n` : ""}
 
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
-CURRENT STUDENT MESSAGE:
-"${message}"
+CURRENT STUDENT MESSAGE: "${message}"
 
-Your role:
-1. Coach with a Socratic style, but be helpful when students need code examples.
-2. Ask ONE concise question (<= 25 words) to guide their thinking.
-3. Provide helpful hints when students are stuck or ask for guidance. do not provide hints otherwise.
-4. Keep tone friendly and educational.
-5. Do not provide code examples unless explicitly asked for.
-6. Do not provide solutions unless explicitly asked for.Ask one guiding question at a time. If the student does not know the answer, ask another question. guiding questions should be concise and focused on one aspect of the problem.
+Code policy: allowCode = ${allowCode}
 
-Code policy (conditional):
-- allowCode = ${allowCode}
-- If allowCode = false: Use questions and conceptual hints only.
-- If allowCode = true and student explicitly requests code: 
-  * CRITICAL: Only provide incremental code snippets, NEVER complete solutions
-  * Analyze what's already in their editor and provide ONLY the next 1-3 lines they need
-  * If they have an empty function, provide just the first variable declaration or setup
-  * If they have setup code, provide just the next logical step (loop, condition, etc.)
-  * If they have partial logic, provide just the missing piece to complete that step
-  * NEVER provide full algorithm implementations - break it into tiny incremental steps
-  * Each snippet should be 1-5 lines maximum and build on their existing code
+Provide educational tutoring response.`;
 
-Output format:
-- Lead with a guiding question or brief explanation
-- Provide helpful hints as needed (do not provide hints otherwise)
-- If code is warranted and allowCode=true, include properly formatted code:
-${"```"}python
-# Clear, educational code example
-# With proper indentation and comments
-${"```"}
-
-`;
-
-  const systemGuidance =
-    "You are a helpful Socratic coding tutor. Guide students with questions and provide educational code examples when requested. When allowCode=true and students ask for code help, provide clear, well-formatted Python examples that teach concepts. Balance Socratic questioning with practical code assistance.";
-  const combined = `${systemGuidance}\n\n${conversationPrompt}`;
-  const text = await llmText(combined, { temperature: 0.3, maxTokens: 600 });
+  const text = await llmText(conversationPrompt, { temperature: 0.3, maxTokens: 600 });
   return text || "I'm sorry, I couldn't generate a response. Please try again.";
 }
 
@@ -452,6 +525,7 @@ export async function insertSnippetSmart(
   snippet: CodeSnippet,
   problemDescription: string,
   cursorPosition?: { line: number; column: number },
+  contextHint?: string,
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
   // 1) Deterministic, fast path: anchor-based insertion if the first line exists
   try {
@@ -508,6 +582,9 @@ SNIPPET TO INSERT:
 ${snippet.code}
 ---END SNIPPET---
 
+COACHING HINT (what to fix):
+${contextHint || "(no explicit hint)"}
+
 IMPORTANT RULES:
 1. If the snippet code already exists in the current file, return insertAtLine: -1
 2. Find the most logical place to insert this snippet considering:
@@ -521,6 +598,7 @@ IMPORTANT RULES:
 MERGE CLEANUP:
 - If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
 - If both bin(i).count('1') and DP relation (res[i] = res[i >> 1] + (i & 1)) implementations are present for the same function, keep only one consistent implementation based on continuity with surrounding code. Prefer DP if both appear.
+- CRITICAL: If the snippet fixes bugs in similar existing code (e.g., n >> 1 vs n >>= 1, or return n vs return count), REPLACE the buggy lines rather than marking as duplicate. Look for logical errors, missing assignments, wrong return values.
 
 Output JSON:
 {
@@ -530,22 +608,45 @@ Output JSON:
 }`;
 
   console.log("[ai-chat] insert_snippet using main model for smart placement");
-  const raw = await llmJson(placementPrompt, { maxTokens: 500 });
-  let insertAtLine: number | undefined;
-  let indent: string | undefined;
-  let rationale: string | undefined;
+  console.log("[ai-chat] Snippet to insert:", snippet.code);
+  console.log("[ai-chat] Current code length:", code.length);
+  
   try {
-    const parsed = JSON.parse(raw || "{}");
-    if (typeof parsed.insertAtLine === "number")
-      insertAtLine = parsed.insertAtLine;
-    if (typeof parsed.indentation === "string") indent = parsed.indentation;
-    if (typeof parsed.rationale === "string") rationale = parsed.rationale;
-  } catch {
-    // ignore
+    const raw = await llmJson(placementPrompt, { maxTokens: 500 });
+    console.log("[ai-chat] LLM response for insertion:", raw);
+    
+    let insertAtLine: number | undefined;
+    let indent: string | undefined;
+    let rationale: string | undefined;
+    
+    try {
+      const parsed = JSON.parse(raw || "{}");
+      console.log("[ai-chat] Parsed insertion result:", parsed);
+      if (typeof parsed.insertAtLine === "number")
+        insertAtLine = parsed.insertAtLine;
+      if (typeof parsed.indentation === "string") indent = parsed.indentation;
+      if (typeof parsed.rationale === "string") rationale = parsed.rationale;
+    } catch (parseError) {
+      console.error("[ai-chat] Failed to parse LLM response:", parseError);
+      throw new Error(`Invalid JSON response from LLM: ${raw}`);
+    }
+  } catch (llmError) {
+    console.error("[ai-chat] LLM call failed:", llmError);
+    throw new Error(`LLM call failed: ${llmError.message}`);
   }
 
-  // If snippet already exists or placement invalid, return original
+  // If model claims snippet already exists, try small deterministic bug-fix replacements (Python heuristics)
   if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
+    let fixed = code;
+    // Heuristic 1: fix right-shift without assignment inside loops
+    fixed = fixed.replace(/^(\s*)(n)\s*>>\s*1\s*$/gm, "$1$2 >>= 1");
+    // Heuristic 2: fix return n to return count if count variable is used in snippet
+    if (/\bcount\b/.test(snippet.code)) {
+      fixed = fixed.replace(/^(\s*)return\s+n\s*$/gm, "$1return count");
+    }
+    if (fixed !== code) {
+      return { newCode: fixed, insertedAtLine: -1, rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes' };
+    }
     return { newCode: code, insertedAtLine: -1, rationale };
   }
 

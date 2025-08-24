@@ -37,6 +37,17 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     },
   });
 
+  // Context tracking for Responses API optimization
+  const [contextState, setContextState] = useState<{
+    responseId: string | null;
+    contextInitialized: boolean;
+    lastCodeSnapshot: string;
+  }>({
+    responseId: null,
+    contextInitialized: false,
+    lastCodeSnapshot: '',
+  });
+
   const highlightDecorationsRef = useRef<string[]>([]);
   const startTimeRef = useRef<Date | null>(null);
 
@@ -173,6 +184,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       startTimeRef.current = new Date();
 
+      // Update context state for Responses API optimization
+      setContextState({
+        responseId: data.responseId || null,
+        contextInitialized: !!data.responseId,
+        lastCodeSnapshot: currentCode,
+      });
+
       setCoachingState(prev => ({
         ...prev,
         session: {
@@ -220,6 +238,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       startTimeRef.current = null;
     }
     
+    // Reset context state for clean start
+    setContextState({
+      responseId: null,
+      contextInitialized: false,
+      lastCodeSnapshot: '',
+    });
+    
     setCoachingState({
       session: null,
       isCoachModeActive: false,
@@ -257,6 +282,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     try {
       const currentCode = editorRef.current?.getValue() || "";
       
+      // Check if code has significantly changed (for context optimization)
+      const codeChanged = contextState.lastCodeSnapshot !== currentCode;
+      
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           action: 'validate_coaching_submission',
@@ -264,12 +292,26 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           studentCode: userCode,
           studentResponse: userInput,
           currentEditorCode: currentCode,
+          // Context tracking for token optimization
+          previousResponseId: contextState.responseId,
+          codeChanged,
+          forceNewContext: codeChanged,
         },
       });
 
       if (error) throw error;
 
       console.log("✅ [COACHING] Validation response:", data);
+
+      // Update context state with new response ID
+      if (data.responseId) {
+        setContextState(prev => ({
+          ...prev,
+          responseId: data.responseId,
+          contextInitialized: true,
+          lastCodeSnapshot: currentCode,
+        }));
+      }
 
       setCoachingState(prev => ({
         ...prev,
@@ -316,28 +358,25 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
                     code: before,
                     snippet,
                     cursorPosition,
-                    problemDescription: problemDescription || ""
+                    problemDescription: problemDescription || "",
+                    message: `[coaching snippet insertion] Fix these issues: ${data.feedback || 'Apply suggested code changes'}`,
+                    conversationHistory: [],
                   },
                 });
 
                 if (insertError) {
                   console.error("❌ [COACHING] Smart insertion failed:", insertError);
-                  // Fallback to simple insertion
-                  if (onCodeInsert) {
-                    await onCodeInsert(codeToInsert);
-                  }
+                  throw new Error(`Smart insertion failed: ${insertError.message}`);
                 } else if (insertResult?.newCode) {
                   console.log("✅ [COACHING] Smart insertion successful");
                   editor?.setValue(insertResult.newCode);
                 } else {
                   console.warn("⚠️ [COACHING] No new code returned from smart insertion");
+                  throw new Error("Smart insertion returned no code");
                 }
               } catch (error) {
                 console.error("❌ [COACHING] Smart insertion error:", error);
-                // Fallback to simple insertion
-                if (onCodeInsert) {
-                  await onCodeInsert(codeToInsert);
-                }
+                throw error; // Re-throw to be caught by outer try-catch
               }
             } else {
               console.log("[COACHING] Suggested code already present; skipping insertion.");
@@ -465,49 +504,57 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         };
 
         try {
+          console.log("🔧 [COACHING] Sending smart insertion request:", {
+            action: "insert_snippet",
+            codeLength: before.length,
+            snippet,
+            cursorPosition,
+            problemDescription: problemDescription || ""
+          });
+          
           const { data: insertResult, error: insertError } = await supabase.functions.invoke("ai-chat", {
             body: {
               action: "insert_snippet",
               code: before,
               snippet,
               cursorPosition,
-              problemDescription: problemDescription || ""
+              problemDescription: problemDescription || "",
+              message: `[coaching snippet insertion] Fix these issues: ${coachingState.lastValidation?.feedback || 'Apply suggested code changes'}`,
+              conversationHistory: [],
             },
           });
+          
+          console.log("📥 [COACHING] Smart insertion response:", { insertResult, insertError });
 
           if (insertError) {
             console.error("❌ [COACHING] Smart insertion failed:", insertError);
-            // Fallback to simple insertion
-            if (onCodeInsert) {
-              await onCodeInsert(codeToInsert);
-            }
+            throw new Error(`Smart insertion failed: ${insertError.message}`);
           } else if (insertResult?.newCode) {
             console.log("✅ [COACHING] Smart insertion successful");
             editor?.setValue(insertResult.newCode);
           } else {
             console.warn("⚠️ [COACHING] No new code returned from smart insertion");
+            throw new Error("Smart insertion returned no code");
           }
         } catch (error) {
           console.error("❌ [COACHING] Smart insertion error:", error);
-          // Fallback to simple insertion
-          if (onCodeInsert) {
-            await onCodeInsert(codeToInsert);
-          }
+          throw error; // Re-throw to be caught by outer try-catch
         }
       } else {
         console.log("[COACHING] Suggested code already present; skipping insertion.");
       }
 
-      // After insertion, just dismiss overlay and show success - don't auto-generate next step  
+      // After insertion, keep overlay open but change to "next step" mode
       setCoachingState(prev => ({ 
         ...prev, 
-        showInputOverlay: false, 
+        showInputOverlay: true,
         lastValidation: undefined, 
         isWaitingForResponse: false,
+        inputMode: "next_step", // New mode to track post-insertion state
         feedback: {
           show: true,
           type: "success", 
-          message: "✅ Correct code inserted! Continue working or validate your solution.",
+          message: "✅ Code inserted! What do you think about this approach?",
           showConfetti: false,
         },
       }));
