@@ -394,7 +394,7 @@ export function insertCodeSnippet(
   currentCode: string,
   snippet: CodeSnippet,
   cursorPosition?: { line: number; column: number },
-): { newCode: string; newCursorPosition: { line: number; column: number } } {
+): { newCode: string; insertedAtLine: number; newCursorPosition: { line: number; column: number } } {
   console.log("🔍 Starting code insertion:", {
     currentCodeLines: currentCode.split("\n").length,
     snippetType: snippet.insertionHint?.type,
@@ -454,6 +454,7 @@ export function insertCodeSnippet(
 
   return {
     newCode,
+    insertedAtLine: insertionPoint.line,
     newCursorPosition: {
       line: newCursorLine,
       column: newCursorColumn,

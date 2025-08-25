@@ -1,13 +1,60 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Minimize2, Move, Check, ChevronDown, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useRef, useEffect } from 'react';
+import { Button } from '../ui/button';
+import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle } from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+// Blurred hint component with click-to-reveal
+const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
+  const [isRevealed, setIsRevealed] = useState(false);
+
+  return (
+    <div 
+      className="relative cursor-pointer"
+      onClick={() => setIsRevealed(!isRevealed)}
+      style={{ 
+        fontSize: "12px", 
+        color: "#6b7280",
+        padding: "6px 10px",
+        backgroundColor: "rgba(59, 130, 246, 0.08)",
+        borderRadius: "6px",
+        borderLeft: "3px solid rgba(59, 130, 246, 0.3)"
+      }}
+    >
+      <div className="flex items-center gap-2">
+        {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+        <span className="text-xs font-medium">
+          {isRevealed ? 'Hide Hint' : 'Click to reveal hint'}
+        </span>
+      </div>
+      {isRevealed && (
+        <div className="mt-2 text-gray-700 dark:text-gray-300">
+          💡 {hint}
+        </div>
+      )}
+      {!isRevealed && (
+        <div 
+          className="mt-2 select-none"
+          style={{
+            filter: 'blur(4px)',
+            color: '#9ca3af',
+            fontSize: '11px'
+          }}
+        >
+          This hint will help guide you to the solution...
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface SimpleOverlayProps {
   isVisible: boolean;
   position: { x: number; y: number };
-  onValidateCode: () => void;
+  onValidateCode: (explanation?: string) => void;
   onCancel: () => void;
   onExitCoach?: () => void;
+  onFinishCoaching?: () => void;
+  onInsertCorrectCode?: () => void; // New prop for inserting correct code
   isValidating?: boolean;
   hasError?: boolean;
   // Coaching specific props
@@ -18,6 +65,7 @@ interface SimpleOverlayProps {
   validationResult?: {
     isCorrect: boolean;
     feedback: string;
+    codeToAdd?: string; // Available corrected code
     nextStep?: {
       question: string;
       hint: string;
@@ -40,6 +88,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   onValidateCode,
   onCancel,
   onExitCoach,
+  onFinishCoaching,
+  onInsertCorrectCode,
   isValidating = false,
   hasError = false,
   question,
@@ -54,6 +104,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [customPosition, setCustomPosition] = useState<{ x: number; y: number } | null>(null);
+  const [studentExplanation, setStudentExplanation] = useState("");
+  const [showTextInput, setShowTextInput] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
 
@@ -62,13 +114,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     if (!isVisible) {
       setIsMinimized(false);
       setCustomPosition(null);
+      setStudentExplanation("");
+      setShowTextInput(false);
     }
   }, [isVisible]);
 
 
 
   const handleValidate = () => {
-    onValidateCode();
+    onValidateCode(studentExplanation);
   };
 
 
@@ -194,73 +248,6 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
   return (
     <>
-      {/* Arrow connector - pointing to highlighted code */}
-      {!isMobile && !customPosition && highlightedLine && editorRef?.current && (
-        (() => {
-          const editorDom = editorRef.current?.getDomNode?.();
-          const editorRect = editorDom?.getBoundingClientRect();
-          
-          if (!editorRect) return null;
-          
-          // Calculate highlighted line position in viewport
-          const highlightedY = editorRect.top + position.y;
-          const arrowY = smartPosition.y - 8;
-          const shouldShowAbove = smartPosition.y > highlightedY;
-          
-          return (
-            <div
-              style={{
-                position: "fixed",
-                left: smartPosition.x + 20,
-                top: arrowY,
-                zIndex: 999,
-                width: 0,
-                height: 0,
-                borderLeft: "8px solid transparent",
-                borderRight: "8px solid transparent", 
-                ...(shouldShowAbove 
-                  ? { borderTop: "12px solid #3b82f6" }
-                  : { borderBottom: "12px solid #3b82f6" }
-                ),
-                filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))",
-              }}
-              className="transition-all duration-300 ease-in-out"
-            />
-          );
-        })()
-      )}
-      
-      {/* Connection line - connects arrow to highlighted code */}
-      {!isMobile && !customPosition && highlightedLine && editorRef?.current && (
-        (() => {
-          const editorDom = editorRef.current?.getDomNode?.();
-          const editorRect = editorDom?.getBoundingClientRect();
-          
-          if (!editorRect) return null;
-          
-          // Calculate line position and height
-          const highlightedViewportY = editorRect.top + position.y;
-          const connectionStartY = Math.min(smartPosition.y - 8, highlightedViewportY + 15);
-          const connectionEndY = Math.max(smartPosition.y - 8, highlightedViewportY + 15);
-          const lineHeight = Math.abs(connectionEndY - connectionStartY);
-          
-          return lineHeight > 20 ? (
-            <div
-              style={{
-                position: "fixed",
-                left: smartPosition.x + 27,
-                top: connectionStartY,
-                width: "2px",
-                height: lineHeight,
-                backgroundColor: "#3b82f6",
-                opacity: 0.6,
-                zIndex: 998,
-              }}
-              className="transition-all duration-300 ease-in-out"
-            />
-          ) : null;
-        })()
-      )}
       
       <div
         ref={overlayRef}
@@ -276,12 +263,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           borderRadius: "12px",
           boxShadow: "0 16px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6)",
           minWidth: isMobile ? "calc(100vw - 32px)" : "420px",
-          maxWidth: isMobile ? "calc(100vw - 32px)" : "480px",
-          maxHeight: isMobile ? "400px" : "350px",
+          maxWidth: isMobile ? "calc(100vw - 32px)" : "500px",
+          maxHeight: isMobile ? "70vh" : "60vh",
           cursor: isDragging ? "grabbing" : "default",
           transform: `scale(${isMinimized ? "0.95" : "1"})`,
           opacity: isMinimized ? 0.7 : 1,
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
         className="dark:bg-gray-800/80 dark:border-gray-600/40 transition-all duration-300 ease-in-out"
       >
@@ -324,135 +313,165 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         </div>
       </div>
 
-      {/* Question section */}
-      {question && !isMinimized && (
+      {/* Scrollable Content Area */}
+      {!isMinimized && (
         <div 
           style={{ 
-            padding: "16px", 
-            maxHeight: "120px",
+            flex: 1,
             overflowY: "auto",
             scrollbarWidth: "thin"
           }}
           className="scrollbar-thin scrollbar-thumb-gray-300/50 dark:scrollbar-thumb-gray-600/50 hover:scrollbar-thumb-gray-400/70"
         >
-          <div 
-            style={{ 
-              fontSize: "14px", 
-              fontWeight: "500", 
-              marginBottom: hint ? "8px" : "0",
-              color: "#1f2937",
-              lineHeight: "1.6"
-            }}
-            className="dark:text-gray-100"
-          >
-            {question}
-          </div>
-          {hint && (
-            <div 
-              style={{ 
-                fontSize: "12px", 
-                color: "#6b7280",
-                padding: "6px 10px",
-                backgroundColor: "rgba(59, 130, 246, 0.08)",
-                borderRadius: "6px",
-                borderLeft: "3px solid rgba(59, 130, 246, 0.3)"
-              }}
-              className="dark:text-gray-400 dark:bg-blue-500/10"
-            >
-              {hint}
+          {/* Question section */}
+          {question && (
+            <div style={{ padding: "16px" }}>
+              <div 
+                style={{ 
+                  fontSize: "14px", 
+                  fontWeight: "500", 
+                  marginBottom: hint && !validationResult ? "8px" : "0",
+                  color: "#1f2937",
+                  lineHeight: "1.6"
+                }}
+                className="dark:text-gray-100"
+              >
+                {question}
+              </div>
+              {hint && !validationResult && (
+                <BlurredHintComponent hint={hint} />
+              )}
+            </div>
+          )}
+
+          {/* Validation Result Section */}
+          {validationResult && (
+            <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${
+              validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+            }`}>
+              <div className="flex items-start gap-3">
+                {validationResult.isCorrect ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <div className={`text-sm font-medium mb-1 ${
+                    validationResult.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {validationResult.isCorrect ? 'Great work! ✨' : 'Not quite right'}
+                  </div>
+                  <div className={`text-sm ${
+                    validationResult.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                  }`}>
+                    {validationResult.feedback}
+                  </div>
+                  {validationResult.nextStep && (
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                      <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                        Next Step:
+                      </div>
+                      <div className="text-sm text-blue-700 dark:text-blue-300">
+                        {validationResult.nextStep.question}
+                      </div>
+                      {validationResult.nextStep.hint && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
+                          💡 {validationResult.nextStep.hint}
+                        </div>
+                      )}
+                      {validationResult.feedback.includes('faster') || validationResult.feedback.includes('efficient') || validationResult.feedback.includes('O(n)') ? (
+                        <Button
+                          onClick={() => {
+                            // TODO: Start optimization coaching session
+                            console.log('Starting optimization coaching...');
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Learn Optimization
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Instructions section */}
+          {!validationResult && !isValidating && (
+            <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30">
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
+              </div>
+              
+              {/* Optional explanation input */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowTextInput(!showTextInput)}
+                  className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                >
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showTextInput ? 'rotate-180' : ''}`} />
+                  {showTextInput ? 'Hide explanation' : 'Add explanation (optional)'}
+                </button>
+                
+                {showTextInput && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={studentExplanation}
+                      onChange={(e) => setStudentExplanation(e.target.value)}
+                      placeholder="Explain what you're trying to do or what you're stuck on... (e.g., 'I can't figure out how to loop through this' or 'Not sure about the algorithm approach')"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      rows={3}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      💡 This helps the AI coach provide more targeted feedback
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Loading state during validation */}
+          {isValidating && (
+            <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    Analyzing your code...
+                  </div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                    AI coach is reviewing your implementation and preparing feedback.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error state - AI service unavailable */}
+          {hasError && (
+            <div className="px-4 py-3 border-t border-red-200/50 dark:border-red-600/30 bg-red-50 dark:bg-red-900/20">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                    AI Coach Unavailable
+                  </div>
+                  <div className="text-sm text-red-700 dark:text-red-300 mb-3">
+                    The AI coaching service is temporarily down. You can continue coding on your own or exit coach mode.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Validation Result Section */}
-      {!isMinimized && validationResult && (
-        <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${
-          validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-        }`}>
-          <div className="flex items-start gap-3">
-            {validationResult.isCorrect ? (
-              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-            ) : (
-              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-            )}
-            <div className="flex-1">
-              <div className={`text-sm font-medium mb-1 ${
-                validationResult.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-              }`}>
-                {validationResult.isCorrect ? 'Great work! ✨' : 'Not quite right'}
-              </div>
-              <div className={`text-sm ${
-                validationResult.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-              }`}>
-                {validationResult.feedback}
-              </div>
-              {validationResult.nextStep && (
-                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
-                  <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
-                    Next Step:
-                  </div>
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
-                    {validationResult.nextStep.question}
-                  </div>
-                  {validationResult.nextStep.hint && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
-                      💡 {validationResult.nextStep.hint}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Instructions section */}
-      {!isMinimized && !validationResult && (
-        <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30">
-          <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-            Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
-          </div>
-        </div>
-      )}
-
-      {/* Error state - AI service unavailable */}
-      {!isMinimized && hasError && (
-        <div className="px-4 py-3 border-t border-red-200/50 dark:border-red-600/30 bg-red-50 dark:bg-red-900/20">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
-                AI Coach Unavailable
-              </div>
-              <div className="text-sm text-red-700 dark:text-red-300 mb-3">
-                The AI coaching service is temporarily down. You can continue coding on your own or exit coach mode.
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={onCancel}
-                  size="sm"
-                  variant="outline"
-                  className="text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/30"
-                >
-                  Continue Coding
-                </Button>
-                {onExitCoach && (
-                  <Button
-                    onClick={onExitCoach}
-                    size="sm"
-                    className="bg-red-600/90 hover:bg-red-700/90 text-white"
-                  >
-                    Exit Coach Mode
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Actions bar */}
+      {/* Fixed Actions bar */}
       {!isMinimized && !hasError && (
         <div 
           style={{
@@ -462,37 +481,67 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             padding: "12px",
             borderTop: "1px solid rgba(229, 231, 235, 0.3)",
             backgroundColor: "rgba(249, 250, 251, 0.4)",
+            flexShrink: 0
           }}
           className="dark:border-gray-600/30 dark:bg-gray-750/40"
         >
           {validationResult?.isCorrect ? (
             <Button
-              onClick={onCancel}
+              onClick={() => {
+                // Trigger confetti animation
+                confetti({
+                  particleCount: 100,
+                  spread: 70,
+                  origin: { y: 0.6 }
+                });
+                
+                // Wait a moment then finish coaching
+                setTimeout(() => {
+                  if (onFinishCoaching) {
+                    onFinishCoaching();
+                  } else {
+                    onCancel();
+                  }
+                }, 1000);
+              }}
               size="sm"
               className="bg-green-600/90 hover:bg-green-700/90 text-white backdrop-blur-sm shadow-md px-6"
             >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Continue
+              <Sparkles className="w-4 h-4 mr-2" />
+              Finish
             </Button>
           ) : validationResult && !validationResult.isCorrect ? (
-            <Button
-              onClick={handleValidate}
-              disabled={isValidating}
-              size="sm"
-              className="bg-orange-600/90 hover:bg-orange-700/90 text-white backdrop-blur-sm shadow-md px-6"
-            >
-              {isValidating ? (
-                <>
-                  <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
-                  Checking Code...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Try Again
-                </>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleValidate}
+                disabled={isValidating}
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900/30"
+              >
+                {isValidating ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border border-orange-600/30 border-t-orange-600 rounded-full animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Try Again
+                  </>
+                )}
+              </Button>
+              {validationResult.codeToAdd && onInsertCorrectCode && (
+                <Button
+                  onClick={onInsertCorrectCode}
+                  size="sm"
+                  className="bg-blue-600/90 hover:bg-blue-700/90 text-white backdrop-blur-sm shadow-md"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Use Correct Code
+                </Button>
               )}
-            </Button>
+            </div>
           ) : (
             <Button
               onClick={handleValidate}
@@ -515,6 +564,42 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           )}
         </div>
       )}
+
+      {/* Error state actions */}
+      {!isMinimized && hasError && (
+        <div 
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "12px",
+            borderTop: "1px solid rgba(229, 231, 235, 0.3)",
+            backgroundColor: "rgba(249, 250, 251, 0.4)",
+            flexShrink: 0
+          }}
+          className="dark:border-gray-600/30 dark:bg-gray-750/40"
+        >
+          <div className="flex gap-2">
+            <Button
+              onClick={onCancel}
+              size="sm"
+              variant="outline"
+              className="text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/30"
+            >
+              Continue Coding
+            </Button>
+            {onExitCoach && (
+              <Button
+                onClick={onExitCoach}
+                size="sm"
+                className="bg-red-600/90 hover:bg-red-700/90 text-white"
+              >
+                Exit Coach Mode
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Minimized state - compact */}
       {isMinimized && (
@@ -522,7 +607,6 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
             Awaiting response...
-            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse animation-delay-150" />
           </div>
         </div>
       )}
