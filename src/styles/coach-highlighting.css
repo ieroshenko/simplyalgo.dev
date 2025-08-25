@@ -1,38 +1,38 @@
 /* AI Coaching System Highlighting Styles */
 
-/* Coach highlight area - lighter blue highlighting */
+/* Coach highlight area - very subtle highlighting */
 .coach-highlight-area {
-  background-color: rgba(59, 130, 246, 0.08) !important; /* much lighter blue */
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 4px;
-  animation: coachHighlightPulse 2s ease-in-out infinite;
+  background-color: rgba(59, 130, 246, 0.03) !important; /* extremely light blue */
+  border-left: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 0;
+  animation: coachHighlightPulse 3s ease-in-out infinite;
 }
 
 .dark .coach-highlight-area {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border-color: rgba(59, 130, 246, 0.4);
+  background-color: rgba(59, 130, 246, 0.08) !important; /* Blue primary with low opacity */
+  border-left-color: rgba(59, 130, 246, 0.5); /* Blue primary */
 }
 
 /* Subtle pulsing animation to draw attention */
 @keyframes coachHighlightPulse {
   0%, 100% {
-    background-color: rgba(59, 130, 246, 0.08);
-    border-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.03);
+    border-left-color: rgba(59, 130, 246, 0.3);
   }
   50% {
-    background-color: rgba(59, 130, 246, 0.12);
-    border-color: rgba(59, 130, 246, 0.35);
+    background-color: rgba(59, 130, 246, 0.05);
+    border-left-color: rgba(59, 130, 246, 0.4);
   }
 }
 
 @keyframes coachHighlightPulseDark {
   0%, 100% {
-    background-color: rgba(59, 130, 246, 0.15);
-    border-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(59, 130, 246, 0.08); /* Blue primary */
+    border-left-color: rgba(59, 130, 246, 0.5);
   }
   50% {
-    background-color: rgba(59, 130, 246, 0.25);
-    border-color: rgba(59, 130, 246, 0.6);
+    background-color: rgba(59, 130, 246, 0.12); /* Slightly more opaque */
+    border-left-color: rgba(59, 130, 246, 0.7);
   }
 }
 
@@ -53,8 +53,8 @@
 }
 
 .dark .coach-input-overlay {
-  background: #1f2937;
-  border-color: #3b82f6;
+  background: #1a1e23; /* Dark card background */
+  border-color: #3b82f6; /* Blue primary */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -79,7 +79,7 @@
 }
 
 .dark .coach-input-textarea::placeholder {
-  color: #9ca3af;
+  color: #999999; /* Muted foreground */
 }
 
 /* Input overlay actions */
@@ -92,7 +92,7 @@
 }
 
 .dark .coach-input-actions {
-  border-top-color: #374151;
+  border-top-color: #2f343a; /* Border color */
 }
 
 /* Coach bubble positioning */
@@ -101,8 +101,8 @@
   top: 20px;
   right: 20px;
   max-width: 320px;
-  background: #3b82f6;
-  color: white;
+  background: #3b82f6; /* Blue primary */
+  color: #ffffff; /* White text */
   border-radius: 16px;
   padding: 16px 20px;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
@@ -129,7 +129,7 @@
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid #3b82f6;
+  border-top: 8px solid #3b82f6; /* Blue primary */
 }
 
 /* Coach progress indicator */
@@ -152,9 +152,9 @@
 }
 
 .dark .coach-progress {
-  background: #1f2937;
-  border-color: #374151;
-  color: white;
+  background: #1a1e23; /* Dark card background */
+  border-color: #2f343a; /* Border color */
+  color: #f2f2f2; /* Light foreground */
 }
 
 .coach-progress-bar {
@@ -166,19 +166,19 @@
 }
 
 .dark .coach-progress-bar {
-  background: #374151;
+  background: #262a30; /* Secondary background */
 }
 
 .coach-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(90deg, #3b82f6, #2563eb); /* Blue primary gradient */
   transition: width 0.3s ease;
 }
 
 /* Coach mode button in toolbar */
 .coach-mode-button {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  color: white;
+  background: linear-gradient(135deg, #3b82f6, #2563eb); /* Blue primary gradient */
+  color: #ffffff; /* White text */
   border: none;
   border-radius: 6px;
   padding: 8px 12px;
@@ -192,17 +192,18 @@
 }
 
 .coach-mode-button:hover {
-  background: linear-gradient(135deg, #2563eb, #1e40af);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8); /* Darker blue gradient on hover */
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }
 
 .coach-mode-button.active {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: linear-gradient(135deg, #ef4444, #dc2626); /* Red gradient for active state */
+  color: #ffffff; /* White text on red background */
 }
 
 .coach-mode-button.active:hover {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: linear-gradient(135deg, #dc2626, #b91c1c); /* Darker red gradient on hover */
 }
 
 /* Responsive adjustments */

@@ -17,13 +17,15 @@ import {
   X,
   Clock,
   Maximize2,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useSubmissions } from "@/hooks/useSubmissions";
-import { pythonSolutions } from "@/data/pythonSolutions";
+import { useSolutions } from "@/hooks/useSolutions";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { TestRunnerService } from "@/services/testRunner";
 import { TestResult, CodeSnippet } from "@/types";
@@ -32,12 +34,16 @@ import { toast } from "sonner";
 import Timer from "@/components/Timer";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCodeSnippet } from "@/utils/codeInsertion";
+import { smartInsertCode } from "@/utils/smartCodeInsertion";
 import { useCoachingNew } from "@/hooks/useCoachingNew";
+import { useTheme } from "@/hooks/useTheme";
+import { useEditorTheme } from "@/hooks/useEditorTheme";
 import CoachBubble from "@/components/coaching/CoachBubble";
 import HighlightOverlay from "@/components/coaching/HighlightOverlay";
 import SimpleOverlay from "@/components/coaching/SimpleOverlay";
 import FeedbackOverlay from "@/components/coaching/FeedbackOverlay";
 import CoachProgress from "@/components/coaching/CoachProgress";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import Editor from "@monaco-editor/react";
 import {
   Dialog,
@@ -105,6 +111,8 @@ const ProblemSolverNew = () => {
   const { user } = useAuth();
   const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
+  const { theme, setTheme, isDark } = useTheme();
+  const { currentTheme } = useEditorTheme();
   const [activeTab, setActiveTab] = useState("question");
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -200,8 +208,7 @@ const ProblemSolverNew = () => {
     loading: subsLoading,
     error: subsError,
   } = useSubmissions(user?.id, problem?.id);
-
-  const solutions = problem ? pythonSolutions[problem.id] || [] : [];
+  const { solutions, loading: solutionsLoading } = useSolutions(problemId);
 
   // Coaching system integration
   const {
@@ -364,43 +371,65 @@ const ProblemSolverNew = () => {
         column: position?.column || 0,
       };
 
-      // Skip backend AI call for coaching-validated snippets
+      // Use backend AI-guided insertion for all snippets
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
       
-      if (!snippet.isValidated) {
-        // Only use backend GPT-guided insertion for non-coaching snippets
-        try {
-          const { data, error } = await supabase.functions.invoke("ai-chat", {
-            body: {
-              action: "insert_snippet",
-              code: currentCode,
-              snippet,
-              cursorPosition,
-              problemDescription: problem.description,
-              message: "[snippet insertion request]",
-              conversationHistory: [],
-            },
+      console.log("🚀 Starting AI-powered insertion:", {
+        snippetCode: snippet.code,
+        currentCodeLength: currentCode.length,
+        cursorPosition,
+        snippetType: snippet.insertionHint?.type
+      });
+      
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-chat", {
+          body: {
+            action: "insert_snippet",
+            code: currentCode,
+            snippet,
+            cursorPosition,
+            problemDescription: problem.description,
+            message: snippet.isValidated ? "[coaching snippet insertion]" : "[snippet insertion request]",
+            conversationHistory: [],
+          },
+        });
+        
+        console.log("🤖 AI insertion response:", { 
+          error: !!error, 
+          hasData: !!data,
+          dataKeys: data ? Object.keys(data) : [],
+          newCodeLength: data?.newCode?.length || 0
+        });
+        
+        if (error) throw error;
+        if (data && typeof data.newCode === "string") {
+          newCodeFromBackend = data.newCode;
+          insertedAtLine =
+            typeof data.insertedAtLine === "number"
+              ? data.insertedAtLine
+              : undefined;
+          
+          console.log("✅ AI insertion successful:", {
+            insertedAtLine,
+            codeLengthChange: newCodeFromBackend.length - currentCode.length,
+            rationale: data.rationale || "No rationale provided"
           });
-          if (error) throw error;
-          if (data && typeof data.newCode === "string") {
-            newCodeFromBackend = data.newCode;
-            insertedAtLine =
-              typeof data.insertedAtLine === "number"
-                ? data.insertedAtLine
-                : undefined;
-          }
-        } catch (e) {
-          console.warn("Backend insert_snippet failed:", e);
         }
+      } catch (e) {
+        console.error("❌ AI insertion failed:", e);
+        console.error("Error details:", {
+          message: (e as Error)?.message,
+          stack: (e as Error)?.stack
+        });
       }
 
-      // For coaching-validated snippets, use direct insertion
-      if (snippet.isValidated || !newCodeFromBackend) {
-        const result = insertCodeSnippet(currentCode, snippet);
-        newCodeFromBackend = result.newCode;
-        insertedAtLine = result.insertedAtLine;
-      }
+      // Only use AI insertion - no fallback
+      console.log("🤖 AI insertion result:", { 
+        success: !!newCodeFromBackend, 
+        insertedAt: insertedAtLine,
+        codeLength: newCodeFromBackend?.length || 0 
+      });
 
       if (!newCodeFromBackend) {
         toast.error("Code insertion failed. Please try again.");
@@ -528,6 +557,10 @@ const ProblemSolverNew = () => {
     refetch();
   };
 
+  const toggleTheme = () => {
+    setTheme(isDark ? "light" : "dark");
+  };
+
   const leftPanelTabs = [
     { id: "question", label: "Question" },
     { id: "solution", label: "Solution" },
@@ -564,6 +597,19 @@ const ProblemSolverNew = () => {
 
           <div className="flex items-center space-x-2">
             <Timer />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="text-muted-foreground hover:text-foreground"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -679,7 +725,11 @@ const ProblemSolverNew = () => {
                   {/* Solution Tab */}
                   <TabPanel value="solution" activeTab={activeTab}>
                     <div className="space-y-6">
-                      {solutions.length === 0 ? (
+                      {solutionsLoading ? (
+                        <div className="text-sm text-muted-foreground">
+                          Loading solutions...
+                        </div>
+                      ) : solutions.length === 0 ? (
                         <div className="text-sm text-muted-foreground">
                           No curated solutions yet.
                         </div>
@@ -726,7 +776,7 @@ const ProblemSolverNew = () => {
                                   height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
                                   defaultLanguage="python"
                                   value={sol.code}
-                                  theme="light"
+                                  theme={currentTheme}
                                   options={{
                                     readOnly: true,
                                     minimap: { enabled: false },
@@ -745,8 +795,8 @@ const ProblemSolverNew = () => {
                                 Time & Space Complexity
                               </h3>
                               <ul className="text-sm text-muted-foreground space-y-1">
-                                <li>• Time complexity: {sol.complexity.time}</li>
-                                <li>• Space complexity: {sol.complexity.space}</li>
+                                <li>• Time complexity: {sol.time_complexity}</li>
+                                <li>• Space complexity: {sol.space_complexity}</li>
                               </ul>
                               {sol.explanation && (
                                 <p className="text-sm text-muted-foreground mt-2">
@@ -852,12 +902,12 @@ const ProblemSolverNew = () => {
                                         </div>
                                       </div>
                                       <Editor
-                                        height="50vh"
+                                        height={`${Math.max(s.code.split('\n').length * 20 + 40, 100)}px`}
                                         defaultLanguage={(
                                           s.language || "python"
                                         ).toLowerCase()}
                                         value={s.code}
-                                        theme="light"
+                                        theme={currentTheme}
                                         options={{
                                           readOnly: true,
                                           minimap: { enabled: false },
@@ -1126,7 +1176,7 @@ const ProblemSolverNew = () => {
             <SimpleOverlay
               isVisible={true}
               position={coachingState.inputPosition}
-              onValidateCode={() => {
+              onValidateCode={(explanation) => {
                 // Get code from the highlighted area in the main editor
                 const editor = codeEditorRef.current;
                 if (!editor) {
@@ -1138,8 +1188,8 @@ const ProblemSolverNew = () => {
                 const currentCode = editor.getValue();
                 console.log("Validating code from editor:", currentCode);
                 
-                // Submit the current editor code for validation
-                submitCoachingCode(currentCode, "Code validation from highlighted area");
+                // Submit the current editor code for validation with optional explanation
+                submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
               }}
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
@@ -1152,6 +1202,7 @@ const ProblemSolverNew = () => {
                 nextStep: coachingState.lastValidation.nextStep
               } : null}
               onInsertCorrectCode={insertCorrectCode}
+              onFinishCoaching={stopCoaching}
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
                 console.log("Exiting coach mode due to AI service error");
@@ -1163,6 +1214,24 @@ const ProblemSolverNew = () => {
             />
           )}
         </>
+      )}
+
+      {/* Loading Spinner for AI Coaching */}
+      {coachingState.isWaitingForResponse && (
+        <LoadingSpinner 
+          message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."} 
+        />
+      )}
+
+      {/* Feedback Overlay for coaching errors/success */}
+      {coachingState.feedback.show && (
+        <FeedbackOverlay
+          isVisible={coachingState.feedback.show}
+          type={coachingState.feedback.type || "hint"}
+          message={coachingState.feedback.message}
+          onClose={closeFeedback}
+          showConfetti={coachingState.feedback.showConfetti}
+        />
       )}
     </div>
   );

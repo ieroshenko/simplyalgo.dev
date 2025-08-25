@@ -288,14 +288,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
           value={content}
           onChange={handleContentChange}
           className="w-full h-full bg-transparent border-none outline-none resize-none text-sm flex-1 placeholder-muted-foreground"
-          placeholder="Start writing your notes...
-
-# Heading
-**Bold text**
-*Italic text*
-`code`
-- List item
-[Link](url)"
+          placeholder="Start writing your notes..."
         />
       </div>
 
