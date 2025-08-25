@@ -37,6 +37,7 @@ import { insertCodeSnippet } from "@/utils/codeInsertion";
 import { smartInsertCode } from "@/utils/smartCodeInsertion";
 import { useCoachingNew } from "@/hooks/useCoachingNew";
 import { useTheme } from "@/hooks/useTheme";
+import { useEditorTheme } from "@/hooks/useEditorTheme";
 import CoachBubble from "@/components/coaching/CoachBubble";
 import HighlightOverlay from "@/components/coaching/HighlightOverlay";
 import SimpleOverlay from "@/components/coaching/SimpleOverlay";
@@ -111,6 +112,7 @@ const ProblemSolverNew = () => {
   const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const { theme, setTheme, isDark } = useTheme();
+  const { currentTheme } = useEditorTheme();
   const [activeTab, setActiveTab] = useState("question");
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -369,9 +371,16 @@ const ProblemSolverNew = () => {
         column: position?.column || 0,
       };
 
-      // Use backend GPT-guided insertion for all snippets
+      // Use backend AI-guided insertion for all snippets
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
+      
+      console.log("🚀 Starting AI-powered insertion:", {
+        snippetCode: snippet.code,
+        currentCodeLength: currentCode.length,
+        cursorPosition,
+        snippetType: snippet.insertionHint?.type
+      });
       
       try {
         const { data, error } = await supabase.functions.invoke("ai-chat", {
@@ -385,6 +394,14 @@ const ProblemSolverNew = () => {
             conversationHistory: [],
           },
         });
+        
+        console.log("🤖 AI insertion response:", { 
+          error: !!error, 
+          hasData: !!data,
+          dataKeys: data ? Object.keys(data) : [],
+          newCodeLength: data?.newCode?.length || 0
+        });
+        
         if (error) throw error;
         if (data && typeof data.newCode === "string") {
           newCodeFromBackend = data.newCode;
@@ -392,34 +409,27 @@ const ProblemSolverNew = () => {
             typeof data.insertedAtLine === "number"
               ? data.insertedAtLine
               : undefined;
+          
+          console.log("✅ AI insertion successful:", {
+            insertedAtLine,
+            codeLengthChange: newCodeFromBackend.length - currentCode.length,
+            rationale: data.rationale || "No rationale provided"
+          });
         }
       } catch (e) {
-        console.warn("Backend insert_snippet failed:", e);
-        // Fallback to manual insertion only if GPT fails
+        console.error("❌ AI insertion failed:", e);
+        console.error("Error details:", {
+          message: (e as Error)?.message,
+          stack: (e as Error)?.stack
+        });
       }
 
-      // Fallback to manual insertion only if GPT fails
-      if (!newCodeFromBackend) {
-        // Check if the code already exists to prevent duplicates
-        const codeToInsert = snippet.code.trim();
-        const currentCodeLines = currentCode.split('\n').map(line => line.trim());
-        const snippetLines = codeToInsert.split('\n').map(line => line.trim());
-        
-        // Check if all snippet lines already exist in the current code
-        const allLinesExist = snippetLines.every(snippetLine => 
-          snippetLine === '' || currentCodeLines.some(currentLine => currentLine === snippetLine)
-        );
-        
-        if (allLinesExist && snippetLines.some(line => line !== '')) {
-          console.log("🚫 Code already exists, skipping insertion:", codeToInsert);
-          toast.info("Code already exists in the editor");
-          return;
-        }
-        
-        const result = insertCodeSnippet(currentCode, snippet);
-        newCodeFromBackend = result.newCode;
-        insertedAtLine = result.insertedAtLine;
-      }
+      // Only use AI insertion - no fallback
+      console.log("🤖 AI insertion result:", { 
+        success: !!newCodeFromBackend, 
+        insertedAt: insertedAtLine,
+        codeLength: newCodeFromBackend?.length || 0 
+      });
 
       if (!newCodeFromBackend) {
         toast.error("Code insertion failed. Please try again.");
@@ -766,7 +776,7 @@ const ProblemSolverNew = () => {
                                   height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
                                   defaultLanguage="python"
                                   value={sol.code}
-                                  theme="light"
+                                  theme={currentTheme}
                                   options={{
                                     readOnly: true,
                                     minimap: { enabled: false },
@@ -897,7 +907,7 @@ const ProblemSolverNew = () => {
                                           s.language || "python"
                                         ).toLowerCase()}
                                         value={s.code}
-                                        theme="light"
+                                        theme={currentTheme}
                                         options={{
                                           readOnly: true,
                                           minimap: { enabled: false },
@@ -1166,7 +1176,7 @@ const ProblemSolverNew = () => {
             <SimpleOverlay
               isVisible={true}
               position={coachingState.inputPosition}
-              onValidateCode={() => {
+              onValidateCode={(explanation) => {
                 // Get code from the highlighted area in the main editor
                 const editor = codeEditorRef.current;
                 if (!editor) {
@@ -1178,8 +1188,8 @@ const ProblemSolverNew = () => {
                 const currentCode = editor.getValue();
                 console.log("Validating code from editor:", currentCode);
                 
-                // Submit the current editor code for validation
-                submitCoachingCode(currentCode, "Code validation from highlighted area");
+                // Submit the current editor code for validation with optional explanation
+                submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
               }}
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
@@ -1210,6 +1220,17 @@ const ProblemSolverNew = () => {
       {coachingState.isWaitingForResponse && (
         <LoadingSpinner 
           message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."} 
+        />
+      )}
+
+      {/* Feedback Overlay for coaching errors/success */}
+      {coachingState.feedback.show && (
+        <FeedbackOverlay
+          isVisible={coachingState.feedback.show}
+          type={coachingState.feedback.type || "hint"}
+          message={coachingState.feedback.message}
+          onClose={closeFeedback}
+          showConfetti={coachingState.feedback.showConfetti}
         />
       )}
     </div>

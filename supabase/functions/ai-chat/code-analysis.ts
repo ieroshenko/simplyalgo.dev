@@ -1,5 +1,5 @@
-import { llmText, llmJson, llmJsonFast } from "./openai-utils.ts";
-import { CodeSnippet, ChatMessage } from "./types.ts";
+import { llmText, llmJson, llmJsonFast, llmWithSessionContext } from "./openai-utils.ts";
+import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
 
 /**
  * Lightweight sanitizer to fix common TSX issues in generated components before returning to client.
@@ -92,6 +92,7 @@ export function sanitizeGeneratedTsx(input: string): string {
 
 /**
  * Main conversation handler - generates AI response for general chat
+ * Now uses context-aware approach to optimize token usage
  */
 export async function generateConversationResponse(
   message: string,
@@ -99,84 +100,138 @@ export async function generateConversationResponse(
   conversationHistory: ChatMessage[],
   testCases?: unknown[],
   currentCode?: string,
+  sessionId?: string, // New parameter for context management
 ): Promise<string> {
-  const serializedTests =
-    Array.isArray(testCases) && testCases.length > 0
-      ? JSON.stringify(testCases)
-      : undefined;
+  // Check if we can use context-aware approach or need to fallback
+  if (!sessionId) {
+    console.log("[chat] No session ID provided, using legacy approach");
+    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+  }
 
-  // Determine if we should allow code in the reply - be more liberal for explicit requests
+  // Use context-aware approach for optimal token usage
+  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
+    ? JSON.stringify(testCases) 
+    : undefined;
+
+  // Analyze message for code request patterns
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
   const explicitCodeRequest =
-    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(
-      message,
-    );
+    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
   const codeKeywords =
-    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(
-      message,
-    );
+    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
   const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
 
-  const conversationPrompt = `
-You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+  let contextualResponse: ContextualResponse;
+  
+  try {
+    // Always use the same comprehensive context approach
+    // Responses API will handle continuation automatically via previous_response_id
+    const chatContext = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
 
 TEST EXECUTION CONTEXT:
 - The student's code will be executed automatically on Judge0 against the official test cases.
 - Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
-- Do NOT ask about basic Python syntax like colons, indentation, or function definitions.
-- Do NOT ask the student to run tests or provide test cases.
-- Do NOT ask about function scaffolding (e.g., self usage) or basic typing/import boilerplate unless the student explicitly asks.
-- Provide hints first; only provide code if the student requests it or has shared code.
-- Once you believe the student's solution is likely correct, then ask ONE follow-up about time and space complexity.
+- CRITICAL: Do NOT include any import statements in your code suggestions
+- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
+
+TEACHING APPROACH - CRITICAL RULES:
+- Ask guiding questions first, provide code only when explicitly requested
+- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
+- When providing code, give ONLY small pieces (1-3 lines maximum)
+- Focus on the immediate next step the student needs
+- Build upon the current code in the editor - analyze what they have and suggest the next logical step
+- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
+- BAD examples: Complete functions, full solutions, import statements
 
 PROBLEM CONTEXT:
 ${problemDescription}
 
 ${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
+${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
 
+CONVERSATION HISTORY:
+${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
+
+CURRENT STUDENT MESSAGE: "${message}"
+
+Code policy: allowCode = ${allowCode}
+
+Provide educational tutoring response.`;
+
+    contextualResponse = await llmWithSessionContext(
+      sessionId,
+      chatContext,
+      'chat',
+      currentCode || '',
+      {
+        temperature: 0.3,
+        maxTokens: 600
+      }
+    );
+
+    console.log(`[chat] Context-aware response generated - Tokens saved: ${contextualResponse.tokensSaved || 0}`);
+    return contextualResponse.content || "I'm sorry, I couldn't generate a response. Please try again.";
+    
+  } catch (error) {
+    console.error("[chat] Context-aware generation failed, falling back to legacy:", error);
+    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+  }
+}
+
+/**
+ * Legacy chat response generation (fallback for when session ID is not available)
+ */
+async function generateLegacyChatResponse(
+  message: string,
+  problemDescription: string,
+  conversationHistory: ChatMessage[],
+  testCases?: unknown[],
+  currentCode?: string,
+): Promise<string> {
+  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
+    ? JSON.stringify(testCases) 
+    : undefined;
+
+  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
+  const explicitCodeRequest =
+    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
+  const codeKeywords =
+    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
+  const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
+
+  const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+
+TEST EXECUTION CONTEXT:
+- The student's code will be executed automatically on Judge0 against the official test cases.
+- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
+- CRITICAL: Do NOT include any import statements in your code suggestions
+- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
+
+TEACHING APPROACH - CRITICAL RULES:
+- Ask guiding questions first, provide code only when explicitly requested
+- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
+- When providing code, give ONLY small pieces (1-3 lines maximum)
+- Focus on the immediate next step the student needs
+- Build upon the current code in the editor - analyze what they have and suggest the next logical step
+- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
+- BAD examples: Complete functions, full solutions, import statements
+
+PROBLEM CONTEXT:
+${problemDescription}
+
+${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
 ${currentCode ? `CURRENT CODE IN EDITOR:\n${"```"}python\n${currentCode}\n${"```"}\n` : ""}
 
 CONVERSATION HISTORY:
 ${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
-CURRENT STUDENT MESSAGE:
-"${message}"
+CURRENT STUDENT MESSAGE: "${message}"
 
-Your role:
-1. Coach with a Socratic style, but be helpful when students need code examples.
-2. Ask ONE concise question (<= 25 words) to guide their thinking.
-3. Provide helpful hints when students are stuck or ask for guidance. do not provide hints otherwise.
-4. Keep tone friendly and educational.
-5. Do not provide code examples unless explicitly asked for.
-6. Do not provide solutions unless explicitly asked for.Ask one guiding question at a time. If the student does not know the answer, ask another question. guiding questions should be concise and focused on one aspect of the problem.
+Code policy: allowCode = ${allowCode}
 
-Code policy (conditional):
-- allowCode = ${allowCode}
-- If allowCode = false: Use questions and conceptual hints only.
-- If allowCode = true and student explicitly requests code: 
-  * CRITICAL: Only provide incremental code snippets, NEVER complete solutions
-  * Analyze what's already in their editor and provide ONLY the next 1-3 lines they need
-  * If they have an empty function, provide just the first variable declaration or setup
-  * If they have setup code, provide just the next logical step (loop, condition, etc.)
-  * If they have partial logic, provide just the missing piece to complete that step
-  * NEVER provide full algorithm implementations - break it into tiny incremental steps
-  * Each snippet should be 1-5 lines maximum and build on their existing code
+Provide educational tutoring response.`;
 
-Output format:
-- Lead with a guiding question or brief explanation
-- Provide helpful hints as needed (do not provide hints otherwise)
-- If code is warranted and allowCode=true, include properly formatted code:
-${"```"}python
-# Clear, educational code example
-# With proper indentation and comments
-${"```"}
-
-`;
-
-  const systemGuidance =
-    "You are a helpful Socratic coding tutor. Guide students with questions and provide educational code examples when requested. When allowCode=true and students ask for code help, provide clear, well-formatted Python examples that teach concepts. Balance Socratic questioning with practical code assistance.";
-  const combined = `${systemGuidance}\n\n${conversationPrompt}`;
-  const text = await llmText(combined, { temperature: 0.3, maxTokens: 600 });
+  const text = await llmText(conversationPrompt, { temperature: 0.3, maxTokens: 600 });
   return text || "I'm sorry, I couldn't generate a response. Please try again.";
 }
 
@@ -452,51 +507,13 @@ export async function insertSnippetSmart(
   snippet: CodeSnippet,
   problemDescription: string,
   cursorPosition?: { line: number; column: number },
+  contextHint?: string,
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  // 1) Deterministic, fast path: anchor-based insertion if the first line exists
-  try {
-    const snippetLines = (snippet.code || "").split("\n");
-    const firstLineTrim = (snippetLines[0] || "").trim();
-    if (firstLineTrim.length > 0) {
-      const lines = code.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === firstLineTrim) {
-          // If next lines already match snippet continuation, skip (already inserted)
-          const secondLineTrim = (snippetLines[1] || "").trim();
-          if (secondLineTrim && lines[i + 1]?.trim() === secondLineTrim) {
-            return {
-              newCode: code,
-              insertedAtLine: -1,
-              rationale: "Snippet already present after anchor",
-            };
-          }
-          const indent = lines[i].match(/^\s*/)?.[0] || "";
-          const toInsert = snippetLines
-            .slice(1)
-            .map((l, idx) => (idx === 0 ? indent + l.trim() : indent + l));
-          const newLines = [...lines];
-          newLines.splice(i + 1, 0, ...toInsert);
-          const newCode = newLines.join("\n");
-          console.log(
-            "[ai-chat] insert_snippet anchor-based insertion at line",
-            i + 1,
-          );
-          return {
-            newCode,
-            insertedAtLine: i + 1,
-            rationale: "Anchor-based placement after matching first line",
-          };
-        }
-      }
-    }
-  } catch (e) {
-    console.warn(
-      "[ai-chat] Anchor-based insertion failed, continuing to model placement:",
-      e,
-    );
-  }
+  // Skip anchor-based insertion for now - it was causing false positives
+  // Let AI handle all insertion decisions for better context awareness
+  console.log("[ai-chat] Skipping anchor-based insertion, using AI placement for better context awareness");
 
-  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them.
+  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them with full context awareness.
 
 CURRENT FILE:
 ---BEGIN FILE---
@@ -508,15 +525,29 @@ SNIPPET TO INSERT:
 ${snippet.code}
 ---END SNIPPET---
 
-IMPORTANT RULES:
+COACHING HINT (what to fix):
+${contextHint || "(no explicit hint)"}
+
+CRITICAL CONTEXT ANALYSIS:
+- Analyze the current code structure, variables, and logic flow
+- Understand what the student is trying to build based on existing code
+- Consider the algorithm pattern and where this snippet fits in the solution
+- Look for incomplete functions, missing initializations, or logical next steps
+
+SMART INSERTION RULES:
 1. If the snippet code already exists in the current file, return insertAtLine: -1
-2. Find the most logical place to insert this snippet considering:
-   - Code flow and algorithm structure
-   - Variable scope and dependencies
-   - Function boundaries
-   - Proper indentation context
-3. The snippet should be inserted as new lines, not replace existing code
-4. Consider if this is part of an algorithm implementation inside a function
+2. Find the most logical place considering:
+   - Algorithm flow and current code structure
+   - Variable scope and dependencies (if initializing variables, place at function start)
+   - Function boundaries and proper indentation
+   - What the student appears to be building based on existing code
+3. Insert as new lines, don't replace existing code unless fixing bugs
+4. Consider the logical sequence: imports → initialization → main logic → return
+
+MERGE CLEANUP:
+- If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
+- If both bin(i).count('1') and DP relation (res[i] = res[i >> 1] + (i & 1)) implementations are present for the same function, keep only one consistent implementation based on continuity with surrounding code. Prefer DP if both appear.
+- CRITICAL: If the snippet fixes bugs in similar existing code (e.g., n >> 1 vs n >>= 1, or return n vs return count), REPLACE the buggy lines rather than marking as duplicate. Look for logical errors, missing assignments, wrong return values.
 
 Output JSON:
 {
@@ -526,22 +557,45 @@ Output JSON:
 }`;
 
   console.log("[ai-chat] insert_snippet using main model for smart placement");
-  const raw = await llmJson(placementPrompt, { maxTokens: 500 });
+  console.log("[ai-chat] Snippet to insert:", snippet.code);
+  console.log("[ai-chat] Current code length:", code.length);
+  
   let insertAtLine: number | undefined;
   let indent: string | undefined;
   let rationale: string | undefined;
+  
   try {
-    const parsed = JSON.parse(raw || "{}");
-    if (typeof parsed.insertAtLine === "number")
-      insertAtLine = parsed.insertAtLine;
-    if (typeof parsed.indentation === "string") indent = parsed.indentation;
-    if (typeof parsed.rationale === "string") rationale = parsed.rationale;
-  } catch {
-    // ignore
+    const raw = await llmJson(placementPrompt, { maxTokens: 500 });
+    console.log("[ai-chat] LLM response for insertion:", raw);
+    
+    try {
+      const parsed = JSON.parse(raw || "{}");
+      console.log("[ai-chat] Parsed insertion result:", parsed);
+      if (typeof parsed.insertAtLine === "number")
+        insertAtLine = parsed.insertAtLine;
+      if (typeof parsed.indentation === "string") indent = parsed.indentation;
+      if (typeof parsed.rationale === "string") rationale = parsed.rationale;
+    } catch (parseError) {
+      console.error("[ai-chat] Failed to parse LLM response:", parseError);
+      throw new Error(`Invalid JSON response from LLM: ${raw}`);
+    }
+  } catch (llmError) {
+    console.error("[ai-chat] LLM call failed:", llmError);
+    throw new Error(`LLM call failed: ${llmError.message}`);
   }
 
-  // If snippet already exists or placement invalid, return original
+  // If model claims snippet already exists, try small deterministic bug-fix replacements (Python heuristics)
   if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
+    let fixed = code;
+    // Heuristic 1: fix right-shift without assignment inside loops
+    fixed = fixed.replace(/^(\s*)(n)\s*>>\s*1\s*$/gm, "$1$2 >>= 1");
+    // Heuristic 2: fix return n to return count if count variable is used in snippet
+    if (/\bcount\b/.test(snippet.code)) {
+      fixed = fixed.replace(/^(\s*)return\s+n\s*$/gm, "$1return count");
+    }
+    if (fixed !== code) {
+      return { newCode: fixed, insertedAtLine: -1, rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes' };
+    }
     return { newCode: code, insertedAtLine: -1, rationale };
   }
 
@@ -562,8 +616,38 @@ Output JSON:
     return contextIndent + line;
   });
 
-  const newLines = [...lines];
+  let newLines = [...lines];
   newLines.splice(safeInsertLine, 0, ...indentedSnippet);
+
+  // Simple deterministic cleanup: if we inserted a return within a function, strip trivial unreachable duplicates after it
+  try {
+    // Find the function start above insertion (Python-style `def`)
+    let funcStart = -1;
+    for (let i = safeInsertLine; i >= 0; i--) {
+      if (/^\s*def\s+\w+\s*\(/.test(newLines[i])) { funcStart = i; break; }
+    }
+    if (funcStart !== -1) {
+      // Find the first return line inside function after insertion
+      let firstReturn = -1;
+      for (let i = safeInsertLine; i < newLines.length; i++) {
+        if (/^\s*return\b/.test(newLines[i])) { firstReturn = i; break; }
+      }
+      if (firstReturn !== -1) {
+        // If there are simple computed lines after return like alternate loops or extra return, trim trailing duplicate block
+        // Heuristic: if following lines include `for i in range` or another `return res`, drop them
+        const tail = newLines.slice(firstReturn + 1);
+        const hasAltLoop = tail.some(l => /for\s+i\s+in\s+range\s*\(/.test(l));
+        const hasSecondReturn = tail.some(l => /^\s*return\b/.test(l));
+        if (hasAltLoop || hasSecondReturn) {
+          // keep only up to firstReturn
+          newLines = newLines.slice(0, firstReturn + 1);
+        }
+      }
+    }
+  } catch (_) {
+    // non-fatal cleanup error; ignore
+  }
+
   const newCode = newLines.join("\n");
   return { newCode, insertedAtLine: safeInsertLine, rationale };
 }
