@@ -371,9 +371,16 @@ const ProblemSolverNew = () => {
         column: position?.column || 0,
       };
 
-      // Use backend GPT-guided insertion for all snippets
+      // Use backend AI-guided insertion for all snippets
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
+      
+      console.log("🚀 Starting AI-powered insertion:", {
+        snippetCode: snippet.code,
+        currentCodeLength: currentCode.length,
+        cursorPosition,
+        snippetType: snippet.insertionHint?.type
+      });
       
       try {
         const { data, error } = await supabase.functions.invoke("ai-chat", {
@@ -387,6 +394,14 @@ const ProblemSolverNew = () => {
             conversationHistory: [],
           },
         });
+        
+        console.log("🤖 AI insertion response:", { 
+          error: !!error, 
+          hasData: !!data,
+          dataKeys: data ? Object.keys(data) : [],
+          newCodeLength: data?.newCode?.length || 0
+        });
+        
         if (error) throw error;
         if (data && typeof data.newCode === "string") {
           newCodeFromBackend = data.newCode;
@@ -394,34 +409,27 @@ const ProblemSolverNew = () => {
             typeof data.insertedAtLine === "number"
               ? data.insertedAtLine
               : undefined;
+          
+          console.log("✅ AI insertion successful:", {
+            insertedAtLine,
+            codeLengthChange: newCodeFromBackend.length - currentCode.length,
+            rationale: data.rationale || "No rationale provided"
+          });
         }
       } catch (e) {
-        console.warn("Backend insert_snippet failed:", e);
-        // Fallback to manual insertion only if GPT fails
+        console.error("❌ AI insertion failed:", e);
+        console.error("Error details:", {
+          message: (e as Error)?.message,
+          stack: (e as Error)?.stack
+        });
       }
 
-      // Fallback to manual insertion only if GPT fails
-      if (!newCodeFromBackend) {
-        // Check if the code already exists to prevent duplicates
-        const codeToInsert = snippet.code.trim();
-        const currentCodeLines = currentCode.split('\n').map(line => line.trim());
-        const snippetLines = codeToInsert.split('\n').map(line => line.trim());
-        
-        // Check if all snippet lines already exist in the current code
-        const allLinesExist = snippetLines.every(snippetLine => 
-          snippetLine === '' || currentCodeLines.some(currentLine => currentLine === snippetLine)
-        );
-        
-        if (allLinesExist && snippetLines.some(line => line !== '')) {
-          console.log("🚫 Code already exists, skipping insertion:", codeToInsert);
-          toast.info("Code already exists in the editor");
-          return;
-        }
-        
-        const result = insertCodeSnippet(currentCode, snippet);
-        newCodeFromBackend = result.newCode;
-        insertedAtLine = result.insertedAtLine;
-      }
+      // Only use AI insertion - no fallback
+      console.log("🤖 AI insertion result:", { 
+        success: !!newCodeFromBackend, 
+        insertedAt: insertedAtLine,
+        codeLength: newCodeFromBackend?.length || 0 
+      });
 
       if (!newCodeFromBackend) {
         toast.error("Code insertion failed. Please try again.");

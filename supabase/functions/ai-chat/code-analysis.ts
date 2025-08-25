@@ -124,24 +124,24 @@ export async function generateConversationResponse(
   let contextualResponse: ContextualResponse;
   
   try {
-    // For first message or new session, send comprehensive initial context
-    const isInitialMessage = !conversationHistory || conversationHistory.length === 0;
-    
-    if (isInitialMessage) {
-      // Create comprehensive initial context for the session
-      const initialChatContext = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+    // Always use the same comprehensive context approach
+    // Responses API will handle continuation automatically via previous_response_id
+    const chatContext = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
 
-EXECUTION ENVIRONMENT:
-- Student code runs automatically on Judge0 against official test cases
-- Judge0 handles all imports (List, Optional, etc.) and Python setup automatically
-- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
-- Code format: Just the function definition (def solution_name():) with implementation
-- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
-- Focus on algorithm logic and problem-solving approach
+TEST EXECUTION CONTEXT:
+- The student's code will be executed automatically on Judge0 against the official test cases.
+- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
+- CRITICAL: Do NOT include any import statements in your code suggestions
+- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
 
-CODE FORMAT REQUIREMENTS: Always provide pure function implementations only:
-- ✅ Good: def twoSum(nums, target): return []
-- ❌ Bad: from typing import List; class Solution: def twoSum(self, nums: List[int], target: int) -> List[int]:
+TEACHING APPROACH - CRITICAL RULES:
+- Ask guiding questions first, provide code only when explicitly requested
+- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
+- When providing code, give ONLY small pieces (1-3 lines maximum)
+- Focus on the immediate next step the student needs
+- Build upon the current code in the editor - analyze what they have and suggest the next logical step
+- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
+- BAD examples: Complete functions, full solutions, import statements
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -149,26 +149,6 @@ ${problemDescription}
 ${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
 ${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
 
-CURRENT STUDENT MESSAGE: "${message}"
-
-Code policy: allowCode = ${allowCode}
-
-Provide educational tutoring response.`;
-
-      contextualResponse = await llmWithSessionContext(
-        sessionId,
-        initialChatContext,
-        'chat',
-        currentCode || '',
-        {
-          temperature: 0.3,
-          maxTokens: 600
-        }
-      );
-      
-    } else {
-      // Continue conversation with minimal context
-      const continuationPrompt = `${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
 CONVERSATION HISTORY:
 ${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
@@ -178,17 +158,16 @@ Code policy: allowCode = ${allowCode}
 
 Provide educational tutoring response.`;
 
-      contextualResponse = await llmWithSessionContext(
-        sessionId,
-        continuationPrompt,
-        'chat',
-        currentCode || '',
-        {
-          temperature: 0.3,
-          maxTokens: 600
-        }
-      );
-    }
+    contextualResponse = await llmWithSessionContext(
+      sessionId,
+      chatContext,
+      'chat',
+      currentCode || '',
+      {
+        temperature: 0.3,
+        maxTokens: 600
+      }
+    );
 
     console.log(`[chat] Context-aware response generated - Tokens saved: ${contextualResponse.tokensSaved || 0}`);
     return contextualResponse.content || "I'm sorry, I couldn't generate a response. Please try again.";
@@ -222,17 +201,20 @@ async function generateLegacyChatResponse(
 
   const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
 
-EXECUTION ENVIRONMENT:
-- Student code runs automatically on Judge0 against official test cases
-- Judge0 handles all imports (List, Optional, etc.) and Python setup automatically
-- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
-- Code format: Just the function definition (def solution_name():) with implementation
-- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
-- Focus on algorithm logic and problem-solving approach
+TEST EXECUTION CONTEXT:
+- The student's code will be executed automatically on Judge0 against the official test cases.
+- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
+- CRITICAL: Do NOT include any import statements in your code suggestions
+- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
 
-CODE FORMAT REQUIREMENTS: Always provide pure function implementations only:
-- ✅ Good: def twoSum(nums, target): return []
-- ❌ Bad: from typing import List; class Solution: def twoSum(self, nums: List[int], target: int) -> List[int]:
+TEACHING APPROACH - CRITICAL RULES:
+- Ask guiding questions first, provide code only when explicitly requested
+- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
+- When providing code, give ONLY small pieces (1-3 lines maximum)
+- Focus on the immediate next step the student needs
+- Build upon the current code in the editor - analyze what they have and suggest the next logical step
+- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
+- BAD examples: Complete functions, full solutions, import statements
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -527,50 +509,11 @@ export async function insertSnippetSmart(
   cursorPosition?: { line: number; column: number },
   contextHint?: string,
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  // 1) Deterministic, fast path: anchor-based insertion if the first line exists
-  try {
-    const snippetLines = (snippet.code || "").split("\n");
-    const firstLineTrim = (snippetLines[0] || "").trim();
-    if (firstLineTrim.length > 0) {
-      const lines = code.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === firstLineTrim) {
-          // If next lines already match snippet continuation, skip (already inserted)
-          const secondLineTrim = (snippetLines[1] || "").trim();
-          if (secondLineTrim && lines[i + 1]?.trim() === secondLineTrim) {
-            return {
-              newCode: code,
-              insertedAtLine: -1,
-              rationale: "Snippet already present after anchor",
-            };
-          }
-          const indent = lines[i].match(/^\s*/)?.[0] || "";
-          const toInsert = snippetLines
-            .slice(1)
-            .map((l, idx) => (idx === 0 ? indent + l.trim() : indent + l));
-          const newLines = [...lines];
-          newLines.splice(i + 1, 0, ...toInsert);
-          const newCode = newLines.join("\n");
-          console.log(
-            "[ai-chat] insert_snippet anchor-based insertion at line",
-            i + 1,
-          );
-          return {
-            newCode,
-            insertedAtLine: i + 1,
-            rationale: "Anchor-based placement after matching first line",
-          };
-        }
-      }
-    }
-  } catch (e) {
-    console.warn(
-      "[ai-chat] Anchor-based insertion failed, continuing to model placement:",
-      e,
-    );
-  }
+  // Skip anchor-based insertion for now - it was causing false positives
+  // Let AI handle all insertion decisions for better context awareness
+  console.log("[ai-chat] Skipping anchor-based insertion, using AI placement for better context awareness");
 
-  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them.
+  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them with full context awareness.
 
 CURRENT FILE:
 ---BEGIN FILE---
@@ -585,15 +528,21 @@ ${snippet.code}
 COACHING HINT (what to fix):
 ${contextHint || "(no explicit hint)"}
 
-IMPORTANT RULES:
+CRITICAL CONTEXT ANALYSIS:
+- Analyze the current code structure, variables, and logic flow
+- Understand what the student is trying to build based on existing code
+- Consider the algorithm pattern and where this snippet fits in the solution
+- Look for incomplete functions, missing initializations, or logical next steps
+
+SMART INSERTION RULES:
 1. If the snippet code already exists in the current file, return insertAtLine: -1
-2. Find the most logical place to insert this snippet considering:
-   - Code flow and algorithm structure
-   - Variable scope and dependencies
-   - Function boundaries
-   - Proper indentation context
-3. The snippet should be inserted as new lines, not replace existing code
-4. Consider if this is part of an algorithm implementation inside a function
+2. Find the most logical place considering:
+   - Algorithm flow and current code structure
+   - Variable scope and dependencies (if initializing variables, place at function start)
+   - Function boundaries and proper indentation
+   - What the student appears to be building based on existing code
+3. Insert as new lines, don't replace existing code unless fixing bugs
+4. Consider the logical sequence: imports → initialization → main logic → return
 
 MERGE CLEANUP:
 - If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
@@ -611,13 +560,13 @@ Output JSON:
   console.log("[ai-chat] Snippet to insert:", snippet.code);
   console.log("[ai-chat] Current code length:", code.length);
   
+  let insertAtLine: number | undefined;
+  let indent: string | undefined;
+  let rationale: string | undefined;
+  
   try {
     const raw = await llmJson(placementPrompt, { maxTokens: 500 });
     console.log("[ai-chat] LLM response for insertion:", raw);
-    
-    let insertAtLine: number | undefined;
-    let indent: string | undefined;
-    let rationale: string | undefined;
     
     try {
       const parsed = JSON.parse(raw || "{}");

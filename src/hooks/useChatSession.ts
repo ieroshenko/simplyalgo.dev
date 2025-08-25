@@ -349,14 +349,14 @@ export const useChatSession = ({
             ? data.codeSnippets
             : undefined;
 
-        // Gate snippet visibility: allow when user explicitly asks for code OR AI naturally provides code blocks
+        // Gate snippet visibility: simple logic matching dev-tazi-003
         const lastUserMsg = content;
         const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(lastUserMsg);
         const explicitAsk =
-          /\b(write|show|give|provide|insert|add|implement|code|import|define|declare|create)\b/i.test(
+          /\b(write|show|give|provide|insert|add|implement|code|import|define|create)\b/i.test(
             lastUserMsg,
           );
-        const allowSnippets = hasExplicitCode || explicitAsk || (rawSnippets && rawSnippets.length > 0);
+        const allowSnippets = hasExplicitCode || explicitAsk;
 
         // Dedupe snippets against entire session and within this response
         let dedupedSnippets = allowSnippets
