@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { llmText, getOpenAI } from "./openai-utils.ts";
-import { CoachingSession, CoachingValidation, CoachingStep } from "./types.ts";
+import { llmText, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
+import { CoachingSession, CoachingValidation, CoachingStep, ContextualResponse } from "./types.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
@@ -29,60 +29,203 @@ export async function startInteractiveCoaching(
   problemDescription: string,
   difficulty: "beginner" | "intermediate" | "advanced"
 ) {
-  console.log("🎯 [startInteractiveCoaching] Starting...", { problemId, userId, difficulty });
+  console.log("🎯 [startInteractiveCoaching] Starting context-aware coaching...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  // Generate first coaching question
-  const firstStep = await generateNextCoachingStep(sessionId, currentCode, problemDescription, difficulty);
+  // Analyze current code to determine correct line numbers
+  const codeLines = (currentCode || "def countBits(self, n: int) -> List[int]:").split('\n');
+  const nextLineNumber = Math.max(2, codeLines.length + 1);
+
+  // Create comprehensive initial context with ALL coaching rules and context
+  const initialContextPrompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+
+CRITICAL EXECUTION CONTEXT (REMEMBER FOR ENTIRE SESSION):
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY by the platform
+- Students ONLY implement the core algorithm logic inside the function body
+- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
+- Code format: Just the function definition (def solution_name():) with implementation
+- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
+- NEVER mention function signatures, imports, or test case handling in ANY response
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
+
+PROBLEM CONTEXT (FOR ENTIRE SESSION):
+Problem ID: ${problemId}  
+Problem Description: ${problemDescription}
+Difficulty Level: ${difficulty}
+
+COACHING METHODOLOGY (FOR ENTIRE SESSION):
+1. Analyze the student's COMPLETE code state before each response
+2. Guide step-by-step algorithm development through Socratic questioning
+3. If code is correct/complete, determine session completion or optimization opportunities
+4. NEVER duplicate code that already exists in their editor
+5. Focus on missing algorithmic components only
+
+CURRENT STUDENT CODE STATE:
+\`\`\`python
+${currentCode || "def countBits(self, n: int) -> List[int]:"}
+\`\`\`
+
+ALGORITHM-FOCUSED COACHING APPROACH:
+- Examine existing algorithm implementation (ignore signatures)
+- If they have data structures initialized, guide to the next algorithmic step  
+- Focus on core logic: iteration patterns, bit manipulation, counting, etc.
+- Ask about algorithmic approach, not code formatting or imports
+- Reference line ${nextLineNumber} for where they should add algorithm code
+- Be specific about algorithmic steps, not boilerplate code
+
+Now analyze this student's current code and generate the FIRST coaching step.
+
+Return JSON object with:
+- A specific question about what algorithm step to implement next
+- A concrete hint that guides them to the solution logic  
+- The correct highlight area for where they should add code
+
+Required JSON format:
+{
+  "question": "[Specific question about next algorithm step based on current code]",
+  "hint": "[Specific actionable hint about algorithm logic they should implement]", 
+  "highlightArea": {
+    "startLine": ${nextLineNumber},
+    "startColumn": 1,
+    "endLine": ${nextLineNumber},
+    "endColumn": 1
+  },
+  "difficulty": "${difficulty}",
+  "currentStepNumber": 1,
+  "awaitingSubmission": true,
+  "isCompleted": false
+}
+
+Examples of good Socratic questions/hints (guide discovery, don't give solutions):
+- Question: "What data structure would be appropriate to store results for each number from 0 to n?"
+- Hint: "Think about what type of collection can hold multiple values and allows access by index"
+
+- Question: "How would you systematically process each number from 0 to n?"  
+- Hint: "What Python construct allows you to repeat an operation for a sequence of numbers?"
+
+- Question: "What approach could you use to count bits in a number's binary representation?"
+- Hint: "Consider what Python functions might help convert numbers to different representations"
+
+CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions that help them think through the problem step by step.
+
+Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
+
+  // Use context-aware AI call to create initial coaching context
+  let stepData;
+  let contextualResponse: ContextualResponse;
   
-  // Validate the generated step
-  if (!firstStep || !firstStep.question) {
-    console.error("🚨 [startInteractiveCoaching] Invalid step generated:", firstStep);
-    throw new Error("Failed to generate valid coaching step");
-  }
-  
-  console.log("✅ [startInteractiveCoaching] Generated step:", firstStep);
-  
-  // Store session in database
   try {
-    const { data, error } = await supabaseAdmin
+    console.log("🎯 [startInteractiveCoaching] Creating initial coaching context...");
+    
+    // Use the new context-aware function to create initial context
+    contextualResponse = await llmWithSessionContext(
+      sessionId,
+      initialContextPrompt,
+      'coaching',
+      currentCode,
+      {
+        maxTokens: 800,
+        temperature: 0.7,
+        responseFormat: "json_object"
+      }
+    );
+
+    console.log("🎯 [startInteractiveCoaching] Context created successfully");
+    console.log(`🎯 [startInteractiveCoaching] Response ID: ${contextualResponse.responseId}`);
+    console.log(`🎯 [startInteractiveCoaching] Is new context: ${contextualResponse.isNewContext}`);
+
+    const rawContent = contextualResponse.content;
+    let cleanContent = rawContent.trim();
+    
+    console.log("🎯 [startInteractiveCoaching] Raw AI response:", rawContent);
+    
+    if (cleanContent.startsWith("```")) {
+      cleanContent = cleanContent
+        .replace(/^```(?:json)?\n?/m, "")
+        .replace(/```$/m, "")
+        .trim();
+    }
+
+    console.log("🎯 [startInteractiveCoaching] Cleaned response:", cleanContent);
+    
+    if (!cleanContent || cleanContent === "{}") {
+      console.error("🚨 [startInteractiveCoaching] Empty response from AI");
+      throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
+    }
+    
+    stepData = JSON.parse(cleanContent);
+    console.log("🎯 [startInteractiveCoaching] Parsed step data:", stepData);
+    
+    // Validate required fields
+    if (!stepData.question || !stepData.highlightArea) {
+      console.error("🚨 [startInteractiveCoaching] Missing required fields:", stepData);
+      throw new Error("Invalid coaching step data");
+    }
+  } catch (error) {
+    console.error("🚨 [startInteractiveCoaching] AI generation failed:", error);
+    throw error;
+  }
+
+  // Only create database session AFTER successful AI step generation
+  try {
+    console.log("🎯 [startInteractiveCoaching] Creating database session...");
+    const { error: sessionError } = await supabaseAdmin
       .from("coaching_sessions")
       .insert({
         id: sessionId,
         user_id: userId,
         problem_id: problemId,
-        difficulty,
+        difficulty: difficulty || "beginner",
+        total_steps: 5, // Estimated total steps for the problem
         current_step_number: 1,
-        current_question: firstStep.question,
+        current_question: stepData.question,
+        is_active: true,
         awaiting_submission: true,
-        is_completed: false,
-        session_state: 'active',
+        started_at: new Date().toISOString(),
         initial_code: currentCode,
-        total_steps: 0, // Will be updated as we progress
-        steps: [] // No longer using pre-generated steps
-      })
-      .select()
-      .single();
+        response_id: contextualResponse.responseId, // Store response ID for context continuity
+        context_initialized: true,
+        last_code_snapshot: currentCode,
+        context_created_at: new Date().toISOString(),
+      });
 
-    if (error) {
-      console.error("Error creating coaching session:", error);
+    if (sessionError) {
+      console.error("🚨 [startInteractiveCoaching] Database error:", sessionError);
       throw new Error("Failed to create coaching session");
     }
-
-    console.log("✅ [startInteractiveCoaching] Session created successfully");
+    
+    // Store the initial step
+    await supabaseAdmin
+      .from("coaching_responses")
+      .insert({
+        session_id: sessionId,
+        step_number: 1,
+        ai_question: stepData.question,
+        ai_hint: stepData.hint,
+        highlight_area: stepData.highlightArea,
+        created_at: new Date().toISOString(),
+        response_id: contextualResponse.responseId, // Store response ID for this step
+      });
+    
+    console.log("🎯 [startInteractiveCoaching] Session created successfully with response_id:", contextualResponse.responseId);
+    console.log(`🎯 [startInteractiveCoaching] Tokens potentially saved in future requests: ${contextualResponse.tokensSaved || 'N/A (initial context)'}`);
+    
     return {
       sessionId,
-      question: firstStep.question,
-      hint: firstStep.hint,
-      highlightArea: firstStep.highlightArea,
-      difficulty,
+      question: stepData.question,
+      hint: stepData.hint,
+      highlightArea: stepData.highlightArea,
+      difficulty: stepData.difficulty || difficulty,
       currentStepNumber: 1,
       awaitingSubmission: true,
-      isCompleted: false
+      isCompleted: false,
+      responseId: contextualResponse.responseId, // Return response ID for frontend tracking
+      contextInitialized: true,
     };
   } catch (dbError) {
-    console.error("Database operation failed:", dbError);
-    throw new Error("Failed to store coaching session");
+    console.error("🚨 [startInteractiveCoaching] Database operation failed:", dbError);
+    throw new Error("Failed to create coaching session");
   }
 }
 
@@ -98,14 +241,17 @@ export async function generateNextCoachingStep(
 ): Promise<CoachingStep> {
   console.log("🎯 [generateNextCoachingStep] Generating step...");
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform. Generate a single, targeted coaching question.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
 
-CODING ENVIRONMENT CONTEXT:
-- This is an online coding platform similar to LeetCode
-- Students write Python code that gets executed with Judge0 (automatic test runner)
-- All necessary imports (List, Optional, etc.) are handled automatically by the judge system
-- Students only need to implement the algorithm logic inside the function body
-- The platform tests their code against multiple test cases automatically
+CRITICAL EXECUTION CONTEXT:
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
+- Students ONLY implement the core algorithm logic inside the function body
+- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
+- Code format: Just the function definition (def solution_name():) with implementation
+- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
+- NEVER mention function signatures, imports, or test case handling in questions
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
 
 PROBLEM: ${problemDescription}
 
@@ -118,24 +264,24 @@ ${previousResponse ? `PREVIOUS STUDENT RESPONSE: ${previousResponse}` : ''}
 
 STUDENT PROGRESS ANALYSIS:
 ${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student has empty editor or only function signature. They need guidance on algorithm approach and implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their current logic for correctness, efficiency, and next steps."}
+  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
-COACHING STRATEGY:
-1. If code is empty/minimal: Focus on problem understanding, algorithm approach, and first implementation steps
-2. If code exists: Analyze current implementation, identify issues, and guide improvements  
-3. Ask ONE specific question that helps them write 1-3 lines of code (not the whole solution)
-4. Guide them to discover solutions rather than giving direct answers
+ALGORITHM-FOCUSED COACHING STRATEGY:
+1. If code is minimal: Focus on algorithm approach and first implementation steps  
+2. If code exists: Analyze algorithm logic, identify issues, and guide algorithmic improvements
+3. Ask ONE specific question about algorithm logic that helps them write 1-3 lines of core code
+4. Guide algorithmic discovery rather than giving direct code solutions
 
-QUESTION REQUIREMENTS:
-- Ask about SPECIFIC next steps: "What data structure would store your results?" or "How would you iterate through the array?"
-- Focus on writing small incremental code pieces
-- Reference their ACTUAL code with specific line numbers if they have code
-- Include helpful hints that guide discovery
+QUESTION REQUIREMENTS (ALGORITHM-FOCUSED):
+- Ask about SPECIFIC algorithmic steps: "What data structure would store your results?" or "How would you process each number?"
+- Focus on core algorithm logic: loops, conditions, data manipulation
+- Reference their ACTUAL algorithm implementation with specific line numbers
+- Include hints that guide algorithmic discovery, not boilerplate code
 
-FOR HIGHLIGHTING: Use EXACT line numbers from their code, or line 1 if they only have function signature
+FOR HIGHLIGHTING: Use EXACT line numbers from their algorithm code (ignore function signature lines)
 
 Return ONLY a JSON object with this structure:
 {
@@ -235,58 +381,70 @@ export async function validateCoachingSubmission(
     throw new Error("Coaching session not found");
   }
 
-  const prompt = `You are an expert coding coach. Validate a student's code submission and provide feedback.
-
-Current Problem: ${session.problemDescription}
-
-Student's Current Code:
+  // Create concise prompt for context continuation (the AI already knows all the coaching rules)
+  const contextContinuationPrompt = `STUDENT CODE UPDATE:
 \`\`\`python
 ${currentEditorCode}
 \`\`\`
 
-Student's Response/Explanation: "${studentResponse}"
+${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area" 
+  ? `STUDENT RESPONSE: "${studentResponse}"
 
-The student has written code in the highlighted area and is asking for validation. Analyze their current code implementation:
+` : ""}VALIDATION REQUEST:
+Analyze the student's current code implementation. Has their algorithm improved? What should happen next?
 
-1. Check if the code logic is correct for solving the problem
-2. Look for syntax errors, logical errors, or missing components
-3. Determine if they're on the right track or need guidance
-4. If correct, acknowledge their progress and suggest the next step
-5. If incorrect, provide specific feedback and guidance
+Determine if:
+1. Code is correct/complete → session can end or offer optimization
+2. Code has issues → provide specific algorithmic guidance  
+3. Code needs more implementation → guide next step
 
-Return a JSON object with this exact structure:
+CRITICAL ANALYSIS POINTS:
+- Check if the code already has all necessary algorithmic components
+- Don't duplicate existing code in codeToAdd
+- If algorithm is complete and correct, indicate session completion
+- Focus on what's MISSING from their algorithm, not what exists
+
+Return JSON in this exact format:
 {
   "isCorrect": boolean,
-  "feedback": "string - specific feedback about their code implementation",
-  "nextStep": {
-    "question": "string - next coaching question to guide them",
-    "hint": "string - helpful hint for the next step",
-    "highlightArea": {
-      "startLine": number,
-      "endLine": number,
-      "description": "string - what area of code to focus on next"
-    }
+  "feedback": "specific feedback message about their code",
+  "nextAction": "insert_and_continue" | "retry" | "hint" | "complete_session",
+  "codeAnalysis": {
+    "syntax": "valid" | "invalid",
+    "logic": "correct" | "incorrect" | "partial",
+    "efficiency": "optimal" | "acceptable" | "inefficient"
   },
-  "codeToAdd": "string - if their approach is correct, any additional code to add (optional)"
-}
+  "codeToAdd": "code to insert if nextAction is insert_and_continue",
+  "nextStep": {
+    "question": "next guiding question for the student",
+    "expectedCodeType": "variable" | "loop" | "condition" | "expression" | "return" | "any",
+    "hint": "helpful hint for the next step"
+  }
+}`;
 
-Be encouraging but accurate. Help them learn through discovery.`;
-
+  let contextualResponse: ContextualResponse;
+  
   try {
-    console.log("🎯 [validateCoachingSubmission] Initializing OpenAI...");
-    const openai = getOpenAI();
+    console.log("🎯 [validateCoachingSubmission] Using context-aware validation...");
     
-    console.log("🎯 [validateCoachingSubmission] Making API call to gpt-5-mini...");
-    const response = await openai.chat.completions.create({
-      model: "gpt-5-mini", 
-      messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 1000,
-      // GPT-5 doesn't support temperature, top_p, etc.
-    });
+    // Use context continuation instead of sending full coaching rules again
+    contextualResponse = await llmWithSessionContext(
+      sessionId,
+      contextContinuationPrompt,
+      'coaching',
+      currentEditorCode,
+      {
+        maxTokens: 1500,
+        responseFormat: "json_object"
+      }
+    );
 
-    console.log("🎯 [validateCoachingSubmission] API call successful");
+    console.log("🎯 [validateCoachingSubmission] Context-aware validation successful");
+    console.log(`🎯 [validateCoachingSubmission] Response ID: ${contextualResponse.responseId}`);
+    console.log(`🎯 [validateCoachingSubmission] Is new context: ${contextualResponse.isNewContext}`);
+    console.log(`🎯 [validateCoachingSubmission] Tokens saved: ${contextualResponse.tokensSaved || 0}`);
 
-    const rawContent = response.choices[0].message.content || "{}";
+    const rawContent = contextualResponse.content;
     let cleanContent = rawContent.trim();
     
     console.log("🎯 [validateCoachingSubmission] Raw AI response:", rawContent);
@@ -303,11 +461,8 @@ Be encouraging but accurate. Help them learn through discovery.`;
     if (!cleanContent || cleanContent === "{}") {
       console.error("🚨 [validateCoachingSubmission] Empty or invalid response from AI");
       console.error("🚨 [validateCoachingSubmission] Raw response was:", JSON.stringify(rawContent));
-      console.error("🚨 [validateCoachingSubmission] Response choices:", response.choices);
-      console.error("🚨 [validateCoachingSubmission] Response usage:", response.usage);
-      console.error("🚨 [validateCoachingSubmission] Response model:", response.model);
-      console.error("🚨 [validateCoachingSubmission] Full response object keys:", Object.keys(response));
-      
+      console.error("🚨 [validateCoachingSubmission] Context response ID:", contextualResponse.responseId);
+      console.error("🚨 [validateCoachingSubmission] Is new context:", contextualResponse.isNewContext);
       
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
@@ -321,7 +476,7 @@ Be encouraging but accurate. Help them learn through discovery.`;
       throw new Error("Validation missing required fields");
     }
     
-    // Store the response in database
+    // Store the response in database with context information
     await supabaseAdmin
       .from("coaching_responses")
       .insert({
@@ -331,27 +486,44 @@ Be encouraging but accurate. Help them learn through discovery.`;
         student_response: studentResponse,
         submitted_code: studentCode,
         validation_result: validation,
-        is_correct: validation.isCorrect
+        is_correct: validation.isCorrect,
+        response_id: contextualResponse.responseId, // Store response ID for this validation
+        tokens_saved: contextualResponse.tokensSaved || 0,
+        context_continued: !contextualResponse.isNewContext
       });
 
-    // Update session state
+    // Update session state and context information
+    const sessionUpdateData: any = {
+      response_id: contextualResponse.responseId, // Always update with latest response ID
+      last_code_snapshot: currentEditorCode,
+      context_initialized: true,
+    };
+
     if (validation.nextAction === "complete_session") {
+      sessionUpdateData.is_completed = true;
+      sessionUpdateData.session_state = 'completed';
+      sessionUpdateData.awaiting_submission = false;
+      
       await supabaseAdmin
         .from("coaching_sessions")
-        .update({
-          is_completed: true,
-          session_state: 'completed',
-          awaiting_submission: false
-        })
+        .update(sessionUpdateData)
         .eq("id", sessionId);
+        
     } else if (validation.isCorrect && validation.nextAction === "insert_and_continue") {
+      sessionUpdateData.current_step_number = session.current_step_number + 1;
+      sessionUpdateData.current_question = validation.nextStep?.question || "";
+      sessionUpdateData.awaiting_submission = true;
+      
       await supabaseAdmin
         .from("coaching_sessions")
-        .update({
-          current_step_number: session.current_step_number + 1,
-          current_question: validation.nextStep?.question || "",
-          awaiting_submission: true
-        })
+        .update(sessionUpdateData)
+        .eq("id", sessionId);
+        
+    } else {
+      // For any other case, just update the context information
+      await supabaseAdmin
+        .from("coaching_sessions")
+        .update(sessionUpdateData)
         .eq("id", sessionId);
     }
 
@@ -378,14 +550,17 @@ export async function generateCoachingSession(
   console.log("🎯 [generateCoachingSession] Starting...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform. Analyze the student's current progress and generate targeted coaching steps.
+  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
 
-CODING ENVIRONMENT CONTEXT:
-- This is an online coding platform similar to LeetCode
-- Students write Python code that gets executed with Judge0 (automatic test runner)
-- All necessary imports (List, Optional, etc.) are handled automatically by the judge system
-- Students only need to implement the algorithm logic inside the function body
-- The platform tests their code against multiple test cases automatically
+CRITICAL EXECUTION CONTEXT:
+- This code runs on Judge0 servers (automatic execution like LeetCode)
+- Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
+- Students ONLY implement the core algorithm logic inside the function body
+- CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
+- Code format: Just the function definition (def solution_name():) with implementation
+- Do NOT provide: import statements, class definitions, if __name__ == "__main__", or test code
+- NEVER mention function signatures, imports, or test case handling in questions
+- Focus EXCLUSIVELY on algorithm implementation and problem-solving logic
 
 PROBLEM: ${problemDescription}
 
@@ -396,28 +571,28 @@ ${"```"}
 
 STUDENT PROGRESS ANALYSIS:
 ${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student has empty editor or only function signature. They need guidance on algorithm approach and implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their current logic for correctness, efficiency, and next steps."}
+  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
-COACHING STRATEGY:
-1. If code is empty/minimal: Focus on problem understanding, algorithm approach, and first implementation steps
-2. If code exists: Analyze current implementation, identify issues, and guide improvements
-3. Always provide specific, actionable steps that build on their current progress
-4. Ask questions that help them discover solutions rather than giving direct answers
+ALGORITHM-FOCUSED COACHING STRATEGY:
+1. If code is minimal: Focus on algorithm approach and first implementation steps
+2. If code exists: Analyze algorithm logic, identify issues, and guide algorithmic improvements  
+3. Always provide specific, actionable steps that build on their current algorithm progress
+4. Ask questions about algorithm logic that help them discover solutions
 
-Create 3-5 coaching steps that guide the student through improving their solution. Each step should:
-1. Ask a specific question about their ACTUAL code (not generic questions)
-2. Highlight the EXACT lines from their code that are relevant to the question
-3. Include expected keywords in the student's response
-4. Provide a helpful hint specific to their current implementation
+Create 3-5 algorithm-focused coaching steps that guide the student through improving their solution. Each step should:
+1. Ask a specific question about their ACTUAL algorithm implementation (not generic questions)
+2. Highlight the EXACT lines from their algorithm code that are relevant to the question
+3. Include expected algorithmic keywords in the student's response  
+4. Provide a helpful hint specific to their current algorithm implementation
 
-CRITICAL: For highlightArea, use EXACT line numbers from the student's code:
-- If they have only a function signature (1 line), highlight line 1
-- If they have multiple lines, highlight the specific lines relevant to each question
-- startLine and endLine should correspond to actual lines in their code
-- Don't use placeholder numbers like "1-5" for everything
+CRITICAL: For highlightArea, use EXACT line numbers from the student's algorithm code:
+- Focus on lines containing algorithm logic (skip function signature lines)
+- If they have algorithm code, highlight the specific algorithmic lines relevant to each question
+- startLine and endLine should correspond to actual algorithm implementation lines
+- Don't highlight boilerplate code or function signatures
 
 Return ONLY a JSON object with this structure:
 {
@@ -425,12 +600,12 @@ Return ONLY a JSON object with this structure:
   "steps": [
     {
       "id": "step-1", 
-      "question": "[Question about their specific code]",
-      "hint": "[Hint specific to what they've written]",
-      "expectedKeywords": ["keyword1", "keyword2"],
+      "question": "[Question about their specific algorithm implementation]",
+      "hint": "[Algorithmic hint specific to what they've implemented]",
+      "expectedKeywords": ["algorithm_keyword1", "logic_keyword2"],
       "highlightArea": {
-        "startLine": [actual line number],
-        "endLine": [actual line number], 
+        "startLine": [actual algorithm line number],
+        "endLine": [actual algorithm line number], 
         "startColumn": 1,
         "endColumn": 50
       }
@@ -438,9 +613,7 @@ Return ONLY a JSON object with this structure:
   ]
 }
 
-Example: If they only have "def topKFrequent(self, nums, k):" on line 1, then highlight line 1 for that question.
-
-Make each step build on their current progress and guide them toward implementing the missing parts.
+Make each step build on their current algorithm progress and guide them toward implementing the missing algorithmic pieces. Focus on algorithm logic, data structures, and problem-solving approach.
 
 IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, reasoning, or markdown formatting. The response should be valid JSON that can be parsed directly.`;
 
@@ -527,3 +700,4 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     throw new Error(`Failed to parse coaching session: ${(parseError as Error)?.message}`);
   }
 }
+

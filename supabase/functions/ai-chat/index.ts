@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import OpenAI from "https://esm.sh/openai@4";
 
 // Import modular components
 import { 
@@ -16,7 +17,8 @@ import {
 } from "./openai-utils.ts";
 import { 
   startInteractiveCoaching, 
-  validateCoachingSubmission 
+  validateCoachingSubmission,
+  generateNextCoachingStep 
 } from "./coaching.ts";
 import { 
   maybeGenerateDiagram, 
@@ -256,6 +258,49 @@ serve(async (req) => {
       }
     }
 
+    // Generate next coaching step action
+    if (req.method === "POST" && action === "generate_next_coaching_step") {
+      const { sessionId, currentCode, previousResponse, problemDescription, difficulty } = body;
+      
+      if (!sessionId || !currentCode) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing sessionId or currentCode for generate_next_coaching_step action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      try {
+        const nextStep = await generateNextCoachingStep(
+          sessionId,
+          currentCode,
+          previousResponse || "",
+          problemDescription || "",
+          difficulty || "medium"
+        );
+        
+        return new Response(JSON.stringify(nextStep), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error("Error generating next coaching step:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate next coaching step",
+            details: (error as Error)?.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     // Clear chat action
     if (req.method === "POST" && action === "clear_chat") {
       if (!sessionId || !userId) {
@@ -350,8 +395,8 @@ serve(async (req) => {
       }
     }
 
-    // Validate required fields for normal chat operations
-    if (!message || !problemDescription) {
+    // Validate required fields for normal chat operations (not for action requests)
+    if (!action && (!message || !problemDescription)) {
       return new Response(
         JSON.stringify({
           error: "Missing required fields: message, problemDescription",
@@ -365,10 +410,15 @@ serve(async (req) => {
 
     // Smart insertion action
     if (req.method === "POST" && action === "insert_snippet") {
-      if (!code || !snippet) {
+      console.log("[ai-chat] insert_snippet request received");
+      console.log("[ai-chat] code length:", code?.length || 0);
+      console.log("[ai-chat] snippet:", snippet);
+      
+      if (!code || !snippet?.code) {
+        console.error("[ai-chat] Missing required fields - code:", !!code, "snippet.code:", !!snippet?.code);
         return new Response(
           JSON.stringify({
-            error: "Missing code or snippet for insert_snippet action",
+            error: "Missing code or snippet.code for insert_snippet action",
           }),
           {
             status: 400,
@@ -378,7 +428,13 @@ serve(async (req) => {
       }
 
       try {
-        const result = await insertSnippetSmart(code, snippet, cursorPosition);
+        const result = await insertSnippetSmart(
+          code,
+          snippet,
+          problemDescription || "",
+          cursorPosition,
+          message || ""
+        );
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -397,26 +453,32 @@ serve(async (req) => {
       }
     }
 
+    // Generate or retrieve chat session ID for context continuity
+    const chatSessionId = sessionId || `chat_${userId || 'anonymous'}_${problemId || Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+    
+    console.log(`[ai-chat] Using chat session: ${chatSessionId}`);
+
     // Default chat behavior: generate conversation + analyze snippets + opportunistic diagram
     const [conversationResponse, userCodeSnippets, diagram] = await Promise.all(
       [
         generateConversationResponse(
-          message,
-          problemDescription,
+          (message || "").slice(0, 800),
+          (problemDescription || "").slice(0, 1200),
           conversationHistory || [],
           testCases,
-          currentCode,
+          (currentCode || "").slice(0, 3000),
+          chatSessionId, // Pass session ID for context management
         ),
         analyzeCodeSnippets(
-          message,
+          (message || "").slice(0, 800),
           conversationHistory || [],
-          problemDescription,
+          (problemDescription || "").slice(0, 1200),
           testCases,
-          currentCode,
+          (currentCode || "").slice(0, 3000),
         ),
         maybeGenerateDiagram(
-          message,
-          problemDescription,
+          (message || "").slice(0, 800),
+          (problemDescription || "").slice(0, 1200),
           conversationHistory || [],
           false,
           preferredEngines,
@@ -424,10 +486,16 @@ serve(async (req) => {
       ],
     );
 
-    // Skip AI response analysis - code blocks now have direct "Add to Editor" buttons
-    const aiCodeSnippets: CodeSnippet[] = [];
+    // Analyze AI response for code snippets to enable "Add to Editor" buttons in chat
+    const aiCodeSnippets = await analyzeCodeSnippets(
+      conversationResponse,
+      conversationHistory || [],
+      (problemDescription || "").slice(0, 1200),
+      testCases,
+      (currentCode || "").slice(0, 3000),
+    );
     console.log(
-      `[Main] Skipping AI response analysis - using direct code block buttons instead`,
+      `[Main] AI response analysis complete: ${aiCodeSnippets.length} snippets found`,
     );
 
     // Combine code snippets from user message and AI response

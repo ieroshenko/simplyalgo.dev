@@ -405,6 +405,14 @@ export const useCoaching = ({ problemId, userId, problemDescription, editorRef, 
           },
         });
         
+        // Also show a toast notification for immediate visibility
+        if (typeof window !== 'undefined' && (window as any).toast) {
+          (window as any).toast.error("AI Coach is temporarily unavailable", {
+            description: "The coaching service is down. You can continue coding on your own.",
+            duration: 5000,
+          });
+        }
+        
         // Auto-hide error message after 5 seconds
         setTimeout(() => {
           setCoachingState(prev => ({
@@ -509,6 +517,62 @@ export const useCoaching = ({ problemId, userId, problemDescription, editorRef, 
     }
   }, [applyHighlight, getScreenPosition]);
 
+  // Insert correct code and proceed to next step
+  const insertCorrectCode = useCallback(async () => {
+    if (!coachingState.lastValidation?.codeToAdd) return;
+    
+    console.log("🎯 [COACHING] Inserting correct code:", coachingState.lastValidation.codeToAdd);
+    
+    const codeToInsert = coachingState.lastValidation.codeToAdd;
+    
+    try {
+      // Use the provided onCodeInsert callback or insert directly
+      if (onCodeInsert) {
+        await onCodeInsert(codeToInsert);
+        console.log("✅ [COACHING] Correct code inserted successfully via callback");
+      } else if (editorRef.current) {
+        const currentCode = editorRef.current.getValue();
+        const snippet = {
+          id: `coaching-correct-${Date.now()}`,
+          code: codeToInsert,
+          language: "python",
+          isValidated: true,
+          insertionType: "smart" as const,
+          insertionHint: {
+            type: "statement" as const,
+            scope: "function" as const,
+            description: "Coaching corrected code"
+          }
+        };
+
+        const result = insertCodeSnippet(currentCode, snippet);
+        editorRef.current.setValue(result.newCode);
+        console.log("✅ [COACHING] Correct code inserted directly into editor");
+      }
+      
+      // Hide feedback and show next question
+      setCoachingState(prev => ({
+        ...prev,
+        feedback: { ...prev.feedback, show: false },
+        showInputOverlay: false,
+      }));
+      
+      // Show next question if available
+      if (coachingState.lastValidation?.nextStep) {
+        setTimeout(() => {
+          showInteractiveQuestion({
+            question: coachingState.lastValidation!.nextStep!.question,
+            hint: coachingState.lastValidation!.nextStep!.hint,
+            highlightArea: coachingState.lastValidation!.nextStep!.highlightArea,
+          });
+        }, 1000);
+      }
+      
+    } catch (error) {
+      console.error("🚨 [COACHING] Error inserting correct code:", error);
+    }
+  }, [coachingState.lastValidation, onCodeInsert, editorRef, showInteractiveQuestion]);
+
 
   // Submit and validate student's code in interactive coaching
   const submitCoachingCode = useCallback(async (studentCode: string, studentResponse?: string) => {
@@ -580,67 +644,82 @@ export const useCoaching = ({ problemId, userId, problemDescription, editorRef, 
         },
       }));
       
-      if (isCorrect && nextAction === "insert_and_continue") {
-        // Auto-insert the code using the existing snippet insertion system
-        console.log("🎯 [COACHING] Code validation successful - inserting code");
-        
-        // Use the provided onCodeInsert callback or insert directly
-        if (onCodeInsert) {
-          setTimeout(async () => {
-            try {
-              await onCodeInsert(studentCode);
-              console.log("✅ [COACHING] Code inserted successfully via callback");
-              
-              // Show next question if provided
-              if (validation.nextStep) {
-                setTimeout(() => {
-                  showInteractiveQuestion({
-                    question: validation.nextStep.question,
-                    hint: validation.nextStep.hint,
-                    highlightArea: validation.nextStep.highlightArea,
-                  });
-                }, 1000); // Allow time for insertion animation
-              }
-            } catch (insertError) {
-              console.error("🚨 [COACHING] Error inserting code:", insertError);
-            }
-          }, 1500); // Allow time for success feedback
-        } else if (editorRef.current) {
-          // Fallback: insert directly into editor
-          setTimeout(() => {
-            try {
-              const currentCode = editorRef.current!.getValue();
-              const snippet = {
-                id: `coaching-${Date.now()}`,
-                code: studentCode,
-                language: "python",
-                isValidated: true,
-                insertionType: "smart" as const,
-                insertionHint: {
-                  type: "statement" as const,
-                  scope: "function" as const,
-                  description: "Coaching validated code"
+      if (nextAction === "insert_and_continue") {
+        if (isCorrect) {
+          console.log("🎯 [COACHING] Code validation successful - auto-inserting correct code");
+          
+          // Auto-insert correct code and proceed to next step
+          const codeToInsert = validation.codeToAdd || studentCode;
+          
+          if (onCodeInsert) {
+            setTimeout(async () => {
+              try {
+                await onCodeInsert(codeToInsert);
+                console.log("✅ [COACHING] Code inserted successfully via callback");
+                
+                // Show next question if provided
+                if (validation.nextStep) {
+                  setTimeout(() => {
+                    showInteractiveQuestion({
+                      question: validation.nextStep.question,
+                      hint: validation.nextStep.hint,
+                      highlightArea: validation.nextStep.highlightArea,
+                    });
+                  }, 1000);
                 }
-              };
-
-              const result = insertCodeSnippet(currentCode, snippet);
-              editorRef.current!.setValue(result.newCode);
-              console.log("✅ [COACHING] Code inserted directly into editor");
-              
-              // Show next question if provided
-              if (validation.nextStep) {
-                setTimeout(() => {
-                  showInteractiveQuestion({
-                    question: validation.nextStep.question,
-                    hint: validation.nextStep.hint,
-                    highlightArea: validation.nextStep.highlightArea,
-                  });
-                }, 1000);
+              } catch (insertError) {
+                console.error("🚨 [COACHING] Error inserting code:", insertError);
               }
-            } catch (insertError) {
-              console.error("🚨 [COACHING] Error inserting code directly:", insertError);
-            }
-          }, 1500);
+            }, 1500);
+          } else if (editorRef.current) {
+            setTimeout(() => {
+              try {
+                const currentCode = editorRef.current!.getValue();
+                const snippet = {
+                  id: `coaching-${Date.now()}`,
+                  code: codeToInsert,
+                  language: "python",
+                  isValidated: true,
+                  insertionType: "smart" as const,
+                  insertionHint: {
+                    type: "statement" as const,
+                    scope: "function" as const,
+                    description: "Coaching validated code"
+                  }
+                };
+
+                const result = insertCodeSnippet(currentCode, snippet);
+                editorRef.current!.setValue(result.newCode);
+                console.log("✅ [COACHING] Code inserted directly into editor");
+                
+                if (validation.nextStep) {
+                  setTimeout(() => {
+                    showInteractiveQuestion({
+                      question: validation.nextStep.question,
+                      hint: validation.nextStep.hint,
+                      highlightArea: validation.nextStep.highlightArea,
+                    });
+                  }, 1000);
+                }
+              } catch (insertError) {
+                console.error("🚨 [COACHING] Error inserting code directly:", insertError);
+              }
+            }, 1500);
+          }
+        } else {
+          console.log("🎯 [COACHING] Code needs correction - showing feedback with options");
+          
+          // Store the corrected code and next step for later use
+          setCoachingState(prev => ({
+            ...prev,
+            lastValidation: {
+              ...validation,
+              codeToAdd: validation.codeToAdd,
+              nextStep: validation.nextStep
+            },
+            showInputOverlay: true, // Keep overlay open for retry or correction
+            inputPosition: prev.inputPosition,
+          }));
         }
       } else if (nextAction === "complete_session") {
         // Session completed!
@@ -794,6 +873,7 @@ export const useCoaching = ({ problemId, userId, problemDescription, editorRef, 
     stopCoaching,
     submitResponse,
     submitCoachingCode, // New interactive coaching submission
+    insertCorrectCode, // Insert AI-provided correct code
     cancelInput,
     closeFeedback,
     skipStep,

@@ -97,7 +97,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
         .select("*")
         .eq("user_id", user.id)
         .eq("problem_id", problemId)
-        .single()) as SupabaseQueryResult<NotesData>;
+        .maybeSingle()) as SupabaseQueryResult<NotesData>;
 
       if (error && error.code !== "PGRST116") {
         throw error;
@@ -288,14 +288,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
           value={content}
           onChange={handleContentChange}
           className="w-full h-full bg-transparent border-none outline-none resize-none text-sm flex-1 placeholder-muted-foreground"
-          placeholder="Start writing your notes...
-
-# Heading
-**Bold text**
-*Italic text*
-`code`
-- List item
-[Link](url)"
+          placeholder="Start writing your notes..."
         />
       </div>
 

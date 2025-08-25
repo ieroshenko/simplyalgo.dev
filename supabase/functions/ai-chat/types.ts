@@ -185,3 +185,48 @@ export interface CoachingStep {
     endColumn: number;
   };
 }
+
+// Session context management for Responses API optimization
+export interface SessionContext {
+  sessionId: string;
+  responseId: string | null;
+  isInitialized: boolean;
+  contextType: 'chat' | 'coaching';
+  lastCodeState: string;
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+export interface ContextualResponse {
+  content: string;
+  responseId: string;
+  isNewContext: boolean;
+  tokensSaved?: number;
+}
+
+// Enhanced coaching session with response context
+export interface EnhancedCoachingSession extends CoachingSession {
+  response_id: string | null;
+  context_initialized: boolean;
+  last_code_snapshot: string;
+  context_created_at: string | null;
+}
+
+// Chat message with context tracking
+export interface ContextualChatMessage extends ChatMessage {
+  messageId: string;
+  responseId: string | null;
+  isContextInit: boolean;
+  timestamp: string;
+}
+
+// Request body extensions for context management
+export interface ContextAwareRequestBody extends RequestBody {
+  // Context management fields
+  previousResponseId?: string;
+  forceNewContext?: boolean;
+  contextType?: 'chat' | 'coaching';
+  // Code change tracking
+  codeSnapshot?: string;
+  codeChanged?: boolean;
+}

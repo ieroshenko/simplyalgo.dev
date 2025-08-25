@@ -1,14 +1,14 @@
 import OpenAI from "https://esm.sh/openai@4";
-import { ResponsesApiRequest, ResponsesApiResponse } from "./types.ts";
+import { ResponsesApiRequest, ResponsesApiResponse, SessionContext, ContextualResponse } from "./types.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
 
 // Model configuration
-export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "o3-mini").trim();
+export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5").trim();
 export const modelSource = Deno.env.get("OPENAI_MODEL")
   ? "OPENAI_MODEL env set"
-  : "defaulted to o3-mini (no OPENAI_MODEL)";
+  : "defaulted to gpt-5 (no OPENAI_MODEL)";
 export const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
 // OpenAI client instance
@@ -190,6 +190,315 @@ export async function llmJson(
     maxTokens: opts.maxTokens,
     responseFormat: "json_object",
   });
+}
+
+/**
+ * Create initial context with response storage for session continuity
+ */
+export async function createInitialContext(
+  prompt: string,
+  opts: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: "json_object" | undefined;
+  },
+): Promise<{ content: string; responseId: string }> {
+  const openai = getOpenAI();
+  const model = configuredModel;
+  
+  if (useResponsesApi) {
+    // Try Responses API with store: true for context preservation
+    const responseModels = [model, "o3-mini"].filter(
+      (v, i, a) => a.indexOf(v) === i,
+    );
+    
+    for (const respModel of responseModels) {
+      try {
+        console.log(`[ai-chat] Creating initial context with model=${respModel}`);
+        const req = {
+          ...buildResponsesRequest(respModel, prompt, {
+            maxTokens: opts.maxTokens,
+            responseFormat: opts.responseFormat,
+          }),
+          store: true, // Enable context storage
+        };
+        
+        const response = await openai.responses.create(
+          req as unknown as ResponsesApiResponse,
+        );
+        
+        const content = extractResponsesText(response);
+        const responseId = (response as unknown as { id?: string }).id || '';
+        
+        if (content.trim().length > 0 && responseId) {
+          console.log(`[ai-chat] Initial context created with response_id=${responseId}`);
+          return { content, responseId };
+        }
+        
+        console.warn(
+          `[ai-chat] Initial context creation failed for model=${respModel}; trying next option...`,
+        );
+        continue;
+      } catch (e) {
+        const err = e as unknown as { name?: string; message?: string };
+        console.warn(
+          `[ai-chat] Initial context creation failed for model=${respModel}. ${err?.name || ""}: ${err?.message || ""}`,
+        );
+        continue;
+      }
+    }
+    
+    console.warn(
+      `[ai-chat] All initial context attempts failed; falling back to Chat Completions.`,
+    );
+  }
+  
+  // Fallback to Chat Completions (no context storage)
+  const content = await llmText(prompt, opts);
+  return { content, responseId: '' };
+}
+
+/**
+ * Continue conversation using previous response context
+ */
+export async function continueWithContext(
+  prompt: string,
+  previousResponseId: string,
+  opts: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: "json_object" | undefined;
+  },
+): Promise<{ content: string; responseId: string }> {
+  const openai = getOpenAI();
+  const model = configuredModel;
+  
+  if (useResponsesApi && previousResponseId) {
+    const responseModels = [model, "o3-mini"].filter(
+      (v, i, a) => a.indexOf(v) === i,
+    );
+    
+    for (const respModel of responseModels) {
+      try {
+        console.log(`[ai-chat] Continuing with context response_id=${previousResponseId}, model=${respModel}`);
+        const req = {
+          ...buildResponsesRequest(respModel, prompt, {
+            maxTokens: opts.maxTokens,
+            responseFormat: opts.responseFormat,
+          }),
+          previous_response_id: previousResponseId, // Continue from previous context
+          store: true, // Continue storing context
+        };
+        
+        const response = await openai.responses.create(
+          req as unknown as ResponsesApiResponse,
+        );
+        
+        const content = extractResponsesText(response);
+        const responseId = (response as unknown as { id?: string }).id || previousResponseId;
+        
+        if (content.trim().length > 0) {
+          console.log(`[ai-chat] Context continuation successful with response_id=${responseId}`);
+          return { content, responseId };
+        }
+        
+        console.warn(
+          `[ai-chat] Context continuation failed for model=${respModel}; trying next option...`,
+        );
+        continue;
+      } catch (e) {
+        const err = e as unknown as { name?: string; message?: string };
+        console.warn(
+          `[ai-chat] Context continuation failed for model=${respModel}. ${err?.name || ""}: ${err?.message || ""}`,
+        );
+        continue;
+      }
+    }
+    
+    console.warn(
+      `[ai-chat] All context continuation attempts failed; falling back to full context.`,
+    );
+  }
+  
+  // Fallback: if no previous context or continuation failed, create new context
+  console.log(`[ai-chat] Creating new context due to continuation failure or missing response_id`);
+  return await createInitialContext(prompt, opts);
+}
+
+/**
+ * Smart LLM caller that automatically handles context continuity
+ */
+export async function llmWithContext(
+  prompt: string,
+  previousResponseId: string | null,
+  opts: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: "json_object" | undefined;
+  },
+): Promise<{ content: string; responseId: string }> {
+  if (previousResponseId && previousResponseId.trim() !== '') {
+    // Continue with existing context
+    return await continueWithContext(prompt, previousResponseId, opts);
+  } else {
+    // Create new context
+    return await createInitialContext(prompt, opts);
+  }
+}
+
+// ================== SESSION CONTEXT MANAGEMENT ==================
+
+// In-memory session context cache (for edge function lifetime)
+const sessionContextCache = new Map<string, SessionContext>();
+
+/**
+ * Create or retrieve session context for coaching/chat sessions
+ */
+export function getOrCreateSessionContext(
+  sessionId: string,
+  contextType: 'chat' | 'coaching',
+  initialCode: string = '',
+): SessionContext {
+  const existing = sessionContextCache.get(sessionId);
+  
+  if (existing && existing.contextType === contextType) {
+    // Update last used timestamp
+    existing.lastUsedAt = new Date().toISOString();
+    return existing;
+  }
+  
+  // Create new session context
+  const context: SessionContext = {
+    sessionId,
+    responseId: null,
+    isInitialized: false,
+    contextType,
+    lastCodeState: initialCode,
+    createdAt: new Date().toISOString(),
+    lastUsedAt: new Date().toISOString(),
+  };
+  
+  sessionContextCache.set(sessionId, context);
+  console.log(`[session-context] Created new context for ${contextType} session: ${sessionId}`);
+  
+  return context;
+}
+
+/**
+ * Update session context with new response ID and code state
+ */
+export function updateSessionContext(
+  sessionId: string,
+  responseId: string,
+  codeState: string = '',
+): void {
+  const context = sessionContextCache.get(sessionId);
+  
+  if (context) {
+    context.responseId = responseId;
+    context.isInitialized = true;
+    context.lastCodeState = codeState;
+    context.lastUsedAt = new Date().toISOString();
+    
+    console.log(`[session-context] Updated context ${sessionId} with response_id: ${responseId}`);
+  } else {
+    console.warn(`[session-context] Attempted to update non-existent context: ${sessionId}`);
+  }
+}
+
+/**
+ * Check if code has changed significantly enough to warrant context refresh
+ */
+export function hasSignificantCodeChange(
+  oldCode: string,
+  newCode: string,
+  threshold: number = 0.3, // 30% change threshold
+): boolean {
+  if (!oldCode || !newCode) return true;
+  
+  const oldLines = oldCode.trim().split('\n').filter(line => line.trim() !== '');
+  const newLines = newCode.trim().split('\n').filter(line => line.trim() !== '');
+  
+  // Simple diff based on line count and content
+  const lineDiff = Math.abs(oldLines.length - newLines.length);
+  const maxLines = Math.max(oldLines.length, newLines.length);
+  
+  if (maxLines === 0) return false;
+  
+  // Check if change ratio exceeds threshold
+  const changeRatio = lineDiff / maxLines;
+  const hasSignificantChange = changeRatio > threshold;
+  
+  console.log(`[code-diff] Change ratio: ${changeRatio.toFixed(3)}, significant: ${hasSignificantChange}`);
+  
+  return hasSignificantChange;
+}
+
+/**
+ * Smart context-aware LLM caller for coaching/chat sessions
+ */
+export async function llmWithSessionContext(
+  sessionId: string,
+  prompt: string,
+  contextType: 'chat' | 'coaching',
+  currentCode: string = '',
+  opts: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: "json_object" | undefined;
+    forceNewContext?: boolean;
+  } = {},
+): Promise<ContextualResponse> {
+  const sessionContext = getOrCreateSessionContext(sessionId, contextType, currentCode);
+  
+  // Determine if we need a new context
+  const needsNewContext = 
+    opts.forceNewContext ||
+    !sessionContext.isInitialized ||
+    !sessionContext.responseId ||
+    hasSignificantCodeChange(sessionContext.lastCodeState, currentCode);
+  
+  let result: { content: string; responseId: string };
+  let tokensSaved = 0;
+  
+  if (needsNewContext) {
+    console.log(`[session-context] Creating new context for ${contextType} session: ${sessionId}`);
+    result = await createInitialContext(prompt, opts);
+    updateSessionContext(sessionId, result.responseId, currentCode);
+  } else {
+    console.log(`[session-context] Continuing with existing context for ${contextType} session: ${sessionId}`);
+    result = await continueWithContext(prompt, sessionContext.responseId!, opts);
+    updateSessionContext(sessionId, result.responseId, currentCode);
+    
+    // Estimate tokens saved (rough calculation)
+    tokensSaved = Math.floor(prompt.length * 0.6); // Assuming 60% reduction
+  }
+  
+  return {
+    content: result.content,
+    responseId: result.responseId,
+    isNewContext: needsNewContext,
+    tokensSaved,
+  };
+}
+
+/**
+ * Clear session context (useful for manual resets)
+ */
+export function clearSessionContext(sessionId: string): void {
+  const deleted = sessionContextCache.delete(sessionId);
+  if (deleted) {
+    console.log(`[session-context] Cleared context for session: ${sessionId}`);
+  } else {
+    console.warn(`[session-context] Attempted to clear non-existent context: ${sessionId}`);
+  }
+}
+
+/**
+ * Get session context info (for debugging)
+ */
+export function getSessionContextInfo(sessionId: string): SessionContext | null {
+  return sessionContextCache.get(sessionId) || null;
 }
 
 /**
