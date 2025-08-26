@@ -116,19 +116,63 @@ export const useProblems = (userId?: string) => {
 
   const fetchCategories = async () => {
     try {
+      // 1) Load categories (to preserve ordering and colors)
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("categories")
-        .select("*")
+        .select("id, name, color, sort_order")
         .order("sort_order");
 
       if (categoriesError) throw categoriesError;
 
-      // Calculate solved/total for each category
-      const formattedCategories: Category[] = categoriesData.map(
+      // 2) Load problems with their category name to compute totals map
+      const { data: problemsData, error: problemsError } = await supabase
+        .from("problems")
+        .select("id, categories(name)");
+
+      if (problemsError) throw problemsError;
+
+      const totalsByCategory = new Map<string, number>();
+      const problemIdToCategory = new Map<string, string>();
+
+      (problemsData || []).forEach((problem: any) => {
+        const catName: string = problem?.categories?.name || "Unknown";
+        totalsByCategory.set(catName, (totalsByCategory.get(catName) || 0) + 1);
+        problemIdToCategory.set(problem.id, catName);
+      });
+
+      // 3) If we have a user, compute solved per category from attempts
+      const solvedByCategory = new Map<string, number>();
+      if (userId) {
+        const { data: attemptsData, error: attemptsError } = await supabase
+          .from("user_problem_attempts")
+          .select("problem_id, status")
+          .eq("user_id", userId)
+          .eq("status", "passed");
+
+        if (attemptsError) throw attemptsError;
+
+        // Count distinct problem_ids solved per category
+        const solvedProblemIds = new Set<string>();
+        (attemptsData || []).forEach((attempt: any) => {
+          if (attempt?.problem_id) solvedProblemIds.add(attempt.problem_id);
+        });
+
+        solvedProblemIds.forEach((pid) => {
+          const catName = problemIdToCategory.get(pid);
+          if (!catName) return;
+          solvedByCategory.set(
+            catName,
+            (solvedByCategory.get(catName) || 0) + 1,
+          );
+        });
+      }
+
+      // 4) Assemble final categories using DB order
+      const formattedCategories: Category[] = (categoriesData || []).map(
         (category: any) => ({
           name: category.name,
-          solved: 0, // TODO: Calculate from user attempts
-          total: 0, // TODO: Calculate from problems count
+          solved: solvedByCategory.get(category.name) || 0,
+          total: totalsByCategory.get(category.name) || 0,
           color: category.color,
         }),
       );

@@ -54,7 +54,7 @@ const DataStructureVault = () => {
   };
 
   const handleCardClick = (slug: string) => {
-    navigate(`/leetcode/data-structures/${slug}`);
+    navigate(`/DSA/data-structures/${slug}`);
   };
 
   return (

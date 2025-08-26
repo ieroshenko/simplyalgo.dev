@@ -66,7 +66,7 @@ const Auth = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">simplyalgo</h1>
             <p className="text-muted-foreground mt-2">
-              Learn LeetCode with AI guidance
+              Learn DSA with AI guidance
             </p>
           </div>
         </div>

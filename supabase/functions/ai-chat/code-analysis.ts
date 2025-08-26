@@ -126,7 +126,7 @@ export async function generateConversationResponse(
   try {
     // Always use the same comprehensive context approach
     // Responses API will handle continuation automatically via previous_response_id
-    const chatContext = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+    const chatContext = `You are SimplyAlgo's AI coding tutor, helping students solve DSA-style problems step by step.
 
 TEST EXECUTION CONTEXT:
 - The student's code will be executed automatically on Judge0 against the official test cases.
@@ -199,7 +199,7 @@ async function generateLegacyChatResponse(
     /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
   const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
 
-  const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve LeetCode-style problems step by step.
+  const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve DSA-style problems step by step.
 
 TEST EXECUTION CONTEXT:
 - The student's code will be executed automatically on Judge0 against the official test cases.
@@ -284,7 +284,7 @@ export async function analyzeCodeSnippets(
   }
 
   const analysisPrompt = `
-You are an expert coding tutor analyzing ${isAIResponse ? "AI assistant code" : "student code"} for a LeetCode-style problem.
+You are an expert coding tutor analyzing ${isAIResponse ? "AI assistant code" : "student code"} for a DSA-style problem.
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -671,7 +671,7 @@ export async function generateVisualizationComponent(problem: {
     `[generateVisualizationComponent] Generating for problem: ${problem.title}`,
   );
 
-  const prompt = `Generate a complete React component that visualizes the algorithm for this LeetCode problem:
+  const prompt = `Generate a complete React component that visualizes the algorithm for this DSA problem:
 
 **Problem:** ${problem.title}
 **Category:** ${problem.category}

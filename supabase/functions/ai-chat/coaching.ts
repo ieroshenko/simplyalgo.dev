@@ -37,10 +37,10 @@ export async function startInteractiveCoaching(
   const nextLineNumber = Math.max(2, codeLines.length + 1);
 
   // Create comprehensive initial context with ALL coaching rules and context
-  const initialContextPrompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+  const initialContextPrompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
 CRITICAL EXECUTION CONTEXT (REMEMBER FOR ENTIRE SESSION):
-- This code runs on Judge0 servers (automatic execution like LeetCode)
+- This code runs on Judge0 servers (automatic execution like DSA)
 - Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY by the platform
 - Students ONLY implement the core algorithm logic inside the function body
 - CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
@@ -241,10 +241,10 @@ export async function generateNextCoachingStep(
 ): Promise<CoachingStep> {
   console.log("🎯 [generateNextCoachingStep] Generating step...");
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+  const prompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
 CRITICAL EXECUTION CONTEXT:
-- This code runs on Judge0 servers (automatic execution like LeetCode)
+- This code runs on Judge0 servers (automatic execution like DSA)
 - Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
 - Students ONLY implement the core algorithm logic inside the function body
 - CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks
@@ -550,10 +550,10 @@ export async function generateCoachingSession(
   console.log("🎯 [generateCoachingSession] Starting...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  const prompt = `You are an expert coding coach for a LeetCode-style platform with Judge0 execution environment.
+  const prompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
 CRITICAL EXECUTION CONTEXT:
-- This code runs on Judge0 servers (automatic execution like LeetCode)
+- This code runs on Judge0 servers (automatic execution like DSA)
 - Function signatures, imports (List, Optional, etc.), and test cases are PROVIDED AUTOMATICALLY
 - Students ONLY implement the core algorithm logic inside the function body
 - CRITICAL: Provide ONLY function implementations without imports, classes, or main blocks

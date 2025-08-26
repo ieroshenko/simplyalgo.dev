@@ -69,7 +69,7 @@ src/
 │   └── useProblems.tsx  # Problem data management
 ├── pages/               # Main application pages
 │   ├── Dashboard.tsx    # User dashboard
-│   ├── LeetCodeArena.tsx# Problem browser
+│   ├── DSAArena.tsx# Problem browser
 │   └── ProblemSolver.tsx# Code editor interface
 ├── lib/                 # Utility functions
 ├── types/               # TypeScript type definitions

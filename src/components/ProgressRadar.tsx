@@ -1,13 +1,32 @@
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserStats } from "@/hooks/useUserStats";
+import { supabase } from "@/integrations/supabase/client";
 
 const ProgressRadar = () => {
-  // Mock progress data
-  const progressData = {
-    overall: 75,
-    patterns: 80,
-    problems: 70,
-    systemDesign: 65,
-  };
+  const { user } = useAuth();
+  const { stats } = useUserStats(user?.id);
+
+  const [totalProblems, setTotalProblems] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const { count, error } = await supabase
+        .from("problems")
+        .select("id", { count: "exact", head: true });
+      if (!error && typeof count === "number") {
+        setTotalProblems(count);
+      }
+    };
+    fetchTotals();
+  }, []);
+
+  const overallPercent = useMemo(() => {
+    if (!totalProblems || totalProblems <= 0) return 0;
+    const solved = stats.totalSolved || 0;
+    return Math.min(100, Math.round((solved / totalProblems) * 100));
+  }, [stats.totalSolved, totalProblems]);
 
   return (
     <Card className="w-full max-w-sm">
@@ -37,7 +56,7 @@ const ProgressRadar = () => {
                 strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
-                strokeDasharray={`${progressData.overall * 4.02} 402`}
+                strokeDasharray={`${overallPercent * 4.02} 402`}
                 className="transition-all duration-300"
               />
             </svg>
@@ -46,7 +65,7 @@ const ProgressRadar = () => {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
                 <div className="text-2xl font-bold text-foreground">
-                  {progressData.overall}%
+                  {overallPercent}%
                 </div>
                 <div className="text-xs text-muted-foreground">Progress</div>
               </div>
@@ -57,9 +76,7 @@ const ProgressRadar = () => {
             Progress
           </div>
           <div className="text-sm text-muted-foreground text-center">
-            Keep pushing forward!
-            <br />
-            System Design needs work
+            {stats.totalSolved} solved out of {totalProblems}
           </div>
         </div>
       </CardContent>

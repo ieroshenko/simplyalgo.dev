@@ -178,7 +178,7 @@ CREATE TABLE test_cases (
 - **Type Imports**: Automatic `typing` module imports
 - **Class Wrapping**: Automatic Solution class creation for methods
 - **Data Structure Support**: Built-in ListNode, TreeNode handling
-- **LeetCode Compatibility**: Seamless function signature handling
+- **DSA Compatibility**: Seamless function signature handling
 
 ## Monitoring & Debugging
 

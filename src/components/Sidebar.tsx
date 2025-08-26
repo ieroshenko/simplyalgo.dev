@@ -105,8 +105,8 @@ const Sidebar = () => {
         })}
       </div>
 
-      {/* Category Progress - Only show on LeetCode Arena pages */}
-      {(location.pathname === "/leetcode" ||
+      {/* Category Progress - Only show on DSA Arena pages */}
+      {(location.pathname === "/DSA" ||
         location.pathname === "/arena") && (
         <div className="px-4 pb-4 flex-1">
           <Card className="p-4 space-y-4">
