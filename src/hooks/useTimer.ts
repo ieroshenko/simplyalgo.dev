@@ -67,12 +67,12 @@ export const useTimer = () => {
           // Update tab title with timer
           const timeStr = formatTime(newTime);
           const modeIcon = mode === "stopwatch" ? "▶" : "⏱";
-          document.title = `${modeIcon} ${timeStr} - LeetCode Arena`;
+          document.title = `${modeIcon} ${timeStr} - DSA Arena`;
 
           if (mode === "timer" && newTime <= 0) {
             setIsRunning(false);
             // Reset title when timer ends
-            document.title = "LeetCode Arena";
+            document.title = "DSA Arena";
           }
 
           return newTime;
@@ -84,7 +84,7 @@ export const useTimer = () => {
         intervalRef.current = null;
       }
       // Reset title when stopped
-      document.title = "LeetCode Arena";
+      document.title = "DSA Arena";
     }
 
     return () => {
@@ -92,7 +92,7 @@ export const useTimer = () => {
         clearInterval(intervalRef.current);
       }
       // Reset title on cleanup
-      document.title = "LeetCode Arena";
+      document.title = "DSA Arena";
     };
   }, [isRunning, mode, formatTime]);
 

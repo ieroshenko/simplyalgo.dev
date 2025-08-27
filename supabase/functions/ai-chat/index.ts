@@ -18,7 +18,9 @@ import {
 import { 
   startInteractiveCoaching, 
   validateCoachingSubmission,
-  generateNextCoachingStep 
+  generateNextCoachingStep,
+  startOptimizationCoaching,
+  validateOptimizationStep,
 } from "./coaching.ts";
 import { 
   maybeGenerateDiagram, 
@@ -255,6 +257,46 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
+      }
+    }
+
+    // Start optimization coaching action
+    if (req.method === "POST" && action === "start_optimization_coaching") {
+      if (!problemId || !userId || !currentCode || !problemDescription) {
+        return new Response(
+          JSON.stringify({ error: "Missing fields for start_optimization_coaching" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      try {
+        const result = await startOptimizationCoaching(
+          problemId,
+          userId,
+          currentCode,
+          problemDescription,
+          difficulty || "beginner",
+        );
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("[OPTIMIZATION] start failed:", e);
+        return new Response(JSON.stringify({ error: "Failed to start optimization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
+    // Validate optimization step action
+    if (req.method === "POST" && action === "validate_optimization_step") {
+      if (!sessionId || !currentEditorCode || !problemDescription) {
+        return new Response(
+          JSON.stringify({ error: "Missing fields for validate_optimization_step" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      try {
+        const result = await validateOptimizationStep(sessionId, currentEditorCode, problemDescription);
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("[OPTIMIZATION] validate failed:", e);
+        return new Response(JSON.stringify({ error: "Failed to validate optimization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 

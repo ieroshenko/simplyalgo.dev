@@ -21,7 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
 
-const LeetCodeArena = () => {
+const DSAArena = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const {
@@ -121,7 +121,7 @@ const LeetCodeArena = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Leetcode Arena
+              DSA Arena
             </h1>
             <p className="text-muted-foreground mt-1">
               Master coding patterns and solve problems to sharpen your skills
@@ -259,4 +259,4 @@ const LeetCodeArena = () => {
   );
 };
 
-export default LeetCodeArena;
+export default DSAArena;

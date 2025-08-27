@@ -55,6 +55,8 @@ interface SimpleOverlayProps {
   onExitCoach?: () => void;
   onFinishCoaching?: () => void;
   onInsertCorrectCode?: () => void; // New prop for inserting correct code
+  onStartOptimization?: () => void; // Trigger optimization flow
+  onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
   isValidating?: boolean;
   hasError?: boolean;
   // Coaching specific props
@@ -65,6 +67,7 @@ interface SimpleOverlayProps {
   validationResult?: {
     isCorrect: boolean;
     feedback: string;
+    isOptimizable?: boolean;
     codeToAdd?: string; // Available corrected code
     nextStep?: {
       question: string;
@@ -99,6 +102,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   highlightedLine,
   editorHeight,
   editorRef,
+  onStartOptimization,
+  onPositionChange,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -118,6 +123,13 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       setShowTextInput(false);
     }
   }, [isVisible]);
+
+  // Report current position to parent when it changes
+  useEffect(() => {
+    const pos = customPosition || position;
+    if (onPositionChange && pos) onPositionChange(pos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customPosition, position?.x, position?.y]);
 
 
 
@@ -227,7 +239,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      if (isDragging) {
+        setIsDragging(false);
+        const pos = customPosition || position;
+        if (pos && onPositionChange) onPositionChange(pos);
+      }
     };
 
     if (isDragging) {
@@ -239,7 +255,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragOffset]);
+  }, [isDragging, dragOffset, customPosition, position, onPositionChange]);
 
   if (!isVisible) return null;
 
@@ -366,24 +382,38 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   }`}>
                     {validationResult.feedback}
                   </div>
-                  {validationResult.nextStep && (
+                  {(() => {
+                    const q = (validationResult.nextStep?.question || "").trim();
+                    const h = (validationResult.nextStep?.hint || "").trim();
+                    return Boolean(q || h);
+                  })() && (
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
                       <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
                         Next Step:
                       </div>
-                      <div className="text-sm text-blue-700 dark:text-blue-300">
-                        {validationResult.nextStep.question}
-                      </div>
-                      {validationResult.nextStep.hint && (
+                      {validationResult.nextStep?.question?.trim() && (
+                        <div className="text-sm text-blue-700 dark:text-blue-300">
+                          {validationResult.nextStep?.question}
+                        </div>
+                      )}
+                      {validationResult.nextStep?.hint?.trim() && (
                         <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
                           💡 {validationResult.nextStep.hint}
                         </div>
                       )}
-                      {validationResult.feedback.includes('faster') || validationResult.feedback.includes('efficient') || validationResult.feedback.includes('O(n)') ? (
+                      {(() => {
+                        const q = validationResult.nextStep?.question || "";
+                        const h = validationResult.nextStep?.hint || "";
+                        const f = validationResult.feedback || "";
+                        const text = `${q} ${h} ${f}`;
+                        const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|alternative\s+approach)/i.test(text);
+                        const hasNext = Boolean(q || h);
+                        const shouldShow = validationResult.isCorrect && hasNext && (validationResult.isOptimizable || mentionsOptimize);
+                        return shouldShow;
+                      })() ? (
                         <Button
                           onClick={() => {
-                            // TODO: Start optimization coaching session
-                            console.log('Starting optimization coaching...');
+                            if (onStartOptimization) onStartOptimization();
                           }}
                           size="sm"
                           variant="outline"

@@ -9,13 +9,13 @@ const CoreBattleCards = () => {
 
   const battles = [
     {
-      title: "LeetCode Arena",
+      title: "DSA Arena",
       description: "Master common coding patterns & solve problems",
       icon: Code,
       color: "bg-primary/10",
       iconColor: "text-primary",
-      path: "/leetcode",
-      featureFlag: "LEETCODE_ARENA" as const,
+      path: "/DSA",
+      featureFlag: "DSA_ARENA" as const,
     },
     {
       title: "System-Design War-Room",

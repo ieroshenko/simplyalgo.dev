@@ -219,6 +219,7 @@ const ProblemSolverNew = () => {
     insertCorrectCode,
     cancelInput,
     closeFeedback,
+    startOptimization,
   } = useCoachingNew({
     problemId: problemId || "",
     userId: user?.id || "anonymous",
@@ -275,7 +276,7 @@ const ProblemSolverNew = () => {
           <h1 className="text-2xl font-bold text-foreground mb-2">
             Problem not found
           </h1>
-          <Button onClick={() => navigate("/leetcode")}>
+          <Button onClick={() => navigate("/DSA")}>
             Back to Problems
           </Button>
         </div>
@@ -577,7 +578,7 @@ const ProblemSolverNew = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/leetcode")}
+              onClick={() => navigate("/DSA")}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -963,7 +964,7 @@ const ProblemSolverNew = () => {
                   onRun={handleRun}
                   onSubmit={handleSubmit}
                   isRunning={isRunning}
-                  onStartCoaching={() => startCoaching("beginner")}
+                  onStartCoaching={() => startCoaching()}
                   onStopCoaching={stopCoaching}
                   isCoachModeActive={coachingState.isCoachModeActive}
                   isCoachingLoading={coachingState.isWaitingForResponse}
@@ -1202,6 +1203,12 @@ const ProblemSolverNew = () => {
                 nextStep: coachingState.lastValidation.nextStep
               } : null}
               onInsertCorrectCode={insertCorrectCode}
+              onPositionChange={(pos) => {
+                // Use the coaching hook’s stored position via a dedicated setter in future;
+                // for now, rely on showInteractiveQuestion preserving this prop value.
+                coachingState.inputPosition = pos as { x: number; y: number } | null;
+              }}
+              onStartOptimization={() => startOptimization()}
               onFinishCoaching={stopCoaching}
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {

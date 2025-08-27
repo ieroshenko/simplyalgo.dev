@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import LeetCodeArena from "./pages/LeetCodeArena";
+import DSAArena from "./pages/DSAArena";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -53,10 +53,10 @@ const App = () => (
               }
             />
             <Route
-              path="/leetcode"
+              path="/DSA"
               element={
                 <ProtectedRoute>
-                  <LeetCodeArena />
+                  <DSAArena />
                 </ProtectedRoute>
               }
             />
@@ -64,7 +64,7 @@ const App = () => (
               path="/arena"
               element={
                 <ProtectedRoute>
-                  <LeetCodeArena />
+                  <DSAArena />
                 </ProtectedRoute>
               }
             />
@@ -77,7 +77,7 @@ const App = () => (
               }
             />
             <Route
-              path="/leetcode/data-structures/:slug"
+              path="/DSA/data-structures/:slug"
               element={
                 <ProtectedRoute>
                   <DataStructureDetail />

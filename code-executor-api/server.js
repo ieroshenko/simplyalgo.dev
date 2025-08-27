@@ -720,7 +720,7 @@ test_case_index = int(sys.stdin.read().strip())
 # Dynamic test cases from database/API
 test_cases = ${testCasesJson}
 
-# Helpers for common LeetCode structures (ListNode)
+# Helpers for common DSA structures (ListNode)
 class ListNode:
     def __init__(self, val=0, next=None):
         self.val = val
@@ -839,7 +839,7 @@ app.post("/execute", async (req, res) => {
 
     console.log(`Received language: ${language}`);
 
-    // Auto-process Python code for LeetCode-style execution
+    // Auto-process Python code for DSA-style execution
     if (
       language.toLowerCase() === "python" ||
       language.toLowerCase() === "python3"

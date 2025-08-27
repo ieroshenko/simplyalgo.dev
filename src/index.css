@@ -66,7 +66,7 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Modern Coding Platform Dark Theme (LeetCode/NeetCode style) */
+    /* Modern Coding Platform Dark Theme (DSA/NeetCode style) */
     --background: 220 13% 9%; /* #0f1419 - Very dark blue-gray background */
     --foreground: 0 0% 95%; /* #f2f2f2 - Light foreground text */
 

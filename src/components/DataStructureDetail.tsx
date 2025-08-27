@@ -44,9 +44,9 @@ const DataStructureDetail = () => {
           <p className="text-muted-foreground mb-4">
             The requested data structure could not be found.
           </p>
-          <Button onClick={() => navigate("/leetcode")}>
+          <Button onClick={() => navigate("/DSA")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to LeetCode Arena
+            Back to DSA Arena
           </Button>
         </div>
       </div>
@@ -74,7 +74,7 @@ const DataStructureDetail = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/leetcode")}
+            onClick={() => navigate("/DSA")}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -194,7 +194,7 @@ const DataStructureDetail = () => {
           {/* Related Problems */}
           <Card>
             <CardHeader>
-              <CardTitle>Related LeetCode Problems</CardTitle>
+              <CardTitle>Related DSA Problems</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
