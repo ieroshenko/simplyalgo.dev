@@ -109,9 +109,10 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       const screenPos = editorRef.current.getScrolledVisiblePosition?.(position);
       
       if (screenPos) {
+        const belowY = (screenPos.top || 0) + (screenPos.height || 20) + 12;
         return {
-          x: Math.max(50, Math.min(window.innerWidth - 400, screenPos.left + 50)),
-          y: Math.max(30, Math.min(window.innerHeight - 300, screenPos.top + 50))
+          x: Math.max(50, Math.min(window.innerWidth - 400, (screenPos.left || 0) + 50)),
+          y: Math.max(30, Math.min(window.innerHeight - 300, belowY))
         };
       }
       
@@ -127,6 +128,51 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     }
   }, [editorRef]);
 
+  // Calculate position for overlay: always place below the last line in editor
+  const getPositionBelowLastLine = useCallback(() => {
+    try {
+      if (!editorRef.current) return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
+
+      const code = editorRef.current.getValue();
+      const totalLines = Math.max(1, (code || "").split('\n').length);
+      const pos = { lineNumber: totalLines, column: 1 };
+      const editorNode = editorRef.current.getDomNode?.();
+      const editorRect = editorNode?.getBoundingClientRect();
+      const linePos = editorRef.current.getScrolledVisiblePosition?.(pos);
+
+      if (linePos && editorRect) {
+        // Absolute coordinates for last line
+        const absLeft = editorRect.left + (linePos.left || 0);
+        const absTop = editorRect.top + (linePos.top || 0);
+        const absBelowY = absTop + (linePos.height || 20) + 16;
+        const editorMidY = editorRect.top + editorRect.height / 2;
+
+        // If last line is past the center of editor, center the overlay
+        if (absTop > editorMidY) {
+          const centerX = editorRect.left + editorRect.width / 2 - 200; // assume ~400px overlay width
+          const centerY = editorRect.top + editorRect.height / 2 - 130; // assume ~260px overlay height
+          return {
+            x: Math.max(24, Math.min(window.innerWidth - 420, centerX)),
+            y: Math.max(30, Math.min(window.innerHeight - 260, centerY)),
+          };
+        }
+
+        // Otherwise place just below the last line
+        return {
+          x: Math.max(24, Math.min(window.innerWidth - 420, absLeft + 8)),
+          y: Math.max(30, Math.min(window.innerHeight - 260, absBelowY)),
+        };
+      }
+
+      // Fallback: estimate based on line count
+      const estimatedY = Math.min(window.innerHeight - 260, 120 + totalLines * 20);
+      return { x: 24, y: Math.max(30, estimatedY) };
+    } catch (error) {
+      console.warn('Error calculating position for last line:', error);
+      return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
+    }
+  }, [editorRef]);
+
   // Show interactive question overlay
   const showInteractiveQuestion = useCallback(({ question, hint, highlightArea }: {
     question: string;
@@ -135,22 +181,76 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
   }) => {
     console.log("🎯 [SHOW QUESTION] Showing interactive question:", { question, hint, highlightArea });
 
-    // Apply highlight if provided
-    if (highlightArea) {
-      applyHighlight(highlightArea);
+    // Normalize highlight to next blank line within same function, if needed
+    let finalHighlight = highlightArea || null;
+    try {
+      if (highlightArea && editorRef.current) {
+        const code = editorRef.current.getValue();
+        const lines = (code || '').split('\n');
+        const start = Math.max(1, Math.min(lines.length, highlightArea.startLine));
+        const startIdx = start - 1;
+        // Find enclosing function def above
+        let defIdx = -1; let defIndent = 0;
+        for (let i = startIdx; i >= 0; i--) {
+          const m = lines[i].match(/^(\s*)def\s+\w+\s*\(/);
+          if (m) { defIdx = i; defIndent = m[1]?.length || 0; break; }
+        }
+        let candidate = startIdx;
+        if (defIdx !== -1) {
+          // Limit search to this function body
+          let endIdx = lines.length - 1;
+          for (let j = defIdx + 1; j < lines.length; j++) {
+            const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
+            if (/^\s*def\s+\w+\s*\(/.test(lines[j]) && indent <= defIndent) { endIdx = j - 1; break; }
+          }
+          // If current line not blank, move to next blank within function
+          if (lines[candidate].trim() !== '') {
+            for (let k = candidate; k <= endIdx; k++) {
+              if (lines[k].trim() === '') { candidate = k; break; }
+            }
+          }
+        } else {
+          // No function found: pick next blank anywhere
+          if (lines[candidate].trim() !== '') {
+            for (let k = candidate; k < lines.length; k++) {
+              if (lines[k].trim() === '') { candidate = k; break; }
+            }
+          }
+        }
+        finalHighlight = { startLine: candidate + 1, endLine: candidate + 1 };
+      }
+    } catch (e) {
+      // ignore normalization errors; use original
+      finalHighlight = highlightArea || null;
     }
 
-    // Calculate position for the overlay
-    const lineNumber = highlightArea?.startLine || 1;
-    const screenPosition = getScreenPosition(lineNumber);
+    // Apply highlight if provided
+    if (finalHighlight) {
+      applyHighlight(finalHighlight);
+    }
+
+    // Calculate position for the overlay: always below the last line to avoid covering code
+    const screenPosition = getPositionBelowLastLine();
 
     setCoachingState(prev => ({
       ...prev,
       showInputOverlay: true,
-      inputPosition: screenPosition,
-      currentHighlight: highlightArea || null,
+      // Preserve previous overlay position if already set
+      inputPosition: prev.inputPosition || screenPosition,
+      currentHighlight: finalHighlight || null,
+      session: prev.session ? {
+        ...prev.session,
+        currentQuestion: question,
+        currentHint: hint,
+        highlightArea: finalHighlight ? {
+          startLine: finalHighlight.startLine,
+          endLine: finalHighlight.endLine,
+          startColumn: 1,
+          endColumn: 1,
+        } : prev.session.highlightArea,
+      } : prev.session,
     }));
-  }, [applyHighlight, getScreenPosition]);
+  }, [applyHighlight, getPositionBelowLastLine]);
 
   // Start coaching session
   const startCoaching = useCallback(async () => {
@@ -609,6 +709,58 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     stopCoaching();
   }, [stopCoaching]);
 
+  // Start optimization flow
+  const startOptimization = useCallback(async () => {
+    try {
+      // Show global loading spinner (same as coach mode)
+      setCoachingState(prev => ({ ...prev, isWaitingForResponse: true, isValidating: false }));
+      const editor = editorRef.current;
+      const currentCode = editor?.getValue() || "";
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          action: 'start_optimization_coaching',
+          problemId,
+          userId,
+          currentCode,
+          difficulty: 'beginner',
+          problemDescription: problemDescription || `Problem ${problemId}`,
+        },
+      });
+      if (error) throw error;
+      // Reuse overlay to show first optimization step (question/hint/highlight if returned)
+      const step = typeof data?.step === 'string' ? (() => { try { return JSON.parse(data.step); } catch { return null; } })() : null;
+      if (data?.nextAction === 'complete_optimization') {
+        setCoachingState(prev => ({
+          ...prev,
+          feedback: { show: true, type: 'success', message: data?.message || 'Already optimal. Great job!', showConfetti: true },
+          isWaitingForResponse: false,
+        }));
+        return;
+      }
+      if (step) {
+        showInteractiveQuestion({
+          question: step.question,
+          hint: step.hint,
+          highlightArea: step.highlightArea,
+        });
+        // Ensure overlay shows the new step (hide validation panel)
+        setCoachingState(prev => ({
+          ...prev,
+          lastValidation: undefined,
+          isWaitingForResponse: false,
+          showInputOverlay: true,
+        }));
+      }
+    } catch (e) {
+      console.error('❌ [OPTIMIZATION] Failed to start:', e);
+      setCoachingState(prev => ({
+        ...prev,
+        feedback: { show: true, type: 'error', message: 'Failed to start optimization. Please try again.', showConfetti: false },
+        isWaitingForResponse: false,
+      }));
+    }
+  }, [editorRef, problemId, userId, problemDescription, showInteractiveQuestion]);
+
   return {
     coachingState,
     startCoaching,
@@ -619,6 +771,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     cancelInput,
     closeFeedback,
     skipStep,
+    startOptimization,
     getElapsedTime,
   };
 };

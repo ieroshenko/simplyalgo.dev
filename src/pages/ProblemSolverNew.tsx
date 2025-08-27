@@ -219,6 +219,7 @@ const ProblemSolverNew = () => {
     insertCorrectCode,
     cancelInput,
     closeFeedback,
+    startOptimization,
   } = useCoachingNew({
     problemId: problemId || "",
     userId: user?.id || "anonymous",
@@ -963,7 +964,7 @@ const ProblemSolverNew = () => {
                   onRun={handleRun}
                   onSubmit={handleSubmit}
                   isRunning={isRunning}
-                  onStartCoaching={() => startCoaching("beginner")}
+                  onStartCoaching={() => startCoaching()}
                   onStopCoaching={stopCoaching}
                   isCoachModeActive={coachingState.isCoachModeActive}
                   isCoachingLoading={coachingState.isWaitingForResponse}
@@ -1202,6 +1203,12 @@ const ProblemSolverNew = () => {
                 nextStep: coachingState.lastValidation.nextStep
               } : null}
               onInsertCorrectCode={insertCorrectCode}
+              onPositionChange={(pos) => {
+                // Use the coaching hook’s stored position via a dedicated setter in future;
+                // for now, rely on showInteractiveQuestion preserving this prop value.
+                coachingState.inputPosition = pos as { x: number; y: number } | null;
+              }}
+              onStartOptimization={() => startOptimization()}
               onFinishCoaching={stopCoaching}
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {

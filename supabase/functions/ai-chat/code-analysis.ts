@@ -113,20 +113,28 @@ export async function generateConversationResponse(
     ? JSON.stringify(testCases) 
     : undefined;
 
-  // Analyze message for code request patterns
+  // Analyze message for request/intent signals
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
   const explicitCodeRequest =
-    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
-  const codeKeywords =
-    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
-  const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
+    /(\b(write|show|give|provide)\s+(me\s+)?(code|snippet)\b)|\b(insert|add)\s+(code|line|lines|snippet)\b|\b(implement|import|define)\b/i.test(
+      message,
+    );
+  const stuckIndicators = /(stuck|blocked|don'?t know|not sure|lost|confused)/i.test(
+    message,
+  );
+  const explicitHintAsk = /\b(hint|nudge)\b/i.test(message);
+  const isFirstTurn = (conversationHistory || []).length === 0;
+  // Hints allowed only if explicitly asked or user signals being stuck
+  const allowHint = explicitHintAsk || stuckIndicators;
+  // Code allowed when explicitly asked or stuck; block on first turn unless explicitly asked for code
+  const allowCode = (hasExplicitCode || explicitCodeRequest || stuckIndicators) && (!isFirstTurn || hasExplicitCode || explicitCodeRequest);
 
   let contextualResponse: ContextualResponse;
   
   try {
     // Always use the same comprehensive context approach
     // Responses API will handle continuation automatically via previous_response_id
-    const chatContext = `You are SimplyAlgo's AI coding tutor, helping students solve DSA-style problems step by step.
+    const chatContext = `You are SimplyAlgo's AI stocastic coding coach. Use a friendly tone and guide students step by step.
 
 TEST EXECUTION CONTEXT:
 - The student's code will be executed automatically on Judge0 against the official test cases.
@@ -135,13 +143,23 @@ TEST EXECUTION CONTEXT:
 - CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
 
 TEACHING APPROACH - CRITICAL RULES:
-- Ask guiding questions first, provide code only when explicitly requested
-- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
-- When providing code, give ONLY small pieces (1-3 lines maximum)
-- Focus on the immediate next step the student needs
-- Build upon the current code in the editor - analyze what they have and suggest the next logical step
-- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
-- BAD examples: Complete functions, full solutions, import statements
+- Start with one brief, friendly next-step explanation (<= 30 words) grounded in CURRENT CODE.
+- Then ask exactly ONE concise Socratic question (<= 18 words). No lists, no multiple questions.
+- Do NOT provide hints or code unless permitted below.
+- Hint policy: allowHint = ${allowHint}. If true, include at most ONE short conceptual hint (<= 12 words). No code.
+- Code policy: allowCode = ${allowCode}. If true, you may include at most ONE tiny code block (1–3 lines) with a one‑sentence explanation. No full functions.
+- Keep total reply under ~45 words. Friendly and concise.
+- Focus on the immediate next step based on the student's current code.
+- Build upon the current code in the editor - analyze what they have and suggest the next logical step.
+
+CODE ANALYSIS PATTERNS:
+- If CURRENT CODE is empty or minimal: Provide approach guidance and thinking framework.
+- If CURRENT CODE has correct logic: Acknowledge good parts, suggest next step using existing variables.
+- If CURRENT CODE has wrong logic: Gently identify issues, guide toward a correct path.
+- Always reference specific lines and symbols from CURRENT CODE.
+- Use existing variables/functions in suggestions.
+- Build incrementally on what's already written.
+- Treat code as “minimal” if it’s empty, only a function signature, or lacks control flow (no loops/conditions).
 
 PROBLEM CONTEXT:
 ${problemDescription}
@@ -156,16 +174,22 @@ CURRENT STUDENT MESSAGE: "${message}"
 
 Code policy: allowCode = ${allowCode}
 
-Provide educational tutoring response.`;
+Response requirements:
+- Begin with a brief next-step explanation (<= 30 words) based on CURRENT CODE.
+- Then ask exactly ONE Socratic question (<= 18 words).
+- If allowHint is true and allowCode is false, add one short conceptual hint (no code).
+- If allowCode is true, you may add one tiny code block formatted as:\n\n${"```"}python\n<1-3 lines>\n${"```"}\n\nwith a one‑sentence rationale.
+- Otherwise, provide no code or extra commentary.`;
 
+    const session = sessionId || `anon-${Date.now()}`;
     contextualResponse = await llmWithSessionContext(
-      sessionId,
+      session,
       chatContext,
       'chat',
       currentCode || '',
       {
         temperature: 0.3,
-        maxTokens: 600
+        maxTokens: 220
       }
     );
 
@@ -173,66 +197,9 @@ Provide educational tutoring response.`;
     return contextualResponse.content || "I'm sorry, I couldn't generate a response. Please try again.";
     
   } catch (error) {
-    console.error("[chat] Context-aware generation failed, falling back to legacy:", error);
-    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+    console.error("[chat] Context-aware generation failed:", error);
+    return "Sorry, I hit a snag generating a response. Please try again.";
   }
-}
-
-/**
- * Legacy chat response generation (fallback for when session ID is not available)
- */
-async function generateLegacyChatResponse(
-  message: string,
-  problemDescription: string,
-  conversationHistory: ChatMessage[],
-  testCases?: unknown[],
-  currentCode?: string,
-): Promise<string> {
-  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
-    ? JSON.stringify(testCases) 
-    : undefined;
-
-  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
-  const explicitCodeRequest =
-    /\b(write|show|give|provide|insert|add|implement|code|import|define|create|how do i|help me)\b/i.test(message);
-  const codeKeywords =
-    /\b(algorithm|logic|solution|function|method|approach|example)\b/i.test(message);
-  const allowCode = hasExplicitCode || explicitCodeRequest || codeKeywords;
-
-  const conversationPrompt = `You are SimplyAlgo's AI coding tutor, helping students solve DSA-style problems step by step.
-
-TEST EXECUTION CONTEXT:
-- The student's code will be executed automatically on Judge0 against the official test cases.
-- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
-- CRITICAL: Do NOT include any import statements in your code suggestions
-- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
-
-TEACHING APPROACH - CRITICAL RULES:
-- Ask guiding questions first, provide code only when explicitly requested
-- NEVER PROVIDE COMPLETE FUNCTION DEFINITIONS (no "def functionName():" with full implementation)
-- When providing code, give ONLY small pieces (1-3 lines maximum)
-- Focus on the immediate next step the student needs
-- Build upon the current code in the editor - analyze what they have and suggest the next logical step
-- Good examples: "What data structure would help track counts?", "Try: res = [0] * (n + 1)", "Add: for i in range(1, n + 1):"
-- BAD examples: Complete functions, full solutions, import statements
-
-PROBLEM CONTEXT:
-${problemDescription}
-
-${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
-${currentCode ? `CURRENT CODE IN EDITOR:\n${"```"}python\n${currentCode}\n${"```"}\n` : ""}
-
-CONVERSATION HISTORY:
-${conversationHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
-
-CURRENT STUDENT MESSAGE: "${message}"
-
-Code policy: allowCode = ${allowCode}
-
-Provide educational tutoring response.`;
-
-  const text = await llmText(conversationPrompt, { temperature: 0.3, maxTokens: 600 });
-  return text || "I'm sorry, I couldn't generate a response. Please try again.";
 }
 
 /**
@@ -584,19 +551,131 @@ Output JSON:
     throw new Error(`LLM call failed: ${llmError.message}`);
   }
 
-  // If model claims snippet already exists, try small deterministic bug-fix replacements (Python heuristics)
+  // If model claims snippet already exists or cannot place, attempt repairs or controlled replacement
   if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
+    const hintLower = (contextHint || '').toLowerCase();
+    const isCoachingInsert = hintLower.includes('[coaching snippet insertion]');
+    const wantsFix = /(fix|replace|correct|broken|bug|cleanup|clean up|delete|remove|rewrite|overhaul)/i.test(
+      contextHint || '',
+    );
+    const allowDestructiveFixes = isCoachingInsert || wantsFix;
+
+    // Step 1: lightweight deterministic bug-fix heuristics
     let fixed = code;
-    // Heuristic 1: fix right-shift without assignment inside loops
     fixed = fixed.replace(/^(\s*)(n)\s*>>\s*1\s*$/gm, "$1$2 >>= 1");
-    // Heuristic 2: fix return n to return count if count variable is used in snippet
     if (/\bcount\b/.test(snippet.code)) {
       fixed = fixed.replace(/^(\s*)return\s+n\s*$/gm, "$1return count");
     }
     if (fixed !== code) {
-      return { newCode: fixed, insertedAtLine: -1, rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes' };
+      return {
+        newCode: fixed,
+        insertedAtLine: -1,
+        rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes',
+      };
     }
-    return { newCode: code, insertedAtLine: -1, rationale };
+
+    // Step 2: if allowed, escalate to controlled replacement at function level
+    if (allowDestructiveFixes) {
+      const lines = code.split('\n');
+      const snippetLines = snippet.code.split('\n');
+
+      // Helper: find function range by name
+      const getFunctionNameFromSnippet = (): string | null => {
+        for (const s of snippetLines) {
+          const m = s.match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
+          if (m) return m[1];
+        }
+        return null;
+      };
+
+      const findFunctionRangeByName = (name: string): { start: number; end: number } | null => {
+        let start = -1;
+        for (let i = 0; i < lines.length; i++) {
+          if (/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/.test(lines[i])) {
+            const m = lines[i].match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
+            if (m && m[1] === name) {
+              start = i;
+              break;
+            }
+          }
+        }
+        if (start === -1) return null;
+        // Find end by scanning until next top-level def with indentation <= current def
+        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
+        let end = lines.length;
+        for (let j = start + 1; j < lines.length; j++) {
+          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
+          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) {
+            end = j;
+            break;
+          }
+        }
+        return { start, end };
+      };
+
+      // Helper: find enclosing function around a line
+      const findEnclosingFunction = (lineIndex: number): { start: number; end: number } | null => {
+        let start = -1;
+        for (let i = lineIndex; i >= 0; i--) {
+          if (/^\s*def\s+/.test(lines[i])) { start = i; break; }
+        }
+        if (start === -1) return null;
+        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
+        let end = lines.length;
+        for (let j = start + 1; j < lines.length; j++) {
+          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
+          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) { end = j; break; }
+        }
+        return { start, end };
+      };
+
+      const snippetFuncName = getFunctionNameFromSnippet();
+      let target: { start: number; end: number } | null = null;
+
+      if (snippetFuncName) {
+        target = findFunctionRangeByName(snippetFuncName);
+      }
+      if (!target && cursorPosition && typeof cursorPosition.line === 'number') {
+        target = findEnclosingFunction(Math.max(0, Math.min(lines.length - 1, cursorPosition.line)));
+      }
+
+      // Replace strategy
+      if (target) {
+        const { start, end } = target;
+        // If we're replacing body only (snippet has no def) but target exists, keep def line
+        let replacement: string[];
+        if (!snippetFuncName && /^\s*def\s+/.test(lines[start])) {
+          const bodyIndent = (lines[start].match(/^\s*/)?.[0] || '') + '    ';
+          const indentedSnippet = snippetLines.map((l) => (l.trim().length ? bodyIndent + l.trim() : l));
+          replacement = [lines[start], ...indentedSnippet];
+        } else {
+          replacement = snippetLines;
+        }
+        const newLines = [
+          ...lines.slice(0, start),
+          ...replacement,
+          ...lines.slice(end),
+        ];
+        return {
+          newCode: newLines.join('\n'),
+          insertedAtLine: start,
+          rationale: (rationale ? rationale + '; ' : '') + 'replaced conflicting function region',
+        };
+      }
+
+      // Fallback: replace entire file if unrecoverable and snippet is small/safe
+      const snippetLen = snippet.code.trim().length;
+      if (snippetLen > 0 && snippetLen < 4000) {
+        return {
+          newCode: snippet.code,
+          insertedAtLine: 0,
+          rationale: (rationale ? rationale + '; ' : '') + 'file-level replacement due to irreparable code',
+        };
+      }
+    }
+
+    // If not allowed to be destructive or no safe target found, return original code with rationale
+    return { newCode: code, insertedAtLine: -1, rationale: rationale ? rationale : 'no safe insertion point; non-destructive' };
   }
 
   // Deterministic insertion of ONLY the provided snippet

@@ -20,6 +20,89 @@ const supabaseAdmin = supabaseServiceKey
   : supabase;
 
 /**
+ * Simple optimization heuristics to judge if code is likely optimizable (top-level)
+ */
+function analyzeOptimizationHeuristics(
+  code: string,
+  _problemDescription: string,
+): {
+  isOptimizable: boolean;
+  currentComplexity?: string;
+  targetComplexity?: string;
+  reason?: string;
+} {
+  const src = (code || "").toLowerCase();
+  const hasNestedFor = /\n\s*for\b[\s\S]*\n\s{2,}for\b/.test(code);
+  const usesDictOrSet = /(dict\(|\{\s*\}|\bset\(|\{[^:}]+:[^}]+\})/.test(src) || /\bCounter\(/.test(code);
+  const usesTwoPointers = /(i\+\+|j\-\-|two\s*pointers|left\s*=|right\s*=)/.test(src);
+  const sortsInsideLoop = /for\b[\s\S]*?(sorted\(|\.sort\()/.test(src);
+  const repeatedMembershipInList = /for\b[\s\S]*?\bin\s+\w+\s*:\s*\n[\s\S]*?\bin\s+\w+/.test(src) && !usesDictOrSet;
+
+  // If time is O(n) with extra space via set/dict → suggest O(1) space target
+  if (usesDictOrSet && !hasNestedFor && !sortsInsideLoop) {
+    return {
+      isOptimizable: true,
+      currentComplexity: "O(n) time, O(n) space",
+      targetComplexity: "O(1) space (e.g., XOR or arithmetic)",
+      reason: "Extra memory detected",
+    };
+  }
+
+  if (sortsInsideLoop || hasNestedFor || repeatedMembershipInList) {
+    return {
+      isOptimizable: true,
+      currentComplexity: hasNestedFor ? "~O(n^2)" : undefined,
+      targetComplexity: "O(n) or O(n log n)",
+      reason: "Nested loops/sort inside loop/membership scans detected",
+    };
+  }
+  if (!usesDictOrSet && !usesTwoPointers) {
+    return {
+      isOptimizable: true,
+      targetComplexity: "O(n) or O(n log n)",
+      reason: "No hash/set or two-pointer patterns detected",
+    };
+  }
+  return {
+    isOptimizable: false,
+    currentComplexity: usesTwoPointers ? "O(n)" : "~O(n)",
+    targetComplexity: usesTwoPointers ? "O(n)" : "O(n)",
+    reason: "Efficient pattern detected",
+  };
+}
+
+/**
+ * Compute a reasonable insert/highlight line inside the current function body
+ */
+function computeSuggestedInsertLine(code: string): number {
+  const lines = (code || "").split('\n');
+  if (lines.length === 0) return 2;
+  let defLine = -1;
+  let defIndent = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^(\s*)def\s+\w+\s*\(/);
+    if (m) { defLine = i; defIndent = m[1]?.length || 0; break; }
+  }
+  if (defLine === -1) return Math.max(2, lines.length + 1);
+  let bodyStart = defLine + 1;
+  while (bodyStart < lines.length) {
+    const indent = (lines[bodyStart].match(/^\s*/)?.[0] || '').length;
+    if (indent > defIndent) break;
+    bodyStart++;
+  }
+  if (bodyStart >= lines.length) return defLine + 2;
+  // Next blank within body, else last body + 1
+  let firstBlank = -1, last = bodyStart;
+  for (let i = bodyStart; i < lines.length; i++) {
+    const indent = (lines[i].match(/^\s*/)?.[0] || '').length;
+    if (/^\s*def\s+\w+\s*\(/.test(lines[i]) && indent <= defIndent) break;
+    last = i;
+    if (firstBlank === -1 && lines[i].trim() === '') firstBlank = i;
+  }
+  const target = firstBlank !== -1 ? firstBlank + 1 : last + 2;
+  return Math.max(2, target);
+}
+/**
  * Start an interactive coaching session - generates first question
  */
 export async function startInteractiveCoaching(
@@ -32,9 +115,45 @@ export async function startInteractiveCoaching(
   console.log("🎯 [startInteractiveCoaching] Starting context-aware coaching...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
   
-  // Analyze current code to determine correct line numbers
-  const codeLines = (currentCode || "def countBits(self, n: int) -> List[int]:").split('\n');
-  const nextLineNumber = Math.max(2, codeLines.length + 1);
+  // Analyze current code to determine an insertion line inside the active function
+  const codeLines = (currentCode || '').split('\n');
+  const computeNextLineNumber = () => {
+    if (!codeLines.length) return 2;
+    // Find last function definition and its indent
+    let defLine = -1;
+    let defIndent = 0;
+    for (let i = codeLines.length - 1; i >= 0; i--) {
+      const line = codeLines[i];
+      const m = line.match(/^(\s*)def\s+\w+\s*\(/);
+      if (m) {
+        defLine = i;
+        defIndent = m[1]?.length || 0;
+        break;
+      }
+    }
+    // If no def found, append after last line
+    if (defLine === -1) return Math.max(2, codeLines.length + 1);
+    // Find first line with greater indent -> function body start
+    let bodyStart = defLine + 1;
+    while (bodyStart < codeLines.length) {
+      const indent = (codeLines[bodyStart].match(/^\s*/)?.[0] || '').length;
+      if (indent > defIndent) break;
+      bodyStart++;
+    }
+    if (bodyStart >= codeLines.length) return defLine + 2;
+    // Prefer first blank line in body; else choose last body line + 1
+    let firstBlankInBody = -1;
+    let lastBodyLine = bodyStart;
+    for (let i = bodyStart; i < codeLines.length; i++) {
+      const indent = (codeLines[i].match(/^\s*/)?.[0] || '').length;
+      if (/^\s*def\s+\w+\s*\(/.test(codeLines[i]) && indent <= defIndent) break;
+      lastBodyLine = i;
+      if (firstBlankInBody === -1 && codeLines[i].trim() === '') firstBlankInBody = i;
+    }
+    const target = firstBlankInBody !== -1 ? firstBlankInBody + 1 : lastBodyLine + 2;
+    return Math.max(2, target);
+  };
+  const nextLineNumber = computeNextLineNumber();
 
   // Create comprehensive initial context with ALL coaching rules and context
   const initialContextPrompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
@@ -60,10 +179,12 @@ COACHING METHODOLOGY (FOR ENTIRE SESSION):
 3. If code is correct/complete, determine session completion or optimization opportunities
 4. NEVER duplicate code that already exists in their editor
 5. Focus on missing algorithmic components only
+6. ALWAYS reference specific lines and symbols (variables/functions) present in the CURRENT CODE
+7. ONLY one step at a time: do not advance to the next step until the current change is validated as correct.
 
 CURRENT STUDENT CODE STATE:
 \`\`\`python
-${currentCode || "def countBits(self, n: int) -> List[int]:"}
+${currentCode}
 \`\`\`
 
 ALGORITHM-FOCUSED COACHING APPROACH:
@@ -71,7 +192,7 @@ ALGORITHM-FOCUSED COACHING APPROACH:
 - If they have data structures initialized, guide to the next algorithmic step  
 - Focus on core logic: iteration patterns, bit manipulation, counting, etc.
 - Ask about algorithmic approach, not code formatting or imports
-- Reference line ${nextLineNumber} for where they should add algorithm code
+- Reference line ${nextLineNumber} for where they should add algorithm code, and mention existing symbol names (e.g., variables) when applicable
 - Be specific about algorithmic steps, not boilerplate code
 
 Now analyze this student's current code and generate the FIRST coaching step.
@@ -97,6 +218,7 @@ Required JSON format:
   "isCompleted": false
 }
 
+
 Examples of good Socratic questions/hints (guide discovery, don't give solutions):
 - Question: "What data structure would be appropriate to store results for each number from 0 to n?"
 - Hint: "Think about what type of collection can hold multiple values and allows access by index"
@@ -110,6 +232,36 @@ Examples of good Socratic questions/hints (guide discovery, don't give solutions
 CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions that help them think through the problem step by step.
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
+
+/**
+ * Simple optimization heuristics to judge if code is likely optimizable
+ */
+function analyzeOptimizationHeuristics(code: string, _problemDescription: string): {
+  isOptimizable: boolean;
+  currentComplexity?: string;
+  targetComplexity?: string;
+  reason?: string;
+} {
+  const src = (code || "").toLowerCase();
+  const hasNestedFor = /\n\s*for\b[\s\S]*\n\s{2,}for\b/.test(code);
+  const usesDictOrSet = /(dict\(|\{\s*\}|\bset\(|\{[^:}]+:[^}]+\})/.test(src) || /\bCounter\(/.test(code);
+  const usesTwoPointers = /(i\+\+|j\-\-|two\s*pointers|left\s*=|right\s*=)/.test(src);
+  const sortsInsideLoop = /for\b[\s\S]*?(sorted\(|\.sort\()/.test(src);
+  const repeatedMembershipInList = /for\b[\s\S]*?\bin\s+\w+\s*:\s*\n[\s\S]*?\bin\s+\w+/.test(src) && !usesDictOrSet;
+
+  // If time is O(n) with extra space via set/dict → suggest O(1) space target
+  if (usesDictOrSet && !hasNestedFor && !sortsInsideLoop) {
+    return { isOptimizable: true, currentComplexity: "O(n) time, O(n) space", targetComplexity: "O(1) space (e.g., XOR or arithmetic)", reason: "Extra memory detected" };
+  }
+
+  if (sortsInsideLoop || hasNestedFor || repeatedMembershipInList) {
+    return { isOptimizable: true, currentComplexity: hasNestedFor ? "~O(n^2)" : undefined, targetComplexity: "O(n) or O(n log n)", reason: "Nested loops/sort inside loop/membership scans detected" };
+  }
+  if (!usesDictOrSet && !usesTwoPointers) {
+    return { isOptimizable: true, targetComplexity: "O(n) or O(n log n)", reason: "No hash/set or two-pointer patterns detected" };
+  }
+  return { isOptimizable: false, currentComplexity: usesTwoPointers ? "O(n)" : "~O(n)", targetComplexity: usesTwoPointers ? "O(n)" : "O(n)", reason: "Efficient pattern detected" };
+}
 
   // Use context-aware AI call to create initial coaching context
   let stepData;
@@ -255,7 +407,7 @@ CRITICAL EXECUTION CONTEXT:
 
 PROBLEM: ${problemDescription}
 
-STUDENT'S CURRENT CODE STATE:
+STUDENT'S CURRENT CODE STATE (USE TO GROUND ALL REFERENCES):
 \`\`\`python
 ${currentCode || "# No code written yet"}
 \`\`\`
@@ -274,16 +426,18 @@ ALGORITHM-FOCUSED COACHING STRATEGY:
 2. If code exists: Analyze algorithm logic, identify issues, and guide algorithmic improvements
 3. Ask ONE specific question about algorithm logic that helps them write 1-3 lines of core code
 4. Guide algorithmic discovery rather than giving direct code solutions
+5. ALWAYS reference specific lines (by number) and existing symbols (variables/functions) from CURRENT CODE.
+6. ONLY one step at a time: do not propose future steps; wait for validation before progressing.
 
 QUESTION REQUIREMENTS (ALGORITHM-FOCUSED):
 - Ask about SPECIFIC algorithmic steps: "What data structure would store your results?" or "How would you process each number?"
 - Focus on core algorithm logic: loops, conditions, data manipulation
-- Reference their ACTUAL algorithm implementation with specific line numbers
+- Reference their ACTUAL algorithm implementation with specific line numbers and existing symbol names
 - Include hints that guide algorithmic discovery, not boilerplate code
 
 FOR HIGHLIGHTING: Use EXACT line numbers from their algorithm code (ignore function signature lines)
 
-Return ONLY a JSON object with this structure:
+Return ONLY a JSON object with this structure (ONE STEP ONLY):
 {
   "question": "[Specific question about next code to write]",
   "hint": "[Hint that guides them to the answer without giving it away]", 
@@ -382,7 +536,7 @@ export async function validateCoachingSubmission(
   }
 
   // Create concise prompt for context continuation (the AI already knows all the coaching rules)
-  const contextContinuationPrompt = `STUDENT CODE UPDATE:
+  const contextContinuationPrompt = `STUDENT CODE UPDATE (GROUND IN CURRENT CODE and REFERENCE LINES/SYMBOLS):
 \`\`\`python
 ${currentEditorCode}
 \`\`\`
@@ -412,7 +566,11 @@ Return JSON in this exact format:
   "codeAnalysis": {
     "syntax": "valid" | "invalid",
     "logic": "correct" | "incorrect" | "partial",
-    "efficiency": "optimal" | "acceptable" | "inefficient"
+    "efficiency": "optimal" | "acceptable" | "inefficient",
+    "timeComplexity": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
+    "spaceComplexity": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
+    "recommendedTime": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
+    "recommendedSpace": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other"
   },
   "codeToAdd": "code to insert if nextAction is insert_and_continue",
   "nextStep": {
@@ -468,6 +626,17 @@ Return JSON in this exact format:
     }
     
     const validation = JSON.parse(cleanContent);
+
+    // Add optimization detect flag to inform UI about Learn Optimization button visibility
+    try {
+      const heur = analyzeOptimizationHeuristics(currentEditorCode, problemDescription);
+      (validation as any).isOptimizable = Boolean(heur?.isOptimizable);
+    } catch (_) {
+      (validation as any).isOptimizable = true;
+    }
+
+    // If correct but not optimal, we no longer inject any default next step text.
+    // Rendering logic on the frontend hides the Next Step card when empty.
     console.log("🎯 [validateCoachingSubmission] Parsed validation:", validation);
     
     // Validate required fields
@@ -538,6 +707,85 @@ Return JSON in this exact format:
 }
 
 /**
+ * Start optimization coaching steps
+ */
+export async function startOptimizationCoaching(
+  problemId: string,
+  userId: string,
+  currentCode: string,
+  problemDescription: string,
+  difficulty: "beginner" | "intermediate" | "advanced" = "beginner",
+) {
+  const sessionId = crypto.randomUUID();
+
+  const heur = analyzeOptimizationHeuristics(currentCode, problemDescription);
+  if (!heur.isOptimizable) {
+    return {
+      sessionId,
+      nextAction: "complete_optimization",
+      message: "Solution already appears optimal. Great job!",
+      targetComplexity: heur.targetComplexity || "O(n)",
+    };
+  }
+
+  const prompt = `You are an expert optimization coach.
+
+PROBLEM: ${problemDescription}
+
+CURRENT CODE (optimize by editing minimal lines, keep signature unchanged):
+\`\`\`python
+${currentCode || "# no code"}
+\`\`\`
+
+GOAL:
+- Identify one concrete optimization step toward ${heur.targetComplexity || "a better complexity"}.
+- Reference specific lines and existing symbols.
+- Provide ONE short question and ONE hint.
+- If a tiny, safe edit (1–3 lines) helps, include it as codeToAdd.
+
+Return JSON only:
+{
+  "question": "...",
+  "hint": "...",
+  "targetComplexity": "O(n) | O(n log n) | ...",
+  "expectedChange": "data_structure|algorithm|constant_factor",
+  "highlightArea": { "startLine": <number>, "endLine": <number> },
+  "codeToAdd": "optional tiny edit or empty string",
+  "nextAction": "hint" | "insert_and_continue"
+}`;
+
+  const text = await llmText(prompt, { temperature: 0.3, maxTokens: 500 });
+  return { sessionId, step: text };
+}
+
+/**
+ * Validate optimization step
+ */
+export async function validateOptimizationStep(
+  sessionId: string,
+  currentEditorCode: string,
+  problemDescription: string,
+) {
+  const heur = analyzeOptimizationHeuristics(currentEditorCode, problemDescription);
+  if (!heur.isOptimizable) {
+    return {
+      isCorrect: true,
+      improved: true,
+      currentComplexity: heur.currentComplexity || "O(n)",
+      feedback: "Solution is already optimal. Nicely done!",
+      nextAction: "complete_optimization",
+    };
+  }
+
+  // Ask for the next minimal improvement (no benchmarking)
+  const prompt = `Given the current code, propose the next minimal optimization step toward ${heur.targetComplexity || "a better complexity"}.
+Use existing symbols and reference specific lines. Return JSON with fields: question, hint, expectedChange, highlightArea {startLine,endLine}, codeToAdd (<=3 lines or empty), nextAction (hint|insert_and_continue). Code only if safe.`;
+
+  const text = await llmText(prompt + "\n\nCURRENT CODE:\n" + currentEditorCode, { temperature: 0.2, maxTokens: 500 });
+  return { isCorrect: true, improved: false, nextStep: text, nextAction: "hint" };
+}
+
+/**
  * Generate a coaching session with step-by-step guidance (legacy function for compatibility)
  */
 export async function generateCoachingSession(
@@ -564,7 +812,7 @@ CRITICAL EXECUTION CONTEXT:
 
 PROBLEM: ${problemDescription}
 
-STUDENT'S CURRENT CODE STATE:
+STUDENT'S CURRENT CODE STATE (USE TO GROUND ALL REFERENCES):
 ${"```"}python
 ${currentCode || "# No code written yet"}
 ${"```"}
