@@ -17,7 +17,7 @@ const CompanyIcons: React.FC<CompanyIconsProps> = ({
 }) => {
   if (!companies || companies.length === 0) {
     return (
-      <span className="text-xs text-muted-foreground">No data</span>
+      <span className="text-xs text-muted-foreground"></span>
     );
   }
 
