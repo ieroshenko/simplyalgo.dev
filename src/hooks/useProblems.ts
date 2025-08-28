@@ -27,6 +27,7 @@ export interface Problem {
   // New editorial fields
   recommendedTimeComplexity?: string;
   recommendedSpaceComplexity?: string;
+  companies?: string[]; // Array of company names
 }
 
 export interface Category {
@@ -73,6 +74,7 @@ type ProblemRowWithRelations = {
   acceptance_rate?: number|null;
   recommended_time_complexity?: string|null;
   recommended_space_complexity?: string|null;
+  companies?: string[]|null; // JSONB array of company names
 };
 
 type ProblemIdWithCategory = {
@@ -147,6 +149,7 @@ export const useProblems = (userId?: string) => {
           acceptanceRate: problem.acceptance_rate ?? undefined,
           recommendedTimeComplexity: problem.recommended_time_complexity ?? undefined,
           recommendedSpaceComplexity: problem.recommended_space_complexity ?? undefined,
+          companies: (problem.companies || []) as string[],
         };
       });
 

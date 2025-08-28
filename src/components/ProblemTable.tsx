@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Problem } from "@/types";
 import { useNavigate } from "react-router-dom";
+import CompanyIcons from "@/components/CompanyIcons";
 
 interface ProblemTableProps {
   problems: Problem[];
@@ -73,7 +74,8 @@ const ProblemTable = ({
       case "Easy":
         return "bg-success text-success-foreground";
       case "Medium":
-        return "bg-accent text-accent-foreground";
+        // Use yellow/amber for Medium to differentiate from Easy (green)
+        return "bg-amber-500 text-white";
       case "Hard":
         return "bg-destructive text-destructive-foreground";
       default:
@@ -130,6 +132,9 @@ const ProblemTable = ({
                 Difficulty
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-foreground">
+                Companies
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-foreground">
                 Action
               </th>
             </tr>
@@ -178,6 +183,14 @@ const ProblemTable = ({
                     <Badge className={getDifficultyColor(problem.difficulty)}>
                       {problem.difficulty}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <CompanyIcons 
+                      companies={problem.companies || []}
+                      maxVisible={4}
+                      size={18}
+                      className="max-w-32"
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <Button

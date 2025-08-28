@@ -28,6 +28,7 @@ export interface Problem {
     explanation?: string;
   }>;
   testCases: TestCase[];
+  companies?: string[]; // Array of company names
 }
 
 export interface User {

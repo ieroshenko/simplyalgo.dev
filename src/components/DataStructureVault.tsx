@@ -45,7 +45,7 @@ const DataStructureVault = () => {
       case "Easy":
         return "bg-primary text-primary-foreground";
       case "Medium":
-        return "bg-accent text-accent-foreground";
+        return "bg-amber-500 text-white";
       case "Hard":
         return "bg-destructive text-destructive-foreground";
       default:

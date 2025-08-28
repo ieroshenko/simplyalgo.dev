@@ -19,7 +19,6 @@ import {
   Maximize2,
   Moon,
   Sun,
-  Brain,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,6 +44,7 @@ import SimpleOverlay from "@/components/coaching/SimpleOverlay";
 import FeedbackOverlay from "@/components/coaching/FeedbackOverlay";
 import CoachProgress from "@/components/coaching/CoachProgress";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
 import {
   Dialog,
@@ -160,12 +160,19 @@ const ProblemSolverNew = () => {
     const newValue = !showBottomPanel;
     setShowBottomPanel(newValue);
     localStorage.setItem("showBottomPanel", JSON.stringify(newValue));
+    if (!newValue) {
+      // show hint after collapsing
+      localStorage.setItem("hint-tests-collapsed", "1");
+    }
   }, [showBottomPanel]);
 
   const toggleRightPanel = useCallback(() => {
     const newValue = !showRightPanel;
     setShowRightPanel(newValue);
     localStorage.setItem("showRightPanel", JSON.stringify(newValue));
+    if (!newValue) {
+      localStorage.setItem("hint-chat-collapsed", "1");
+    }
   }, [showRightPanel]);
 
   // Keyboard shortcuts
@@ -250,10 +257,6 @@ const ProblemSolverNew = () => {
     setExpandedSubmissionId((prev) => (prev === id ? null : id));
   };
 
-  // Complexity analysis state
-  const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
-  const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
-
   // Fullscreen viewer state
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenCode, setFullscreenCode] = useState("");
@@ -294,7 +297,7 @@ const ProblemSolverNew = () => {
       case "Easy":
         return "bg-success text-success-foreground";
       case "Medium":
-        return "bg-accent text-accent-foreground";
+        return "bg-amber-500 text-white";
       case "Hard":
         return "bg-destructive text-destructive-foreground";
       default:
@@ -312,43 +315,6 @@ const ProblemSolverNew = () => {
       toast.success("Copied to clipboard");
     } catch {
       toast.error("Failed to copy");
-    }
-  };
-
-  const handleAnalyzeComplexity = async (submissionCode: string, submissionId: string) => {
-    if (!submissionCode.trim()) {
-      toast.error("No code to analyze");
-      return;
-    }
-
-    setAnalyzingSubmissionId(submissionId);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-chat", {
-        body: {
-          action: "analyze_complexity",
-          code: submissionCode,
-          problemId: problem.id,
-          problemDescription: problem.description,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.complexityAnalysis) {
-        setComplexityResults(prev => ({
-          ...prev,
-          [submissionId]: data.complexityAnalysis
-        }));
-        toast.success("Complexity analysis completed!");
-      } else {
-        throw new Error("Invalid response format");
-      }
-    } catch (error) {
-      console.error("Complexity analysis failed:", error);
-      toast.error("Failed to analyze complexity. Please try again.");
-    } finally {
-      setAnalyzingSubmissionId(null);
     }
   };
 
@@ -547,11 +513,6 @@ const ProblemSolverNew = () => {
         problemId: problem.id,
       });
       setTestResults(response.results);
-      
-      // Auto-expand the test results panel when results arrive
-      // Force panel to be visible and expanded regardless of previous state
-      setShowBottomPanel(true);
-      localStorage.setItem("showBottomPanel", JSON.stringify(true));
       setTestPanelSize(150); // Expand test panel when results are received
 
       const passedCount = response.results.filter((r) => r.passed).length;
@@ -650,6 +611,7 @@ const ProblemSolverNew = () => {
 
           <div className="flex items-center space-x-2">
             <Timer />
+            <ShortcutsHelp />
             <Button
               variant="ghost"
               size="sm"
@@ -952,24 +914,6 @@ const ProblemSolverNew = () => {
                                             <Copy className="w-4 h-4 mr-1" />
                                             Copy
                                           </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleAnalyzeComplexity(s.code, s.id)}
-                                            disabled={analyzingSubmissionId === s.id}
-                                          >
-                                            {analyzingSubmissionId === s.id ? (
-                                              <>
-                                                <div className="w-4 h-4 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                                                Analyzing...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Brain className="w-4 h-4 mr-1" />
-                                                Analyze
-                                              </>
-                                            )}
-                                          </Button>
                                         </div>
                                       </div>
                                       <Editor
@@ -990,57 +934,6 @@ const ProblemSolverNew = () => {
                                           wordWrap: "on",
                                         }}
                                       />
-
-                                      {/* Complexity Analysis Results */}
-                                      {complexityResults[s.id] && (
-                                        <div className="mt-4 space-y-4">
-                                          <h4 className="text-sm font-semibold text-foreground">
-                                            Complexity Analysis
-                                          </h4>
-                                          
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Time Complexity */}
-                                            <div className="bg-muted/50 p-3 rounded-lg border border-border">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                                <span className="text-xs font-semibold text-foreground">Time</span>
-                                                <Badge variant="outline" className="text-xs font-mono">
-                                                  {complexityResults[s.id].timeComplexity}
-                                                </Badge>
-                                              </div>
-                                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                                {complexityResults[s.id].timeExplanation}
-                                              </p>
-                                            </div>
-
-                                            {/* Space Complexity */}
-                                            <div className="bg-muted/50 p-3 rounded-lg border border-border">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <div className="w-3 h-3 bg-green-600 dark:bg-green-400 rounded-sm" />
-                                                <span className="text-xs font-semibold text-foreground">Space</span>
-                                                <Badge variant="outline" className="text-xs font-mono">
-                                                  {complexityResults[s.id].spaceComplexity}
-                                                </Badge>
-                                              </div>
-                                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                                {complexityResults[s.id].spaceExplanation}
-                                              </p>
-                                            </div>
-                                          </div>
-
-                                          {/* Overall Analysis */}
-                                          {complexityResults[s.id].overallAnalysis && (
-                                            <div className="bg-muted/50 p-3 rounded-lg border border-border">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs font-semibold text-foreground">Summary</span>
-                                              </div>
-                                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                                {complexityResults[s.id].overallAnalysis}
-                                              </p>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1096,6 +989,14 @@ const ProblemSolverNew = () => {
                   <ResizableHandle withHandle />
                   <ResizablePanel defaultSize={testPanelSize} minSize={20}>
                     <div className="h-full bg-background border-t border-border flex flex-col">
+                      {/* One-time hint for tests panel */}
+                      {!showBottomPanel && localStorage.getItem("hint-tests-collapsed") === "1" && (
+                        <div className="absolute bottom-3 right-3 z-10">
+                          <div className="px-3 py-1.5 rounded-full bg-muted text-xs text-muted-foreground border shadow-sm">
+                            Press {/(Mac|iPhone|iPad|iPod)/i.test(navigator.platform || "") ? "⌘" : "Ctrl"}+J to toggle Tests
+                          </div>
+                        </div>
+                      )}
                       {testResults.length === 0 ? (
                         <div className="p-4">
                           <div className="text-sm font-medium text-foreground mb-3">

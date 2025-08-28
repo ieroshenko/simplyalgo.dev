@@ -46,26 +46,7 @@ const Sidebar = () => {
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 
-  const categoryIcons = {
-    "Array & Hashing": Hash,
-    String: Type,
-    "Two Pointers": ArrowLeftRight,
-    "Sliding Window": SlidersHorizontal,
-    Stack: Database,
-    "Binary Search": Search,
-    "Dynamic Programming": Layers,
-    "Linked List": List,
-    Trees: TreePine,
-    Tries: FolderTree,
-    "Heap / Priority Queue": Mountain,
-    Backtracking: RotateCcw,
-    Graphs: Network,
-    Matrix: Grid3X3,
-    Greedy: DollarSign,
-    Intervals: Calendar,
-    "Math & Geometry": Calculator,
-    "Bit Manipulation": Binary,
-  };
+  // No per-category icons in progress list (simplified UI)
 
   return (
     <div className="w-64 bg-background border-r border-border h-full flex flex-col">
@@ -115,17 +96,12 @@ const Sidebar = () => {
             </h3>
             <div className="space-y-3">
               {categories.map((category) => {
-                const IconComponent =
-                  categoryIcons[category.name as keyof typeof categoryIcons];
                 const percentage = (category.solved / category.total) * 100;
 
                 return (
                   <div key={category.name} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        {IconComponent && (
-                          <IconComponent className="w-4 h-4 text-muted-foreground" />
-                        )}
                         <span className="text-sm text-foreground">
                           {category.name}
                         </span>
