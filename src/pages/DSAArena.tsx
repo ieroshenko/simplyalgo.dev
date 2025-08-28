@@ -2,10 +2,18 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Sidebar from "@/components/Sidebar";
 import ProblemTable from "@/components/ProblemTable";
 import DataStructureVault from "@/components/DataStructureVault";
-import { useState, useEffect } from "react";
+import CompanyIcon from "@/components/CompanyIcon";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
@@ -39,9 +47,36 @@ const DSAArena = () => {
       return saved || undefined;
     },
   );
+  const [selectedCompany, setSelectedCompany] = useState<string | undefined>(
+    () => {
+      // Load selected company from localStorage on initialization
+      const saved = localStorage.getItem("selected-company");
+      return saved || undefined;
+    },
+  );
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | undefined>(
+    () => {
+      // Load selected difficulty from localStorage on initialization
+      const saved = localStorage.getItem("selected-difficulty");
+      return saved || undefined;
+    },
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories = ["All", ...dbCategories.map((c) => c.name)];
+  
+  // Extract unique companies from problems with memoization
+  const companies = useMemo(() => {
+    const allCompanies = Array.from(
+      new Set(
+        problems.flatMap(problem => problem.companies || [])
+      )
+    ).sort();
+    return ["All", ...allCompanies];
+  }, [problems]);
+  
+  // Define difficulty options
+  const difficulties = ["All", "Easy", "Medium", "Hard"];
 
   // Function to handle category selection with persistence
   const handleCategorySelect = (category: string) => {
@@ -53,6 +88,32 @@ const DSAArena = () => {
       localStorage.setItem("selected-category", categoryValue);
     } else {
       localStorage.removeItem("selected-category");
+    }
+  };
+
+  // Function to handle company selection with persistence
+  const handleCompanySelect = (company: string) => {
+    const companyValue = company === "All" ? undefined : company;
+    setSelectedCompany(companyValue);
+
+    // Persist to localStorage
+    if (companyValue) {
+      localStorage.setItem("selected-company", companyValue);
+    } else {
+      localStorage.removeItem("selected-company");
+    }
+  };
+
+  // Function to handle difficulty selection with persistence
+  const handleDifficultySelect = (difficulty: string) => {
+    const difficultyValue = difficulty === "All" ? undefined : difficulty;
+    setSelectedDifficulty(difficultyValue);
+
+    // Persist to localStorage
+    if (difficultyValue) {
+      localStorage.setItem("selected-difficulty", difficultyValue);
+    } else {
+      localStorage.removeItem("selected-difficulty");
     }
   };
 
@@ -70,6 +131,30 @@ const DSAArena = () => {
       localStorage.removeItem("selected-category");
     }
   }, [dbCategories, selectedCategory, problemsLoading]);
+
+  // Validate saved company exists in available companies
+  useEffect(() => {
+    if (
+      !problemsLoading &&
+      companies.length > 1 &&
+      selectedCompany &&
+      !companies.includes(selectedCompany)
+    ) {
+      setSelectedCompany(undefined);
+      localStorage.removeItem("selected-company");
+    }
+  }, [companies, selectedCompany, problemsLoading]);
+
+  // Validate saved difficulty exists in available difficulties
+  useEffect(() => {
+    if (
+      selectedDifficulty &&
+      !difficulties.includes(selectedDifficulty)
+    ) {
+      setSelectedDifficulty(undefined);
+      localStorage.removeItem("selected-difficulty");
+    }
+  }, [selectedDifficulty]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -190,38 +275,117 @@ const DSAArena = () => {
           </TabsList>
 
           <TabsContent value="problems" className="space-y-6">
-            {/* Category Filters */}
+            {/* Filters */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">
-                Filter by Category
+                Filters
               </h2>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <Button
-                    key={category}
-                    variant={
-                      selectedCategory === category ||
-                      (category === "All" && !selectedCategory)
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    onClick={() => handleCategorySelect(category)}
-                    className={
-                      selectedCategory === category ||
-                      (category === "All" && !selectedCategory)
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-secondary"
-                    }
+              <div className="flex flex-wrap gap-4">
+                {/* Category Filter */}
+                <div className="flex flex-col space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Category</label>
+                  <Select
+                    value={selectedCategory || "All"}
+                    onValueChange={(value) => handleCategorySelect(value)}
                   >
-                    {category}
-                  </Button>
-                ))}
+                    <SelectTrigger className="w-48">
+                      <SelectValue>
+                        {selectedCategory || "All Categories"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Company Filter */}
+                <div className="flex flex-col space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Company</label>
+                  <Select
+                    value={selectedCompany || "All"}
+                    onValueChange={(value) => handleCompanySelect(value)}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue>
+                        <div className="flex items-center gap-2">
+                          {selectedCompany && selectedCompany !== "All" && (
+                            <CompanyIcon company={selectedCompany} size={16} className="p-0" />
+                          )}
+                          {selectedCompany || "All Companies"}
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company} value={company}>
+                          <div className="flex items-center gap-2">
+                            {company !== "All" && (
+                              <CompanyIcon company={company} size={16} className="p-0" />
+                            )}
+                            {company}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Difficulty Filter */}
+                <div className="flex flex-col space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Difficulty</label>
+                  <Select
+                    value={selectedDifficulty || "All"}
+                    onValueChange={(value) => handleDifficultySelect(value)}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue>
+                        <div className="flex items-center gap-2">
+                          {selectedDifficulty && selectedDifficulty !== "All" && (
+                            <div 
+                              className={`w-3 h-3 rounded-full ${
+                                selectedDifficulty === "Easy" ? "bg-green-500" :
+                                selectedDifficulty === "Medium" ? "bg-amber-500" :
+                                selectedDifficulty === "Hard" ? "bg-red-500" : ""
+                              }`}
+                            />
+                          )}
+                          {selectedDifficulty || "All Difficulties"}
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {difficulties.map((difficulty) => (
+                        <SelectItem key={difficulty} value={difficulty}>
+                          <div className="flex items-center gap-2">
+                            {difficulty !== "All" && (
+                              <div 
+                                className={`w-3 h-3 rounded-full ${
+                                  difficulty === "Easy" ? "bg-green-500" :
+                                  difficulty === "Medium" ? "bg-amber-500" :
+                                  difficulty === "Hard" ? "bg-red-500" : ""
+                                }`}
+                              />
+                            )}
+                            {difficulty}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
             {/* Search */}
             <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">
+                Search
+              </h2>
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
@@ -237,13 +401,19 @@ const DSAArena = () => {
             {/* Problems Table */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">
-                {selectedCategory
-                  ? `${selectedCategory} Problems`
+                {selectedCategory || selectedCompany || selectedDifficulty
+                  ? [
+                      selectedCategory && `${selectedCategory}`,
+                      selectedCompany && `${selectedCompany}`,
+                      selectedDifficulty && `${selectedDifficulty}`
+                    ].filter(Boolean).join(" ") + " Problems"
                   : "All Problems"}
               </h2>
               <ProblemTable
                 problems={problems}
                 filteredCategory={selectedCategory}
+                filteredCompany={selectedCompany}
+                filteredDifficulty={selectedDifficulty}
                 searchQuery={searchQuery}
                 onToggleStar={toggleStar}
               />

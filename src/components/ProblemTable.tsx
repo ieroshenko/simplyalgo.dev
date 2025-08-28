@@ -1,40 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  CheckCircle2,
-  Circle,
-  Star,
-  StarOff,
-  Play,
-  List,
-  Sparkles,
-  Trophy,
-  Zap,
-  Database,
-  Layers,
-  Hash,
-  Type,
-  ArrowLeftRight,
-  SlidersHorizontal,
-  Search,
-  TreePine,
-  FolderTree,
-  Mountain,
-  RotateCcw,
-  Network,
-  Grid3X3,
-  DollarSign,
-  Calendar,
-  Calculator,
-  Binary,
-} from "lucide-react";
+import { Circle, Star, Play, Trophy, Zap } from "lucide-react";
 import { Problem } from "@/types";
 import { useNavigate } from "react-router-dom";
+import CompanyIcons from "@/components/CompanyIcons";
 
 interface ProblemTableProps {
   problems: Problem[];
   filteredCategory?: string;
+  filteredCompany?: string;
+  filteredDifficulty?: string;
   searchQuery?: string;
   onToggleStar?: (problemId: string) => void;
 }
@@ -42,38 +18,22 @@ interface ProblemTableProps {
 const ProblemTable = ({
   problems,
   filteredCategory,
+  filteredCompany,
+  filteredDifficulty,
   searchQuery,
   onToggleStar,
 }: ProblemTableProps) => {
   const navigate = useNavigate();
 
-  const categoryIcons = {
-    "Array & Hashing": Hash,
-    String: Type,
-    "Two Pointers": ArrowLeftRight,
-    "Sliding Window": SlidersHorizontal,
-    Stack: Database,
-    "Binary Search": Search,
-    "Dynamic Programming": Layers,
-    "Linked List": List,
-    Trees: TreePine,
-    Tries: FolderTree,
-    "Heap / Priority Queue": Mountain,
-    Backtracking: RotateCcw,
-    Graphs: Network,
-    Matrix: Grid3X3,
-    Greedy: DollarSign,
-    Intervals: Calendar,
-    "Math & Geometry": Calculator,
-    "Bit Manipulation": Binary,
-  };
+  // Category icons removed for a cleaner table UI
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "Easy":
         return "bg-success text-success-foreground";
       case "Medium":
-        return "bg-accent text-accent-foreground";
+        // Use yellow/amber for Medium to differentiate from Easy (green)
+        return "bg-amber-500 text-white";
       case "Hard":
         return "bg-destructive text-destructive-foreground";
       default:
@@ -96,10 +56,15 @@ const ProblemTable = ({
     .filter((problem) => {
       const matchesCategory =
         !filteredCategory || problem.category === filteredCategory;
+      const matchesCompany =
+        !filteredCompany || 
+        (problem.companies && problem.companies.includes(filteredCompany));
+      const matchesDifficulty =
+        !filteredDifficulty || problem.difficulty === filteredDifficulty;
       const matchesSearch =
         !searchQuery ||
         problem.title.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesCompany && matchesDifficulty && matchesSearch;
     })
     .sort((a, b) => {
       // Sort starred problems first
@@ -130,15 +95,15 @@ const ProblemTable = ({
                 Difficulty
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-foreground">
+                Companies
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-foreground">
                 Action
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filteredProblems.map((problem) => {
-              const CategoryIcon =
-                categoryIcons[problem.category as keyof typeof categoryIcons];
-
               return (
                 <tr
                   key={problem.id}
@@ -165,19 +130,22 @@ const ProblemTable = ({
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      {CategoryIcon && (
-                        <CategoryIcon className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm text-foreground">
-                        {problem.category}
-                      </span>
-                    </div>
+                    <span className="text-sm text-foreground">
+                      {problem.category}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <Badge className={getDifficultyColor(problem.difficulty)}>
                       {problem.difficulty}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <CompanyIcons 
+                      companies={problem.companies || []}
+                      maxVisible={4}
+                      size={18}
+                      className="max-w-32"
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <Button

@@ -1,0 +1,179 @@
+import React from 'react';
+import {
+  SiGoogle,
+  SiAmazon,
+  SiMeta,
+  SiApple,
+  SiNetflix,
+  SiNvidia,
+  SiTesla,
+  SiUber,
+  SiAirbnb,
+  SiAdobe,
+  SiSalesforce,
+  SiOracle,
+  SiIntel,
+  SiCisco,
+  SiPaypal,
+  SiSpotify,
+  SiTiktok, // For ByteDance
+} from 'react-icons/si';
+import { Building2, Square } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
+
+interface CompanyIconProps {
+  company: string;
+  size?: number;
+  className?: string;
+}
+
+const CompanyIcon: React.FC<CompanyIconProps> = ({ 
+  company, 
+  size = 20, 
+  className = "" 
+}) => {
+  const { isDark } = useTheme();
+
+  const getCompanyIcon = (companyName: string) => {
+    const normalizedName = companyName.toLowerCase().replace(/\s+/g, '');
+    
+    const iconMap: Record<string, { 
+      icon: React.ComponentType<any>; 
+      color: string;
+      darkColor?: string; // Optional dark mode color
+      name: string; 
+    }> = {
+      'google': { 
+        icon: SiGoogle, 
+        color: '#4285F4', 
+        name: 'Google' 
+      },
+      'amazon': { 
+        icon: SiAmazon, 
+        color: '#FF9900', 
+        name: 'Amazon' 
+      },
+      'meta': { 
+        icon: SiMeta, 
+        color: '#1877F2', 
+        name: 'Meta' 
+      },
+      'microsoft': { 
+        icon: Square, 
+        color: '#00A4EF', 
+        name: 'Microsoft' 
+      },
+      'apple': { 
+        icon: SiApple, 
+        color: '#000000',
+        darkColor: '#FFFFFF', 
+        name: 'Apple' 
+      },
+      'netflix': { 
+        icon: SiNetflix, 
+        color: '#E50914', 
+        name: 'Netflix' 
+      },
+      'nvidia': { 
+        icon: SiNvidia, 
+        color: '#76B900', 
+        name: 'NVIDIA' 
+      },
+      'tesla': { 
+        icon: SiTesla, 
+        color: '#CC0000', 
+        name: 'Tesla' 
+      },
+      'uber': { 
+        icon: SiUber, 
+        color: '#000000',
+        darkColor: '#FFFFFF', 
+        name: 'Uber' 
+      },
+      'airbnb': { 
+        icon: SiAirbnb, 
+        color: '#FF5A5F', 
+        name: 'Airbnb' 
+      },
+      'adobe': { 
+        icon: SiAdobe, 
+        color: '#FF0000', 
+        name: 'Adobe' 
+      },
+      'salesforce': { 
+        icon: SiSalesforce, 
+        color: '#00A1E0', 
+        name: 'Salesforce' 
+      },
+      'oracle': { 
+        icon: SiOracle, 
+        color: '#F80000', 
+        name: 'Oracle' 
+      },
+      'ibm': { 
+        icon: Building2, 
+        color: '#006699', 
+        name: 'IBM' 
+      },
+      'intel': { 
+        icon: SiIntel, 
+        color: '#0071C5', 
+        name: 'Intel' 
+      },
+      'cisco': { 
+        icon: SiCisco, 
+        color: '#1BA0D7', 
+        name: 'Cisco' 
+      },
+      'paypal': { 
+        icon: SiPaypal, 
+        color: '#003087', 
+        name: 'PayPal' 
+      },
+      'spotify': { 
+        icon: SiSpotify, 
+        color: '#1ED760', 
+        name: 'Spotify' 
+      },
+      'bytedance': { 
+        icon: SiTiktok, 
+        color: '#000000',
+        darkColor: '#FFFFFF', 
+        name: 'TikTok' 
+      },
+      'zoom': { 
+        icon: Building2, // Using generic building icon for Zoom as it's not in simple-icons
+        color: '#2D8CFF', 
+        name: 'Zoom' 
+      },
+    };
+
+    return iconMap[normalizedName] || { 
+      icon: Building2, 
+      color: '#6B7280',
+      darkColor: '#9CA3AF',
+      name: companyName 
+    };
+  };
+
+  const companyData = getCompanyIcon(company);
+  const IconComponent = companyData.icon;
+  
+  // Use dark color if available and in dark mode, otherwise use regular color
+  const iconColor = isDark && companyData.darkColor ? companyData.darkColor : companyData.color;
+
+  return (
+    <div
+      className={`inline-flex items-center justify-center rounded-sm hover:bg-secondary/50 p-1 transition-colors bg-background/50 border border-border/20 ${className}`}
+      title={companyData.name}
+    >
+      <IconComponent 
+        size={size}
+        style={{ color: iconColor }}
+        className="drop-shadow-sm"
+      />
+    </div>
+  );
+};
+
+export default CompanyIcon;
