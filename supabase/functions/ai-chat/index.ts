@@ -495,6 +495,107 @@ serve(async (req) => {
       }
     }
 
+    // Analyze complexity action
+    if (req.method === "POST" && action === "analyze_complexity") {
+      console.log("[ai-chat] complexity analysis request received");
+      
+      if (!code) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing code for analyze_complexity action",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      try {
+        const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
+        
+        const prompt = `Analyze the time and space complexity of this code solution for the following problem:
+
+Problem: ${problemDescription || "No description provided"}
+
+Code to analyze:
+\`\`\`python
+${code}
+\`\`\`
+
+Please provide:
+1. Time complexity in Big O notation
+2. Detailed explanation of why this is the time complexity
+3. Space complexity in Big O notation  
+4. Detailed explanation of why this is the space complexity
+5. Overall analysis summary
+
+Respond in JSON format:
+{
+  "timeComplexity": "O(...)",
+  "timeExplanation": "Detailed explanation of time complexity",
+  "spaceComplexity": "O(...)", 
+  "spaceExplanation": "Detailed explanation of space complexity",
+  "overallAnalysis": "Summary of the algorithm's efficiency and characteristics"
+}`;
+
+        const completionParams = {
+          model: configuredModel,
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert algorithm analyst. Analyze code complexity accurately and provide clear, educational explanations. Always respond with valid JSON format."
+            },
+            {
+              role: "user", 
+              content: prompt
+            }
+          ],
+          max_completion_tokens: 1000,
+        };
+
+        // Only add temperature for non-GPT-5 models
+        if (!configuredModel.startsWith("gpt-5")) {
+          completionParams.temperature = 0.1;
+        }
+
+        const completion = await openai.chat.completions.create(completionParams);
+
+        const responseText = completion.choices[0]?.message?.content;
+        if (!responseText) {
+          throw new Error("No response from AI");
+        }
+
+        // Parse the JSON response
+        let complexityAnalysis;
+        try {
+          complexityAnalysis = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error("Failed to parse AI response as JSON:", responseText);
+          throw new Error("Invalid response format from AI");
+        }
+
+        return new Response(
+          JSON.stringify({ complexityAnalysis }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      } catch (error) {
+        console.error("Error analyzing complexity:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to analyze complexity",
+            details: (error as Error).message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     // Generate or retrieve chat session ID for context continuity
     const chatSessionId = sessionId || `chat_${userId || 'anonymous'}_${problemId || Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
     

@@ -9,36 +9,27 @@ const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
 
   return (
     <div 
-      className="relative cursor-pointer"
+      className="relative cursor-pointer bg-blue-50/80 dark:bg-blue-950/50 border-l-2 border-blue-400 dark:border-blue-500 rounded-md p-2"
       onClick={() => setIsRevealed(!isRevealed)}
-      style={{ 
-        fontSize: "12px", 
-        color: "#6b7280",
-        padding: "6px 10px",
-        backgroundColor: "rgba(59, 130, 246, 0.08)",
-        borderRadius: "6px",
-        borderLeft: "3px solid rgba(59, 130, 246, 0.3)"
-      }}
     >
       <div className="flex items-center gap-2">
-        {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-        <span className="text-xs font-medium">
+        {isRevealed ? 
+          <EyeOff className="w-3 h-3 text-muted-foreground" /> : 
+          <Eye className="w-3 h-3 text-muted-foreground" />
+        }
+        <span className="text-xs font-medium text-muted-foreground">
           {isRevealed ? 'Hide Hint' : 'Click to reveal hint'}
         </span>
       </div>
       {isRevealed && (
-        <div className="mt-2 text-gray-700 dark:text-gray-300">
+        <div className="mt-2 text-foreground text-sm">
           💡 {hint}
         </div>
       )}
       {!isRevealed && (
         <div 
-          className="mt-2 select-none"
-          style={{
-            filter: 'blur(4px)',
-            color: '#9ca3af',
-            fontSize: '11px'
-          }}
+          className="mt-2 select-none text-xs text-muted-foreground"
+          style={{ filter: 'blur(4px)' }}
         >
           This hint will help guide you to the solution...
         </div>
@@ -273,40 +264,34 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           left: smartPosition.x,
           top: smartPosition.y,
           zIndex: 1000,
-          backgroundColor: "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(16px) saturate(1.2)",
-          border: "1px solid rgba(226, 232, 240, 0.8)",
           borderRadius: "12px",
-          boxShadow: "0 16px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6)",
           minWidth: isMobile ? "calc(100vw - 32px)" : "420px",
           maxWidth: isMobile ? "calc(100vw - 32px)" : "500px",
           maxHeight: isMobile ? "70vh" : "60vh",
           cursor: isDragging ? "grabbing" : "default",
           transform: `scale(${isMinimized ? "0.95" : "1"})`,
-          opacity: isMinimized ? 0.7 : 1,
+          opacity: isMinimized ? 0.9 : 1,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         }}
-        className="dark:bg-gray-800/80 dark:border-gray-600/40 transition-all duration-300 ease-in-out"
+        className="transition-all duration-300 ease-in-out bg-background/95 border border-border backdrop-blur-lg shadow-2xl"
       >
       {/* Header with compact design */}
       <div 
         style={{
           padding: "8px 12px",
-          borderBottom: "1px solid rgba(229, 231, 235, 0.3)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          backgroundColor: "rgba(249, 250, 251, 0.6)",
           borderRadius: "11px 11px 0 0",
         }}
-        className="dark:bg-gray-750/60 dark:border-gray-600/30 drag-handle"
+        className="drag-handle border-b border-border bg-muted/50"
       >
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <ChevronDown className="w-3 h-3 text-blue-500" />
-            <div className="text-xs font-medium text-blue-600 dark:text-blue-400">
+            <ChevronDown className="w-3 h-3 text-primary" />
+            <div className="text-xs font-medium text-primary">
               AI Coach
             </div>
           </div>
@@ -315,16 +300,16 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="p-1 hover:bg-gray-200/50 dark:hover:bg-gray-600/50 rounded transition-colors"
+            className="p-1 hover:bg-muted rounded transition-colors"
             title={isMinimized ? "Expand" : "Minimize"}
           >
-            <Minimize2 className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+            <Minimize2 className="w-3 h-3 text-muted-foreground hover:text-foreground" />
           </button>
           <div 
             title="Drag to move"
-            className="p-1 hover:bg-gray-200/50 dark:hover:bg-gray-600/50 rounded cursor-move drag-handle"
+            className="p-1 hover:bg-muted rounded cursor-move drag-handle"
           >
-            <Move className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+            <Move className="w-3 h-3 text-muted-foreground hover:text-foreground" />
           </div>
         </div>
       </div>
@@ -340,18 +325,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           className="scrollbar-thin scrollbar-thumb-gray-300/50 dark:scrollbar-thumb-gray-600/50 hover:scrollbar-thumb-gray-400/70"
         >
           {/* Question section */}
-          {question && (
-            <div style={{ padding: "16px" }}>
-              <div 
-                style={{ 
-                  fontSize: "14px", 
-                  fontWeight: "500", 
-                  marginBottom: hint && !validationResult ? "8px" : "0",
-                  color: "#1f2937",
-                  lineHeight: "1.6"
-                }}
-                className="dark:text-gray-100"
-              >
+          {question && !validationResult && (
+            <div className="p-4">
+              <div className="text-sm font-medium text-foreground mb-2 leading-relaxed">
                 {question}
               </div>
               {hint && !validationResult && (
@@ -362,8 +338,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Validation Result Section */}
           {validationResult && (
-            <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${
-              validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+            <div className={`px-4 py-3 border-t border-border ${
+              validationResult.isCorrect ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'
             }`}>
               <div className="flex items-start gap-3">
                 {validationResult.isCorrect ? (
@@ -417,7 +393,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                           }}
                           size="sm"
                           variant="outline"
-                          className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                          className="mt-2 border-purple-300 text-purple-700 hover:border-purple-400 hover:bg-purple-100/60 dark:border-purple-600 dark:text-purple-300 dark:hover:border-purple-500 dark:hover:bg-purple-900/30"
                         >
                           <Sparkles className="w-4 h-4 mr-2" />
                           Learn Optimization
@@ -432,16 +408,16 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Instructions section */}
           {!validationResult && !isValidating && (
-            <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30">
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
+            <div className="px-4 py-3 border-t border-border">
+              <div className="text-sm text-muted-foreground mb-3">
+                Write your code in the highlighted area above, then click <strong className="text-foreground">Check Code</strong> to validate.
               </div>
               
               {/* Optional explanation input */}
               <div className="space-y-2">
                 <button
                   onClick={() => setShowTextInput(!showTextInput)}
-                  className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                  className="flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
                 >
                   <ChevronDown className={`w-3 h-3 transition-transform ${showTextInput ? 'rotate-180' : ''}`} />
                   {showTextInput ? 'Hide explanation' : 'Add explanation (optional)'}
@@ -453,10 +429,10 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                       value={studentExplanation}
                       onChange={(e) => setStudentExplanation(e.target.value)}
                       placeholder="Explain what you're trying to do or what you're stuck on... (e.g., 'I can't figure out how to loop through this' or 'Not sure about the algorithm approach')"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      className="w-full px-3 py-2 text-sm border border-input rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground placeholder:text-muted-foreground"
                       rows={3}
                     />
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className="text-xs text-muted-foreground">
                       💡 This helps the AI coach provide more targeted feedback
                     </div>
                   </div>
@@ -467,14 +443,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Loading state during validation */}
           {isValidating && (
-            <div className="px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 bg-blue-50 dark:bg-blue-900/20">
+            <div className="px-4 py-3 border-t border-border bg-blue-50/50 dark:bg-blue-950/30">
               <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />
+                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                  <div className="text-sm font-medium text-foreground mb-1">
                     Analyzing your code...
                   </div>
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                  <div className="text-sm text-muted-foreground">
                     AI coach is reviewing your implementation and preparing feedback.
                   </div>
                 </div>
@@ -484,14 +460,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Error state - AI service unavailable */}
           {hasError && (
-            <div className="px-4 py-3 border-t border-red-200/50 dark:border-red-600/30 bg-red-50 dark:bg-red-900/20">
+            <div className="px-4 py-3 border-t border-border bg-red-50/50 dark:bg-red-950/30">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                  <div className="text-sm font-medium text-destructive mb-1">
                     AI Coach Unavailable
                   </div>
-                  <div className="text-sm text-red-700 dark:text-red-300 mb-3">
+                  <div className="text-sm text-muted-foreground mb-3">
                     The AI coaching service is temporarily down. You can continue coding on your own or exit coach mode.
                   </div>
                 </div>
@@ -503,18 +479,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
       {/* Fixed Actions bar */}
       {!isMinimized && !hasError && (
-        <div 
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "12px",
-            borderTop: "1px solid rgba(229, 231, 235, 0.3)",
-            backgroundColor: "rgba(249, 250, 251, 0.4)",
-            flexShrink: 0
-          }}
-          className="dark:border-gray-600/30 dark:bg-gray-750/40"
-        >
+        <div className="flex justify-center items-center p-3 border-t border-border bg-muted/30 flex-shrink-0">
+        
           {validationResult?.isCorrect ? (
             <Button
               onClick={() => {
@@ -535,7 +501,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 }, 1000);
               }}
               size="sm"
-              className="bg-green-600/90 hover:bg-green-700/90 text-white backdrop-blur-sm shadow-md px-6"
+              className="bg-green-600 hover:bg-green-700 text-white px-6"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Finish
@@ -547,11 +513,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 disabled={isValidating}
                 size="sm"
                 variant="outline"
-                className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900/30"
+                className="border-orange-400 text-orange-600 hover:bg-orange-50 dark:border-orange-500 dark:text-orange-400 dark:hover:bg-orange-950/30"
               >
                 {isValidating ? (
                   <>
-                    <div className="w-4 h-4 mr-2 border border-orange-600/30 border-t-orange-600 rounded-full animate-spin" />
+                    <div className="w-4 h-4 mr-2 border border-orange-400/30 border-t-orange-600 rounded-full animate-spin" />
                     Checking...
                   </>
                 ) : (
@@ -565,7 +531,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 <Button
                   onClick={onInsertCorrectCode}
                   size="sm"
-                  className="bg-blue-600/90 hover:bg-blue-700/90 text-white backdrop-blur-sm shadow-md"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Use Correct Code
@@ -577,11 +543,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               onClick={handleValidate}
               disabled={isValidating}
               size="sm"
-              className="bg-blue-600/90 hover:bg-blue-700/90 text-white backdrop-blur-sm shadow-md px-6"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >
               {isValidating ? (
                 <>
-                  <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 mr-2 border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   Checking Code...
                 </>
               ) : (
@@ -597,24 +563,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
       {/* Error state actions */}
       {!isMinimized && hasError && (
-        <div 
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "12px",
-            borderTop: "1px solid rgba(229, 231, 235, 0.3)",
-            backgroundColor: "rgba(249, 250, 251, 0.4)",
-            flexShrink: 0
-          }}
-          className="dark:border-gray-600/30 dark:bg-gray-750/40"
-        >
+        <div className="flex justify-center items-center p-3 border-t border-border bg-muted/30 flex-shrink-0">
+        
           <div className="flex gap-2">
             <Button
               onClick={onCancel}
               size="sm"
               variant="outline"
-              className="text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/30"
+              className="border-destructive/30 text-destructive hover:bg-destructive/10"
             >
               Continue Coding
             </Button>
@@ -622,7 +578,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               <Button
                 onClick={onExitCoach}
                 size="sm"
-                className="bg-red-600/90 hover:bg-red-700/90 text-white"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               >
                 Exit Coach Mode
               </Button>
@@ -634,8 +590,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       {/* Minimized state - compact */}
       {isMinimized && (
         <div className="px-4 py-3 text-center">
-          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
-            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+          <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
             Awaiting response...
           </div>
         </div>
