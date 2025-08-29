@@ -42,7 +42,6 @@ const Sidebar = () => {
 
   const navigationItems = [
     { icon: Sparkles, label: "Dashboard", path: "/dashboard" },
-    { icon: TrendingUp, label: "Analytics", path: "/analytics" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 

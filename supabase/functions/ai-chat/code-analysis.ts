@@ -66,7 +66,7 @@ export function sanitizeGeneratedTsx(input: string): string {
   // 9) Handle truncated JSX components at the end of the code
   // Look for incomplete JSX tags like `<ComponentName` or `<ComponentName values={prop`
   const lines = code.split("\n");
-  let lastLine = lines[lines.length - 1].trim();
+  const lastLine = lines[lines.length - 1].trim();
 
   // If the last line looks like an incomplete JSX tag, remove it
   if (

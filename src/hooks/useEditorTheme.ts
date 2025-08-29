@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { editor } from "monaco-editor";
+import { useState } from "react";
 
 export type EditorTheme =
   | "light"
@@ -8,13 +7,6 @@ export type EditorTheme =
   | "monokai"
   | "github-dark";
 
-const themes = {
-  light: "light",
-  "vs-dark": "vs-dark",
-  "gruvbox-dark": "gruvbox-dark",
-  monokai: "monokai",
-  "github-dark": "github-dark",
-};
 
 export const useEditorTheme = () => {
   const [currentTheme, setCurrentTheme] = useState<EditorTheme>(() => {
@@ -38,7 +30,7 @@ export const useEditorTheme = () => {
     localStorage.setItem("editor-theme", theme);
   };
 
-  const defineCustomThemes = (monaco: any) => {
+  const defineCustomThemes = (monaco: typeof import("monaco-editor")) => {
     // Gruvbox Dark Theme
     monaco.editor.defineTheme("gruvbox-dark", {
       base: "vs-dark",

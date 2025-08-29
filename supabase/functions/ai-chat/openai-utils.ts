@@ -1,5 +1,6 @@
 import OpenAI from "https://esm.sh/openai@4";
 import { ResponsesApiRequest, ResponsesApiResponse, SessionContext, ContextualResponse } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
@@ -126,7 +127,7 @@ export async function llmText(
     );
     for (const respModel of responseModels) {
       try {
-        console.log(`[ai-chat] Using Responses API with model=${respModel}`);
+        logger.llmCall(respModel, 0, { sessionId: 'unknown', type: 'responses_api' });
         const req = buildResponsesRequest(respModel, prompt, {
           maxTokens: opts.maxTokens,
           responseFormat: opts.responseFormat,

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { llmText, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
 import { CoachingSession, CoachingValidation, CoachingStep, ContextualResponse } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
@@ -112,7 +113,7 @@ export async function startInteractiveCoaching(
   problemDescription: string,
   difficulty: "beginner" | "intermediate" | "advanced"
 ) {
-  console.log("🎯 [startInteractiveCoaching] Starting context-aware coaching...", { problemId, userId, difficulty });
+  logger.coaching("Starting context-aware coaching", { problemId, userId, difficulty, action: "start_interactive_coaching" });
   const sessionId = crypto.randomUUID();
   
   // Analyze current code to determine an insertion line inside the active function
@@ -233,42 +234,12 @@ CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions t
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
 
-/**
- * Simple optimization heuristics to judge if code is likely optimizable
- */
-function analyzeOptimizationHeuristics(code: string, _problemDescription: string): {
-  isOptimizable: boolean;
-  currentComplexity?: string;
-  targetComplexity?: string;
-  reason?: string;
-} {
-  const src = (code || "").toLowerCase();
-  const hasNestedFor = /\n\s*for\b[\s\S]*\n\s{2,}for\b/.test(code);
-  const usesDictOrSet = /(dict\(|\{\s*\}|\bset\(|\{[^:}]+:[^}]+\})/.test(src) || /\bCounter\(/.test(code);
-  const usesTwoPointers = /(i\+\+|j\-\-|two\s*pointers|left\s*=|right\s*=)/.test(src);
-  const sortsInsideLoop = /for\b[\s\S]*?(sorted\(|\.sort\()/.test(src);
-  const repeatedMembershipInList = /for\b[\s\S]*?\bin\s+\w+\s*:\s*\n[\s\S]*?\bin\s+\w+/.test(src) && !usesDictOrSet;
-
-  // If time is O(n) with extra space via set/dict → suggest O(1) space target
-  if (usesDictOrSet && !hasNestedFor && !sortsInsideLoop) {
-    return { isOptimizable: true, currentComplexity: "O(n) time, O(n) space", targetComplexity: "O(1) space (e.g., XOR or arithmetic)", reason: "Extra memory detected" };
-  }
-
-  if (sortsInsideLoop || hasNestedFor || repeatedMembershipInList) {
-    return { isOptimizable: true, currentComplexity: hasNestedFor ? "~O(n^2)" : undefined, targetComplexity: "O(n) or O(n log n)", reason: "Nested loops/sort inside loop/membership scans detected" };
-  }
-  if (!usesDictOrSet && !usesTwoPointers) {
-    return { isOptimizable: true, targetComplexity: "O(n) or O(n log n)", reason: "No hash/set or two-pointer patterns detected" };
-  }
-  return { isOptimizable: false, currentComplexity: usesTwoPointers ? "O(n)" : "~O(n)", targetComplexity: usesTwoPointers ? "O(n)" : "O(n)", reason: "Efficient pattern detected" };
-}
-
   // Use context-aware AI call to create initial coaching context
   let stepData;
   let contextualResponse: ContextualResponse;
   
   try {
-    console.log("🎯 [startInteractiveCoaching] Creating initial coaching context...");
+    logger.coaching("Creating initial coaching context", { sessionId, action: "create_context" });
     
     // Use the new context-aware function to create initial context
     contextualResponse = await llmWithSessionContext(
@@ -283,14 +254,13 @@ function analyzeOptimizationHeuristics(code: string, _problemDescription: string
       }
     );
 
-    console.log("🎯 [startInteractiveCoaching] Context created successfully");
-    console.log(`🎯 [startInteractiveCoaching] Response ID: ${contextualResponse.responseId}`);
-    console.log(`🎯 [startInteractiveCoaching] Is new context: ${contextualResponse.isNewContext}`);
+    logger.coaching("Context created successfully", { sessionId, responseId: contextualResponse.responseId });
+    logger.debug("Context response details", { responseId: contextualResponse.responseId, isNewContext: contextualResponse.isNewContext });
 
     const rawContent = contextualResponse.content;
     let cleanContent = rawContent.trim();
     
-    console.log("🎯 [startInteractiveCoaching] Raw AI response:", rawContent);
+    logger.debug("Raw AI response received", { sessionId, responseLength: rawContent?.length });
     
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
@@ -299,29 +269,29 @@ function analyzeOptimizationHeuristics(code: string, _problemDescription: string
         .trim();
     }
 
-    console.log("🎯 [startInteractiveCoaching] Cleaned response:", cleanContent);
+    logger.debug("Response cleaned and processed", { sessionId, cleanContentLength: cleanContent.length });
     
     if (!cleanContent || cleanContent === "{}") {
-      console.error("🚨 [startInteractiveCoaching] Empty response from AI");
+      logger.error("Empty response from AI", undefined, { sessionId, action: "start_interactive_coaching" });
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
     
     stepData = JSON.parse(cleanContent);
-    console.log("🎯 [startInteractiveCoaching] Parsed step data:", stepData);
+    logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData.question, hasHighlightArea: !!stepData.highlightArea });
     
     // Validate required fields
     if (!stepData.question || !stepData.highlightArea) {
-      console.error("🚨 [startInteractiveCoaching] Missing required fields:", stepData);
+      logger.error("Missing required fields in step data", undefined, { sessionId, stepData, action: "validate_step_data" });
       throw new Error("Invalid coaching step data");
     }
   } catch (error) {
-    console.error("🚨 [startInteractiveCoaching] AI generation failed:", error);
+    logger.error("AI generation failed", error, { sessionId, action: "start_interactive_coaching" });
     throw error;
   }
 
   // Only create database session AFTER successful AI step generation
   try {
-    console.log("🎯 [startInteractiveCoaching] Creating database session...");
+    logger.coaching("Creating database session", { sessionId, problemId, userId });
     const { error: sessionError } = await supabaseAdmin
       .from("coaching_sessions")
       .insert({
@@ -343,7 +313,7 @@ function analyzeOptimizationHeuristics(code: string, _problemDescription: string
       });
 
     if (sessionError) {
-      console.error("🚨 [startInteractiveCoaching] Database error:", sessionError);
+      logger.error("Database error creating session", sessionError, { sessionId, problemId, userId, action: "create_session" });
       throw new Error("Failed to create coaching session");
     }
     
@@ -360,8 +330,8 @@ function analyzeOptimizationHeuristics(code: string, _problemDescription: string
         response_id: contextualResponse.responseId, // Store response ID for this step
       });
     
-    console.log("🎯 [startInteractiveCoaching] Session created successfully with response_id:", contextualResponse.responseId);
-    console.log(`🎯 [startInteractiveCoaching] Tokens potentially saved in future requests: ${contextualResponse.tokensSaved || 'N/A (initial context)'}`);
+    logger.coaching("Session created successfully", { sessionId, responseId: contextualResponse.responseId, problemId, userId });
+    logger.debug("Token optimization status", { sessionId, tokensSaved: contextualResponse.tokensSaved || 0 });
     
     return {
       sessionId,
@@ -376,7 +346,7 @@ function analyzeOptimizationHeuristics(code: string, _problemDescription: string
       contextInitialized: true,
     };
   } catch (dbError) {
-    console.error("🚨 [startInteractiveCoaching] Database operation failed:", dbError);
+    logger.error("Database operation failed", dbError, { sessionId, action: "create_coaching_session" });
     throw new Error("Failed to create coaching session");
   }
 }
@@ -391,7 +361,7 @@ export async function generateNextCoachingStep(
   difficulty: "beginner" | "intermediate" | "advanced",
   previousResponse?: string
 ): Promise<CoachingStep> {
-  console.log("🎯 [generateNextCoachingStep] Generating step...");
+  logger.coaching("Generating next coaching step", { sessionId, action: "generate_next_step" });
   
   const prompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
@@ -453,25 +423,25 @@ Return ONLY a JSON object with this structure (ONE STEP ONLY):
 IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, reasoning, or markdown formatting. The response should be valid JSON that can be parsed directly.`;
 
   try {
-    console.log("🎯 [generateNextCoachingStep] Initializing OpenAI...");
+    logger.debug("Initializing OpenAI for coaching step", { sessionId });
     const openai = getOpenAI();
     
-    console.log("🎯 [generateNextCoachingStep] Making API call to gpt-5-mini...");
+    logger.llmCall("gpt-5-mini", 0, { sessionId, action: "generate_coaching_step" });
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [{ role: "user", content: prompt }],
       max_completion_tokens: 800,
     });
 
-    console.log("🎯 [generateNextCoachingStep] API call successful");
+    logger.debug("API call completed successfully", { sessionId });
     const rawContent = response.choices[0]?.message?.content || "{}";
     let cleanContent = rawContent.trim();
     
-    console.log("🎯 [generateNextCoachingStep] Raw AI response:", rawContent);
-    console.log("🎯 [generateNextCoachingStep] Response choices:", response.choices);
-    console.log("🎯 [generateNextCoachingStep] Response usage:", response.usage);
-    console.log("🎯 [generateNextCoachingStep] Response model:", response.model);
-    console.log("🎯 [generateNextCoachingStep] Full response object keys:", Object.keys(response));
+    logger.debug("Raw AI response received", { sessionId, responseLength: rawContent?.length });
+    logger.debug("Response details", { sessionId, choiceCount: response.choices?.length });
+    logger.llmResponse("gpt-5-mini", response.usage?.prompt_tokens || 0, response.usage?.completion_tokens || 0, 0, { sessionId });
+    logger.debug("Model used", { sessionId, model: response.model });
+    logger.debug("Response structure", { sessionId, responseKeys: Object.keys(response) });
     
     // Remove markdown code blocks if present
     if (cleanContent.startsWith("```")) {
@@ -481,12 +451,12 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
         .trim();
     }
     
-    console.log("🎯 [generateNextCoachingStep] Cleaned response:", cleanContent);
+    logger.debug("Response cleaned", { sessionId, cleanContentLength: cleanContent.length });
     
     if (!cleanContent || cleanContent === "{}") {
-      console.error("🚨 [generateNextCoachingStep] Empty or invalid response from AI");
-      console.error("🚨 [generateNextCoachingStep] Raw response was:", JSON.stringify(rawContent));
-      console.error("🚨 [generateNextCoachingStep] Response choices length:", response.choices?.length);
+      logger.error("Empty or invalid response from AI", undefined, { sessionId, action: "generate_next_step" });
+      logger.error("Raw response details", undefined, { sessionId, rawResponse: rawContent });
+      logger.debug("Response choices info", { sessionId, choicesLength: response.choices?.length });
       console.error("🚨 [generateNextCoachingStep] First choice:", JSON.stringify(response.choices?.[0], null, 2));
       console.error("🚨 [generateNextCoachingStep] API response object:", JSON.stringify(response, null, 2));
       
@@ -495,18 +465,18 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     }
     
     const step = JSON.parse(cleanContent);
-    console.log("🎯 [generateNextCoachingStep] Parsed step:", step);
+    logger.debug("Step parsed successfully", { sessionId, hasQuestion: !!step.question, hasHint: !!step.hint });
     
     // Validate required fields
     if (!step.question || !step.hint) {
-      console.error("🚨 [generateNextCoachingStep] Missing required fields:", step);
+      logger.error("Missing required fields in step", undefined, { sessionId, step, action: "validate_step" });
       throw new Error("Step missing required fields");
     }
     
-    console.log("✅ [generateNextCoachingStep] Step generation successful");
+    logger.coaching("Step generation successful", { sessionId });
     return step;
   } catch (error) {
-    console.error("🚨 [generateNextCoachingStep] Error:", error);
+    logger.error("Step generation failed", error, { sessionId, action: "generate_next_step" });
     
     // Don't return fallback - let the error propagate to frontend for proper handling
     throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
