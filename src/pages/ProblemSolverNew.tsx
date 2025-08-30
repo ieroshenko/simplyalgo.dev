@@ -19,6 +19,7 @@ import {
   Maximize2,
   Moon,
   Sun,
+  Brain,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -113,7 +114,7 @@ const ProblemSolverNew = () => {
   const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const { theme, setTheme, isDark } = useTheme();
-  const { currentTheme } = useEditorTheme();
+  const { currentTheme, defineCustomThemes } = useEditorTheme();
   const [activeTab, setActiveTab] = useState("question");
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -148,6 +149,10 @@ const ProblemSolverNew = () => {
     const saved = localStorage.getItem("showRightPanel");
     return saved !== null ? JSON.parse(saved) : true;
   });
+
+  // Complexity analysis state
+  const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
+  const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
 
   // Panel toggle functions
   const toggleLeftPanel = useCallback(() => {
@@ -315,6 +320,59 @@ const ProblemSolverNew = () => {
       toast.success("Copied to clipboard");
     } catch {
       toast.error("Failed to copy");
+    }
+  };
+
+  const handleAnalyzeComplexity = async (code: string, submissionId: string) => {
+    if (!problem || !user) {
+      toast.error("Unable to analyze complexity - missing context");
+      return;
+    }
+
+    setAnalyzingSubmissionId(submissionId);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          action: "analyze_complexity",
+          code,
+          problem_id: problem.id,
+          problem_description: problem.description,
+          user_id: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Handle the response structure from the backend
+      const analysis = result.complexityAnalysis || result;
+      
+      setComplexityResults(prev => ({
+        ...prev,
+        [submissionId]: {
+          time_complexity: analysis.timeComplexity,
+          time_explanation: analysis.timeExplanation,
+          space_complexity: analysis.spaceComplexity,
+          space_explanation: analysis.spaceExplanation,
+          analysis: analysis.overallAnalysis
+        }
+      }));
+
+      toast.success("Complexity analysis complete!");
+    } catch (error) {
+      console.error("Complexity analysis error:", error);
+      toast.error("Failed to analyze complexity. Please try again.");
+    } finally {
+      setAnalyzingSubmissionId(null);
     }
   };
 
@@ -761,7 +819,7 @@ const ProblemSolverNew = () => {
                                     Python
                                   </Button>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -772,16 +830,16 @@ const ProblemSolverNew = () => {
                                         `${problem.title} — ${sol.title}`,
                                       )
                                     }
+                                    className="h-7 px-2 text-xs"
                                   >
-                                    <Maximize2 className="w-4 h-4 mr-1" />
                                     Maximize
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleCopy(sol.code)}
+                                    className="h-7 px-2 text-xs"
                                   >
-                                    <Copy className="w-4 h-4 mr-1" />
                                     Copy
                                   </Button>
                                 </div>
@@ -792,6 +850,9 @@ const ProblemSolverNew = () => {
                                   defaultLanguage="python"
                                   value={sol.code}
                                   theme={currentTheme}
+                                  onMount={(editor, monaco) => {
+                                    defineCustomThemes(monaco);
+                                  }}
                                   options={{
                                     readOnly: true,
                                     minimap: { enabled: false },
@@ -891,7 +952,7 @@ const ProblemSolverNew = () => {
                                         <div className="text-xs text-muted-foreground">
                                           {s.language || "Python"}
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-1.5">
                                           <Button
                                             variant="outline"
                                             size="sm"
@@ -902,17 +963,30 @@ const ProblemSolverNew = () => {
                                                 `${problem.title} — Submission`,
                                               )
                                             }
+                                            className="h-7 px-2 text-xs"
                                           >
-                                            <Maximize2 className="w-4 h-4 mr-1" />
                                             Maximize
                                           </Button>
                                           <Button
                                             variant="outline"
                                             size="sm"
                                             onClick={() => handleCopy(s.code)}
+                                            className="h-7 px-2 text-xs"
                                           >
-                                            <Copy className="w-4 h-4 mr-1" />
                                             Copy
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleAnalyzeComplexity(s.code, s.id)}
+                                            disabled={analyzingSubmissionId === s.id}
+                                            className="h-7 px-2 text-xs"
+                                          >
+                                            {analyzingSubmissionId === s.id ? (
+                                              "Analyzing..."
+                                            ) : (
+                                              "Analyze"
+                                            )}
                                           </Button>
                                         </div>
                                       </div>
@@ -923,6 +997,9 @@ const ProblemSolverNew = () => {
                                         ).toLowerCase()}
                                         value={s.code}
                                         theme={currentTheme}
+                                        onMount={(editor, monaco) => {
+                                          defineCustomThemes(monaco);
+                                        }}
                                         options={{
                                           readOnly: true,
                                           minimap: { enabled: false },
@@ -934,6 +1011,58 @@ const ProblemSolverNew = () => {
                                           wordWrap: "on",
                                         }}
                                       />
+
+                                      {/* Complexity Analysis Results */}
+                                      {complexityResults[s.id] && (
+                                        <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
+                                          <h4 className="font-medium text-sm text-foreground mb-3">
+                                            Complexity Analysis
+                                          </h4>
+                                          <div className="space-y-3">
+                                            {/* Time Complexity */}
+                                            <div>
+                                              <div className="text-sm font-medium text-foreground mb-1">
+                                                Time Complexity: 
+                                                <Badge variant="outline" className="ml-2 text-xs">
+                                                  {complexityResults[s.id].time_complexity || "N/A"}
+                                                </Badge>
+                                              </div>
+                                              {complexityResults[s.id].time_explanation && (
+                                                <p className="text-sm text-muted-foreground">
+                                                  {complexityResults[s.id].time_explanation}
+                                                </p>
+                                              )}
+                                            </div>
+
+                                            {/* Space Complexity */}
+                                            <div>
+                                              <div className="text-sm font-medium text-foreground mb-1">
+                                                Space Complexity: 
+                                                <Badge variant="outline" className="ml-2 text-xs">
+                                                  {complexityResults[s.id].space_complexity || "N/A"}
+                                                </Badge>
+                                              </div>
+                                              {complexityResults[s.id].space_explanation && (
+                                                <p className="text-sm text-muted-foreground">
+                                                  {complexityResults[s.id].space_explanation}
+                                                </p>
+                                              )}
+                                            </div>
+
+                                            {/* Overall Analysis */}
+                                            {complexityResults[s.id].analysis && (
+                                              <div className="pt-3 border-t border-border">
+                                                <h5 className="text-sm font-medium text-foreground mb-2">
+                                                  Analysis Summary
+                                                </h5>
+                                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                                  {complexityResults[s.id].analysis}
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1172,7 +1301,10 @@ const ProblemSolverNew = () => {
                 height="80vh"
                 defaultLanguage={fullscreenLang}
                 value={fullscreenCode}
-                theme="light"
+                theme={currentTheme}
+                onMount={(editor, monaco) => {
+                  defineCustomThemes(monaco);
+                }}
                 options={{
                   readOnly: true,
                   minimap: { enabled: true },

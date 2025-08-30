@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Code, Play } from "lucide-react";
 import Editor from "@monaco-editor/react";
+import { useEditorTheme } from "@/hooks/useEditorTheme";
 import dataStructures from "@/data/dataStructures.json";
 
 type Language = "python" | "javascript";
@@ -29,6 +30,7 @@ const DataStructureDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [selectedLanguage, setSelectedLanguage] = useState<Language>("python");
+  const { currentTheme, defineCustomThemes } = useEditorTheme();
 
   const structure = dataStructures.find((ds) => ds.slug === slug) as
     | DataStructure
@@ -158,7 +160,10 @@ const DataStructureDetail = () => {
                 height="400px"
                 language={selectedLanguage}
                 value={structure.code[selectedLanguage]}
-                theme="light"
+                theme={currentTheme}
+                onMount={(editor, monaco) => {
+                  defineCustomThemes(monaco);
+                }}
                 options={{
                   readOnly: true,
                   minimap: { enabled: false },

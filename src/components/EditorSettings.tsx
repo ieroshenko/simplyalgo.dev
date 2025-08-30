@@ -16,14 +16,14 @@ import { Settings, Palette, Keyboard } from "lucide-react";
 import { EditorTheme, useEditorTheme } from "@/hooks/useEditorTheme";
 
 interface EditorSettingsProps {
-  currentTheme: EditorTheme;
+  selectedTheme: EditorTheme;
   onThemeChange: (theme: EditorTheme) => void;
   vimMode: boolean;
   onVimModeChange: (enabled: boolean) => void;
 }
 
 const EditorSettings = ({
-  currentTheme,
+  selectedTheme,
   onThemeChange,
   vimMode,
   onVimModeChange,
@@ -48,7 +48,7 @@ const EditorSettings = ({
           Editor Theme
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup
-          value={currentTheme}
+          value={selectedTheme}
           onValueChange={onThemeChange}
         >
           {availableThemes.map((theme) => (

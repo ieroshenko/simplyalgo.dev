@@ -110,8 +110,8 @@ export async function generateConversationResponse(
 
   // Use context-aware approach for optimal token usage
   const serializedTests = Array.isArray(testCases) && testCases.length > 0 
-    ? JSON.stringify(testCases) 
-    : undefined;
+      ? JSON.stringify(testCases)
+      : undefined;
 
   // Analyze message for request/intent signals
   const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
@@ -120,21 +120,23 @@ export async function generateConversationResponse(
       message,
     );
   const stuckIndicators = /(stuck|blocked|don'?t know|not sure|lost|confused)/i.test(
-    message,
-  );
+      message,
+    );
   const explicitHintAsk = /\b(hint|nudge)\b/i.test(message);
   const isFirstTurn = (conversationHistory || []).length === 0;
   // Hints allowed only if explicitly asked or user signals being stuck
   const allowHint = explicitHintAsk || stuckIndicators;
   // Code allowed when explicitly asked or stuck; block on first turn unless explicitly asked for code
   const allowCode = (hasExplicitCode || explicitCodeRequest || stuckIndicators) && (!isFirstTurn || hasExplicitCode || explicitCodeRequest);
+  // Detect direct questions to prioritize an answer first
+  const directQuestion = /\?|\b(what|how|why|explain|can\s+you\s+explain|help\s+me\s+understand)\b/i.test(message);
 
   let contextualResponse: ContextualResponse;
   
   try {
     // Always use the same comprehensive context approach
     // Responses API will handle continuation automatically via previous_response_id
-    const chatContext = `You are SimplyAlgo's AI stocastic coding coach. Use a friendly tone and guide students step by step.
+    const chatContext = `You are SimplyAlgo's AI stocastic coding coach. Use a friendly, concise tone and guide students step by step.
 
 TEST EXECUTION CONTEXT:
 - The student's code will be executed automatically on Judge0 against the official test cases.
@@ -143,12 +145,15 @@ TEST EXECUTION CONTEXT:
 - CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
 
 TEACHING APPROACH - CRITICAL RULES:
-- Start with one brief, friendly next-step explanation (<= 30 words) grounded in CURRENT CODE.
-- Then ask exactly ONE concise Socratic question (<= 18 words). No lists, no multiple questions.
+- Do NOT include unsolicited praise (e.g., "Great start", "You're on track").
+- Mode selection:
+  - directAnswerMode = ${directQuestion}.
+  - If directAnswerMode is true: Answer the user's question directly first (<= 40 words). After answering, optionally ask ONE short follow-up question (<= 14 words). Do NOT preface with words like "First" or "Next". Do NOT restate the problem.
+  - If directAnswerMode is false: Provide one brief, neutral next-step explanation (<= 26 words) grounded in CURRENT CODE, then ask exactly ONE concise Socratic question (<= 16 words).
 - Do NOT provide hints or code unless permitted below.
-- Hint policy: allowHint = ${allowHint}. If true, include at most ONE short conceptual hint (<= 12 words). No code.
+- Hint policy: allowHint = ${allowHint}. If true, include at most ONE short conceptual hint (<= 12 words). No code and do not reveal the answer.
 - Code policy: allowCode = ${allowCode}. If true, you may include at most ONE tiny code block (1–3 lines) with a one‑sentence explanation. No full functions.
-- Keep total reply under ~45 words. Friendly and concise.
+- Keep total reply under ~55 words. Friendly but concise and neutral.
 - Focus on the immediate next step based on the student's current code.
 - Build upon the current code in the editor - analyze what they have and suggest the next logical step.
 
@@ -535,13 +540,13 @@ Output JSON:
     const raw = await llmJson(placementPrompt, { maxTokens: 500 });
     console.log("[ai-chat] LLM response for insertion:", raw);
     
-    try {
-      const parsed = JSON.parse(raw || "{}");
+  try {
+    const parsed = JSON.parse(raw || "{}");
       console.log("[ai-chat] Parsed insertion result:", parsed);
-      if (typeof parsed.insertAtLine === "number")
-        insertAtLine = parsed.insertAtLine;
-      if (typeof parsed.indentation === "string") indent = parsed.indentation;
-      if (typeof parsed.rationale === "string") rationale = parsed.rationale;
+    if (typeof parsed.insertAtLine === "number")
+      insertAtLine = parsed.insertAtLine;
+    if (typeof parsed.indentation === "string") indent = parsed.indentation;
+    if (typeof parsed.rationale === "string") rationale = parsed.rationale;
     } catch (parseError) {
       console.error("[ai-chat] Failed to parse LLM response:", parseError);
       throw new Error(`Invalid JSON response from LLM: ${raw}`);

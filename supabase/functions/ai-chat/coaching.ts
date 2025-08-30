@@ -183,6 +183,13 @@ COACHING METHODOLOGY (FOR ENTIRE SESSION):
 6. ALWAYS reference specific lines and symbols (variables/functions) present in the CURRENT CODE
 7. ONLY one step at a time: do not advance to the next step until the current change is validated as correct.
 
+TONE & HINT POLICY (ALWAYS ENFORCE):
+- Avoid generic praise or encouragement (e.g., "Great start", "You're on track") unless the student just made measurable progress.
+- When the student asks a question, respond directly without prefacing with praise.
+- Ask a question that elicits thinking; the accompanying hint must NOT reveal the answer.
+- Hints should be a single nudge (<= 120 characters), avoid naming the exact final operator/algorithm unless already used in the student's code.
+
+
 CURRENT STUDENT CODE STATE:
 \`\`\`python
 ${currentCode}
@@ -405,12 +412,17 @@ QUESTION REQUIREMENTS (ALGORITHM-FOCUSED):
 - Reference their ACTUAL algorithm implementation with specific line numbers and existing symbol names
 - Include hints that guide algorithmic discovery, not boilerplate code
 
+TONE & HINT POLICY:
+- Do NOT include unsolicited praise (e.g., "Great start", "You're on track"). Keep tone concise and neutral.
+- The hint must NOT answer the question. Avoid naming the exact operator/algorithm unless it already appears in CURRENT CODE.
+- Provide at most one short hint (<= 120 characters). No code in hint.
+
 FOR HIGHLIGHTING: Use EXACT line numbers from their algorithm code (ignore function signature lines)
 
 Return ONLY a JSON object with this structure (ONE STEP ONLY):
 {
   "question": "[Specific question about next code to write]",
-  "hint": "[Hint that guides them to the answer without giving it away]", 
+  "hint": "[One short nudge that does not reveal the answer]", 
   "expectedCodeType": "variable|loop|condition|expression|return|any",
   "highlightArea": {
     "startLine": [actual line number],
