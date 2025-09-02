@@ -49,7 +49,7 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({
       position: "fixed" as const,
       top: "50%",
       left: "50%",
-      transform: "translate(-50%, -50%)",
+      
       zIndex: 9999,
       padding: "20px 24px",
       borderRadius: "12px",
@@ -62,7 +62,7 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({
       transform: isAnimating 
         ? "translate(-50%, -50%) scale(1)" 
         : "translate(-50%, -50%) scale(0.9)",
-      transition: "all 0.3s ease",
+      transition: "all 0.3s ease"
     };
 
     switch (type) {
@@ -135,7 +135,7 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes sparkle {
           0% {
             opacity: 0;

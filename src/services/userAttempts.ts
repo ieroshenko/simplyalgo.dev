@@ -1,11 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   SupabaseError,
-  UserAttempt,
   SupabaseQueryResult,
+  type UserAttempt,
 } from "@/types/supabase-common";
 import { TestResult } from "@/types";
 import { Json } from "@/integrations/supabase/types";
+
+export { type UserAttempt };
 
 export class UserAttemptsService {
   // Get the latest attempt for a user and problem

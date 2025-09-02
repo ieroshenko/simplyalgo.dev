@@ -291,7 +291,7 @@ const CodeEditor = ({
             fontSize: 14,
             fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
             lineHeight: 1.5,
-            padding: { top: 16, bottom: 16, left: 12, right: 16 },
+            padding: { top: 16, bottom: 16 },
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 4,
@@ -307,7 +307,7 @@ const CodeEditor = ({
             hideCursorInOverviewRuler: true,
             overviewRulerLanes: 0,
             rulers: [],
-            renderIndentGuides: false,
+            
             renderWhitespace: "none",
             guides: {
               bracketPairs: false,
@@ -320,7 +320,7 @@ const CodeEditor = ({
               enabled: false,
             },
             showUnused: false,
-            occurrencesHighlight: false,
+            occurrencesHighlight: "off",
             selectionHighlight: false,
             // Basic editing functionality - keep these minimal
             autoIndent: "advanced",

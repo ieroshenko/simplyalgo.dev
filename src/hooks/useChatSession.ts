@@ -218,7 +218,7 @@ export const useChatSession = ({
         suggest_diagram?: boolean | null;
       };
       const formattedMessages: ChatMessage[] = (
-        sessionMessages as DbMessage[]
+        sessionMessages as any[]
       ).map((msg) => ({
         id: msg.id,
         role: msg.role as "user" | "assistant",
@@ -256,12 +256,6 @@ export const useChatSession = ({
           session_id: session.id,
           role: message.role,
           content: message.content,
-          code_snippets: message.codeSnippets || null,
-          diagram: message.diagram ? message.diagram : null,
-          suggest_diagram:
-            typeof message.suggestDiagram === "boolean"
-              ? message.suggestDiagram
-              : null,
         });
 
         if (error) throw error;
