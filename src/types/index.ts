@@ -185,6 +185,14 @@ export interface CoachingValidationResult {
   };
 }
 
+export interface OptimizationStep {
+  question: string;
+  hint?: string;
+  expectedChange?: 'data_structure' | 'algorithm' | 'constant_factor' | string;
+  highlightArea?: CoachHighlightArea;
+  codeToAdd?: string;
+}
+
 export interface CoachingResponse {
   id: string;
   sessionId: string;
@@ -228,6 +236,9 @@ export interface CoachingState {
   isWaitingForResponse: boolean;
   isValidating: boolean;
   lastValidation: CoachingValidationResult | null;
+  lastOptimizationStep?: OptimizationStep | null;
+  // Whether we can offer an optimization coaching path (determined at runtime)
+  isOptimizable?: boolean;
   feedback: {
     show: boolean;
     type: "success" | "error" | "hint" | null;

@@ -44,10 +44,13 @@ interface SimpleOverlayProps {
   onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
   isValidating?: boolean;
   hasError?: boolean;
+  // Offer optimization action when session is completed and optimization is available
+  isOptimizable?: boolean;
   // Coaching specific props
   question?: string;
   hint?: string;
   stepInfo?: { current: number; total: number };
+  isSessionCompleted?: boolean; // NEW: Track if session is completed
   // Validation feedback
   validationResult?: {
     isCorrect: boolean;
@@ -83,12 +86,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   question,
   hint,
   stepInfo,
+  isSessionCompleted = false,
   validationResult,
   highlightedLine,
   editorHeight,
   editorRef,
   onStartOptimization,
   onPositionChange,
+  isOptimizable,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -306,8 +311,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         <div 
           className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
         >
-          {/* Question section */}
-          {question && (
+          {/* Question section - don't show if session is completed */}
+          {question && !isSessionCompleted && (
             <div className="p-4">
               <div className="text-sm font-medium mb-2 text-foreground leading-relaxed">
                 {question}
@@ -315,6 +320,18 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               {hint && !validationResult && (
                 <BlurredHintComponent hint={hint} />
               )}
+            </div>
+          )}
+
+          {/* Session completed notification - show instead of question when done */}
+          {isSessionCompleted && (
+            <div className="p-4 text-center">
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-2">
+                🎉 Session Complete!
+              </div>
+              <div className="text-sm text-muted-foreground">
+                You've successfully completed this coaching session.
+              </div>
             </div>
           )}
 
@@ -388,8 +405,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Instructions section */}
-          {!validationResult && !isValidating && (
+          {/* Instructions section - don't show if session is completed */}
+          {!validationResult && !isValidating && !isSessionCompleted && (
             <div className="px-4 py-3 border-t border-border">
               <div className="text-sm text-muted-foreground mb-3">
                 Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
@@ -462,7 +479,31 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       {/* Fixed Actions bar */}
       {!isMinimized && !hasError && (
         <div className="flex justify-center items-center p-3 border-t border-border bg-muted/20">
-          {validationResult?.isCorrect ? (
+          {isSessionCompleted ? (
+            <div className="flex items-center gap-2">
+              {isOptimizable && onStartOptimization && (
+                <Button
+                  onClick={() => onStartOptimization()}
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                >
+                  Optimize
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                  setTimeout(() => { onFinishCoaching ? onFinishCoaching() : onCancel(); }, 1000);
+                }}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-green-50 px-6"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Finish
+              </Button>
+            </div>
+          ) : validationResult?.isCorrect ? (
             <Button
               onClick={() => {
                 // Trigger confetti animation

@@ -34,8 +34,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Timer from "@/components/Timer";
 import { supabase } from "@/integrations/supabase/client";
-import { insertCodeSnippet } from "@/utils/codeInsertion";
-import { smartInsertCode } from "@/utils/smartCodeInsertion";
+// Removed unused insertion utilities - only using AI smart insertion now
 import { useCoachingNew } from "@/hooks/useCoachingNew";
 import { useTheme } from "@/hooks/useTheme";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
@@ -441,6 +440,7 @@ const ProblemSolverNew = () => {
       // Use backend AI-guided insertion for all snippets
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
+      let backendRationale: string | undefined;
       
       console.log("🚀 Starting AI-powered insertion:", {
         snippetCode: snippet.code,
@@ -457,7 +457,9 @@ const ProblemSolverNew = () => {
             snippet,
             cursorPosition,
             problemDescription: problem.description,
-            message: snippet.isValidated ? "[coaching snippet insertion]" : "[snippet insertion request]",
+            // Do NOT mark chat insertions as coaching. Destructive fixes
+            // are only allowed for explicit coaching flows.
+            message: "[ai-chat snippet insertion]",
             conversationHistory: [],
           },
         });
@@ -476,11 +478,12 @@ const ProblemSolverNew = () => {
             typeof data.insertedAtLine === "number"
               ? data.insertedAtLine
               : undefined;
+          backendRationale = typeof data.rationale === "string" ? data.rationale : undefined;
           
           console.log("✅ AI insertion successful:", {
             insertedAtLine,
             codeLengthChange: newCodeFromBackend.length - currentCode.length,
-            rationale: data.rationale || "No rationale provided"
+            rationale: backendRationale || "No rationale provided"
           });
         }
       } catch (e) {
@@ -498,8 +501,42 @@ const ProblemSolverNew = () => {
         codeLength: newCodeFromBackend?.length || 0 
       });
 
+      // Client-side safety: ask before applying destructive replacements
+      if (newCodeFromBackend) {
+        const shrinkRatio = newCodeFromBackend.length / (currentCode.length || 1);
+        const rationaleText = backendRationale || "";
+        const looksDestructive =
+          shrinkRatio < 0.7 &&
+          /replaced conflicting function region|file-level replacement/i.test(
+            rationaleText,
+          );
+        if (looksDestructive && (snippet.insertionType || "smart") !== "replace") {
+          const ok = window.confirm(
+            "The AI suggests replacing a large portion of your code to insert this snippet. Proceed with replacement?",
+          );
+          if (!ok) {
+            console.warn("User canceled potentially destructive insertion", {
+              shrinkRatio,
+              rationaleText,
+            });
+            toast.error("Insertion canceled. No changes applied.");
+            newCodeFromBackend = null;
+          }
+        }
+      }
+
       if (!newCodeFromBackend) {
         toast.error("Code insertion failed. Please try again.");
+        return;
+      }
+
+      // No-op handling: snippet already present or model suggested no change
+      if (newCodeFromBackend === currentCode || insertedAtLine === -1) {
+        console.log("ℹ️ No insertion needed; snippet already present or unchanged.", {
+          insertedAtLine,
+          rationale: backendRationale,
+        });
+        toast.success("Snippet already present — no changes made.");
         return;
       }
 
@@ -1350,6 +1387,7 @@ const ProblemSolverNew = () => {
               isValidating={coachingState.isValidating}
               question={coachingState.session.currentQuestion}
               hint={coachingState.session.currentHint || coachingState.lastValidation?.nextStep?.hint}
+              isSessionCompleted={coachingState.session.isCompleted}
               validationResult={coachingState.lastValidation ? {
                 isCorrect: coachingState.lastValidation.isCorrect,
                 feedback: coachingState.lastValidation.feedback,
@@ -1358,12 +1396,13 @@ const ProblemSolverNew = () => {
               } : null}
               onInsertCorrectCode={insertCorrectCode}
               onPositionChange={(pos) => {
-                // Use the coaching hook’s stored position via a dedicated setter in future;
+                // Use the coaching hook's stored position via a dedicated setter in future;
                 // for now, rely on showInteractiveQuestion preserving this prop value.
                 coachingState.inputPosition = pos as { x: number; y: number } | null;
               }}
               onStartOptimization={() => startOptimization()}
               onFinishCoaching={stopCoaching}
+              isOptimizable={coachingState.isOptimizable}
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
                 console.log("Exiting coach mode due to AI service error");

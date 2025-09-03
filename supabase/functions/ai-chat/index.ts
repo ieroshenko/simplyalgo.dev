@@ -89,6 +89,7 @@ serve(async (req) => {
       diagram: diagramRequested,
       preferredEngines,
       sessionId,
+      previousResponseId,
       userId,
       problem,
       problemId,
@@ -631,6 +632,9 @@ Respond in JSON format:
           testCases,
           (currentCode || "").slice(0, 3000),
           chatSessionId, // Pass session ID for context management
+          {
+            previousResponseId: typeof previousResponseId === 'string' ? previousResponseId : null,
+          },
         ),
         analyzeCodeSnippets(
           (message || "").slice(0, 800),

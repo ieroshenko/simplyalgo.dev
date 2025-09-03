@@ -1,4 +1,4 @@
-import { llmText, llmJson, llmJsonFast, llmWithSessionContext } from "./openai-utils.ts";
+import { llmText, llmJson, llmJsonFast, llmWithSessionContext, getOrCreateSessionContext, updateSessionContext } from "./openai-utils.ts";
 import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
 
 /**
@@ -100,7 +100,8 @@ export async function generateConversationResponse(
   conversationHistory: ChatMessage[],
   testCases?: unknown[],
   currentCode?: string,
-  sessionId?: string, // New parameter for context management
+  sessionId?: string, // context management key
+  options?: { previousResponseId?: string | null; forceNewContext?: boolean },
 ): Promise<string> {
   // Check if we can use context-aware approach or need to fallback
   if (!sessionId) {
@@ -123,11 +124,12 @@ export async function generateConversationResponse(
       message,
     );
   const explicitHintAsk = /\b(hint|nudge)\b/i.test(message);
+  const explanationRequested = /(explain|explanation|walk\s+me\s+through|remind\s+me|what\s+is|why\s+do\s+we|step\s*by\s*step)/i.test(message);
   const isFirstTurn = (conversationHistory || []).length === 0;
-  // Hints allowed only if explicitly asked or user signals being stuck
-  const allowHint = explicitHintAsk || stuckIndicators;
-  // Code allowed when explicitly asked or stuck; block on first turn unless explicitly asked for code
-  const allowCode = (hasExplicitCode || explicitCodeRequest || stuckIndicators) && (!isFirstTurn || hasExplicitCode || explicitCodeRequest);
+  // Hints allowed only if explicitly asked or user signals being stuck, but NEVER when an explanation is requested
+  const allowHint = (explicitHintAsk || stuckIndicators) && !explanationRequested;
+  // Code allowed when explicitly asked or user is stuck; never when explanation or hint is explicitly requested (unless explicitly asked for code)
+  const allowCode = (!explanationRequested && !explicitHintAsk) && (hasExplicitCode || explicitCodeRequest || stuckIndicators) && (!isFirstTurn || hasExplicitCode || explicitCodeRequest);
   // Detect direct questions to prioritize an answer first
   const directQuestion = /\?|\b(what|how|why|explain|can\s+you\s+explain|help\s+me\s+understand)\b/i.test(message);
 
@@ -148,8 +150,10 @@ TEACHING APPROACH - CRITICAL RULES:
 - Do NOT include unsolicited praise (e.g., "Great start", "You're on track").
 - Mode selection:
   - directAnswerMode = ${directQuestion}.
-  - If directAnswerMode is true: Answer the user's question directly first (<= 40 words). After answering, optionally ask ONE short follow-up question (<= 14 words). Do NOT preface with words like "First" or "Next". Do NOT restate the problem.
-  - If directAnswerMode is false: Provide one brief, neutral next-step explanation (<= 26 words) grounded in CURRENT CODE, then ask exactly ONE concise Socratic question (<= 16 words).
+  - explanationMode = ${explanationRequested}.
+  - If explanationMode is true: Provide a concise explanation in 3–5 sentences tailored to CURRENT CODE. Use one small concrete example and a simple analogy if helpful. No hints. No Socratic question. Aim for ~70–110 words.
+  - If explanationMode is false AND directAnswerMode is true: Answer directly first (<= 40 words). After answering, optionally ask ONE short follow-up question (<= 14 words). Do NOT preface with words like "First" or "Next". Do NOT restate the problem.
+  - If neither explanationMode nor directAnswerMode: Provide one brief, neutral next-step explanation (<= 26 words) grounded in CURRENT CODE, then ask exactly ONE concise Socratic question (<= 16 words).
 - Do NOT provide hints or code unless permitted below.
 - Hint policy: allowHint = ${allowHint}. If true, include at most ONE short conceptual hint (<= 12 words). No code and do not reveal the answer.
 - Code policy: allowCode = ${allowCode}. If true, you may include at most ONE tiny code block (1–3 lines) with a one‑sentence explanation. No full functions.
@@ -180,13 +184,21 @@ CURRENT STUDENT MESSAGE: "${message}"
 Code policy: allowCode = ${allowCode}
 
 Response requirements:
-- Begin with a brief next-step explanation (<= 30 words) based on CURRENT CODE.
-- Then ask exactly ONE Socratic question (<= 18 words).
+- If explanationMode is true: Output a concise paragraph of 3–5 sentences that (1) states the core idea, (2) walks through a small concrete example, and (3) uses a simple analogy if helpful. No hints. No questions. No code.
+- Else begin with a brief next-step explanation (<= 30 words) based on CURRENT CODE.
+- Then ask exactly ONE Socratic question (<= 18 words) only if not in explanationMode.
 - If allowHint is true and allowCode is false, add one short conceptual hint (no code).
 - If allowCode is true, you may add one tiny code block formatted as:\n\n${"```"}python\n<1-3 lines>\n${"```"}\n\nwith a one‑sentence rationale.
 - Otherwise, provide no code or extra commentary.`;
 
     const session = sessionId || `anon-${Date.now()}`;
+    // If client provided a previousResponseId (e.g., after cold start), seed the session cache
+    if (options?.previousResponseId) {
+      // Ensure context exists then update with provided response id and current code snapshot
+      getOrCreateSessionContext(session, 'chat', currentCode || '');
+      updateSessionContext(session, options.previousResponseId, currentCode || '');
+    }
+
     contextualResponse = await llmWithSessionContext(
       session,
       chatContext,
@@ -194,7 +206,8 @@ Response requirements:
       currentCode || '',
       {
         temperature: 0.3,
-        maxTokens: 220
+        maxTokens: 220,
+        forceNewContext: options?.forceNewContext === true,
       }
     );
 
@@ -555,6 +568,8 @@ Output JSON:
     console.error("[ai-chat] LLM call failed:", llmError);
     throw new Error(`LLM call failed: ${llmError.message}`);
   }
+
+  // No language-specific hardcoded placement heuristics — rely on model analysis.
 
   // If model claims snippet already exists or cannot place, attempt repairs or controlled replacement
   if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {

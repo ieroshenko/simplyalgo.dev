@@ -537,6 +537,7 @@ Determine if:
 CRITICAL ANALYSIS POINTS:
 - Check if the code already has all necessary algorithmic components
 - Don't duplicate existing code in codeToAdd
+- codeToAdd must be a tiny, safe patch (<= 3 lines), not a full function. Never include 'def', imports, or main blocks in codeToAdd.
 - If algorithm is complete and correct, indicate session completion
 - Focus on what's MISSING from their algorithm, not what exists
 
@@ -554,7 +555,7 @@ Return JSON in this exact format:
     "recommendedTime": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
     "recommendedSpace": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other"
   },
-  "codeToAdd": "code to insert if nextAction is insert_and_continue",
+  "codeToAdd": "tiny patch (<=3 lines) to insert if nextAction is insert_and_continue (no 'def', no imports)",
   "nextStep": {
     "question": "next guiding question for the student",
     "expectedCodeType": "variable" | "loop" | "condition" | "expression" | "return" | "any",
@@ -747,6 +748,13 @@ export async function validateOptimizationStep(
   sessionId: string,
   currentEditorCode: string,
   problemDescription: string,
+  previousStep?: {
+    question: string;
+    hint?: string;
+    expectedChange?: string;
+    highlightArea?: { startLine: number; endLine: number };
+    codeToAdd?: string;
+  },
 ) {
   const heur = analyzeOptimizationHeuristics(currentEditorCode, problemDescription);
   if (!heur.isOptimizable) {
@@ -759,12 +767,53 @@ export async function validateOptimizationStep(
     };
   }
 
-  // Ask for the next minimal improvement (no benchmarking)
-  const prompt = `Given the current code, propose the next minimal optimization step toward ${heur.targetComplexity || "a better complexity"}.
-Use existing symbols and reference specific lines. Return JSON with fields: question, hint, expectedChange, highlightArea {startLine,endLine}, codeToAdd (<=3 lines or empty), nextAction (hint|insert_and_continue). Code only if safe.`;
+  // Evaluate whether the previous optimization step has been applied; if not, provide feedback and a minimal safe patch.
+  const evalPrompt = `You are an optimization reviewer.
 
-  const text = await llmText(prompt + "\n\nCURRENT CODE:\n" + currentEditorCode, { temperature: 0.2, maxTokens: 500 });
-  return { isCorrect: true, improved: false, nextStep: text, nextAction: "hint" };
+PROBLEM CONTEXT:
+${problemDescription}
+
+CURRENT CODE (Python):
+${"```"}python
+${currentEditorCode}
+${"```"}
+
+${previousStep ? `PREVIOUS OPTIMIZATION STEP (JSON):\n${JSON.stringify(previousStep)}\n` : ''}
+
+TASK:
+1) If PREVIOUS OPTIMIZATION STEP is provided, determine whether the student's code now reflects that change.
+   - If NO: return a JSON with {"isCorrect": false, "improved": false, "feedback": "specific reason", "nextAction": "insert_and_continue"|"retry"|"hint", "codeToAdd": "<=3 lines or empty"}.
+   - If YES: mark improved=true and propose the NEXT minimal optimization step with fields nextStep {question,hint,highlightArea,codeToAdd}.
+2) If no previous step provided, propose the NEXT minimal optimization step.
+3) Never claim completion unless the code is already optimal per heuristics.
+
+Return only JSON in this shape:
+{
+  "isCorrect": boolean,
+  "improved": boolean,
+  "feedback": string,
+  "nextAction": "insert_and_continue" | "retry" | "hint" | "continue" | "complete_optimization",
+  "codeToAdd": string,
+  "nextStep": { "question": string, "hint": string, "highlightArea": { "startLine": number, "endLine": number }, "codeToAdd": string }
+}`;
+
+  const raw = await llmText(evalPrompt, { temperature: 0.2, maxTokens: 700 });
+  let parsed: any = {};
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    // Fall back: request a next step only
+    const prompt = `Given the current code, propose the next minimal optimization step toward ${heur.targetComplexity || "a better complexity"}.
+Use existing symbols and reference specific lines. Return JSON with fields: question, hint, expectedChange, highlightArea {startLine,endLine}, codeToAdd (<=3 lines or empty), nextAction (hint|insert_and_continue).`;
+    const text = await llmText(prompt + "\n\nCURRENT CODE:\n" + currentEditorCode, { temperature: 0.2, maxTokens: 500 });
+    return { isCorrect: true, improved: false, nextStep: text, nextAction: "hint" };
+  }
+
+  // Guard against accidental completion claims if heuristics still say optimizable
+  if (parsed?.nextAction === 'complete_optimization' && heur.isOptimizable) {
+    parsed.nextAction = 'continue';
+  }
+  return parsed;
 }
 
 /**
@@ -930,4 +979,3 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     throw new Error(`Failed to parse coaching session: ${(parseError as Error)?.message}`);
   }
 }
-
