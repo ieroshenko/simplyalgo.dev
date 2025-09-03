@@ -9,6 +9,7 @@ import {
   CodeSnippet,
   ChatMessage 
 } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 import { 
   initializeOpenAI, 
   configuredModel, 
@@ -102,7 +103,7 @@ serve(async (req) => {
     try {
       initializeOpenAI();
     } catch (error) {
-      console.error("Failed to initialize OpenAI:", error);
+      logger.error("Failed to initialize OpenAI", error, { function: 'ai-chat', action: 'init' });
       return new Response(
         JSON.stringify({
           error: "Server configuration error",
@@ -117,7 +118,13 @@ serve(async (req) => {
 
     // Start interactive coaching session action
     if (req.method === "POST" && action === "start_interactive_coaching") {
-      console.log("🎯 [COACHING] Generate session request:", { problemId, userId, hasCurrentCode: !!currentCode, difficulty });
+      logger.coaching("Generate session request", { 
+        problemId, 
+        userId, 
+        hasCurrentCode: !!currentCode, 
+        difficulty,
+        action: 'start_interactive_coaching'
+      });
       
       if (!problemId || !userId || !currentCode) {
         return new Response(
@@ -145,7 +152,11 @@ serve(async (req) => {
       }
 
       try {
-        console.log("🎯 [COACHING] Starting interactive coaching session...");
+        logger.coaching("Starting interactive coaching session", { 
+          problemId, 
+          userId, 
+          difficulty: difficulty || "beginner" 
+        });
         const coachingSession = await startInteractiveCoaching(
           problemId,
           userId,
@@ -153,18 +164,22 @@ serve(async (req) => {
           problemDescription || "",
           difficulty || "beginner"
         );
-        console.log("🎯 [COACHING] Interactive session started:", coachingSession);
+        logger.coaching("Interactive session started", { 
+          problemId, 
+          userId, 
+          sessionId: coachingSession?.sessionId 
+        });
         
         return new Response(JSON.stringify(coachingSession), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (error) {
-        console.error("🚨 [COACHING] Error generating coaching session:", error);
-        console.error("🚨 [COACHING] Error stack:", (error as Error)?.stack);
-        console.error("🚨 [COACHING] Error details:", {
-          name: (error as Error)?.name,
-          message: (error as Error)?.message,
-          cause: (error as unknown as { cause?: unknown })?.cause
+        logger.error("Error generating coaching session", error, {
+          problemId,
+          userId,
+          action: 'start_interactive_coaching',
+          errorName: (error as Error)?.name,
+          errorCause: (error as unknown as { cause?: unknown })?.cause
         });
         
         // Check if this is an AI service unavailable error
@@ -199,7 +214,12 @@ serve(async (req) => {
 
     // Validate interactive coaching submission action
     if (req.method === "POST" && action === "validate_coaching_submission") {
-      console.log("🎯 [COACHING] Validate submission request");
+      logger.coaching("Validate submission request", { 
+        sessionId, 
+        hasStudentCode: !!studentCode,
+        hasCurrentEditorCode: !!currentEditorCode,
+        action: 'validate_coaching_submission'
+      });
       
       if (!sessionId || !studentCode || !currentEditorCode) {
         return new Response(

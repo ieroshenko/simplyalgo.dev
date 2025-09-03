@@ -1,44 +1,45 @@
 import { useState, useEffect } from "react";
-import { editor } from "monaco-editor";
+import { useTheme } from "./useTheme";
 
 export type EditorTheme =
   | "light"
   | "vs-dark"
   | "gruvbox-dark"
   | "monokai"
-  | "github-dark";
-
-const themes = {
-  light: "light",
-  "vs-dark": "vs-dark",
-  "gruvbox-dark": "gruvbox-dark",
-  monokai: "monokai",
-  "github-dark": "github-dark",
-};
+  | "github-dark"
+  | "auto";
 
 export const useEditorTheme = () => {
-  const [currentTheme, setCurrentTheme] = useState<EditorTheme>(() => {
+  const { isDark } = useTheme();
+  
+  const [selectedTheme, setSelectedTheme] = useState<EditorTheme>(() => {
     // Load theme from localStorage on initialization
     const saved = localStorage.getItem("editor-theme");
     const validThemes: EditorTheme[] = [
       "light",
       "vs-dark",
       "gruvbox-dark",
-      "monokai",
+      "monokai", 
       "github-dark",
+      "auto",
     ];
     return saved && validThemes.includes(saved as EditorTheme)
       ? (saved as EditorTheme)
-      : "light";
+      : "auto";
   });
+
+  // Compute the actual theme to use
+  const currentTheme = selectedTheme === "auto" 
+    ? (isDark ? "vs-dark" : "light")
+    : selectedTheme;
 
   // Persist theme changes to localStorage
   const setCurrentThemeWithPersistence = (theme: EditorTheme) => {
-    setCurrentTheme(theme);
+    setSelectedTheme(theme);
     localStorage.setItem("editor-theme", theme);
   };
 
-  const defineCustomThemes = (monaco: any) => {
+  const defineCustomThemes = (monaco: typeof import("monaco-editor")) => {
     // Gruvbox Dark Theme
     monaco.editor.defineTheme("gruvbox-dark", {
       base: "vs-dark",
@@ -117,9 +118,11 @@ export const useEditorTheme = () => {
 
   return {
     currentTheme,
+    selectedTheme,
     setCurrentTheme: setCurrentThemeWithPersistence,
     defineCustomThemes,
     availableThemes: [
+      { value: "auto", label: "Auto (Follow App Theme)" },
       { value: "light", label: "Light" },
       { value: "vs-dark", label: "VS Code Dark" },
       { value: "gruvbox-dark", label: "Gruvbox Dark" },

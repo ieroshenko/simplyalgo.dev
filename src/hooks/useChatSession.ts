@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, ChatSession, CodeSnippet, FlowGraph } from "@/types";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
+import { logger } from "@/utils/logger";
 
 // --- Diagram payload helper & types ---
 type DiagramPayload =
@@ -235,7 +236,7 @@ export const useChatSession = ({
 
       setMessages(formattedMessages);
     } catch (error) {
-      console.error("Error initializing chat session:", error);
+      logger.error("Error initializing chat session", error, { sessionId: session?.id, userId: user?.id });
       toast({
         title: "Error",
         description: "Failed to load chat history. Please try again.",
@@ -266,7 +267,7 @@ export const useChatSession = ({
           .update({ updated_at: new Date().toISOString() })
           .eq("id", session.id);
       } catch (error) {
-        console.error("Error saving message:", error);
+        logger.error("Error saving message", error, { sessionId: session?.id, userId: user?.id });
         toast({
           title: "Error",
           description: "Failed to save message. Please try again.",
@@ -394,7 +395,7 @@ export const useChatSession = ({
         // Save AI response to database
         await saveMessage(aiResponse);
       } catch (error) {
-        console.error("Error calling AI:", error);
+        logger.error("Error calling AI", error, { sessionId: session?.id, userId: user?.id });
         toast({
           title: "Error",
           description: "Failed to get AI response. Please try again.",
@@ -455,7 +456,7 @@ export const useChatSession = ({
         description: "Conversation cleared successfully.",
       });
     } catch (error) {
-      console.error("Error clearing conversation:", error);
+      logger.error("Error clearing conversation", error, { sessionId: session?.id, userId: user?.id });
       toast({
         title: "Error",
         description: "Failed to clear conversation. Please try again.",
@@ -514,7 +515,7 @@ export const useChatSession = ({
         setMessages((prev) => [...prev, aiResponse]);
         await saveMessage(aiResponse);
       } catch (error) {
-        console.error("Error generating diagram:", error);
+        logger.error("Error generating diagram", error, { sessionId: session?.id, userId: user?.id });
         toast({
           title: "Diagram error",
           description: "Failed to generate diagram. Please try again.",

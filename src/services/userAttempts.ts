@@ -10,6 +10,57 @@ import { Json } from "@/integrations/supabase/types";
 export { type UserAttempt };
 
 export class UserAttemptsService {
+  // Fetch recent activity for a user with problem join
+  static async getRecentActivity(
+    userId: string,
+    limit = 5,
+  ): Promise<
+    Array<{
+      id: string;
+      problem_id: string;
+      status: "pending" | "passed" | "failed" | "error" | null;
+      created_at: string;
+      updated_at: string;
+      problem: { title: string; difficulty: "Easy" | "Medium" | "Hard" } | null;
+    }>
+  > {
+    interface RecentActivityRow {
+      id: string;
+      problem_id: string;
+      status: "pending" | "passed" | "failed" | "error" | null;
+      created_at: string;
+      updated_at: string;
+      problems: { title: string; difficulty: "Easy" | "Medium" | "Hard" } | null;
+    }
+
+    const { data, error } = (await supabase
+      .from("user_problem_attempts")
+      .select(
+        "id, problem_id, status, created_at, updated_at, problems(title, difficulty)",
+      )
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(limit)) as SupabaseQueryResult<RecentActivityRow[]>;
+
+    if (error || !data) {
+      console.error("Error fetching recent activity:", error);
+      return [];
+    }
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      problem_id: row.problem_id,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      problem: row.problems
+        ? {
+            title: row.problems.title ?? row.problem_id,
+            difficulty: row.problems.difficulty as "Easy" | "Medium" | "Hard",
+          }
+        : null,
+    }));
+  }
   // Get the latest attempt for a user and problem
   static async getLatestAttempt(
     userId: string,

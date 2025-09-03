@@ -44,8 +44,9 @@ const Auth = () => {
       });
 
       if (error) throw error;
-    } catch (error: any) {
-      setError(error.message || "Failed to sign in with Google");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to sign in with Google";
+      setError(message);
     } finally {
       setLoading(false);
     }

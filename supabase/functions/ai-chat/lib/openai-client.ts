@@ -9,11 +9,11 @@ declare const Deno: { env: { get(name: string): string | undefined } };
 // Global OpenAI client instance
 let openai: OpenAI;
 
-// Model selection via env var; default to o3-mini if not set
-const configuredModel = (Deno.env.get("OPENAI_MODEL") || "o3-mini").trim();
+// Model selection via env var; default to gpt-5-mini if not set
+const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5-mini").trim();
 const modelSource = Deno.env.get("OPENAI_MODEL")
   ? "OPENAI_MODEL env set"
-  : "defaulted to o3-mini (no OPENAI_MODEL)";
+  : "defaulted to gpt-5-mini (no OPENAI_MODEL)";
 const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
 /**

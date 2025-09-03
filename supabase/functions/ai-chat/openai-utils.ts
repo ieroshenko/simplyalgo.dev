@@ -1,14 +1,15 @@
 import OpenAI from "https://esm.sh/openai@4";
 import { ResponsesApiRequest, ResponsesApiResponse, SessionContext, ContextualResponse } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
 
 // Model configuration
-export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5").trim();
+export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5-mini").trim();
 export const modelSource = Deno.env.get("OPENAI_MODEL")
   ? "OPENAI_MODEL env set"
-  : "defaulted to gpt-5 (no OPENAI_MODEL)";
+  : "defaulted to gpt-5-mini (no OPENAI_MODEL)";
 export const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
 
 // OpenAI client instance
@@ -120,13 +121,13 @@ export async function llmText(
   const model = configuredModel;
   
   if (useResponsesApi) {
-    // Try configured Responses model first, then o3-mini, then fall back to Chat API
-    const responseModels = [model, "o3-mini"].filter(
+    // Try configured Responses model first, then gpt-5-mini, then fall back to Chat API
+    const responseModels = [model, "gpt-5-mini"].filter(
       (v, i, a) => a.indexOf(v) === i,
     );
     for (const respModel of responseModels) {
       try {
-        console.log(`[ai-chat] Using Responses API with model=${respModel}`);
+        logger.llmCall(respModel, 0, { sessionId: 'unknown', type: 'responses_api' });
         const req = buildResponsesRequest(respModel, prompt, {
           maxTokens: opts.maxTokens,
           responseFormat: opts.responseFormat,
@@ -208,7 +209,7 @@ export async function createInitialContext(
   
   if (useResponsesApi) {
     // Try Responses API with store: true for context preservation
-    const responseModels = [model, "o3-mini"].filter(
+    const responseModels = [model, "gpt-5-mini"].filter(
       (v, i, a) => a.indexOf(v) === i,
     );
     
@@ -274,7 +275,7 @@ export async function continueWithContext(
   const model = configuredModel;
   
   if (useResponsesApi && previousResponseId) {
-    const responseModels = [model, "o3-mini"].filter(
+    const responseModels = [model, "gpt-5-mini"].filter(
       (v, i, a) => a.indexOf(v) === i,
     );
     

@@ -198,6 +198,61 @@ const AIChat = ({
     }
   }, [messages]);
 
+  // Extract trailing single-line "Hint: ..." outside of code fences
+  const splitContentAndHint = (
+    content: string,
+  ): { body: string; hint?: string } => {
+    const lines = content.split("\n");
+    let inCode = false;
+    let hint: string | undefined;
+    const bodyLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (
+        trimmed.startsWith("```") &&
+        (trimmed === "```" || /^```\w+/.test(trimmed))
+      ) {
+        inCode = !inCode;
+        bodyLines.push(line);
+        continue;
+      }
+      if (!inCode && hint === undefined) {
+        const m = trimmed.match(/^Hint\s*:\s*(.+)$/i);
+        if (m) {
+          hint = m[1];
+          continue;
+        }
+      }
+      bodyLines.push(line);
+    }
+    return { body: bodyLines.join("\n"), hint };
+  };
+
+  const BlurredHint: React.FC<{ text: string }> = ({ text }) => {
+    const [reveal, setReveal] = useState(false);
+    return (
+      <div className="mt-2">
+        <button
+          type="button"
+          className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+          onClick={() => setReveal((v) => !v)}
+          aria-label={reveal ? "Hide hint" : "Reveal hint"}
+        >
+          {reveal ? "Hide hint" : "Reveal hint"}
+        </button>
+        <div className="mt-1 text-xs">
+          {reveal ? (
+            <span className="italic">💡 {text}</span>
+          ) : (
+            <span className="select-none" style={{ filter: "blur(4px)" }}>
+              This hint is hidden
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const formatTime = (timestamp: Date) => {
     return timestamp.toLocaleTimeString([], {
       hour: "2-digit",
@@ -627,7 +682,7 @@ const AIChat = ({
               onKeyDown={handleKeyDown}
               placeholder={
                 isListening
-                  ? "🎤 Listening..."
+                  ? " Listening..."
                   : isProcessing
                     ? "🔄 Processing audio..."
                     : "Ask your AI coach anything..."

@@ -53,7 +53,7 @@ const CodeEditor = ({
     const saved = localStorage.getItem("editor-vim-mode");
     return saved === "true";
   });
-  const { currentTheme, setCurrentTheme, defineCustomThemes } =
+  const { currentTheme, selectedTheme, setCurrentTheme, defineCustomThemes } =
     useEditorTheme();
   const editorRef = useRef<any>(null);
   const vimModeRef = useRef<any>(null);
@@ -181,7 +181,7 @@ const CodeEditor = ({
         </div>
         <div className="flex items-center space-x-2">
           <EditorSettings
-            currentTheme={currentTheme}
+            selectedTheme={selectedTheme}
             onThemeChange={setCurrentTheme}
             vimMode={vimMode}
             onVimModeChange={handleVimModeToggle}
