@@ -89,6 +89,7 @@ serve(async (req) => {
       diagram: diagramRequested,
       preferredEngines,
       sessionId,
+      previousResponseId,
       userId,
       problem,
       problemId,
@@ -560,7 +561,7 @@ Respond in JSON format:
 }`;
 
         const completionParams = {
-          model: configuredModel,
+          model: "gpt-5-mini",
           messages: [
             {
               role: "system",
@@ -575,15 +576,20 @@ Respond in JSON format:
         };
 
         // Only add temperature for non-GPT-5 models
-        if (!configuredModel.startsWith("gpt-5")) {
+        if (!"gpt-5-mini".startsWith("gpt-5")) {
           completionParams.temperature = 0.1;
         }
 
         const completion = await openai.chat.completions.create(completionParams);
 
-        const responseText = completion.choices[0]?.message?.content;
-        if (!responseText) {
-          throw new Error("No response from AI");
+        const responseText = completion.choices[0]?.message?.content || "{}";
+        if (!responseText || responseText.trim() === "{}") {
+          console.error("Empty or invalid AI response for complexity analysis:", {
+            choices: completion.choices,
+            usage: completion.usage,
+            model: completion.model
+          });
+          throw new Error("No valid response from AI for complexity analysis");
         }
 
         // Parse the JSON response
@@ -631,6 +637,9 @@ Respond in JSON format:
           testCases,
           (currentCode || "").slice(0, 3000),
           chatSessionId, // Pass session ID for context management
+          {
+            previousResponseId: typeof previousResponseId === 'string' ? previousResponseId : null,
+          },
         ),
         analyzeCodeSnippets(
           (message || "").slice(0, 800),

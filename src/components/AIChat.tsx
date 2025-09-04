@@ -54,6 +54,7 @@ const AIChat = ({
   const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(
     null,
   );
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   // Track message IDs we've already auto-requested diagrams for (avoid loops)
   const autoRequestedRef = useRef<Set<string>>(new Set());
 
@@ -229,26 +230,108 @@ const AIChat = ({
   };
 
   const BlurredHint: React.FC<{ text: string }> = ({ text }) => {
-    const [reveal, setReveal] = useState(false);
+    const [isRevealed, setIsRevealed] = useState(false);
     return (
-      <div className="mt-2">
-        <button
-          type="button"
-          className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-          onClick={() => setReveal((v) => !v)}
-          aria-label={reveal ? "Hide hint" : "Reveal hint"}
-        >
-          {reveal ? "Hide hint" : "Reveal hint"}
-        </button>
-        <div className="mt-1 text-xs">
-          {reveal ? (
-            <span className="italic">💡 {text}</span>
+      <div
+        className="mt-2 cursor-pointer text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md border-l-4 border-blue-200 dark:border-blue-600"
+        onClick={() => setIsRevealed((v) => !v)}
+        role="button"
+        aria-label={isRevealed ? "Hide hint" : "Click to reveal hint"}
+      >
+        <div className="flex items-center gap-2">
+          {isRevealed ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-3 h-3"
+            >
+              <path d="M3.53 2.47a.75.75 0 1 0-1.06 1.06l2.026 2.026C2.835 6.73 1.651 8.164.88 9.53a1.77 1.77 0 0 0 0 1.94C2.51 14.503 6.04 18 12 18c2.095 0 3.898-.437 5.393-1.152l3.077 3.077a.75.75 0 1 0 1.06-1.06L3.53 2.47ZM12 16.5c-5.18 0-8.317-3.1-9.72-5.53a.27.27 0 0 1 0-.29c.64-1.08 1.63-2.32 2.996-3.37l2.022 2.022A4.5 4.5 0 0 0 12 16.5Z" />
+              <path d="M7.94 8.5 9.4 9.96A3 3 0 0 0 14.04 14.6l1.46 1.46A4.5 4.5 0 0 1 7.94 8.5Z" />
+            </svg>
           ) : (
-            <span className="select-none" style={{ filter: "blur(4px)" }}>
-              This hint is hidden
-            </span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-3 h-3"
+            >
+              <path d="M12 6c-5.96 0-9.49 3.497-11.12 6.53a1.77 1.77 0 0 0 0 1.94C2.51 17.503 6.04 21 12 21s9.49-3.497 11.12-6.53a1.77 1.77 0 0 0 0-1.94C21.49 9.497 17.96 6 12 6Zm0 12c-4.69 0-7.67-2.804-9.28-5.47A.27.27 0 0 1 2.7 12c1.61-2.666 4.59-5.47 9.3-5.47 4.69 0 7.67 2.804 9.28 5.47a.27.27 0 0 1 0 .53C19.67 15.196 16.69 18 12 18Zm0-9a4 4 0 1 0 .001 8.001A4 4 0 0 0 12 9Z" />
+            </svg>
           )}
+          <span className="text-xs font-medium">
+            {isRevealed ? "Hide Hint" : "Click to reveal hint"}
+          </span>
         </div>
+        {isRevealed ? (
+          <div className="mt-2 text-foreground">💡 {text}</div>
+        ) : (
+          <div className="mt-2 select-none filter blur-sm text-muted-foreground text-xs">
+            This hint will help guide you to the solution...
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const CodeBlockWithInsert: React.FC<{
+    code: string;
+    lang: string;
+    onInsert?: (snippet: CodeSnippet) => void;
+    showOverride?: boolean;
+  }> = ({ code, lang, onInsert, showOverride }) => {
+    const [showLocal, setShowLocal] = useState(false);
+    const isMermaid = lang === "mermaid";
+    const visible = showOverride !== undefined ? showOverride : showLocal;
+    return (
+      <div
+        className="relative"
+        onMouseEnter={() => setShowLocal(true)}
+        onMouseLeave={() => setShowLocal(false)}
+      >
+        {isMermaid ? (
+          <Mermaid chart={code} />
+        ) : (
+          <SyntaxHighlighter
+            style={vscDarkPlus}
+            language={lang || "python"}
+            PreTag="div"
+            className="rounded-md !mt-2 !mb-2"
+          >
+            {code.replace(/\n$/, "")}
+          </SyntaxHighlighter>
+        )}
+        {onInsert && !isMermaid && (
+          <button
+            onClick={() => {
+              const snippet: CodeSnippet = {
+                id: `direct-${Date.now()}`,
+                code: code.replace(/\n$/, ""),
+                language: "python",
+                isValidated: true,
+                insertionType: "smart",
+                insertionHint: {
+                  type: "statement",
+                  scope: "function",
+                  description: "Code snippet from AI response",
+                },
+              };
+              onInsert(snippet);
+            }}
+            className={`absolute top-2 right-2 z-20 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded shadow pointer-events-auto transition-opacity duration-150 ${visible ? 'opacity-100' : 'opacity-0'}`}
+            title="Add to Editor"
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add
+          </button>
+        )}
       </div>
     );
   };
@@ -339,96 +422,43 @@ const AIChat = ({
                               ? "border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15"
                               : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
                           }`}
+                          onMouseEnter={() => {
+                            if (message.role === 'assistant') setHoveredMessageId(message.id);
+                          }}
+                          onMouseLeave={() => {
+                            if (message.role === 'assistant') setHoveredMessageId(null);
+                          }}
                         >
                           {message.role === "user" ? (
                             <p className="text-sm whitespace-pre-wrap break-words text-left">
                               {message.content}
                             </p>
                           ) : (
-                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
-                              <ReactMarkdown
-                                components={{
-                                  code({
-                                    inline,
-                                    className,
-                                    children,
-                                    ...props
-                                  }: {
-                                    inline?: boolean;
-                                    className?: string;
-                                    children?: React.ReactNode;
-                                  }) {
-                                    const match = /language-(\w+)/.exec(
-                                      className || "",
-                                    );
-                                    if (
-                                      !inline &&
-                                      match &&
-                                      match[1] === "mermaid"
-                                    ) {
+                            (() => {
+                              const { body, hint } = splitContentAndHint(
+                                message.content,
+                              );
+                              return (
+                                <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
+                                  <ReactMarkdown
+                                  components={{
+                                  code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
+                                    const match = /language-(\w+)/.exec(className || "");
+                                    const lang = match?.[1] || "python";
+                                    if (!inline) {
+                                      // Determine visibility from message hover flag
+                                      const hovered = hoveredMessageId === message.id;
                                       return (
-                                        <Mermaid chart={String(children)} />
+                                        <CodeBlockWithInsert
+                                          code={String(children)}
+                                          lang={lang}
+                                          onInsert={onInsertCodeSnippet}
+                                          showOverride={hovered}
+                                        />
                                       );
                                     }
-                                    return !inline && match ? (
-                                      <div className="relative group">
-                                        <SyntaxHighlighter
-                                          style={vscDarkPlus}
-                                          language={match[1]}
-                                          PreTag="div"
-                                          className="rounded-md !mt-2 !mb-2"
-                                          {...props}
-                                        >
-                                          {String(children).replace(/\n$/, "")}
-                                        </SyntaxHighlighter>
-                                        {match[1] === "python" &&
-                                          onInsertCodeSnippet && (
-                                            <button
-                                              onClick={() => {
-                                                const codeContent = String(
-                                                  children,
-                                                ).replace(/\n$/, "");
-                                                const snippet: CodeSnippet = {
-                                                  id: `direct-${Date.now()}`,
-                                                  code: codeContent,
-                                                  language: "python",
-                                                  isValidated: true,
-                                                  insertionType: "smart",
-                                                  insertionHint: {
-                                                    type: "statement",
-                                                    scope: "function",
-                                                    description:
-                                                      "Code snippet from AI response",
-                                                  },
-                                                };
-                                                onInsertCodeSnippet(snippet);
-                                              }}
-                                              className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1"
-                                            >
-                                              <svg
-                                                className="w-3 h-3"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M12 4v16m8-8H4"
-                                                />
-                                              </svg>
-                                              Add to Editor
-                                            </button>
-                                          )}
-                                      </div>
-                                    ) : (
-                                      <code
-                                        className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono"
-                                        {...props}
-                                      >
-                                        {children}
-                                      </code>
+                                    return (
+                                      <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
                                     );
                                   },
                                   p: ({ children }) => (
@@ -451,9 +481,12 @@ const AIChat = ({
                                   }) => <li className="mb-1">{children}</li>,
                                 }}
                               >
-                                {message.content}
-                              </ReactMarkdown>
-                            </div>
+                                    {body}
+                                  </ReactMarkdown>
+                                  {hint && <BlurredHint text={hint} />}
+                                </div>
+                              );
+                            })()
                           )}
                         </div>
 
@@ -587,7 +620,9 @@ const AIChat = ({
                         {/* Code snippets: render whenever present on assistant messages */}
                         {message.role === "assistant" &&
                           message.codeSnippets &&
-                          message.codeSnippets.length > 0 && (
+                          message.codeSnippets.length > 0 &&
+                          // Avoid duplicate UI: if markdown code blocks exist, prefer inline with overlay
+                          !/```/.test(message.content) && (
                             <div className="mt-3 space-y-3">
                               {message.codeSnippets.map((snippet) => (
                                 <div

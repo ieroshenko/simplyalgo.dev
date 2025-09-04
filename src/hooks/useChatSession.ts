@@ -305,9 +305,6 @@ export const useChatSession = ({
           content: msg.content,
         }));
 
-        // Check if code has significantly changed (for context optimization)
-        const codeChanged = contextState.lastCodeSnapshot !== (currentCode || '');
-
         // Call AI function with context tracking
         const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
@@ -320,8 +317,6 @@ export const useChatSession = ({
             // Context tracking for token optimization
             sessionId: contextState.sessionId,
             previousResponseId: contextState.responseId,
-            codeChanged,
-            forceNewContext: codeChanged,
           },
         });
 
