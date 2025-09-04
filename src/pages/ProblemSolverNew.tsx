@@ -1065,7 +1065,7 @@ const ProblemSolverNew = () => {
                                                 </Badge>
                                               </div>
                                               {complexityResults[s.id].time_explanation && (
-                                                <p className="text-sm text-muted-foreground">
+                                                <p className="text-sm text-foreground/80">
                                                   {complexityResults[s.id].time_explanation}
                                                 </p>
                                               )}
@@ -1080,7 +1080,7 @@ const ProblemSolverNew = () => {
                                                 </Badge>
                                               </div>
                                               {complexityResults[s.id].space_explanation && (
-                                                <p className="text-sm text-muted-foreground">
+                                                <p className="text-sm text-foreground/80">
                                                   {complexityResults[s.id].space_explanation}
                                                 </p>
                                               )}
@@ -1179,28 +1179,32 @@ const ProblemSolverNew = () => {
                               Test Results
                             </div>
                             <div className="flex gap-2 mb-3">
-                              {testResults.map((result, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => setActiveTestCase(index)}
-                                  className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ${
-                                    activeTestCase === index
-                                      ? result.passed
-                                        ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
-                                        : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
-                                      : result.passed
-                                        ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20"
-                                        : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20"
-                                  }`}
-                                >
-                                  {result.passed ? (
-                                    <Check className="w-3 h-3" />
-                                  ) : (
-                                    <X className="w-3 h-3" />
-                                  )}
-                                  <span>Case {index + 1}</span>
-                                </button>
-                              ))}
+                              {testResults.map((result, index) => {
+                                let buttonClass = "flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ";
+                                if (activeTestCase === index) {
+                                  buttonClass += result.passed
+                                    ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
+                                    : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600";
+                                } else {
+                                  buttonClass += result.passed
+                                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20"
+                                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20";
+                                }
+                                return (
+                                  <button
+                                    key={index}
+                                    onClick={() => setActiveTestCase(index)}
+                                    className={buttonClass}
+                                  >
+                                    {result.passed ? (
+                                      <Check className="w-3 h-3" />
+                                    ) : (
+                                      <X className="w-3 h-3" />
+                                    )}
+                                    <span>Case {index + 1}</span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -1385,14 +1389,16 @@ const ProblemSolverNew = () => {
               }}
               onCancel={cancelInput}
               isValidating={coachingState.isValidating}
-              question={coachingState.session.currentQuestion}
-              hint={coachingState.session.currentHint || coachingState.lastValidation?.nextStep?.hint}
-              isSessionCompleted={coachingState.session.isCompleted}
+              question={coachingState.session?.currentQuestion || ""} // ← This should be empty when completed
+              hint={coachingState.session?.currentHint}
+              isSessionCompleted={coachingState.session?.isCompleted || false}
               validationResult={coachingState.lastValidation ? {
                 isCorrect: coachingState.lastValidation.isCorrect,
                 feedback: coachingState.lastValidation.feedback,
                 codeToAdd: coachingState.lastValidation.codeToAdd,
-                nextStep: coachingState.lastValidation.nextStep
+                nextStep: coachingState.lastValidation.nextStep,
+                nextAction: coachingState.lastValidation.nextAction, // ← Add this
+                isOptimizable: coachingState.lastValidation.isOptimizable, // ← Add this
               } : null}
               onInsertCorrectCode={insertCorrectCode}
               onPositionChange={(pos) => {
@@ -1400,9 +1406,10 @@ const ProblemSolverNew = () => {
                 // for now, rely on showInteractiveQuestion preserving this prop value.
                 coachingState.inputPosition = pos as { x: number; y: number } | null;
               }}
-              onStartOptimization={() => startOptimization()}
+              onStartOptimization={(type) => startOptimization(type)} // Pass the type parameter
               onFinishCoaching={stopCoaching}
-              isOptimizable={coachingState.isOptimizable}
+              isOptimizable={coachingState.isOptimizable || coachingState.lastValidation?.isOptimizable}
+              hasAlternative={coachingState.lastValidation?.hasAlternative} // New prop
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
                 console.log("Exiting coach mode due to AI service error");

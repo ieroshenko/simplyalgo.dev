@@ -21,55 +21,37 @@ const supabaseAdmin = supabaseServiceKey
   : supabase;
 
 /**
- * Simple optimization heuristics to judge if code is likely optimizable (top-level)
+ * Parse problem constraints from problem description
+ * Returns the extracted constraints for validation context
  */
-function analyzeOptimizationHeuristics(
-  code: string,
-  _problemDescription: string,
-): {
-  isOptimizable: boolean;
-  currentComplexity?: string;
-  targetComplexity?: string;
-  reason?: string;
+function parseConstraints(problemDescription: string): {
+  constraints: string[];
+  numericalConstraints: { min: number; max: number; variable: string }[];
 } {
-  const src = (code || "").toLowerCase();
-  const hasNestedFor = /\n\s*for\b[\s\S]*\n\s{2,}for\b/.test(code);
-  const usesDictOrSet = /(dict\(|\{\s*\}|\bset\(|\{[^:}]+:[^}]+\})/.test(src) || /\bCounter\(/.test(code);
-  const usesTwoPointers = /(i\+\+|j\-\-|two\s*pointers|left\s*=|right\s*=)/.test(src);
-  const sortsInsideLoop = /for\b[\s\S]*?(sorted\(|\.sort\()/.test(src);
-  const repeatedMembershipInList = /for\b[\s\S]*?\bin\s+\w+\s*:\s*\n[\s\S]*?\bin\s+\w+/.test(src) && !usesDictOrSet;
-
-  // If time is O(n) with extra space via set/dict → suggest O(1) space target
-  if (usesDictOrSet && !hasNestedFor && !sortsInsideLoop) {
-    return {
-      isOptimizable: true,
-      currentComplexity: "O(n) time, O(n) space",
-      targetComplexity: "O(1) space (e.g., XOR or arithmetic)",
-      reason: "Extra memory detected",
-    };
+  const constraints: string[] = [];
+  const numericalConstraints: { min: number; max: number; variable: string }[] = [];
+  
+  // Look for constraint sections
+  const constraintMatch = problemDescription.match(/(?:Constraints?|Constraint)\s*:?\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
+  if (constraintMatch) {
+    const constraintText = constraintMatch[1];
+    constraints.push(constraintText.trim());
+    
+    // Extract numerical constraints like "-1000 <= a, b <= 1000"
+    const numericalMatches = constraintText.matchAll(/(-?\d+)\s*<=?\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*<=?\s*(-?\d+)/g);
+    for (const match of numericalMatches) {
+      const [, minStr, variables, maxStr] = match;
+      const min = parseInt(minStr);
+      const max = parseInt(maxStr);
+      const varList = variables.split(',').map(v => v.trim());
+      
+      for (const variable of varList) {
+        numericalConstraints.push({ min, max, variable });
+      }
+    }
   }
-
-  if (sortsInsideLoop || hasNestedFor || repeatedMembershipInList) {
-    return {
-      isOptimizable: true,
-      currentComplexity: hasNestedFor ? "~O(n^2)" : undefined,
-      targetComplexity: "O(n) or O(n log n)",
-      reason: "Nested loops/sort inside loop/membership scans detected",
-    };
-  }
-  if (!usesDictOrSet && !usesTwoPointers) {
-    return {
-      isOptimizable: true,
-      targetComplexity: "O(n) or O(n log n)",
-      reason: "No hash/set or two-pointer patterns detected",
-    };
-  }
-  return {
-    isOptimizable: false,
-    currentComplexity: usesTwoPointers ? "O(n)" : "~O(n)",
-    targetComplexity: usesTwoPointers ? "O(n)" : "O(n)",
-    reason: "Efficient pattern detected",
-  };
+  
+  return { constraints, numericalConstraints };
 }
 
 /**
@@ -517,29 +499,62 @@ export async function validateCoachingSubmission(
     throw new Error("Coaching session not found");
   }
 
-  // Create concise prompt for context continuation (the AI already knows all the coaching rules)
+  // Parse constraints from problem description for validation context
+  const problemDescription = session.problem_description || "";
+  const { constraints, numericalConstraints } = parseConstraints(problemDescription);
+
+  // Create constraint-aware validation prompt
   const contextContinuationPrompt = `STUDENT CODE UPDATE (GROUND IN CURRENT CODE and REFERENCE LINES/SYMBOLS):
 \`\`\`python
 ${currentEditorCode}
 \`\`\`
 
-${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area" 
+PROBLEM CONTEXT:
+${problemDescription}
+
+${constraints.length > 0 ? `PROBLEM CONSTRAINTS:
+${constraints.join('\n')}
+
+CONSTRAINT-AWARE VALIDATION INSTRUCTIONS:
+- FIRST: Check if the solution works correctly within the stated problem constraints
+- Consider constraints when evaluating edge cases - only flag issues that can actually occur within constraint bounds
+- If test cases pass and solution handles all inputs within constraints, the solution is CORRECT
+- Do not flag theoretical edge cases that cannot occur due to problem constraints
+- Focus on practical correctness within the problem scope
+
+` : ""}${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area" 
   ? `STUDENT RESPONSE: "${studentResponse}"
 
 ` : ""}VALIDATION REQUEST:
-Analyze the student's current code implementation. Has their algorithm improved? What should happen next?
+Analyze the student's current code implementation within the context of the problem constraints. Has their algorithm improved? What should happen next?
 
 Determine if:
-1. Code is correct/complete → session can end or offer optimization
-2. Code has issues → provide specific algorithmic guidance  
+1. Code is correct/complete within constraint bounds → session can end or offer optimization
+2. Code has issues that can occur within constraints → provide specific algorithmic guidance  
 3. Code needs more implementation → guide next step
 
 CRITICAL ANALYSIS POINTS:
+- CONSTRAINT-FIRST VALIDATION: Validate solution against actual problem constraints, not theoretical edge cases
 - Check if the code already has all necessary algorithmic components
-- Don't duplicate existing code in codeToAdd
-- codeToAdd must be a tiny, safe patch (<= 3 lines), not a full function. Never include 'def', imports, or main blocks in codeToAdd.
-- If algorithm is complete and correct, indicate session completion
+- If algorithm is complete and correct within constraints, indicate session completion
 - Focus on what's MISSING from their algorithm, not what exists
+- Only consider edge cases that can actually occur within the given constraints
+
+CONTEXT-AWARE SNIPPET GENERATION:
+- Analyze existing code structure, variables, and function scope before generating codeToAdd
+- Generate patches that build incrementally on current code - never jump ahead multiple logical steps
+- Reference existing variables, functions, and patterns when possible (e.g., if student has 'nums' array, reference 'nums[i]')
+- Ensure snippet teaches ONE specific concept/technique at a time
+- Must integrate seamlessly with existing code structure and indentation
+- Never provide complete solutions or full function rewrites
+
+SNIPPET QUALITY RULES:
+- Maximum 2 lines of actual code (excluding whitespace/comments)
+- Must not duplicate any existing logic or variables already defined
+- Should demonstrate the next logical step in algorithm development
+- Use student's existing variable names and coding style
+- Focus on teaching one concept: loop structure, condition, calculation, return statement, etc.
+- Example good snippets: "for i in range(len(nums)):" or "if target - num in seen:"
 
 Return JSON in this exact format:
 {
@@ -555,7 +570,7 @@ Return JSON in this exact format:
     "recommendedTime": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
     "recommendedSpace": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other"
   },
-  "codeToAdd": "tiny patch (<=3 lines) to insert if nextAction is insert_and_continue (no 'def', no imports)",
+  "codeToAdd": "contextual 1-2 line patch that builds incrementally on existing code, references student variables, teaches one concept (no 'def', imports, or complete solutions)",
   "nextStep": {
     "question": "next guiding question for the student",
     "expectedCodeType": "variable" | "loop" | "condition" | "expression" | "return" | "any",
@@ -612,10 +627,15 @@ Return JSON in this exact format:
 
     // Add optimization detect flag to inform UI about Learn Optimization button visibility
     try {
-      const heur = analyzeOptimizationHeuristics(currentEditorCode, problemDescription);
-      (validation as any).isOptimizable = Boolean(heur?.isOptimizable);
-    } catch (_) {
-      (validation as any).isOptimizable = true;
+      const optimizationAnalysis = await analyzeOptimizationWithAI(currentEditorCode, problemDescription);
+      (validation as any).isOptimizable = optimizationAnalysis.isOptimizable;
+      (validation as any).hasAlternative = optimizationAnalysis.hasAlternative;
+      (validation as any).optimizationAnalysis = optimizationAnalysis;
+    } catch (error) {
+      console.error("Optimization analysis failed:", error);
+      // Conservative fallback
+      (validation as any).isOptimizable = false;
+      (validation as any).hasAlternative = false;
     }
 
     // If correct but not optimal, we no longer inject any default next step text.
@@ -655,6 +675,7 @@ Return JSON in this exact format:
       sessionUpdateData.is_completed = true;
       sessionUpdateData.session_state = 'completed';
       sessionUpdateData.awaiting_submission = false;
+      sessionUpadteData.current_question = "";
       
       await supabaseAdmin
         .from("coaching_sessions")
@@ -701,44 +722,52 @@ export async function startOptimizationCoaching(
 ) {
   const sessionId = crypto.randomUUID();
 
-  const heur = analyzeOptimizationHeuristics(currentCode, problemDescription);
-  if (!heur.isOptimizable) {
+  const analysis = await analyzeOptimizationWithAI(currentCode, problemDescription);
+  
+  if (!analysis.isOptimizable && !analysis.hasAlternative) {
     return {
       sessionId,
       nextAction: "complete_optimization",
       message: "Solution already appears optimal. Great job!",
-      targetComplexity: heur.targetComplexity || "O(n)",
+      currentComplexity: analysis.currentComplexity,
     };
   }
 
-  const prompt = `You are an expert optimization coach.
+  const optimizationType = analysis.isOptimizable ? 'optimization' : 'alternative';
+  const prompt = `You are an expert ${optimizationType} coach.
 
 PROBLEM: ${problemDescription}
 
-CURRENT CODE (optimize by editing minimal lines, keep signature unchanged):
+CURRENT CODE:
 \`\`\`python
 ${currentCode || "# no code"}
 \`\`\`
 
+ANALYSIS CONTEXT:
+- Current complexity: ${JSON.stringify(analysis.currentComplexity)}
+- ${analysis.isOptimizable ? `Target complexity: ${JSON.stringify(analysis.targetComplexity)}` : 'Alternative approach available'}
+- Type: ${analysis.optimizationType}
+- Reason: ${analysis.reason}
+
 GOAL:
-- Identify one concrete optimization step toward ${heur.targetComplexity || "a better complexity"}.
-- Reference specific lines and existing symbols.
-- Provide ONE short question and ONE hint.
-- If a tiny, safe edit (1–3 lines) helps, include it as codeToAdd.
+${analysis.isOptimizable 
+  ? `- Show a concrete optimization step toward better complexity
+     - Focus on algorithmic improvements that reduce time/space complexity`
+  : `- Show an alternative approach with same complexity but different trade-offs
+     - Explain the benefits of the alternative approach`}
 
 Return JSON only:
 {
-  "question": "...",
-  "hint": "...",
-  "targetComplexity": "O(n) | O(n log n) | ...",
-  "expectedChange": "data_structure|algorithm|constant_factor",
-  "highlightArea": { "startLine": <number>, "endLine": <number> },
-  "codeToAdd": "optional tiny edit or empty string",
-  "nextAction": "hint" | "insert_and_continue"
+  "question": "specific question about the ${optimizationType}",
+  "hint": "helpful hint without giving away the solution",
+  "targetComplexity": "${analysis.targetComplexity?.time || analysis.currentComplexity?.time}",
+  "optimizationType": "${optimizationType}",
+  "codeToAdd": "optional 1-2 line hint or empty string",
+  "nextAction": "hint"
 }`;
 
-  const text = await llmText(prompt, { temperature: 0.3, maxTokens: 500 });
-  return { sessionId, step: text };
+  const text = await llmText(prompt, { temperature: 0.3, maxTokens: 600 });
+  return { sessionId, step: text, optimizationType };
 }
 
 /**
@@ -751,69 +780,52 @@ export async function validateOptimizationStep(
   previousStep?: {
     question: string;
     hint?: string;
-    expectedChange?: string;
-    highlightArea?: { startLine: number; endLine: number };
+    optimizationType?: string;
     codeToAdd?: string;
   },
 ) {
-  const heur = analyzeOptimizationHeuristics(currentEditorCode, problemDescription);
-  if (!heur.isOptimizable) {
+  const analysis = await analyzeOptimizationWithAI(currentEditorCode, problemDescription);
+  
+  if (!analysis.isOptimizable && !analysis.hasAlternative) {
     return {
       isCorrect: true,
       improved: true,
-      currentComplexity: heur.currentComplexity || "O(n)",
-      feedback: "Solution is already optimal. Nicely done!",
+      currentComplexity: analysis.currentComplexity,
+      feedback: "Solution is now optimal. Excellent work!",
       nextAction: "complete_optimization",
     };
   }
 
-  // Evaluate whether the previous optimization step has been applied; if not, provide feedback and a minimal safe patch.
   const evalPrompt = `You are an optimization reviewer.
 
-PROBLEM CONTEXT:
-${problemDescription}
+PROBLEM: ${problemDescription}
 
-CURRENT CODE (Python):
-${"```"}python
+CURRENT CODE:
+\`\`\`python
 ${currentEditorCode}
-${"```"}
+\`\`\`
 
-${previousStep ? `PREVIOUS OPTIMIZATION STEP (JSON):\n${JSON.stringify(previousStep)}\n` : ''}
+OPTIMIZATION CONTEXT:
+${JSON.stringify(analysis)}
 
-TASK:
-1) If PREVIOUS OPTIMIZATION STEP is provided, determine whether the student's code now reflects that change.
-   - If NO: return a JSON with {"isCorrect": false, "improved": false, "feedback": "specific reason", "nextAction": "insert_and_continue"|"retry"|"hint", "codeToAdd": "<=3 lines or empty"}.
-   - If YES: mark improved=true and propose the NEXT minimal optimization step with fields nextStep {question,hint,highlightArea,codeToAdd}.
-2) If no previous step provided, propose the NEXT minimal optimization step.
-3) Never claim completion unless the code is already optimal per heuristics.
+${previousStep ? `PREVIOUS STEP: ${JSON.stringify(previousStep)}` : ''}
 
-Return only JSON in this shape:
+TASK: Evaluate if the student has made progress toward the optimization goal.
+
+Return JSON:
 {
   "isCorrect": boolean,
   "improved": boolean,
-  "feedback": string,
-  "nextAction": "insert_and_continue" | "retry" | "hint" | "continue" | "complete_optimization",
-  "codeToAdd": string,
-  "nextStep": { "question": string, "hint": string, "highlightArea": { "startLine": number, "endLine": number }, "codeToAdd": string }
+  "feedback": "specific feedback about progress",
+  "nextAction": "hint|insert_and_continue|complete_optimization",
+  "nextStep": {
+    "question": "next question if continuing",
+    "hint": "next hint if continuing"
+  }
 }`;
 
-  const raw = await llmText(evalPrompt, { temperature: 0.2, maxTokens: 700 });
-  let parsed: any = {};
-  try {
-    parsed = JSON.parse(raw);
-  } catch (_) {
-    // Fall back: request a next step only
-    const prompt = `Given the current code, propose the next minimal optimization step toward ${heur.targetComplexity || "a better complexity"}.
-Use existing symbols and reference specific lines. Return JSON with fields: question, hint, expectedChange, highlightArea {startLine,endLine}, codeToAdd (<=3 lines or empty), nextAction (hint|insert_and_continue).`;
-    const text = await llmText(prompt + "\n\nCURRENT CODE:\n" + currentEditorCode, { temperature: 0.2, maxTokens: 500 });
-    return { isCorrect: true, improved: false, nextStep: text, nextAction: "hint" };
-  }
-
-  // Guard against accidental completion claims if heuristics still say optimizable
-  if (parsed?.nextAction === 'complete_optimization' && heur.isOptimizable) {
-    parsed.nextAction = 'continue';
-  }
-  return parsed;
+  const response = await llmJson(evalPrompt, { temperature: 0.2, maxTokens: 600 });
+  return JSON.parse(response);
 }
 
 /**
@@ -978,4 +990,120 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     console.error("🚨 [generateCoachingSession] Content that failed to parse:", cleanContent || rawContent);
     throw new Error(`Failed to parse coaching session: ${(parseError as Error)?.message}`);
   }
+}
+
+/**
+ * AI-powered optimization analysis - replaces hardcoded heuristics
+ */
+async function analyzeOptimizationWithAI(
+  code: string,
+  problemDescription: string,
+): Promise<{
+  isOptimizable: boolean;
+  hasAlternative: boolean;
+  currentComplexity?: { time: string; space: string };
+  targetComplexity?: { time: string; space: string };
+  reason?: string;
+  optimizationType?: 'time' | 'space' | 'both' | 'alternative';
+}> {
+  const analysisPrompt = `You are an expert algorithm analyst. Analyze this solution for optimization opportunities.
+
+PROBLEM CONTEXT:
+${problemDescription}
+
+CURRENT SOLUTION:
+\`\`\`python
+${code}
+\`\`\`
+
+ANALYSIS TASK:
+1. Determine the current time and space complexity
+2. Check if there are BETTER complexity optimizations available (e.g., O(n²) → O(n), O(n) space → O(1) space)
+3. Check if there are alternative approaches with same complexity but different trade-offs
+4. Consider the problem's typical optimal complexities
+
+RESPONSE FORMAT (JSON only):
+{
+  "isOptimizable": boolean,
+  "hasAlternative": boolean,
+  "currentComplexity": {
+    "time": "O(...)",
+    "space": "O(...)"
+  },
+  "targetComplexity": {
+    "time": "O(...)",
+    "space": "O(...)"
+  },
+  "reason": "brief explanation of optimization opportunity",
+  "optimizationType": "time|space|both|alternative"
+}
+
+RULES:
+- isOptimizable = true ONLY if there's a complexity improvement possible
+- hasAlternative = true if same complexity but different approach exists
+- If solution is already optimal, set isOptimizable = false
+- Be conservative - don't suggest optimizations that don't exist`;
+
+  try {
+    const response = await llmJson(analysisPrompt, {
+      temperature: 0.1,
+      maxTokens: 400,
+    });
+    
+    return JSON.parse(response);
+  } catch (error) {
+    console.error("AI optimization analysis failed:", error);
+    // Fallback to conservative default
+    return {
+      isOptimizable: false,
+      hasAlternative: false,
+      reason: "Analysis unavailable"
+    };
+  }
+}
+
+export async function startAlternativeCoaching(
+  problemId: string,
+  userId: string,
+  currentCode: string,
+  problemDescription: string,
+  difficulty: "beginner" | "intermediate" | "advanced" = "beginner",
+) {
+  const sessionId = crypto.randomUUID();
+
+  const analysis = await analyzeOptimizationWithAI(currentCode, problemDescription);
+  
+  if (!analysis.hasAlternative) {
+    return {
+      sessionId,
+      nextAction: "complete_optimization",
+      message: "No clear alternative approach available. Current solution looks good!",
+      currentComplexity: analysis.currentComplexity,
+    };
+  }
+
+  const prompt = `You are an expert alternative approach coach.
+
+PROBLEM: ${problemDescription}
+
+CURRENT CODE:
+\`\`\`python
+${currentCode || "# no code"}
+\`\`\`
+
+ANALYSIS: ${analysis.reason}
+
+GOAL: Show an alternative approach with same complexity but different trade-offs or implementation style.
+
+Return JSON only:
+{
+  "question": "specific question about the alternative approach",
+  "hint": "helpful hint about the different approach",
+  "approach": "brief description of alternative method",
+  "codeToAdd": "optional 1-2 line hint or empty string",
+  "nextAction": "hint"
+}`;
+
+  const text = await llmText(prompt, { temperature: 0.3, maxTokens: 600 });
+  return { sessionId, step: text, sessionType: 'alternative' };
 }

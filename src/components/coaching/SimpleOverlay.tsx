@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '../ui/button';
-import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle } from 'lucide-react';
+import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle, Zap, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // Blurred hint component with click-to-reveal
@@ -40,7 +40,7 @@ interface SimpleOverlayProps {
   onExitCoach?: () => void;
   onFinishCoaching?: () => void;
   onInsertCorrectCode?: () => void; // New prop for inserting correct code
-  onStartOptimization?: () => void; // Trigger optimization flow
+  onStartOptimization?: (type: 'optimization' | 'alternative') => void; // Trigger optimization or alternative flow
   onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
   isValidating?: boolean;
   hasError?: boolean;
@@ -56,10 +56,17 @@ interface SimpleOverlayProps {
     isCorrect: boolean;
     feedback: string;
     isOptimizable?: boolean;
+    hasAlternative?: boolean;
     codeToAdd?: string; // Available corrected code
     nextStep?: {
       question: string;
       hint: string;
+    };
+    optimizationAnalysis?: {
+      optimizationType?: 'time' | 'space' | 'both' | 'alternative';
+      currentComplexity?: { time: string; space: string };
+      targetComplexity?: { time: string; space: string };
+      reason?: string;
     };
   } | null;
   // Enhanced positioning
@@ -103,6 +110,28 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [showTextInput, setShowTextInput] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  // Centralized overlay state management for cleaner UI logic
+  const overlayState = useMemo(() => {
+    if (isSessionCompleted) return 'completed';
+    if (isValidating) return 'validating';
+    if (validationResult?.isCorrect) return 'correct';
+    if (validationResult && !validationResult.isCorrect) return 'incorrect';
+    return 'initial';
+  }, [isSessionCompleted, isValidating, validationResult]);
+
+  // Enhanced question rendering logic with proper state checks
+  const shouldShowQuestion = useMemo(() => {
+    // Never show questions when session is completed
+    if (isSessionCompleted) return false;
+    // Never show questions during validation
+    if (isValidating) return false;
+    // Never show questions if validation shows problem is solved
+    if (validationResult?.isCorrect && validationResult?.nextAction === 'complete_session') return false;
+    // Never show questions if lastValidation indicates completion
+    if (validationResult?.nextAction === 'complete_session') return false;
+    // Show question only if we have one and session is active
+    return Boolean(question && question.trim() !== '' && !isSessionCompleted);
+  }, [isSessionCompleted, isValidating, question, validationResult]);
 
   // Reset state when overlay is hidden
   useEffect(() => {
@@ -253,29 +282,31 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const isMobile = window.innerWidth < 768;
 
   return (
-    <>
-      
-      <div
-        ref={overlayRef}
-        onMouseDown={handleMouseDown}
-        style={{
-          position: "fixed",
-          left: smartPosition.x,
-          top: smartPosition.y,
-          zIndex: 1000,
-          borderRadius: "12px",
-          minWidth: isMobile ? "calc(100vw - 32px)" : "420px",
-          maxWidth: isMobile ? "calc(100vw - 32px)" : "500px",
-          maxHeight: isMobile ? "70vh" : "60vh",
-          cursor: isDragging ? "grabbing" : "default",
-          transform: `scale(${isMinimized ? "0.95" : "1"})`,
-          opacity: isMinimized ? 0.9 : 1,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
-        className="transition-all duration-300 ease-in-out bg-card text-card-foreground border border-border shadow-lg rounded-xl"
-      >
+    <div
+      ref={overlayRef}
+      onMouseDown={handleMouseDown}
+      role="dialog"
+      tabIndex={0}
+      aria-modal="true"
+      aria-label="AI Coach Overlay"
+      style={{
+        position: "fixed",
+        left: smartPosition.x,
+        top: smartPosition.y,
+        zIndex: 1000,
+        borderRadius: "12px",
+        minWidth: isMobile ? "calc(100vw - 32px)" : "420px",
+        maxWidth: isMobile ? "calc(100vw - 32px)" : "500px",
+        maxHeight: isMobile ? "70vh" : "60vh",
+        cursor: isDragging ? "grabbing" : "default",
+        transform: `scale(${isMinimized ? "0.95" : "1"})`,
+        opacity: isMinimized ? 0.9 : 1,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      className="transition-all duration-300 ease-in-out bg-card text-card-foreground border border-border shadow-lg rounded-xl"
+    >
       {/* Header with compact design */}
       <div 
         className="drag-handle p-3 border-b border-border bg-muted/50 rounded-t-xl flex justify-between items-center"
@@ -311,8 +342,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         <div 
           className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
         >
-          {/* Question section - don't show if session is completed */}
-          {question && !isSessionCompleted && (
+          {/* Question section - using centralized state management */}
+          {shouldShowQuestion && (
             <div className="p-4">
               <div className="text-sm font-medium mb-2 text-foreground leading-relaxed">
                 {question}
@@ -323,11 +354,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Session completed notification - show instead of question when done */}
-          {isSessionCompleted && (
+          {/* Session completed notification - using centralized state management */}
+          {overlayState === 'completed' && (
             <div className="p-4 text-center">
               <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-2">
-                🎉 Session Complete!
+                 Session Complete!
               </div>
               <div className="text-sm text-muted-foreground">
                 You've successfully completed this coaching session.
@@ -335,8 +366,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Validation Result Section */}
-          {validationResult && (
+          {/* Validation Result Section - don't show if session is completed */}
+          {validationResult && !isSessionCompleted && (
             <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${
               validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
             }`}>
@@ -360,7 +391,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   {(() => {
                     const q = (validationResult.nextStep?.question || "").trim();
                     const h = (validationResult.nextStep?.hint || "").trim();
-                    return Boolean(q || h);
+                    return Boolean(q || h) && !isSessionCompleted;
                   })() && (
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
                       <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
@@ -381,7 +412,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                         const h = validationResult.nextStep?.hint || "";
                         const f = validationResult.feedback || "";
                         const text = `${q} ${h} ${f}`;
-                        const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|alternative\s+approach)/i.test(text);
+                        // Remove "alternative\s+approach" from regex - only look for true optimizations
+                        const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|better\s+complexity|more\s+efficient)/i.test(text);
                         const hasNext = Boolean(q || h);
                         const shouldShow = validationResult.isCorrect && hasNext && (validationResult.isOptimizable || mentionsOptimize);
                         return shouldShow;
@@ -405,8 +437,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Instructions section - don't show if session is completed */}
-          {!validationResult && !isValidating && !isSessionCompleted && (
+          {/* Instructions section - using centralized state management */}
+          {overlayState === 'initial' && (
             <div className="px-4 py-3 border-t border-border">
               <div className="text-sm text-muted-foreground mb-3">
                 Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
@@ -440,8 +472,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Loading state during validation */}
-          {isValidating && (
+          {/* Loading state during validation - using centralized state management */}
+          {overlayState === 'validating' && (
             <div className="px-4 py-3 border-t border-border bg-blue-50 dark:bg-blue-950/30">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />
@@ -457,8 +489,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           )}
 
-          {/* Error state - AI service unavailable */}
-          {hasError && (
+          {/* Error state - AI service unavailable - don't show if session is completed */}
+          {hasError && !isSessionCompleted && (
             <div className="px-4 py-3 border-t border-border bg-red-50 dark:bg-red-950/30">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
@@ -476,25 +508,31 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         </div>
       )}
 
-      {/* Fixed Actions bar */}
+      {/* Fixed Actions bar - using centralized state management */}
       {!isMinimized && !hasError && (
         <div className="flex justify-center items-center p-3 border-t border-border bg-muted/20">
-          {isSessionCompleted ? (
+          {overlayState === 'completed' && (
             <div className="flex items-center gap-2">
-              {isOptimizable && onStartOptimization && (
+              {/* Only show optimization button if explicitly marked as optimizable and no next step */}
+              {isOptimizable && onStartOptimization && !validationResult?.nextStep?.question && (
                 <Button
-                  onClick={() => onStartOptimization()}
+                  onClick={() => onStartOptimization('optimization')}
                   size="sm"
                   variant="outline"
                   className="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/20"
                 >
+                  <Zap className="w-4 h-4 mr-2" />
                   Optimize
                 </Button>
               )}
               <Button
                 onClick={() => {
                   confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                  setTimeout(() => { onFinishCoaching ? onFinishCoaching() : onCancel(); }, 1000);
+                  if (onFinishCoaching) {
+                    setTimeout(() => { onFinishCoaching(); }, 1000);
+                  } else {
+                    setTimeout(() => { onCancel(); }, 1000);
+                  }
                 }}
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 text-green-50 px-6"
@@ -503,24 +541,21 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 Finish
               </Button>
             </div>
-          ) : validationResult?.isCorrect ? (
+          )}
+          
+          {overlayState === 'correct' && (
             <Button
               onClick={() => {
-                // Trigger confetti animation
                 confetti({
                   particleCount: 100,
                   spread: 70,
                   origin: { y: 0.6 }
                 });
-                
-                // Wait a moment then finish coaching
-                setTimeout(() => {
-                  if (onFinishCoaching) {
-                    onFinishCoaching();
-                  } else {
-                    onCancel();
-                  }
-                }, 1000);
+                if (onFinishCoaching) {
+                  setTimeout(() => { onFinishCoaching(); }, 1000);
+                } else {
+                  setTimeout(() => { onCancel(); }, 1000);
+                }
               }}
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-green-50 px-6"
@@ -528,7 +563,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               <Sparkles className="w-4 h-4 mr-2" />
               Finish
             </Button>
-          ) : validationResult && !validationResult.isCorrect ? (
+          )}
+          
+          {overlayState === 'incorrect' && (
             <div className="flex gap-2">
               <Button
                 onClick={handleValidate}
@@ -549,7 +586,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   </>
                 )}
               </Button>
-              {validationResult.codeToAdd && onInsertCorrectCode && (
+              {validationResult?.codeToAdd && onInsertCorrectCode && (
                 <Button
                   onClick={onInsertCorrectCode}
                   size="sm"
@@ -560,7 +597,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 </Button>
               )}
             </div>
-          ) : (
+          )}
+          
+          {(overlayState === 'initial' || overlayState === 'validating') && (
             <Button
               onClick={handleValidate}
               disabled={isValidating}
@@ -618,7 +657,6 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         </div>
       )}
     </div>
-    </>
   );
 };
 

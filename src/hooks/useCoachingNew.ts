@@ -19,6 +19,35 @@ interface UseCoachingProps {
   onCodeInsert?: (code: string) => Promise<void>;
 }
 
+interface CoachingState {
+  session: InteractiveCoachSession | null;
+  isCoachModeActive: boolean;
+  currentHighlight: CoachHighlightArea | null;
+  showInputOverlay: boolean;
+  inputPosition: { x: number; y: number } | null;
+  isWaitingForResponse: boolean;
+  isValidating: boolean;
+  lastValidation: {
+    isCorrect: boolean;
+    feedback: string;
+    nextAction: string;
+    codeToAdd: string;
+  } | undefined;
+  feedback: {
+    show: boolean;
+    type: string | null;
+    message: string;
+    showConfetti: boolean;
+  };
+  optimizationSessionType?: 'optimization' | 'alternative'; // Track current session type
+  lastOptimizationStep?: {
+    question: string;
+    hint?: string;
+    sessionType?: 'optimization' | 'alternative';
+    highlightArea?: CoachHighlightArea;
+  };
+}
+
 export const useCoachingNew = ({ problemId, userId, problemDescription, editorRef, onCodeInsert }: UseCoachingProps) => {
   const [coachingState, setCoachingState] = useState<CoachingState>({
     session: null,
@@ -235,6 +264,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     setCoachingState(prev => ({
       ...prev,
       showInputOverlay: true,
+      isWaitingForResponse: false, // Now that overlay is showing, stop loading
       // Preserve previous overlay position if already set
       inputPosition: prev.inputPosition || screenPosition,
       currentHighlight: finalHighlight || null,
@@ -251,6 +281,12 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         } : prev.session.highlightArea,
       } : prev.session,
     }));
+    
+    console.log("🎯 [STATE] Overlay now showing:", {
+      showInputOverlay: true,
+      isWaitingForResponse: false,
+      currentQuestion: question
+    });
   }, [applyHighlight, getPositionBelowLastLine]);
 
   // Start coaching session
@@ -304,7 +340,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           highlightArea: data.highlightArea,
         } as InteractiveCoachSession,
         isCoachModeActive: true,
-        isWaitingForResponse: false,
+        // Keep isWaitingForResponse: true until overlay is ready to show
         currentHighlight: data.highlightArea || null,
       }));
 
@@ -352,7 +388,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           setCoachingState(prev => ({
             ...prev,
             isOptimizable: optimizable,
-            session: prev.session ? { ...prev.session, isCompleted: true, currentQuestion: '', currentHint: undefined } : prev.session,
+            session: prev.session ? { 
+              ...prev.session, 
+              isCompleted: true, 
+              currentQuestion: '', // ← Ensure question is cleared
+              currentHint: undefined 
+            } : prev.session,
+            lastValidation: null, // ← Clear validation to prevent showing nextStep
             showInputOverlay: true,
             inputPosition: pos,
             isWaitingForResponse: false,
@@ -470,6 +512,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             ...prev,
             isOptimizationMode: false,
             session: prev.session ? { ...prev.session, isCompleted: true, currentQuestion: '', currentHint: undefined } : prev.session,
+            lastValidation: null, // Clear validation result to prevent showing nextStep questions
             showInputOverlay: true,
             inputPosition: pos,
             feedback: { show: true, type: 'success', message: data?.feedback || 'Optimization complete!', showConfetti: true },
@@ -646,6 +689,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
                 currentQuestion: "", // Clear the question
                 currentHint: undefined, // Clear the hint
               } : null,
+              lastValidation: null, // Clear validation result to prevent showing nextStep questions
               // Hide overlay to prevent showing question + success together
               showInputOverlay: false,
               inputPosition: null,
@@ -673,45 +717,35 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             setTimeout(stopCoaching, 1500);
           }
         }
-      } else if (data.nextAction === "complete") {
-        // Session completed!
+      } else if (data.nextAction === "complete_session") {
         console.log("🎉 [COACHING] Session completed!");
         
-        // CRITICAL: Clear all overlay state when completing to prevent inconsistent UI
+        // CRITICAL: Clear all overlay state when completing
         setCoachingState(prev => ({
           ...prev,
           session: prev.session ? { 
             ...prev.session, 
             isCompleted: true,
-            currentQuestion: "", // Clear the question
-            currentHint: undefined, // Clear the hint
+            currentQuestion: "", // ← Clear the stale question
+            currentHint: undefined, // ← Clear the hint
           } : null,
-          // Immediately hide overlay to prevent showing question + success together
-          showInputOverlay: false,
-          inputPosition: null,
+          lastValidation: data, // ← Store the validation result for optimization logic
+          showInputOverlay: true, // ← Keep overlay open for completion actions
+          inputPosition: prev.inputPosition,
           currentHighlight: null,
+          isOptimizable: data.isOptimizable, // ← Set optimization flag
           feedback: {
             show: true,
-            type: "success",
+            type: "success", 
             message: "🎉 Congratulations! You've completed the coaching session!",
             showConfetti: true,
           },
         }));
         
-        console.log("🎯 [STATE] Session completed - state updated:", {
-          isCompleted: true,
-          currentQuestion: "",
-          showInputOverlay: false,
-          feedback: "success"
-        });
-        
-        // Clear any editor highlights since session is done
+        // Clear any editor highlights
         if (applyHighlight) {
           applyHighlight(null);
         }
-        
-        // Auto-close after celebration
-        setTimeout(stopCoaching, 3000);
       } else {
         console.log("🎯 [COACHING] Code needs correction - showing feedback");
         
@@ -787,40 +821,14 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         };
 
         try {
-          console.log("🔧 [COACHING] Sending smart insertion request:", {
-            action: "insert_snippet",
-            codeLength: before.length,
-            snippet,
-            cursorPosition,
-            problemDescription: problemDescription || ""
-          });
+          console.log("🔧 [COACHING] Using shared insertion logic for consistency with chat mode");
           
-          const { data: insertResult, error: insertError } = await supabase.functions.invoke("ai-chat", {
-            body: {
-              action: "insert_snippet",
-              code: before,
-              snippet,
-              cursorPosition,
-              problemDescription: problemDescription || "",
-              message: `[coaching snippet insertion] Fix these issues: ${coachingState.lastValidation?.feedback || 'Apply suggested code changes'}`,
-              conversationHistory: [],
-            },
-          });
+          // Use the shared onCodeInsert callback which uses handleInsertCodeSnippet
+          await onCodeInsert(codeToInsert, cursorPosition, insertionType);
           
-          console.log("📥 [COACHING] Smart insertion response:", { insertResult, insertError });
-
-          if (insertError) {
-            console.error("❌ [COACHING] Smart insertion failed:", insertError);
-            throw new Error(`Smart insertion failed: ${insertError.message}`);
-          } else if (insertResult?.newCode) {
-            console.log("✅ [COACHING] Smart insertion successful");
-            editor?.setValue(insertResult.newCode);
-          } else {
-            console.warn("⚠️ [COACHING] No new code returned from smart insertion");
-            throw new Error("Smart insertion returned no code");
-          }
+          console.log("✅ [COACHING] Shared insertion completed successfully");
         } catch (error) {
-          console.error("❌ [COACHING] Smart insertion error:", error);
+          console.error("❌ [COACHING] Shared insertion error:", error);
           throw error; // Re-throw to be caught by outer try-catch
         }
       } else {

@@ -2,6 +2,40 @@ import { llmText, llmJson, llmJsonFast, llmWithSessionContext, getOrCreateSessio
 import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
 
 /**
+ * Parse problem constraints from problem description for constraint-aware analysis
+ * Returns the extracted constraints for validation context
+ */
+function parseConstraints(problemDescription: string): {
+  constraints: string[];
+  numericalConstraints: { min: number; max: number; variable: string }[];
+} {
+  const constraints: string[] = [];
+  const numericalConstraints: { min: number; max: number; variable: string }[] = [];
+  
+  // Look for constraint sections
+  const constraintMatch = problemDescription.match(/(?:Constraints?|Constraint)\s*:?\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
+  if (constraintMatch) {
+    const constraintText = constraintMatch[1];
+    constraints.push(constraintText.trim());
+    
+    // Extract numerical constraints like "-1000 <= a, b <= 1000"
+    const numericalMatches = constraintText.matchAll(/(-?\d+)\s*<=?\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*<=?\s*(-?\d+)/g);
+    for (const match of numericalMatches) {
+      const [, minStr, variables, maxStr] = match;
+      const min = parseInt(minStr);
+      const max = parseInt(maxStr);
+      const varList = variables.split(',').map(v => v.trim());
+      
+      for (const variable of varList) {
+        numericalConstraints.push({ min, max, variable });
+      }
+    }
+  }
+  
+  return { constraints, numericalConstraints };
+}
+
+/**
  * Lightweight sanitizer to fix common TSX issues in generated components before returning to client.
  * - Removes stray markdown fences
  * - Fixes dangling nullish-coalescing operators like `v[0] ??` -> `v[0] ?? 1`
@@ -135,6 +169,9 @@ export async function generateConversationResponse(
 
   let contextualResponse: ContextualResponse;
   
+  // Parse constraints from problem description for constraint-aware analysis
+  const { constraints, numericalConstraints } = parseConstraints(problemDescription);
+
   try {
     // Always use the same comprehensive context approach
     // Responses API will handle continuation automatically via previous_response_id
@@ -146,7 +183,15 @@ TEST EXECUTION CONTEXT:
 - CRITICAL: Do NOT include any import statements in your code suggestions
 - CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
 
-TEACHING APPROACH - CRITICAL RULES:
+${constraints.length > 0 ? `CONSTRAINT-AWARE ANALYSIS:
+- PROBLEM CONSTRAINTS: ${constraints.join('; ')}
+- CRITICAL: When analyzing code correctness, first check if solution works within the stated constraints
+- Do NOT flag theoretical edge cases that cannot occur within the constraint bounds
+- If test cases pass and solution handles all inputs within constraints, acknowledge the solution as CORRECT
+- Focus on practical correctness within the problem scope, not theoretical completeness
+- Only consider issues that can actually occur given the problem constraints
+
+` : ""}TEACHING APPROACH - CRITICAL RULES:
 - Do NOT include unsolicited praise (e.g., "Great start", "You're on track").
 - Mode selection:
   - directAnswerMode = ${directQuestion}.
