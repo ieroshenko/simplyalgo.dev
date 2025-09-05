@@ -207,26 +207,31 @@ const AIChat = ({
     let inCode = false;
     let hint: string | undefined;
     const bodyLines: string[] = [];
-    for (const line of lines) {
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const trimmed = line.trim();
-      if (
-        trimmed.startsWith("```") &&
-        (trimmed === "```" || /^```\w+/.test(trimmed))
-      ) {
+      
+      // Track code fence state
+      if (trimmed.startsWith("```") && (trimmed === "```" || /^```\w+/.test(trimmed))) {
         inCode = !inCode;
         bodyLines.push(line);
         continue;
       }
-      if (!inCode && hint === undefined) {
-        const m = trimmed.match(/^Hint\s*:\s*(.+)$/i);
-        if (m) {
-          hint = m[1];
-          continue;
+      
+      // Look for hint pattern when not in code
+      if (!inCode) {
+        const hintMatch = trimmed.match(/^Hint\s*:\s*(.+)$/i);
+        if (hintMatch) {
+          hint = hintMatch[1];
+          continue; // Don't add this line to body
         }
       }
+      
       bodyLines.push(line);
     }
-    return { body: bodyLines.join("\n"), hint };
+    
+    return { body: bodyLines.join("\n").trim(), hint };
   };
 
   const BlurredHint: React.FC<{ text: string }> = ({ text }) => {
@@ -297,6 +302,10 @@ const AIChat = ({
             language={lang || "python"}
             PreTag="div"
             className="rounded-md !mt-2 !mb-2"
+            customStyle={{
+              whiteSpace: "pre",
+              overflowX: "auto"
+            }}
           >
             {code.replace(/\n$/, "")}
           </SyntaxHighlighter>
@@ -313,7 +322,7 @@ const AIChat = ({
                 insertionHint: {
                   type: "statement",
                   scope: "function",
-                  description: "Code snippet from AI response",
+                  description: "Code snippet from AI response - may be a bug fix or improvement",
                 },
               };
               onInsert(snippet);
@@ -344,7 +353,7 @@ const AIChat = ({
   };
 
   return (
-    <Card className="h-full flex flex-col border-l border-border rounded-none shadow-none">
+    <Card className="h-full flex flex-col border-l border-border rounded-none shadow-none min-w-0">
       {/* Chat Header */}
       <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between">
         <div className="flex items-center space-x-2">
@@ -371,8 +380,12 @@ const AIChat = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full min-h-[400px] p-4" ref={scrollAreaRef}>
+      <div className="flex-1 min-h-0 overflow-hidden min-w-0">
+        <ScrollArea 
+          className="h-full min-h-[200px] p-4 min-w-0" 
+          ref={scrollAreaRef}
+          style={{ minWidth: 0 }}
+        >
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex items-center space-x-2 text-muted-foreground">
@@ -397,8 +410,8 @@ const AIChat = ({
               )}
               <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message) => (
-                  <div key={message.id} className="mb-6">
-                    <div className="flex items-start gap-3">
+                  <div key={message.id} className="mb-6 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0">
                       {/* Avatar */}
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -414,13 +427,13 @@ const AIChat = ({
                         )}
                       </div>
 
-                      {/* Message Content */}
+                      {/* Message Content - Same as left panel with colored borders */}
                       <div className="flex-1 min-w-0">
-                        <div
-                          className={`inline-block max-w-[85%] rounded-lg px-4 py-3 ${
+                        <div 
+                          className={`prose prose-sm max-w-none text-muted-foreground border-l-4 pl-4 ${
                             message.role === "user"
-                              ? "border border-primary/40 bg-primary/10 text-foreground dark:border-primary/30 dark:bg-primary/15"
-                              : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
+                              ? "border-primary/60"
+                              : "border-accent/60"
                           }`}
                           onMouseEnter={() => {
                             if (message.role === 'assistant') setHoveredMessageId(message.id);
@@ -430,16 +443,14 @@ const AIChat = ({
                           }}
                         >
                           {message.role === "user" ? (
-                            <p className="text-sm whitespace-pre-wrap break-words text-left">
-                              {message.content}
-                            </p>
+                            <p className="text-foreground font-medium mb-2">{message.content}</p>
                           ) : (
                             (() => {
                               const { body, hint } = splitContentAndHint(
                                 message.content,
                               );
                               return (
-                                <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
+                                <div>
                                   <ReactMarkdown
                                   components={{
                                   code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
@@ -462,7 +473,7 @@ const AIChat = ({
                                     );
                                   },
                                   p: ({ children }) => (
-                                    <p className="mb-2 last:mb-0">{children}</p>
+                                    <p>{children}</p>
                                   ),
                                   ul: ({ children }) => (
                                     <ul className="list-disc list-outside pl-5 mb-2">
@@ -646,18 +657,20 @@ const AIChat = ({
                                   </div>
 
                                   <div className="bg-slate-900 rounded-md p-3 mb-3">
-                                    <SyntaxHighlighter
-                                      language={snippet.language}
-                                      style={vscDarkPlus}
-                                      customStyle={{
-                                        margin: 0,
-                                        padding: 0,
-                                        background: "transparent",
-                                        fontSize: "0.8rem",
-                                      }}
-                                    >
-                                      {snippet.code}
-                                    </SyntaxHighlighter>
+                                  <SyntaxHighlighter
+                                    language={snippet.language}
+                                    style={vscDarkPlus}
+                                    customStyle={{
+                                      margin: 0,
+                                      padding: 0,
+                                      background: "transparent",
+                                      fontSize: "0.8rem",
+                                      whiteSpace: "pre",
+                                      overflowX: "auto"
+                                    }}
+                                  >
+                                    {snippet.code}
+                                  </SyntaxHighlighter>
                                   </div>
 
                                   {snippet.insertionHint?.description && (

@@ -539,261 +539,79 @@ export async function insertSnippetSmart(
   cursorPosition?: { line: number; column: number },
   contextHint?: string,
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  // Skip anchor-based insertion for now - it was causing false positives
-  // Let AI handle all insertion decisions for better context awareness
-  console.log("[ai-chat] Skipping anchor-based insertion, using AI placement for better context awareness");
+  
+  const mergePrompt = `You are a smart code merging assistant. Your job is to intelligently merge the current code with the new snippet while PRESERVING as much of the existing code as possible.
 
-  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them with full context awareness.
-
-CURRENT FILE:
----BEGIN FILE---
+CURRENT CODE:
+\`\`\`python
 ${code}
----END FILE---
+\`\`\`
 
-SNIPPET TO INSERT:
----BEGIN SNIPPET---
+SNIPPET TO MERGE:
+\`\`\`python
 ${snippet.code}
----END SNIPPET---
+\`\`\`
 
-COACHING HINT (what to fix):
-${contextHint || "(no explicit hint)"}
+CONTEXT: ${contextHint || "User wants to add this code snippet"}
 
-CRITICAL CONTEXT ANALYSIS:
-- Analyze the current code structure, variables, and logic flow
-- Understand what the student is trying to build based on existing code
-- Consider the algorithm pattern and where this snippet fits in the solution
-- Look for incomplete functions, missing initializations, or logical next steps
+EXECUTION ENVIRONMENT:
+- This code runs in Judge0 which automatically handles all imports (List, Optional, etc.)
+- DO NOT add any import statements - they are handled automatically
+- Focus ONLY on the solution logic within the existing method/class structure
 
-SMART INSERTION RULES:
-1. If the snippet code already exists in the current file, return insertAtLine: -1
-2. Find the most logical place considering:
-   - Algorithm flow and current code structure
-   - Variable scope and dependencies (if initializing variables, place at function start)
-   - Function boundaries and proper indentation
-   - What the student appears to be building based on existing code
-3. Insert as new lines, don't replace existing code unless fixing bugs
-4. Consider the logical sequence: imports → initialization → main logic → return
+TASK: Analyze both pieces of code and decide how to merge them:
 
-MERGE CLEANUP:
-- If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
-- If both bin(i).count('1') and DP relation (res[i] = res[i >> 1] + (i & 1)) implementations are present for the same function, keep only one consistent implementation based on continuity with surrounding code. Prefer DP if both appear.
-- CRITICAL: If the snippet fixes bugs in similar existing code (e.g., n >> 1 vs n >>= 1, or return n vs return count), REPLACE the buggy lines rather than marking as duplicate. Look for logical errors, missing assignments, wrong return values.
+1. **MERGE (PREFERRED)**: If possible, integrate the snippet into the existing code structure:
+   - Keep the existing class structure, method signature, and variable names
+   - Only add missing logic or fix specific bugs
+   - Preserve existing working code
+   - Insert snippet lines at the appropriate location within the existing method
+   - DO NOT add imports - focus only on the algorithm logic
 
-Output JSON:
+2. **REPLACE (ONLY IF NECESSARY)**: Only if the current code is completely broken or empty, replace entirely
+   - Even when replacing, DO NOT add import statements
+   - Keep only the class and method structure with the new logic
+
+IMPORTANT RULES:
+- NEVER add import statements (from typing import List, etc.) - they are auto-handled
+- PRESERVE the existing code structure whenever possible
+- DO NOT rewrite working code unnecessarily  
+- DO NOT change variable names that are already correct
+- If the current code has a method signature, keep it exactly the same
+- Only fix actual bugs or add missing functionality
+- Focus on the algorithm logic inside the method body
+
+Return JSON:
 {
-  "insertAtLine": <0-based line number, or -1 if code already exists>,
-  "indentation": "<spaces for proper indentation>",
-  "rationale": "<brief reason for placement or why skipped>"
+  "action": "merge|replace",
+  "newCode": "the complete merged or replacement code WITHOUT any imports",
+  "rationale": "brief explanation of what you did and why"
 }`;
 
-  console.log("[ai-chat] insert_snippet using main model for smart placement");
-  console.log("[ai-chat] Snippet to insert:", snippet.code);
-  console.log("[ai-chat] Current code length:", code.length);
-  
-  let insertAtLine: number | undefined;
-  let indent: string | undefined;
-  let rationale: string | undefined;
-  
   try {
-    const raw = await llmJson(placementPrompt, { maxTokens: 500 });
-    console.log("[ai-chat] LLM response for insertion:", raw);
+    const raw = await llmJson(mergePrompt, { maxTokens: 1500 });
+    const result = JSON.parse(raw || '{}');
     
-  try {
-    const parsed = JSON.parse(raw || "{}");
-      console.log("[ai-chat] Parsed insertion result:", parsed);
-    if (typeof parsed.insertAtLine === "number")
-      insertAtLine = parsed.insertAtLine;
-    if (typeof parsed.indentation === "string") indent = parsed.indentation;
-    if (typeof parsed.rationale === "string") rationale = parsed.rationale;
-    } catch (parseError) {
-      console.error("[ai-chat] Failed to parse LLM response:", parseError);
-      throw new Error(`Invalid JSON response from LLM: ${raw}`);
+    if (!result.newCode) {
+      throw new Error("AI did not return newCode");
     }
-  } catch (llmError) {
-    console.error("[ai-chat] LLM call failed:", llmError);
-    throw new Error(`LLM call failed: ${llmError.message}`);
+    
+    return {
+      newCode: result.newCode,
+      insertedAtLine: result.action === "replace" ? 0 : 1, // Use 1 for merge, 0 for replace
+      rationale: result.rationale || `Applied ${result.action} strategy`
+    };
+    
+  } catch (error) {
+    console.error("[ai-chat] Smart merge failed:", error);
+    
+    // Fallback: simple replacement
+    return {
+      newCode: snippet.code,
+      insertedAtLine: 0,
+      rationale: "Fallback: replaced with snippet code due to merge error"
+    };
   }
-
-  // No language-specific hardcoded placement heuristics — rely on model analysis.
-
-  // If model claims snippet already exists or cannot place, attempt repairs or controlled replacement
-  if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
-    const hintLower = (contextHint || '').toLowerCase();
-    const isCoachingInsert = hintLower.includes('[coaching snippet insertion]');
-    const wantsFix = /(fix|replace|correct|broken|bug|cleanup|clean up|delete|remove|rewrite|overhaul)/i.test(
-      contextHint || '',
-    );
-    const allowDestructiveFixes = isCoachingInsert || wantsFix;
-
-    // Step 1: lightweight deterministic bug-fix heuristics
-    let fixed = code;
-    fixed = fixed.replace(/^(\s*)(n)\s*>>\s*1\s*$/gm, "$1$2 >>= 1");
-    if (/\bcount\b/.test(snippet.code)) {
-      fixed = fixed.replace(/^(\s*)return\s+n\s*$/gm, "$1return count");
-    }
-    if (fixed !== code) {
-      return {
-        newCode: fixed,
-        insertedAtLine: -1,
-        rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes',
-      };
-    }
-
-    // Step 2: if allowed, escalate to controlled replacement at function level
-    if (allowDestructiveFixes) {
-      const lines = code.split('\n');
-      const snippetLines = snippet.code.split('\n');
-
-      // Helper: find function range by name
-      const getFunctionNameFromSnippet = (): string | null => {
-        for (const s of snippetLines) {
-          const m = s.match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-          if (m) return m[1];
-        }
-        return null;
-      };
-
-      const findFunctionRangeByName = (name: string): { start: number; end: number } | null => {
-        let start = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/.test(lines[i])) {
-            const m = lines[i].match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-            if (m && m[1] === name) {
-              start = i;
-              break;
-            }
-          }
-        }
-        if (start === -1) return null;
-        // Find end by scanning until next top-level def with indentation <= current def
-        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
-        let end = lines.length;
-        for (let j = start + 1; j < lines.length; j++) {
-          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
-          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) {
-            end = j;
-            break;
-          }
-        }
-        return { start, end };
-      };
-
-      // Helper: find enclosing function around a line
-      const findEnclosingFunction = (lineIndex: number): { start: number; end: number } | null => {
-        let start = -1;
-        for (let i = lineIndex; i >= 0; i--) {
-          if (/^\s*def\s+/.test(lines[i])) { start = i; break; }
-        }
-        if (start === -1) return null;
-        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
-        let end = lines.length;
-        for (let j = start + 1; j < lines.length; j++) {
-          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
-          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) { end = j; break; }
-        }
-        return { start, end };
-      };
-
-      const snippetFuncName = getFunctionNameFromSnippet();
-      let target: { start: number; end: number } | null = null;
-
-      if (snippetFuncName) {
-        target = findFunctionRangeByName(snippetFuncName);
-      }
-      if (!target && cursorPosition && typeof cursorPosition.line === 'number') {
-        target = findEnclosingFunction(Math.max(0, Math.min(lines.length - 1, cursorPosition.line)));
-      }
-
-      // Replace strategy
-      if (target) {
-        const { start, end } = target;
-        // If we're replacing body only (snippet has no def) but target exists, keep def line
-        let replacement: string[];
-        if (!snippetFuncName && /^\s*def\s+/.test(lines[start])) {
-          const bodyIndent = (lines[start].match(/^\s*/)?.[0] || '') + '    ';
-          const indentedSnippet = snippetLines.map((l) => (l.trim().length ? bodyIndent + l.trim() : l));
-          replacement = [lines[start], ...indentedSnippet];
-        } else {
-          replacement = snippetLines;
-        }
-        const newLines = [
-          ...lines.slice(0, start),
-          ...replacement,
-          ...lines.slice(end),
-        ];
-        return {
-          newCode: newLines.join('\n'),
-          insertedAtLine: start,
-          rationale: (rationale ? rationale + '; ' : '') + 'replaced conflicting function region',
-        };
-      }
-
-      // Fallback: replace entire file if unrecoverable and snippet is small/safe
-      const snippetLen = snippet.code.trim().length;
-      if (snippetLen > 0 && snippetLen < 4000) {
-        return {
-          newCode: snippet.code,
-          insertedAtLine: 0,
-          rationale: (rationale ? rationale + '; ' : '') + 'file-level replacement due to irreparable code',
-        };
-      }
-    }
-
-    // If not allowed to be destructive or no safe target found, return original code with rationale
-    return { newCode: code, insertedAtLine: -1, rationale: rationale ? rationale : 'no safe insertion point; non-destructive' };
-  }
-
-  // Deterministic insertion of ONLY the provided snippet
-  const lines = code.split("\n");
-  const safeInsertLine = Math.min(Math.max(0, insertAtLine), lines.length);
-  // Derive indentation if not provided
-  const contextIndent =
-    indent !== undefined
-      ? indent
-      : lines[safeInsertLine]?.match(/^\s*/)?.[0] || "";
-
-  const snippetLines = snippet.code.split("\n");
-  const indentedSnippet: string[] = snippetLines.map((line, idx) => {
-    if (idx === 0) {
-      return contextIndent + line.trim();
-    }
-    return contextIndent + line;
-  });
-
-  let newLines = [...lines];
-  newLines.splice(safeInsertLine, 0, ...indentedSnippet);
-
-  // Simple deterministic cleanup: if we inserted a return within a function, strip trivial unreachable duplicates after it
-  try {
-    // Find the function start above insertion (Python-style `def`)
-    let funcStart = -1;
-    for (let i = safeInsertLine; i >= 0; i--) {
-      if (/^\s*def\s+\w+\s*\(/.test(newLines[i])) { funcStart = i; break; }
-    }
-    if (funcStart !== -1) {
-      // Find the first return line inside function after insertion
-      let firstReturn = -1;
-      for (let i = safeInsertLine; i < newLines.length; i++) {
-        if (/^\s*return\b/.test(newLines[i])) { firstReturn = i; break; }
-      }
-      if (firstReturn !== -1) {
-        // If there are simple computed lines after return like alternate loops or extra return, trim trailing duplicate block
-        // Heuristic: if following lines include `for i in range` or another `return res`, drop them
-        const tail = newLines.slice(firstReturn + 1);
-        const hasAltLoop = tail.some(l => /for\s+i\s+in\s+range\s*\(/.test(l));
-        const hasSecondReturn = tail.some(l => /^\s*return\b/.test(l));
-        if (hasAltLoop || hasSecondReturn) {
-          // keep only up to firstReturn
-          newLines = newLines.slice(0, firstReturn + 1);
-        }
-      }
-    }
-  } catch (_) {
-    // non-fatal cleanup error; ignore
-  }
-
-  const newCode = newLines.join("\n");
-  return { newCode, insertedAtLine: safeInsertLine, rationale };
 }
 
 /**
