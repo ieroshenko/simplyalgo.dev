@@ -1,14 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
+import { Badge } from "@/components/ui/badge";
 import { Problem } from "@/types";
 import Notes, { NotesHandle } from "@/components/Notes";
 import { useSubmissions } from "@/hooks/useSubmissions";
 import { useSolutions } from "@/hooks/useSolutions";
 import { useState } from "react";
+import Editor from "@monaco-editor/react";
+import { useEditorTheme } from "@/hooks/useEditorTheme";
+import { toast } from "sonner";
 
 interface ProblemPanelProps {
   problem: Problem;
   problemId: string;
+  userId?: string;
   activeTab: string;
   onTabChange: (tab: string) => void;
   leftPanelTabs: Array<{ id: string; label: string }>;
@@ -19,6 +24,7 @@ interface ProblemPanelProps {
 const ProblemPanel = ({
   problem,
   problemId,
+  userId,
   activeTab,
   onTabChange,
   leftPanelTabs,
@@ -29,29 +35,125 @@ const ProblemPanel = ({
     submissions,
     loading: subsLoading,
     error: subsError,
-  } = useSubmissions(problemId);
+  } = useSubmissions(userId, problemId);
   const {
     solutions,
     loading: solutionsLoading,
   } = useSolutions(problemId);
+  const { currentTheme, defineCustomThemes } = useEditorTheme();
   
   const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+  const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
+  const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
 
   const toggleSubmission = (id: string) => {
-    setExpandedSubmissions((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+    setExpandedSubmissionId((prev) => (prev === id ? null : id));
   };
 
-  const renderValue = (value: any): string => {
-    if (typeof value === "string") return value;
-    return JSON.stringify(value, null, 2);
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const formatRelativeTime = (isoDate: string) => {
+    const now = new Date();
+    const then = new Date(isoDate);
+    const diffMs = now.getTime() - then.getTime();
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
+    return then.toLocaleDateString();
+  };
+
+  const handleAnalyzeComplexity = async (code: string, submissionId: string) => {
+    if (!problem || !userId) {
+      toast.error("Unable to analyze complexity - missing context");
+      return;
+    }
+
+    setAnalyzingSubmissionId(submissionId);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          action: "analyze_complexity",
+          code,
+          problem_id: problem.id,
+          problem_description: problem.description,
+          user_id: userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Handle the response structure from the backend
+      const analysis = result.complexityAnalysis || result;
+      
+      setComplexityResults(prev => ({
+        ...prev,
+        [submissionId]: {
+          time_complexity: analysis.timeComplexity,
+          time_explanation: analysis.timeExplanation,
+          space_complexity: analysis.spaceComplexity,
+          space_explanation: analysis.spaceExplanation,
+          analysis: analysis.overallAnalysis
+        }
+      }));
+
+      toast.success("Complexity analysis complete!");
+    } catch (error) {
+      console.error("Complexity analysis error:", error);
+      toast.error("Failed to analyze complexity. Please try again.");
+    } finally {
+      setAnalyzingSubmissionId(null);
+    }
+  };
+
+  const renderValue = (value: unknown): string => {
+    if (value === null || value === undefined) return "null";
+    if (typeof value === "number" || typeof value === "boolean")
+      return String(value);
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+      ) {
+        try {
+          return JSON.stringify(JSON.parse(trimmed));
+        } catch {
+          return value;
+        }
+      }
+      return value;
+    }
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value as Record<string, unknown>);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
   };
 
   const openFullscreen = (code: string, lang: string, title: string) => {
@@ -91,7 +193,9 @@ const ProblemPanel = ({
               Problem Description
             </h2>
             <div className="prose prose-sm max-w-none text-muted-foreground">
-              <p>{problem.description}</p>
+              <div style={{ whiteSpace: "pre-line" }}>
+                {problem.description}
+              </div>
             </div>
           </div>
           {problem.examples && problem.examples.length > 0 && (
@@ -132,6 +236,21 @@ const ProblemPanel = ({
               </div>
             </div>
           )}
+          
+          {/* Recommended Complexity */}
+          <div>
+            <h3 className="text-md font-semibold text-foreground mb-3">
+              Recommended Time & Space Complexity
+            </h3>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>
+                • Time: {problem.recommendedTimeComplexity || "—"}
+              </li>
+              <li>
+                • Space: {problem.recommendedSpaceComplexity || "—"}
+              </li>
+            </ul>
+          </div>
         </div>
       </TabPanel>
 
@@ -167,20 +286,58 @@ const ProblemPanel = ({
                           openFullscreen(
                             sol.code,
                             "python",
-                            sol.title
+                            `${problem.title} — ${sol.title}`,
                           )
                         }
+                        className="h-7 px-2 text-xs"
                       >
-                        Fullscreen
+                        Maximize
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopy(sol.code)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        Copy
                       </Button>
                     </div>
                   </div>
-                  <div className="prose prose-sm max-w-none text-muted-foreground mb-4">
-                    <p>{sol.explanation}</p>
+                  <div className="border rounded overflow-hidden">
+                    <Editor
+                      height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
+                      defaultLanguage="python"
+                      value={sol.code}
+                      theme={currentTheme}
+                      onMount={(editor, monaco) => {
+                        defineCustomThemes(monaco);
+                      }}
+                      options={{
+                        readOnly: true,
+                        minimap: { enabled: false },
+                        lineNumbers: "off",
+                        folding: false,
+                        scrollBeyondLastLine: false,
+                        renderLineHighlight: "none",
+                        fontSize: 15,
+                        wordWrap: "on",
+                      }}
+                    />
                   </div>
-                  <pre className="text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-4 rounded border">
-                    {sol.code}
-                  </pre>
+                </div>
+                <div className="mt-4">
+                  <h3 className="font-semibold text-foreground mb-2">
+                    Time & Space Complexity
+                  </h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Time complexity: {sol.time_complexity}</li>
+                    <li>• Space complexity: {sol.space_complexity}</li>
+                  </ul>
+                  {sol.explanation && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {sol.explanation}
+                    </p>
+                  )}
                 </div>
               </div>
             ))
@@ -220,65 +377,152 @@ const ProblemPanel = ({
                   >
                     <button
                       onClick={() => toggleSubmission(s.id)}
-                      className="w-full p-4 text-left hover:bg-muted/70 transition-colors"
+                      className="w-full flex items-center justify-between p-3 hover:bg-muted/70 transition-colors"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <span
-                              className={`text-sm font-medium ${getStatusColor(
-                                s.status
-                              )}`}
-                            >
-                              {s.status.replace("_", " ").toUpperCase()}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatSubmissionTime(s.submitted_at)}
-                            </span>
-                          </div>
-                          <div className="prose prose-sm max-w-none text-muted-foreground">
-                            <p className="text-xs">
-                              Runtime: {s.runtime || "N/A"} | Memory: {s.memory || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-muted-foreground">
-                          {expandedSubmissions.has(s.id) ? "▼" : "▶"}
-                        </div>
+                      <div className="flex items-center space-x-3 text-left">
+                        <span
+                          className="text-sm font-medium"
+                          style={{
+                            color:
+                              s.status === "passed"
+                                ? "#388e3c"
+                                : s.status === "failed"
+                                  ? "#d32f2f"
+                                  : "#555",
+                          }}
+                        >
+                          {s.status === "passed"
+                            ? "Accepted"
+                            : s.status.charAt(0).toUpperCase() +
+                              s.status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>{s.language || "Python"}</span>
+                        <span>
+                          {formatRelativeTime(s.created_at)}
+                        </span>
                       </div>
                     </button>
-                    {expandedSubmissions.has(s.id) && (
-                      <div className="border-t border-border p-4">
-                        <div className="mb-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                openFullscreen(
-                                  s.code,
-                                  "python",
-                                  `Submission ${formatSubmissionTime(s.submitted_at)}`
-                                )
-                              }
-                            >
-                              Fullscreen
-                            </Button>
-                          </div>
-                        </div>
-                        <pre className="text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-3 rounded border">
-                          {s.code}
-                        </pre>
-                        {s.test_results && (
-                          <div className="mt-3">
-                            <div className="prose prose-sm max-w-none text-muted-foreground">
-                              <p className="text-xs font-medium">Test Results:</p>
+                    {expandedSubmissionId === s.id && (
+                      <div className="px-3 pb-3">
+                        <div className="bg-background border rounded">
+                          <div className="flex items-center justify-between px-3 py-2 border-b">
+                            <div className="text-xs text-muted-foreground">
+                              {s.language || "Python"}
                             </div>
-                            <pre className="text-xs font-mono whitespace-pre overflow-x-auto bg-muted p-2 rounded mt-1">
-                              {JSON.stringify(s.test_results, null, 2)}
-                            </pre>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  openFullscreen(
+                                    s.code,
+                                    s.language || "python",
+                                    `${problem.title} — Submission`,
+                                  )
+                                }
+                                className="h-7 px-2 text-xs"
+                              >
+                                Maximize
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCopy(s.code)}
+                                className="h-7 px-2 text-xs"
+                              >
+                                Copy
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAnalyzeComplexity(s.code, s.id)}
+                                disabled={analyzingSubmissionId === s.id}
+                                className="h-7 px-2 text-xs"
+                              >
+                                {analyzingSubmissionId === s.id ? (
+                                  "Analyzing..."
+                                ) : (
+                                  "Analyze"
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                        )}
+                          <Editor
+                            height={`${Math.max(s.code.split('\n').length * 20 + 40, 100)}px`}
+                            defaultLanguage={(
+                              s.language || "python"
+                            ).toLowerCase()}
+                            value={s.code}
+                            theme={currentTheme}
+                            onMount={(editor, monaco) => {
+                              defineCustomThemes(monaco);
+                            }}
+                            options={{
+                              readOnly: true,
+                              minimap: { enabled: false },
+                              lineNumbers: "off",
+                              folding: false,
+                              scrollBeyondLastLine: false,
+                              renderLineHighlight: "none",
+                              fontSize: 15,
+                              wordWrap: "on",
+                            }}
+                          />
+
+                          {/* Complexity Analysis Results */}
+                          {complexityResults[s.id] && (
+                            <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
+                              <h4 className="font-medium text-sm text-foreground mb-3">
+                                Complexity Analysis
+                              </h4>
+                              <div className="space-y-3">
+                                {/* Time Complexity */}
+                                <div>
+                                  <div className="text-sm font-medium text-foreground mb-1">
+                                    Time Complexity: 
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      {complexityResults[s.id].time_complexity || "N/A"}
+                                    </Badge>
+                                  </div>
+                                  {complexityResults[s.id].time_explanation && (
+                                    <p className="text-sm text-foreground/80">
+                                      {complexityResults[s.id].time_explanation}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Space Complexity */}
+                                <div>
+                                  <div className="text-sm font-medium text-foreground mb-1">
+                                    Space Complexity: 
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      {complexityResults[s.id].space_complexity || "N/A"}
+                                    </Badge>
+                                  </div>
+                                  {complexityResults[s.id].space_explanation && (
+                                    <p className="text-sm text-foreground/80">
+                                      {complexityResults[s.id].space_explanation}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Overall Analysis */}
+                                {complexityResults[s.id].analysis && (
+                                  <div>
+                                    <div className="text-sm font-medium text-foreground mb-1">
+                                      Analysis:
+                                    </div>
+                                    <p className="text-sm text-foreground/80">
+                                      {complexityResults[s.id].analysis}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

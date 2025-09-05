@@ -169,6 +169,7 @@ const ProblemSolverNew = () => {
     submissions,
     loading: subsLoading,
     error: subsError,
+    optimisticAdd,
   } = useSubmissions(user?.id, problem?.id);
   const { solutions, loading: solutionsLoading } = useSolutions(problemId);
 
@@ -535,12 +536,14 @@ const ProblemSolverNew = () => {
 
       if (passedCount === totalCount) {
         toast.success("All tests passed! 🎉");
-        await UserAttemptsService.markProblemSolved(
+        const saved = await UserAttemptsService.markProblemSolved(
           user.id,
           problem.id,
           code,
           response.results,
         );
+        // Optimistically add to submissions list for instant UI feedback
+        if (saved) optimisticAdd(saved);
         await handleProblemSolved(
           problem.difficulty as "Easy" | "Medium" | "Hard",
         );
@@ -666,6 +669,7 @@ const ProblemSolverNew = () => {
                 <ProblemPanel
                   problem={problem}
                   problemId={problemId}
+                  userId={user?.id}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                   leftPanelTabs={leftPanelTabs}
@@ -748,18 +752,18 @@ const ProblemSolverNew = () => {
                                     : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20";
                                 }
                                 return (
-                                  <button
-                                    key={index}
-                                    onClick={() => setActiveTestCase(index)}
+                                <button
+                                  key={index}
+                                  onClick={() => setActiveTestCase(index)}
                                     className={buttonClass}
-                                  >
-                                    {result.passed ? (
-                                      <Check className="w-3 h-3" />
-                                    ) : (
-                                      <X className="w-3 h-3" />
-                                    )}
-                                    <span>Case {index + 1}</span>
-                                  </button>
+                                >
+                                  {result.passed ? (
+                                    <Check className="w-3 h-3" />
+                                  ) : (
+                                    <X className="w-3 h-3" />
+                                  )}
+                                  <span>Case {index + 1}</span>
+                                </button>
                                 );
                               })}
                             </div>

@@ -559,32 +559,25 @@ EXECUTION ENVIRONMENT:
 - DO NOT add any import statements - they are handled automatically
 - Focus ONLY on the solution logic within the existing method/class structure
 
+CRITICAL RULES:
+1. **ONLY INSERT THE EXACT SNIPPET** - Do not add extra statements, returns, or "helpful" completions
+2. **PRESERVE EXISTING CODE** - Keep all existing code unless it directly conflicts with the snippet
+3. **MINIMAL CHANGES** - Make the smallest possible change to integrate the snippet
+4. **NO ASSUMPTIONS** - Don't assume what the user "meant" to include beyond the exact snippet
+
 TASK: Analyze both pieces of code and decide how to merge them:
 
-1. **MERGE (PREFERRED)**: If possible, integrate the snippet into the existing code structure:
-   - Keep the existing class structure, method signature, and variable names
-   - Only add missing logic or fix specific bugs
-   - Preserve existing working code
-   - Insert snippet lines at the appropriate location within the existing method
-   - DO NOT add imports - focus only on the algorithm logic
+1. **MERGE (PREFERRED)**: If possible, integrate the snippet into the existing code structure
+   - Find the best insertion point (usually after variable declarations, before return)
+   - Maintain proper indentation
+   - Do NOT add missing returns, imports, or other "completions"
 
-2. **REPLACE (ONLY IF NECESSARY)**: Only if the current code is completely broken or empty, replace entirely
-   - Even when replacing, DO NOT add import statements
-   - Keep only the class and method structure with the new logic
-
-IMPORTANT RULES:
-- NEVER add import statements (from typing import List, etc.) - they are auto-handled
-- PRESERVE the existing code structure whenever possible
-- DO NOT rewrite working code unnecessarily  
-- DO NOT change variable names that are already correct
-- If the current code has a method signature, keep it exactly the same
-- Only fix actual bugs or add missing functionality
-- Focus on the algorithm logic inside the method body
+2. **REPLACE (ONLY IF NECESSARY)**: Only if the current code is completely broken or empty
 
 Return JSON:
 {
   "action": "merge|replace",
-  "newCode": "the complete merged or replacement code WITHOUT any imports",
+  "newCode": "the complete merged code with ONLY the snippet added, no extra statements",
   "rationale": "brief explanation of what you did and why"
 }`;
 
