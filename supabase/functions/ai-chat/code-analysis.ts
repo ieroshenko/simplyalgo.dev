@@ -148,93 +148,62 @@ export async function generateConversationResponse(
       ? JSON.stringify(testCases)
       : undefined;
 
-  // Analyze message for request/intent signals
-  const hasExplicitCode = /```[\s\S]*?```|`[^`]+`/m.test(message);
-  const explicitCodeRequest =
-    /(\b(write|show|give|provide)\s+(me\s+)?(code|snippet)\b)|\b(insert|add)\s+(code|line|lines|snippet)\b|\b(implement|import|define)\b/i.test(
-      message,
-    );
-  const stuckIndicators = /(stuck|blocked|don'?t know|not sure|lost|confused)/i.test(
-      message,
-    );
-  const explicitHintAsk = /\b(hint|nudge)\b/i.test(message);
-  const explanationRequested = /(explain|explanation|walk\s+me\s+through|remind\s+me|what\s+is|why\s+do\s+we|step\s*by\s*step)/i.test(message);
-  const isFirstTurn = (conversationHistory || []).length === 0;
-  // Hints allowed only if explicitly asked or user signals being stuck, but NEVER when an explanation is requested
-  const allowHint = (explicitHintAsk || stuckIndicators) && !explanationRequested;
-  // Code allowed when explicitly asked or user is stuck; never when explanation or hint is explicitly requested (unless explicitly asked for code)
-  const allowCode = (!explanationRequested && !explicitHintAsk) && (hasExplicitCode || explicitCodeRequest || stuckIndicators) && (!isFirstTurn || hasExplicitCode || explicitCodeRequest);
-  // Detect direct questions to prioritize an answer first
-  const directQuestion = /\?|\b(what|how|why|explain|can\s+you\s+explain|help\s+me\s+understand)\b/i.test(message);
-
   let contextualResponse: ContextualResponse;
   
   // Parse constraints from problem description for constraint-aware analysis
   const { constraints, numericalConstraints } = parseConstraints(problemDescription);
 
   try {
-    // Always use the same comprehensive context approach
-    // Responses API will handle continuation automatically via previous_response_id
-    const chatContext = `You are SimplyAlgo's AI stocastic coding coach. Use a friendly, concise tone and guide students step by step.
+    // Simplified context approach maintaining response ID efficiency
+    const chatContext = `You are SimplyAlgo's friendly AI coding coach. Help students discover solutions through guided questioning.
 
-TEST EXECUTION CONTEXT:
-- The student's code will be executed automatically on Judge0 against the official test cases.
-- Judge0 handles all imports (List, Optional, etc.) and basic Python setup automatically.
-- CRITICAL: Do NOT include any import statements in your code suggestions
-- CRITICAL: When providing code, always wrap it in \`\`\`python code blocks for proper rendering
+CRITICAL COACHING RULES:
+1. FIRST: Always look at their current editor code and reference it directly
+2. DEFAULT RESPONSE: Ask ONE specific guiding question to help them think through the next step
+3. NEVER give full solutions, templates, or complete code blocks unless they explicitly ask "show me the code" or "give me the solution"
+4. When they say "I understand but don't know how to code it" → Ask what specific part they're stuck on
+5. Use their existing code style (function name, variable names, structure) - NOT "class Solution" format
 
-${constraints.length > 0 ? `CONSTRAINT-AWARE ANALYSIS:
-- PROBLEM CONSTRAINTS: ${constraints.join('; ')}
-- CRITICAL: When analyzing code correctness, first check if solution works within the stated constraints
-- Do NOT flag theoretical edge cases that cannot occur within the constraint bounds
-- If test cases pass and solution handles all inputs within constraints, acknowledge the solution as CORRECT
-- Focus on practical correctness within the problem scope, not theoretical completeness
-- Only consider issues that can actually occur given the problem constraints
+EXECUTION ENVIRONMENT:
+- Code runs on Judge0 with automatic imports (List, Optional, etc.)
+- NEVER include import statements in suggestions
+- Use proper Python syntax with type hints when showing small snippets
+- ALWAYS format code properly with newlines, NEVER use semicolons to separate Python statements
 
-` : ""}TEACHING APPROACH - CRITICAL RULES:
-- Do NOT include unsolicited praise (e.g., "Great start", "You're on track").
-- Mode selection:
-  - directAnswerMode = ${directQuestion}.
-  - explanationMode = ${explanationRequested}.
-  - If explanationMode is true: Provide a concise explanation in 3–5 sentences tailored to CURRENT CODE. Use one small concrete example and a simple analogy if helpful. No hints. No Socratic question. Aim for ~70–110 words.
-  - If explanationMode is false AND directAnswerMode is true: Answer directly first (<= 40 words). After answering, optionally ask ONE short follow-up question (<= 14 words). Do NOT preface with words like "First" or "Next". Do NOT restate the problem.
-  - If neither explanationMode nor directAnswerMode: Provide one brief, neutral next-step explanation (<= 26 words) grounded in CURRENT CODE, then ask exactly ONE concise Socratic question (<= 16 words).
-- Do NOT provide hints or code unless permitted below.
-- Hint policy: allowHint = ${allowHint}. If true, include at most ONE short conceptual hint (<= 12 words). No code and do not reveal the answer.
-- Code policy: allowCode = ${allowCode}. If true, you may include at most ONE tiny code block (1–3 lines) with a one‑sentence explanation. No full functions.
-- Keep total reply under ~55 words. Friendly but concise and neutral.
-- Focus on the immediate next step based on the student's current code.
-- Build upon the current code in the editor - analyze what they have and suggest the next logical step.
+${constraints.length > 0 ? `PROBLEM CONSTRAINTS: ${constraints.join('; ')}
+Focus on solutions that work within these constraints.
 
-CODE ANALYSIS PATTERNS:
-- If CURRENT CODE is empty or minimal: Provide approach guidance and thinking framework.
-- If CURRENT CODE has correct logic: Acknowledge good parts, suggest next step using existing variables.
-- If CURRENT CODE has wrong logic: Gently identify issues, guide toward a correct path.
-- Always reference specific lines and symbols from CURRENT CODE.
-- Use existing variables/functions in suggestions.
-- Build incrementally on what's already written.
-- Treat code as “minimal” if it’s empty, only a function signature, or lacks control flow (no loops/conditions).
+` : ""}RESPONSE PATTERNS:
+- Student asks for FULL SOLUTION ("show me solution", "how to solve this", "give me the code"): Provide complete working solution in proper python code blocks
+- Student asks for CODE SNIPPET ("give me snippet", "what's next", "help with this part", "give me some code"): Provide ONLY the next logical step in proper python code blocks, NO follow-up questions
+- Student says "I understand the approach but don't know how to code it": Ask "What's the first step you'd take? What would you check or do with the input?"  
+- Student explains their understanding: Ask "That's right! What would be your base case?" or "How would you handle the recursive calls?"
+- Student asks for explanation: Give brief explanation then ask "What part would you tackle first?"
+- All other cases: Ask ONE guiding question
+
+CODE FORMATTING RULES:
+- ALWAYS use proper markdown code blocks with python language tag for any code (never inline code)
+- When providing code, do NOT ask follow-up questions - just give the code
+- Match the student's existing function signature exactly
+
+PYTHON CODE FORMATTING:
+- Match the student's function signature and style from their editor
+- Use proper type hints: def function_name(param: TreeNode) -> TreeNode:
+- Use newlines, never semicolons: each statement on its own line
+- Only show tiny snippets unless they ask for full code
 
 PROBLEM CONTEXT:
 ${problemDescription}
 
-${serializedTests ? `PROBLEM TEST CASES (JSON):\n${serializedTests}\n` : ""}
+${serializedTests ? `TEST CASES:\n${serializedTests}\n` : ""}
 ${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
 
-CONVERSATION HISTORY:
+RECENT CONVERSATION:
 ${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
 
-CURRENT STUDENT MESSAGE: "${message}"
+STUDENT MESSAGE: "${message}"
 
-Code policy: allowCode = ${allowCode}
-
-Response requirements:
-- If explanationMode is true: Output a concise paragraph of 3–5 sentences that (1) states the core idea, (2) walks through a small concrete example, and (3) uses a simple analogy if helpful. No hints. No questions. No code.
-- Else begin with a brief next-step explanation (<= 30 words) based on CURRENT CODE.
-- Then ask exactly ONE Socratic question (<= 18 words) only if not in explanationMode.
-- If allowHint is true and allowCode is false, add one short conceptual hint (no code).
-- If allowCode is true, you may add one tiny code block formatted as:\n\n${"```"}python\n<1-3 lines>\n${"```"}\n\nwith a one‑sentence rationale.
-- Otherwise, provide no code or extra commentary.`;
+Analyze their current code and respond naturally based on their question.`;
 
     const session = sessionId || `anon-${Date.now()}`;
     // If client provided a previousResponseId (e.g., after cold start), seed the session cache
@@ -539,261 +508,72 @@ export async function insertSnippetSmart(
   cursorPosition?: { line: number; column: number },
   contextHint?: string,
 ): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  // Skip anchor-based insertion for now - it was causing false positives
-  // Let AI handle all insertion decisions for better context awareness
-  console.log("[ai-chat] Skipping anchor-based insertion, using AI placement for better context awareness");
+  
+  const mergePrompt = `You are a smart code merging assistant. Your job is to intelligently merge the current code with the new snippet while PRESERVING as much of the existing code as possible.
 
-  const placementPrompt = `You are a smart code merging assistant. Analyze the current code and the snippet to insert. Your job is to intelligently merge them with full context awareness.
-
-CURRENT FILE:
----BEGIN FILE---
+CURRENT CODE:
+\`\`\`python
 ${code}
----END FILE---
+\`\`\`
 
-SNIPPET TO INSERT:
----BEGIN SNIPPET---
+SNIPPET TO MERGE:
+\`\`\`python
 ${snippet.code}
----END SNIPPET---
+\`\`\`
 
-COACHING HINT (what to fix):
-${contextHint || "(no explicit hint)"}
+CONTEXT: ${contextHint || "User wants to add this code snippet"}
 
-CRITICAL CONTEXT ANALYSIS:
-- Analyze the current code structure, variables, and logic flow
-- Understand what the student is trying to build based on existing code
-- Consider the algorithm pattern and where this snippet fits in the solution
-- Look for incomplete functions, missing initializations, or logical next steps
+EXECUTION ENVIRONMENT:
+- This code runs in Judge0 which automatically handles all imports (List, Optional, etc.)
+- DO NOT add any import statements - they are handled automatically
+- Focus ONLY on the solution logic within the existing method/class structure
 
-SMART INSERTION RULES:
-1. If the snippet code already exists in the current file, return insertAtLine: -1
-2. Find the most logical place considering:
-   - Algorithm flow and current code structure
-   - Variable scope and dependencies (if initializing variables, place at function start)
-   - Function boundaries and proper indentation
-   - What the student appears to be building based on existing code
-3. Insert as new lines, don't replace existing code unless fixing bugs
-4. Consider the logical sequence: imports → initialization → main logic → return
+CRITICAL RULES:
+1. **ONLY INSERT THE EXACT SNIPPET** - Do not add extra statements, returns, or "helpful" completions
+2. **PRESERVE EXISTING CODE** - Keep all existing code unless it directly conflicts with the snippet
+3. **MINIMAL CHANGES** - Make the smallest possible change to integrate the snippet
+4. **NO ASSUMPTIONS** - Don't assume what the user "meant" to include beyond the exact snippet
 
-MERGE CLEANUP:
-- If the new snippet contains a return from inside a function, remove any unreachable lines that occur after that return within the same function body (e.g., duplicate loops or alternate implementations).
-- If both bin(i).count('1') and DP relation (res[i] = res[i >> 1] + (i & 1)) implementations are present for the same function, keep only one consistent implementation based on continuity with surrounding code. Prefer DP if both appear.
-- CRITICAL: If the snippet fixes bugs in similar existing code (e.g., n >> 1 vs n >>= 1, or return n vs return count), REPLACE the buggy lines rather than marking as duplicate. Look for logical errors, missing assignments, wrong return values.
+TASK: Analyze both pieces of code and decide how to merge them:
 
-Output JSON:
+1. **MERGE (PREFERRED)**: If possible, integrate the snippet into the existing code structure
+   - Find the best insertion point (usually after variable declarations, before return)
+   - Maintain proper indentation
+   - Do NOT add missing returns, imports, or other "completions"
+
+2. **REPLACE (ONLY IF NECESSARY)**: Only if the current code is completely broken or empty
+
+Return JSON:
 {
-  "insertAtLine": <0-based line number, or -1 if code already exists>,
-  "indentation": "<spaces for proper indentation>",
-  "rationale": "<brief reason for placement or why skipped>"
+  "action": "merge|replace",
+  "newCode": "the complete merged code with ONLY the snippet added, no extra statements",
+  "rationale": "brief explanation of what you did and why"
 }`;
 
-  console.log("[ai-chat] insert_snippet using main model for smart placement");
-  console.log("[ai-chat] Snippet to insert:", snippet.code);
-  console.log("[ai-chat] Current code length:", code.length);
-  
-  let insertAtLine: number | undefined;
-  let indent: string | undefined;
-  let rationale: string | undefined;
-  
   try {
-    const raw = await llmJson(placementPrompt, { maxTokens: 500 });
-    console.log("[ai-chat] LLM response for insertion:", raw);
+    const raw = await llmJson(mergePrompt, { maxTokens: 1500 });
+    const result = JSON.parse(raw || '{}');
     
-  try {
-    const parsed = JSON.parse(raw || "{}");
-      console.log("[ai-chat] Parsed insertion result:", parsed);
-    if (typeof parsed.insertAtLine === "number")
-      insertAtLine = parsed.insertAtLine;
-    if (typeof parsed.indentation === "string") indent = parsed.indentation;
-    if (typeof parsed.rationale === "string") rationale = parsed.rationale;
-    } catch (parseError) {
-      console.error("[ai-chat] Failed to parse LLM response:", parseError);
-      throw new Error(`Invalid JSON response from LLM: ${raw}`);
+    if (!result.newCode) {
+      throw new Error("AI did not return newCode");
     }
-  } catch (llmError) {
-    console.error("[ai-chat] LLM call failed:", llmError);
-    throw new Error(`LLM call failed: ${llmError.message}`);
+    
+    return {
+      newCode: result.newCode,
+      insertedAtLine: result.action === "replace" ? 0 : 1, // Use 1 for merge, 0 for replace
+      rationale: result.rationale || `Applied ${result.action} strategy`
+    };
+    
+  } catch (error) {
+    console.error("[ai-chat] Smart merge failed:", error);
+    
+    // Fallback: simple replacement
+    return {
+      newCode: snippet.code,
+      insertedAtLine: 0,
+      rationale: "Fallback: replaced with snippet code due to merge error"
+    };
   }
-
-  // No language-specific hardcoded placement heuristics — rely on model analysis.
-
-  // If model claims snippet already exists or cannot place, attempt repairs or controlled replacement
-  if (insertAtLine === -1 || insertAtLine === undefined || insertAtLine < 0) {
-    const hintLower = (contextHint || '').toLowerCase();
-    const isCoachingInsert = hintLower.includes('[coaching snippet insertion]');
-    const wantsFix = /(fix|replace|correct|broken|bug|cleanup|clean up|delete|remove|rewrite|overhaul)/i.test(
-      contextHint || '',
-    );
-    const allowDestructiveFixes = isCoachingInsert || wantsFix;
-
-    // Step 1: lightweight deterministic bug-fix heuristics
-    let fixed = code;
-    fixed = fixed.replace(/^(\s*)(n)\s*>>\s*1\s*$/gm, "$1$2 >>= 1");
-    if (/\bcount\b/.test(snippet.code)) {
-      fixed = fixed.replace(/^(\s*)return\s+n\s*$/gm, "$1return count");
-    }
-    if (fixed !== code) {
-      return {
-        newCode: fixed,
-        insertedAtLine: -1,
-        rationale: rationale ? `${rationale}; applied heuristic fixes` : 'applied heuristic fixes',
-      };
-    }
-
-    // Step 2: if allowed, escalate to controlled replacement at function level
-    if (allowDestructiveFixes) {
-      const lines = code.split('\n');
-      const snippetLines = snippet.code.split('\n');
-
-      // Helper: find function range by name
-      const getFunctionNameFromSnippet = (): string | null => {
-        for (const s of snippetLines) {
-          const m = s.match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-          if (m) return m[1];
-        }
-        return null;
-      };
-
-      const findFunctionRangeByName = (name: string): { start: number; end: number } | null => {
-        let start = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/.test(lines[i])) {
-            const m = lines[i].match(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-            if (m && m[1] === name) {
-              start = i;
-              break;
-            }
-          }
-        }
-        if (start === -1) return null;
-        // Find end by scanning until next top-level def with indentation <= current def
-        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
-        let end = lines.length;
-        for (let j = start + 1; j < lines.length; j++) {
-          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
-          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) {
-            end = j;
-            break;
-          }
-        }
-        return { start, end };
-      };
-
-      // Helper: find enclosing function around a line
-      const findEnclosingFunction = (lineIndex: number): { start: number; end: number } | null => {
-        let start = -1;
-        for (let i = lineIndex; i >= 0; i--) {
-          if (/^\s*def\s+/.test(lines[i])) { start = i; break; }
-        }
-        if (start === -1) return null;
-        const defIndent = (lines[start].match(/^\s*/)?.[0] || '').length;
-        let end = lines.length;
-        for (let j = start + 1; j < lines.length; j++) {
-          const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
-          if (/^\s*def\s+/.test(lines[j]) && indent <= defIndent) { end = j; break; }
-        }
-        return { start, end };
-      };
-
-      const snippetFuncName = getFunctionNameFromSnippet();
-      let target: { start: number; end: number } | null = null;
-
-      if (snippetFuncName) {
-        target = findFunctionRangeByName(snippetFuncName);
-      }
-      if (!target && cursorPosition && typeof cursorPosition.line === 'number') {
-        target = findEnclosingFunction(Math.max(0, Math.min(lines.length - 1, cursorPosition.line)));
-      }
-
-      // Replace strategy
-      if (target) {
-        const { start, end } = target;
-        // If we're replacing body only (snippet has no def) but target exists, keep def line
-        let replacement: string[];
-        if (!snippetFuncName && /^\s*def\s+/.test(lines[start])) {
-          const bodyIndent = (lines[start].match(/^\s*/)?.[0] || '') + '    ';
-          const indentedSnippet = snippetLines.map((l) => (l.trim().length ? bodyIndent + l.trim() : l));
-          replacement = [lines[start], ...indentedSnippet];
-        } else {
-          replacement = snippetLines;
-        }
-        const newLines = [
-          ...lines.slice(0, start),
-          ...replacement,
-          ...lines.slice(end),
-        ];
-        return {
-          newCode: newLines.join('\n'),
-          insertedAtLine: start,
-          rationale: (rationale ? rationale + '; ' : '') + 'replaced conflicting function region',
-        };
-      }
-
-      // Fallback: replace entire file if unrecoverable and snippet is small/safe
-      const snippetLen = snippet.code.trim().length;
-      if (snippetLen > 0 && snippetLen < 4000) {
-        return {
-          newCode: snippet.code,
-          insertedAtLine: 0,
-          rationale: (rationale ? rationale + '; ' : '') + 'file-level replacement due to irreparable code',
-        };
-      }
-    }
-
-    // If not allowed to be destructive or no safe target found, return original code with rationale
-    return { newCode: code, insertedAtLine: -1, rationale: rationale ? rationale : 'no safe insertion point; non-destructive' };
-  }
-
-  // Deterministic insertion of ONLY the provided snippet
-  const lines = code.split("\n");
-  const safeInsertLine = Math.min(Math.max(0, insertAtLine), lines.length);
-  // Derive indentation if not provided
-  const contextIndent =
-    indent !== undefined
-      ? indent
-      : lines[safeInsertLine]?.match(/^\s*/)?.[0] || "";
-
-  const snippetLines = snippet.code.split("\n");
-  const indentedSnippet: string[] = snippetLines.map((line, idx) => {
-    if (idx === 0) {
-      return contextIndent + line.trim();
-    }
-    return contextIndent + line;
-  });
-
-  let newLines = [...lines];
-  newLines.splice(safeInsertLine, 0, ...indentedSnippet);
-
-  // Simple deterministic cleanup: if we inserted a return within a function, strip trivial unreachable duplicates after it
-  try {
-    // Find the function start above insertion (Python-style `def`)
-    let funcStart = -1;
-    for (let i = safeInsertLine; i >= 0; i--) {
-      if (/^\s*def\s+\w+\s*\(/.test(newLines[i])) { funcStart = i; break; }
-    }
-    if (funcStart !== -1) {
-      // Find the first return line inside function after insertion
-      let firstReturn = -1;
-      for (let i = safeInsertLine; i < newLines.length; i++) {
-        if (/^\s*return\b/.test(newLines[i])) { firstReturn = i; break; }
-      }
-      if (firstReturn !== -1) {
-        // If there are simple computed lines after return like alternate loops or extra return, trim trailing duplicate block
-        // Heuristic: if following lines include `for i in range` or another `return res`, drop them
-        const tail = newLines.slice(firstReturn + 1);
-        const hasAltLoop = tail.some(l => /for\s+i\s+in\s+range\s*\(/.test(l));
-        const hasSecondReturn = tail.some(l => /^\s*return\b/.test(l));
-        if (hasAltLoop || hasSecondReturn) {
-          // keep only up to firstReturn
-          newLines = newLines.slice(0, firstReturn + 1);
-        }
-      }
-    }
-  } catch (_) {
-    // non-fatal cleanup error; ignore
-  }
-
-  const newCode = newLines.join("\n");
-  return { newCode, insertedAtLine: safeInsertLine, rationale };
 }
 
 /**

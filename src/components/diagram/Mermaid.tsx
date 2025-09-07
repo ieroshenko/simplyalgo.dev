@@ -48,6 +48,11 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
         const { svg } = await mm.render(id, sanitized);
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
+          const el = containerRef.current.querySelector('svg') as SVGElement | null;
+          if (el) {
+            el.style.maxWidth = '100%';
+            el.style.height = 'auto';
+          }
         }
       } catch (e) {
         if (!cancelled && containerRef.current) {
@@ -64,7 +69,7 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
 
   return (
     <figure className={className}>
-      <div ref={containerRef} className="overflow-auto" />
+      <div ref={containerRef} className="overflow-auto max-w-full" />
       {caption && (
         <figcaption className="mt-2 text-xs text-muted-foreground">
           {caption}

@@ -489,11 +489,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       if (coachingState.isOptimizationMode) {
         // Validate optimization step instead of correctness
+        console.debug('[COACHING][payload] validate_optimization_step codeLen=', currentCode.length);
         const { data, error } = await supabase.functions.invoke('ai-chat', {
           body: {
             action: 'validate_optimization_step',
             sessionId: coachingState.session.id,
             currentEditorCode: currentCode,
+            code: currentCode,
             problemDescription: problemDescription || `Problem ${problemId}`,
             previousStep: coachingState.lastOptimizationStep || undefined,
           },
@@ -556,6 +558,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       }
 
       // Default: validate correctness flow
+      console.debug('[COACHING][payload] validate_coaching_submission codeLen=', currentCode.length);
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           action: 'validate_coaching_submission',
@@ -563,6 +566,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           studentCode: userCode,
           studentResponse: userInput,
           currentEditorCode: currentCode,
+          code: currentCode,
           // Context tracking for token optimization
           previousResponseId: contextState.responseId,
         },
