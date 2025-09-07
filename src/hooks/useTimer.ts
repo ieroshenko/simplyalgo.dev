@@ -21,11 +21,10 @@ export const useTimer = () => {
   }, []);
 
   const start = useCallback(() => {
-    if (mode === "timer" && time === 0) {
-      setTime(timerDuration.hours * 3600 + timerDuration.minutes * 60);
-    }
+    // Start/resume the timer. Time synchronization with duration
+    // is handled when not running via the effect below.
     setIsRunning(true);
-  }, [mode, time, timerDuration]);
+  }, []);
 
   const pause = useCallback(() => {
     setIsRunning(false);
@@ -95,6 +94,15 @@ export const useTimer = () => {
       document.title = "DSA Arena";
     };
   }, [isRunning, mode, formatTime]);
+
+  // Keep displayed time in sync with configured duration when not running in timer mode.
+  // This ensures that editing the duration immediately updates the visible time
+  // and the next start uses the latest value.
+  useEffect(() => {
+    if (!isRunning && mode === "timer") {
+      setTime(timerDuration.hours * 3600 + timerDuration.minutes * 60);
+    }
+  }, [isRunning, mode, timerDuration]);
 
   return {
     mode,

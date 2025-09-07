@@ -9,6 +9,7 @@ import { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
+import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -447,6 +448,15 @@ const ProblemPanel = ({
                                   "Analyze"
                                 )}
                               </Button>
+                              <FlashcardButton
+                                problemId={problemId}
+                                problemStatus="solved"
+                                userId={userId}
+                                submissionCode={s.code}
+                                submissionId={s.id}
+                                variant="submission"
+                                className="h-7 px-2 text-xs"
+                              />
                             </div>
                           </div>
                           <Editor

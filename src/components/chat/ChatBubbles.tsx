@@ -125,23 +125,40 @@ const ChatBubbles = ({
     setIsCanvasOpen(true);
   };
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or typing updates
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
-    }
-  }, [messages]);
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      try {
+        el.scrollTop = el.scrollHeight;
+      } catch {}
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [messages, isTyping]);
 
   const formatTime = (timestamp: Date) => {
     return timestamp.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // Fix malformed Python code (semicolon-separated statements)
+  const fixPythonCode = (code: string): string => {
+    // If code contains semicolons and no newlines, it's likely malformed
+    if (code.includes(';') && !code.includes('\n')) {
+      console.log('Fixing malformed Python code:', code);
+      
+      // Split by semicolons and join with proper newlines
+      const statements = code.split(';').map(s => s.trim()).filter(s => s.length > 0);
+      const fixed = statements.join('\n');
+      
+      console.log('Fixed Python code:', fixed);
+      return fixed;
+    }
+    
+    return code;
   };
 
   // Extract trailing single-line "Hint: ..." outside of code fences
@@ -252,7 +269,11 @@ const ChatBubbles = ({
       </div>
 
       {/* Messages - Using exact left panel pattern */}
-      <div className="flex-1" style={{ height: "calc(100% - 49px)", overflow: "auto" }}>
+      <div
+        ref={scrollAreaRef}
+        className="flex-1"
+        style={{ height: "calc(100% - 49px)", overflow: "auto" }}
+      >
         <div className="p-6">
           {loading ? (
             <div className="text-sm text-muted-foreground">
@@ -268,29 +289,21 @@ const ChatBubbles = ({
             <div className="space-y-6">
               {messages.map((message) => (
                 <div key={message.id} className="mb-6">
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-accent text-accent-foreground"
-                      }`}
-                    >
-                      {message.role === "user" ? (
-                        <User className="w-4 h-4" />
-                      ) : (
+                  <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {/* Avatar for assistant (left side) */}
+                    {message.role === "assistant" && (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
                         <Bot className="w-4 h-4" />
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Message Bubble */}
-                    <div className="flex-1 min-w-0">
+                    <div className="max-w-[80%] min-w-0">
                       <div
-                        className={`rounded-lg p-4 max-w-none ${
+                        className={`rounded-lg p-3 ${
                           message.role === "user"
-                            ? "bg-primary/10 border-l-4 border-primary"
-                            : "bg-accent/10 border-l-4 border-accent"
+                            ? "border border-primary/60 bg-card text-foreground"
+                            : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
                         }`}
                       >
                         <div className={`prose prose-sm max-w-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
@@ -306,6 +319,16 @@ const ChatBubbles = ({
                                       code({ inline, className, children }) {
                                         const match = /language-(\w+)/.exec(className || "");
                                         const lang = match?.[1] || "python";
+                                        
+                                        // Debug logging for code snippets
+                                        console.log('Code snippet detected:', {
+                                          inline,
+                                          className,
+                                          lang,
+                                          children: String(children),
+                                          childrenLength: String(children).length
+                                        });
+                                        
                                         if (!inline) {
                                           return (
                                             <div className="relative group">
@@ -319,14 +342,24 @@ const ChatBubbles = ({
                                                   overflowX: "auto"
                                                 }}
                                               >
-                                                {String(children).replace(/\n$/, "")}
+                                                {fixPythonCode(String(children).replace(/\n$/, ""))}
                                               </SyntaxHighlighter>
                                               {onInsertCodeSnippet && (
                                                 <button
                                                   onClick={() => {
+                                                    const rawCode = String(children).replace(/\n$/, "");
+                                                    const codeToInsert = fixPythonCode(rawCode);
+                                                    console.log('Inserting code snippet:', {
+                                                      originalChildren: String(children),
+                                                      rawCode,
+                                                      fixedCode: codeToInsert,
+                                                      hasNewlines: codeToInsert.includes('\n'),
+                                                      hasSemicolons: codeToInsert.includes(';')
+                                                    });
+                                                    
                                                     const snippet: CodeSnippet = {
                                                       id: `direct-${Date.now()}`,
-                                                      code: String(children).replace(/\n$/, ""),
+                                                      code: codeToInsert,
                                                       language: "python",
                                                       isValidated: true,
                                                       insertionType: "smart",
@@ -488,30 +521,35 @@ const ChatBubbles = ({
                         </div>
                       </div>
                     </div>
+
+                    {/* Avatar for user (right side) */}
+                    {message.role === "user" && (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary text-primary-foreground">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
               
               {isTyping && (
                 <div className="mb-6">
-                  <div className="flex items-start gap-3">
+                  <div className="flex gap-3 justify-start">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
                       <Bot className="w-4 h-4" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="rounded-lg p-4 max-w-none bg-accent/10 border-l-4 border-accent">
-                        <div className="prose prose-sm max-w-none text-foreground">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                            <div
-                              className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}
-                            ></div>
-                            <div
-                              className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}
-                            ></div>
-                          </div>
+                    <div className="max-w-[80%] min-w-0">
+                      <div className="rounded-lg p-3 border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                          <div
+                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
                         </div>
                       </div>
                     </div>

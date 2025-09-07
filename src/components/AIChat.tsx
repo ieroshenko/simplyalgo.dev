@@ -189,15 +189,35 @@ const AIChat = ({
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]",
-      );
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current) {
+        // Try multiple selectors for the scrollable element
+        const scrollElement = 
+          scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]") ||
+          scrollAreaRef.current.querySelector("[data-radix-scroll-area-content]") ||
+          scrollAreaRef.current;
+        
+        console.log('Attempting to scroll:', {
+          scrollAreaRef: !!scrollAreaRef.current,
+          scrollElement: !!scrollElement,
+          scrollHeight: scrollElement?.scrollHeight,
+          currentScrollTop: scrollElement?.scrollTop
+        });
+
+        if (scrollElement) {
+          // Use requestAnimationFrame to ensure DOM has updated
+          requestAnimationFrame(() => {
+            scrollElement.scrollTop = scrollElement.scrollHeight;
+            console.log('Scrolled to:', scrollElement.scrollTop);
+          });
+        }
       }
-    }
-  }, [messages]);
+    };
+
+    // Small delay to ensure content is rendered
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timeoutId);
+  }, [messages, isTyping]);
 
   // Extract trailing single-line "Hint: ..." outside of code fences
   const splitContentAndHint = (
@@ -411,29 +431,21 @@ const AIChat = ({
               <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message) => (
                   <div key={message.id} className="mb-6 min-w-0">
-                    <div className="flex items-start gap-3 min-w-0">
-                      {/* Avatar */}
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          message.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-accent text-accent-foreground"
-                        }`}
-                      >
-                        {message.role === "user" ? (
-                          <User className="w-4 h-4" />
-                        ) : (
+                    <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`} style={{backgroundColor: message.role === "user" ? "rgba(255,0,0,0.1)" : "rgba(0,255,0,0.1)"}}>
+                      {/* Avatar for assistant (left side) */}
+                      {message.role === "assistant" && (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
                           <Bot className="w-4 h-4" />
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      {/* Message Content - Same as left panel with colored borders */}
-                      <div className="flex-1 min-w-0">
+                      {/* Message Content */}
+                      <div className="max-w-[80%] min-w-0">
                         <div 
-                          className={`prose prose-sm max-w-none text-muted-foreground border-l-4 pl-4 ${
+                          className={`prose prose-sm max-w-none text-muted-foreground rounded-lg p-3 ${
                             message.role === "user"
-                              ? "border-primary/60"
-                              : "border-accent/60"
+                              ? "border border-primary/60 bg-card text-foreground"
+                              : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15 pl-4"
                           }`}
                           onMouseEnter={() => {
                             if (message.role === 'assistant') setHoveredMessageId(message.id);
@@ -688,28 +700,33 @@ const AIChat = ({
                           {formatTime(message.timestamp)}
                         </div>
                       </div>
+
+                      {/* Avatar for user (right side) */}
+                      {message.role === "user" && (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary text-primary-foreground">
+                          <User className="w-4 h-4" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
 
                 {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="flex space-x-2 max-w-[80%]">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
-                        <Bot className="w-4 h-4" />
-                      </div>
-                      <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                          <div
-                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
-                          <div
-                            className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                        </div>
+                  <div className="flex justify-start gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                        <div
+                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
                       </div>
                     </div>
                   </div>

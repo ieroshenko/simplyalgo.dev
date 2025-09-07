@@ -54,6 +54,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
+import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 
 
 const ProblemSolverNew = () => {
@@ -655,6 +656,12 @@ const ProblemSolverNew = () => {
                 <StarOff className="w-4 h-4" />
               )}
             </Button>
+            <FlashcardButton
+              problemId={problem.id}
+              problemStatus={problem.status}
+              userId={user?.id}
+              className="ml-2"
+            />
           </div>
         </div>
       </div>

@@ -14,7 +14,8 @@ import {
   initializeOpenAI, 
   configuredModel, 
   modelSource, 
-  useResponsesApi 
+  useResponsesApi,
+  llmJson,
 } from "./openai-utils.ts";
 import { 
   startInteractiveCoaching, 
@@ -519,7 +520,7 @@ serve(async (req) => {
     // Analyze complexity action
     if (req.method === "POST" && action === "analyze_complexity") {
       console.log("[ai-chat] complexity analysis request received");
-      
+
       if (!code) {
         return new Response(
           JSON.stringify({
@@ -533,64 +534,68 @@ serve(async (req) => {
       }
 
       try {
-        const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
-        
-        const prompt = `Analyze the time and space complexity of this code solution for the following problem:
+        // Normalize problem fields from camelCase or snake_case
+        const pid = (body as any).problemId || (body as any).problem_id || problemId || '';
+        const pdesc =
+          (body as any).problemDescription ||
+          (body as any).problem_description ||
+          problemDescription ||
+          '';
 
-Problem: ${problemDescription || "No description provided"}
+        // Optionally fetch recommended complexities from DB
+        let recommendedTime = '';
+        let recommendedSpace = '';
+        if (pid) {
+          try {
+            const { data: prob } = await supabase
+              .from('problems')
+              .select('title, recommended_time_complexity, recommended_space_complexity')
+              .eq('id', pid)
+              .single();
+            if (prob) {
+              recommendedTime = prob.recommended_time_complexity || '';
+              recommendedSpace = prob.recommended_space_complexity || '';
+            }
+          } catch (_) {
+            // Non-fatal if metadata missing
+          }
+        }
 
-Code to analyze:
+        // Guard against extremely large code blocks causing truncation
+        const MAX_LINES = 300;
+        const codeLines = code.split("\n");
+        const trimmedCode =
+          codeLines.length > MAX_LINES
+            ? codeLines.slice(0, MAX_LINES).join("\n") + "\n# ... trimmed ..."
+            : code;
+
+        const prompt = `Analyze the time and space complexity of this code solution for the following problem.
+
+Problem: ${pdesc || "No description provided"}
+
+${recommendedTime || recommendedSpace ? `Target (recommended) complexity for this problem:\n- Time: ${recommendedTime || 'unknown'}\n- Space: ${recommendedSpace || 'unknown'}\n` : ''}
+
+Code to analyze (trimmed if too long):
 \`\`\`python
-${code}
+${trimmedCode}
 \`\`\`
 
-Please provide:
-1. Time complexity in Big O notation
-2. Detailed explanation of why this is the time complexity
-3. Space complexity in Big O notation  
-4. Detailed explanation of why this is the space complexity
-5. Overall analysis summary
+Please provide concise, teacher-friendly explanations (no fluff), and explicitly say if the solution meets the target complexity when targets are provided.
 
 Respond in JSON format:
 {
   "timeComplexity": "O(...)",
-  "timeExplanation": "Detailed explanation of time complexity",
+  "timeExplanation": "Short, clear reason a student would understand",
   "spaceComplexity": "O(...)", 
-  "spaceExplanation": "Detailed explanation of space complexity",
-  "overallAnalysis": "Summary of the algorithm's efficiency and characteristics"
+  "spaceExplanation": "Short, clear reason a student would understand",
+  "meetsRecommendedTime": ${recommendedTime ? 'true|false' : 'null'},
+  "meetsRecommendedSpace": ${recommendedSpace ? 'true|false' : 'null'},
+  "overallAnalysis": "One or two short sentences: does it meet targets and why"
 }`;
 
-        const completionParams = {
-          model: "gpt-5-mini",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert algorithm analyst. Analyze code complexity accurately and provide clear, educational explanations. Always respond with valid JSON format."
-            },
-            {
-              role: "user", 
-              content: prompt
-            }
-          ],
-          max_completion_tokens: 1000,
-        };
-
-        // Only add temperature for non-GPT-5 models
-        if (!"gpt-5-mini".startsWith("gpt-5")) {
-          completionParams.temperature = 0.1;
-        }
-
-        const completion = await openai.chat.completions.create(completionParams);
-
-        const responseText = completion.choices[0]?.message?.content || "{}";
-        if (!responseText || responseText.trim() === "{}") {
-          console.error("Empty or invalid AI response for complexity analysis:", {
-            choices: completion.choices,
-            usage: completion.usage,
-            model: completion.model
-          });
-          throw new Error("No valid response from AI for complexity analysis");
-        }
+        // Use the same LLM pipeline/utilities as chat endpoints
+        // This respects configuredModel and Responses API usage automatically
+        const responseText = await llmJson(prompt, { maxTokens: 600 });
 
         // Parse the JSON response
         let complexityAnalysis;
@@ -598,14 +603,41 @@ Respond in JSON format:
           complexityAnalysis = JSON.parse(responseText);
         } catch (parseError) {
           console.error("Failed to parse AI response as JSON:", responseText);
-          throw new Error("Invalid response format from AI");
+          // Last resort: attempt to extract JSON object via regex
+          const jsonMatch = responseText.match(/\{[\s\S]*\}$/);
+          if (jsonMatch) {
+            try {
+              complexityAnalysis = JSON.parse(jsonMatch[0]);
+            } catch {
+              // If parsing still fails, return a safe fallback instead of 500
+              complexityAnalysis = {
+                timeComplexity: "Unknown",
+                timeExplanation:
+                  "Could not parse the analysis output. Please retry.",
+                spaceComplexity: "Unknown",
+                spaceExplanation:
+                  "Could not parse the analysis output. Please retry.",
+                overallAnalysis:
+                  "Temporary parsing issue from the analysis service.",
+              };
+            }
+          } else {
+            complexityAnalysis = {
+              timeComplexity: "Unknown",
+              timeExplanation:
+                "The analysis service returned an empty response. Please retry or refine the code snippet.",
+              spaceComplexity: "Unknown",
+              spaceExplanation:
+                "The analysis service returned an empty response. Please retry or refine the code snippet.",
+              overallAnalysis:
+                "Unable to determine complexity due to a temporary AI response issue.",
+            };
+          }
         }
 
         return new Response(
           JSON.stringify({ complexityAnalysis }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       } catch (error) {
         console.error("Error analyzing complexity:", error);
@@ -618,6 +650,166 @@ Respond in JSON format:
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
+        );
+      }
+    }
+
+    // Flashcard conversation action
+    if (req.method === "POST" && action === "flashcard_conversation") {
+      console.log("[ai-chat] flashcard conversation request received");
+      
+      const { 
+        problemId, 
+        problemDescription, 
+        solutionCode, 
+        solutionTitle,
+        conversationHistory,
+        currentQuestionIndex = 0,
+        questionType = "initial"
+      } = body;
+
+      console.log("[ai-chat] flashcard request details:", {
+        problemId,
+        problemDescriptionLength: problemDescription?.length || 0,
+        problemDescriptionPreview: problemDescription?.substring(0, 100) + "...",
+        solutionCodeLength: solutionCode?.length || 0,
+        solutionTitle,
+        questionType
+      });
+
+      if (!problemId || !problemDescription || !solutionCode) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing required fields for flashcard conversation",
+            required: ["problemId", "problemDescription", "solutionCode"]
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      try {
+        const openai = initializeOpenAI();
+        if (!openai) {
+          throw new Error("OpenAI client initialization failed");
+        }
+
+        // Generate conversation based on question type
+        let systemPrompt = "";
+        let questionPrompt = "";
+
+        if (questionType === "initial") {
+          systemPrompt = `You are an AI tutor helping a student review their solution to a coding problem through active recall. Your role is to ask thoughtful questions that help them remember and explain their solution without giving away answers.
+
+Guidelines:
+- Ask one question at a time
+- Focus on understanding, not memorization
+- Be encouraging and supportive
+- Don't provide the solution - guide them to recall it
+- Keep questions conversational and clear
+
+Problem: ${problemDescription}
+Solution to review: ${solutionTitle || "User's solution"}`;
+
+          questionPrompt = `Start a flashcard review session for this problem. Ask the student about the main algorithmic approach they used to solve this problem. Be friendly and encouraging.`;
+        } else if (questionType === "followup") {
+          systemPrompt = `You are continuing a flashcard review session. The student is recalling their solution to a coding problem. Based on their previous response, ask a follow-up question about time/space complexity, edge cases, or implementation details.
+
+Problem: ${problemDescription}
+Solution: ${solutionTitle || "User's solution"}
+Previous conversation: ${JSON.stringify(conversationHistory)}`;
+
+          if (currentQuestionIndex === 1) {
+            questionPrompt = `The student explained their approach. Now ask them about the time and space complexity of their solution and why it has that complexity.`;
+          } else if (currentQuestionIndex === 2) {
+            questionPrompt = `The student explained complexity. Now ask them about 1-2 key edge cases they considered when implementing this Python solution. Keep it focused and specific to Python programming.`;
+          } else {
+            questionPrompt = `Provide encouraging feedback on their understanding and let them know they can now rate their recall of this solution.`;
+          }
+        } else if (questionType === "evaluation") {
+          systemPrompt = `You are evaluating a student's understanding of their coding solution during a flashcard review. Based on their responses, provide encouraging feedback and help them assess their recall.
+
+Problem: ${problemDescription}
+Conversation: ${JSON.stringify(conversationHistory)}`;
+
+          questionPrompt = `Based on the student's responses, provide positive feedback on what they remembered well and gently point out any areas they might want to review. Be encouraging and supportive.`;
+        }
+
+        const completionParams = {
+          model: configuredModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: questionPrompt }
+          ],
+          max_completion_tokens: 1000, // Increased to account for GPT-5 reasoning tokens
+        };
+
+        // Only add temperature for non-GPT-5 models
+        if (!configuredModel.startsWith("gpt-5")) {
+          completionParams.temperature = 0.7;
+        }
+
+        console.log("[ai-chat] calling OpenAI with params:", {
+          model: completionParams.model,
+          systemPromptLength: completionParams.messages[0].content.length,
+          questionPromptLength: completionParams.messages[1].content.length,
+          hasTemperature: 'temperature' in completionParams,
+          maxTokens: completionParams.max_completion_tokens,
+          temperature: completionParams.temperature
+        });
+        
+        console.log("[ai-chat] Full system prompt:", completionParams.messages[0].content);
+        console.log("[ai-chat] Full question prompt:", completionParams.messages[1].content);
+
+        const completion = await openai.chat.completions.create(completionParams);
+
+        console.log("[ai-chat] OpenAI completion result:", {
+          choices: completion.choices?.length || 0,
+          contentLength: completion.choices[0]?.message?.content?.length || 0,
+          finishReason: completion.choices[0]?.finish_reason,
+          usage: completion.usage,
+          model: completion.model,
+          id: completion.id
+        });
+
+        const response = completion.choices[0]?.message?.content || "";
+        console.log("[ai-chat] Extracted response content:", {
+          length: response.length,
+          preview: response.substring(0, 200),
+          isEmpty: !response || response.trim() === ""
+        });
+        
+        if (!response || response.trim() === "") {
+          console.error("[ai-chat] Empty response from OpenAI for flashcard conversation");
+          console.error("[ai-chat] Full completion object:", JSON.stringify(completion, null, 2));
+          console.error("[ai-chat] System prompt was:", systemPrompt.substring(0, 200) + "...");
+          console.error("[ai-chat] Question prompt was:", questionPrompt);
+        }
+
+        return new Response(
+          JSON.stringify({
+            response,
+            questionIndex: currentQuestionIndex,
+            nextQuestionType: currentQuestionIndex < 2 ? "followup" : "evaluation"
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+
+      } catch (error) {
+        console.error("Error in flashcard conversation:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate flashcard conversation",
+            details: (error as Error).message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
     }

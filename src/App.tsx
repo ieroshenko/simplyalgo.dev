@@ -10,6 +10,7 @@ import DSAArena from "./pages/DSAArena";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import FlashcardDeck from "./pages/FlashcardDeck";
 import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -113,6 +114,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/flashcards"
+              element={
+                <ProtectedRoute>
+                  <FlashcardDeck />
                 </ProtectedRoute>
               }
             />

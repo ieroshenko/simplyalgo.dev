@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { llmText, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
+import { llmText, llmJson, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
 import { CoachingSession, CoachingValidation, CoachingStep, ContextualResponse } from "./types.ts";
 import { logger } from "./utils/logger.ts";
 
@@ -675,7 +675,7 @@ Return JSON in this exact format:
       sessionUpdateData.is_completed = true;
       sessionUpdateData.session_state = 'completed';
       sessionUpdateData.awaiting_submission = false;
-      sessionUpadteData.current_question = "";
+      sessionUpdateData.current_question = "";
       
       await supabaseAdmin
         .from("coaching_sessions")
