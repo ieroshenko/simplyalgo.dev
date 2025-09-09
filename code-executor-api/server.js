@@ -256,13 +256,11 @@ function parseTestCaseInput(inputString, functionSignature) {
     // Format 1b: "s = \"anagram\", t = \"nagaram\"" (single line, comma-separated)
 
     if (
+      // Single line with comma-separated assignments. We support arrays/objects by tracking bracket depth.
       lines.length === 1 &&
-      lines[0].includes(",") &&
-      !lines[0].includes("[") &&
-      !lines[0].includes("]")
+      lines[0].includes(",")
     ) {
-      // Single line with comma-separated parameters: "s = \"anagram\", t = \"nagaram\""
-      // BUT NOT arrays like: "strs = [\"eat\",\"tea\"]"
+      // Example: "p = [4,7], q = [4,null,7]" or "s = \"anagram\", t = \"nagaram\""
       const line = lines[0];
       console.log("Parsing single line with comma separation:", line);
       console.log("Line length:", line.length);
@@ -426,7 +424,7 @@ function parseTestCaseInput(inputString, functionSignature) {
 }
 
 // Process Python code to add imports and test case execution
-function processPythonCode(userCode, testCases) {
+function processPythonCode(userCode, testCases, problemId) {
   // Add typing imports if needed
   const needsTyping = /\b(List|Dict|Set|Tuple|Optional|Union)\b/.test(userCode);
   let processedCode = userCode;
@@ -455,6 +453,16 @@ class ListNode:
 `;
     processedCode = listNodeDef + processedCode;
     console.log("ListNode definition added");
+  }
+
+  // Add TreeNode definition if needed (for binary tree problems)
+  console.log("Checking if TreeNode definition is needed...");
+  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/ .test(userCode);
+  if (needsTreeNode && !userCode.includes("class TreeNode")) {
+    console.log("Adding TreeNode class definition");
+    const treeNodeDef = `# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
+    processedCode = treeNodeDef + processedCode;
+    console.log("TreeNode definition added");
   }
 
   // Add helper functions for ListNode operations if needed (check both userCode and signature)
@@ -515,10 +523,12 @@ def listnode_to_array(head):
     const lines = processedCode.split("\n");
     const imports = [];
     const listNodeDef = [];
+    const treeNodeDef = [];
     const helperFunctions = [];
     const userCodeLines = [];
 
     let inListNodeDef = false;
+    let inTreeNodeDef = false;
     let inHelperFunctions = false;
     let inUserCode = false;
 
@@ -530,6 +540,9 @@ def listnode_to_array(head):
       } else if (line.includes("# Definition for singly-linked list")) {
         inListNodeDef = true;
         listNodeDef.push(line);
+      } else if (line.includes("# Definition for a binary tree node")) {
+        inTreeNodeDef = true;
+        treeNodeDef.push(line);
       } else if (
         inListNodeDef &&
         (line.startsWith("class ListNode") ||
@@ -544,6 +557,21 @@ def listnode_to_array(head):
           lines[i + 1].trim() !== ""
         ) {
           inListNodeDef = false;
+        }
+      } else if (
+        inTreeNodeDef &&
+        (line.startsWith("class TreeNode") ||
+          line.startsWith("    ") ||
+          line.trim() === "")
+      ) {
+        treeNodeDef.push(line);
+        if (
+          line.trim() === "" &&
+          i < lines.length - 1 &&
+          !lines[i + 1].startsWith("    ") &&
+          lines[i + 1].trim() !== ""
+        ) {
+          inTreeNodeDef = false;
         }
       } else if (line.includes("# Helper functions for ListNode operations")) {
         inHelperFunctions = true;
@@ -590,6 +618,7 @@ def listnode_to_array(head):
     const sections = [];
     if (imports.length > 0) sections.push(imports.join("\n"));
     if (listNodeDef.length > 0) sections.push(listNodeDef.join("\n"));
+    if (treeNodeDef.length > 0) sections.push(treeNodeDef.join("\n"));
     if (helperFunctions.length > 0) sections.push(helperFunctions.join("\n"));
 
     processedCode =
@@ -611,11 +640,21 @@ def listnode_to_array(head):
   const signatureMatch = userCode.match(/def\s+\w+\s*\([^)]+\)/);
   const signature = signatureMatch ? signatureMatch[0] : "";
 
+  // Special-case detection: encode/decode pair problems
+  // Only enable encode/decode chaining for the specific problem id
+  const isEncodeDecode = problemId === "encode-and-decode-strings";
+  if (isEncodeDecode) {
+    console.log(
+      "🔎 Detected encode/decode pair — will validate decode(encode(strs))",
+    );
+  }
+
   // Generate test execution code with dynamic test cases
   const testExecutionCode = generateTestExecutionCode(
     functionName,
     signature,
     testCases,
+    { encodeDecode: isEncodeDecode },
   );
 
   // Combine user code with test execution
@@ -628,7 +667,8 @@ ${testExecutionCode}`;
 }
 
 // Generate test execution code with dynamic test cases
-function generateTestExecutionCode(functionName, signature, testCases) {
+function generateTestExecutionCode(functionName, signature, testCases, options = {}) {
+  const { encodeDecode = false } = options;
   // Convert test cases to Python format
   const pythonTestCases = testCases.map((tc) => {
     console.log(
@@ -644,11 +684,12 @@ function generateTestExecutionCode(functionName, signature, testCases) {
     };
   });
 
-  // Convert JavaScript booleans to Python booleans in JSON string
+  // Convert JavaScript booleans/null to Python equivalents in JSON string
   let testCasesJson = JSON.stringify(pythonTestCases, null, 2);
   testCasesJson = testCasesJson
     .replace(/\btrue\b/g, "True")
-    .replace(/\bfalse\b/g, "False");
+    .replace(/\bfalse\b/g, "False")
+    .replace(/\bnull\b/g, "None");
 
   // Extract parameter names from signature and filter out 'self'
   const paramMatch = signature.match(/def\s+\w+\s*\(([^)]+)\)/);
@@ -666,23 +707,43 @@ function generateTestExecutionCode(functionName, signature, testCases) {
   const originalSignature = signature;
   const hasSelfParam = originalSignature.includes("self");
 
-  // Check if this is a ListNode problem
-  console.log("Function signature for ListNode detection:", signature);
-  const isListNodeProblem = signature.includes("ListNode");
+  // Check if this is a ListNode/TreeNode problem and if the return type is a node
+  console.log("Function signature for ListNode/TreeNode detection:", signature);
+  const isListNodeProblem = /\bListNode\b/.test(signature);
+  const isTreeNodeProblem = /\bTreeNode\b|['\"]TreeNode['\"]/ .test(signature);
+  const returnsListNode = /->\s*[^\n#]*ListNode/.test(signature);
+  const returnsTreeNode = /->\s*[^\n#]*TreeNode/.test(signature);
   console.log("Is ListNode problem:", isListNodeProblem);
+  console.log("Is TreeNode problem:", isTreeNodeProblem);
+  console.log("Returns ListNode:", returnsListNode);
+  console.log("Returns TreeNode:", returnsTreeNode);
   console.log("Function has self param:", hasSelfParam);
   console.log("Function parameters:", params);
 
   if (hasSelfParam) {
     // If function was defined with 'self', we need to create a class instance and call it as a method
     const className = "Solution";
-    if (isListNodeProblem) {
+    if (encodeDecode) {
+      // Expect first param to be the list of strings (e.g., 'strs')
+      const arg = params[0] ? `tc["${params[0]}"]` : "tc.get('strs')";
+      functionCall = `${className}().decode(${className}().encode(${arg}))`;
+      console.log("Generated encode/decode pipeline call:", functionCall);
+    } else if (isListNodeProblem) {
       console.log("Generating ListNode function call for method");
       // Convert arrays to ListNodes for function call
       const paramList = params
         .map((p) => `array_to_listnode(tc["${p}"])`)
         .join(", ");
-      functionCall = `listnode_to_array(${className}().${functionName}(${paramList}))`;
+      const call = `${className}().${functionName}(${paramList})`;
+      functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+      console.log("Generated function call:", functionCall);
+    } else if (isTreeNodeProblem) {
+      console.log("Generating TreeNode function call for method");
+      const paramList = params
+        .map((p) => `array_to_treenode(tc["${p}"])`)
+        .join(", ");
+      const call = `${className}().${functionName}(${paramList})`;
+      functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
       console.log("Generated function call:", functionCall);
     } else if (params.length === 1) {
       functionCall = `${className}().${functionName}(tc["${params[0]}"])`;
@@ -694,12 +755,23 @@ function generateTestExecutionCode(functionName, signature, testCases) {
     }
   } else {
     // Standalone function call
-    if (isListNodeProblem) {
+    if (encodeDecode) {
+      const arg = params[0] ? `tc["${params[0]}"]` : "tc.get('strs')";
+      functionCall = `decode(encode(${arg}))`;
+      console.log("Generated encode/decode pipeline call (standalone):", functionCall);
+    } else if (isListNodeProblem) {
       // Convert arrays to ListNodes for function call
       const paramList = params
         .map((p) => `array_to_listnode(tc["${p}"])`)
         .join(", ");
-      functionCall = `listnode_to_array(${functionName}(${paramList}))`;
+      const call = `${functionName}(${paramList})`;
+      functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+    } else if (isTreeNodeProblem) {
+      const paramList = params
+        .map((p) => `array_to_treenode(tc["${p}"])`)
+        .join(", ");
+      const call = `${functionName}(${paramList})`;
+      functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
     } else if (params.length === 1) {
       functionCall = `${functionName}(tc["${params[0]}"])`;
     } else if (params.length === 2) {
@@ -720,7 +792,7 @@ test_case_index = int(sys.stdin.read().strip())
 # Dynamic test cases from database/API
 test_cases = ${testCasesJson}
 
-# Helpers for common DSA structures (ListNode)
+# Helpers for common DSA structures (ListNode, TreeNode)
 class ListNode:
     def __init__(self, val=0, next=None):
         self.val = val
@@ -742,6 +814,44 @@ def listnode_to_array(head):
     while cur is not None:
         res.append(cur.val)
         cur = cur.next
+    return res
+
+# Binary Tree helpers (level-order array <-> TreeNode)
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def array_to_treenode(arr):
+    if arr is None or len(arr) == 0:
+        return None
+    nodes = [None if (x is None) else TreeNode(x) for x in arr]
+    kids = nodes[::-1]
+    root = kids.pop()
+    for node in nodes:
+        if node is not None:
+            if kids:
+                node.left = kids.pop()
+            if kids:
+                node.right = kids.pop()
+    return root
+
+def treenode_to_array(root):
+    if root is None:
+        return []
+    res = []
+    queue = [root]
+    while queue:
+        node = queue.pop(0)
+        if node is None:
+            res.append(None)
+        else:
+            res.append(node.val)
+            queue.append(node.left)
+            queue.append(node.right)
+    while res and res[-1] is None:
+        res.pop()
     return res
 
 if 0 <= test_case_index < len(test_cases):
@@ -844,7 +954,7 @@ app.post("/execute", async (req, res) => {
       language.toLowerCase() === "python" ||
       language.toLowerCase() === "python3"
     ) {
-      code = processPythonCode(code, testCases);
+      code = processPythonCode(code, testCases, problemId);
     }
 
     // Prepare batched submissions for all test cases

@@ -132,7 +132,9 @@ const ChatBubbles = ({
     const raf = requestAnimationFrame(() => {
       try {
         el.scrollTop = el.scrollHeight;
-      } catch {}
+      } catch {
+        // Ignore scroll errors
+      }
     });
     return () => cancelAnimationFrame(raf);
   }, [messages, isTyping]);
