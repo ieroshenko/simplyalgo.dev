@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalStorageService Browser Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>LocalStorageService Browser Test</h1>
+    <div id="test-results"></div>
+
+    <script type="module">
+        // Simple test framework for browser
+        class BrowserTester {
+            constructor() {
+                this.results = [];
+                this.container = document.getElementById('test-results');
+            }
+
+            test(name, testFn) {
+                try {
+                    testFn();
+                    this.addResult(name, 'success', 'PASS');
+                } catch (error) {
+                    this.addResult(name, 'error', `FAIL: ${error.message}`);
+                }
+            }
+
+            addResult(name, type, message) {
+                const div = document.createElement('div');
+                div.className = `test-result ${type}`;
+                div.innerHTML = `<strong>${name}:</strong> ${message}`;
+                this.container.appendChild(div);
+            }
+
+            expect(actual) {
+                return {
+                    toBe: (expected) => {
+                        if (actual !== expected) {
+                            throw new Error(`Expected ${actual} to be ${expected}`);
+                        }
+                    },
+                    toEqual: (expected) => {
+                        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`);
+                        }
+                    },
+                    toBeNull: () => {
+                        if (actual !== null) {
+                            throw new Error(`Expected ${actual} to be null`);
+                        }
+                    },
+                    toBeTruthy: () => {
+                        if (!actual) {
+                            throw new Error(`Expected ${actual} to be truthy`);
+                        }
+                    },
+                    toBeFalsy: () => {
+                        if (actual) {
+                            throw new Error(`Expected ${actual} to be falsy`);
+                        }
+                    }
+                };
+            }
+        }
+
+        // LocalStorageService implementation (inline for browser test)
+        class LocalStorageService {
+            constructor(config) {
+                this.config = config;
+                this.STORAGE_KEY = 'coach_overlay_positions';
+            }
+
+            save(key, data) {
+                try {
+                    if (!this.isLocalStorageAvailable()) {
+                        return false;
+                    }
+
+                    if (!this.validateData(data)) {
+                        return false;
+                    }
+
+                    const serializedData = JSON.stringify(data);
+                    localStorage.setItem(key, serializedData);
+                    return true;
+                } catch (error) {
+                    console.warn('LocalStorageService: Failed to save data', error);
+                    return false;
+                }
+            }
+
+            load(key) {
+                try {
+                    if (!this.isLocalStorageAvailable()) {
+                        return null;
+                    }
+
+                    const serializedData = localStorage.getItem(key);
+                    if (!serializedData) {
+                        return null;
+                    }
+
+                    const data = JSON.parse(serializedData);
+                    
+                    if (this.hasTimestamp(data) && this.isExpired(data.timestamp)) {
+                        this.remove(key);
+                        return null;
+                    }
+
+                    return data;
+                } catch (error) {
+                    console.warn('LocalStorageService: Failed to load data', error);
+                    return null;
+                }
+            }
+
+            remove(key) {
+                try {
+                    if (!this.isLocalStorageAvailable()) {
+                        return;
+                    }
+                    localStorage.removeItem(key);
+                } catch (error) {
+                    console.warn('LocalStorageService: Failed to remove data', error);
+                }
+            }
+
+            isExpired(timestamp) {
+                const now = Date.now();
+                return (now - timestamp) > this.config.maxAge;
+            }
+
+            savePosition(problemId, position) {
+                const positionData = this.load(this.STORAGE_KEY) || {};
+                
+                const metadata = {
+                    createdAt: positionData[problemId]?.metadata.createdAt || Date.now(),
+                    lastUsed: Date.now(),
+                    deviceType: this.getDeviceType(),
+                    screenResolution: `${window.screen.width}x${window.screen.height}`
+                };
+
+                positionData[problemId] = {
+                    position,
+                    metadata
+                };
+
+                return this.save(this.STORAGE_KEY, positionData);
+            }
+
+            loadPosition(problemId) {
+                const positionData = this.load(this.STORAGE_KEY);
+                if (!positionData || !positionData[problemId]) {
+                    return null;
+                }
+
+                const entry = positionData[problemId];
+                
+                entry.metadata.lastUsed = Date.now();
+                this.save(this.STORAGE_KEY, positionData);
+
+                return entry.position;
+            }
+
+            clearAllPositions() {
+                this.remove(this.STORAGE_KEY);
+            }
+
+            isLocalStorageAvailable() {
+                try {
+                    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+                        return false;
+                    }
+                    const testKey = '__localStorage_test__';
+                    localStorage.setItem(testKey, 'test');
+                    localStorage.removeItem(testKey);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            validateData(data) {
+                if (data === null || data === undefined) {
+                    return false;
+                }
+
+                try {
+                    JSON.stringify(data);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            hasTimestamp(data) {
+                return data && typeof data === 'object' && typeof data.timestamp === 'number';
+            }
+
+            getDeviceType() {
+                if (typeof window === 'undefined') {
+                    return 'desktop';
+                }
+                return window.innerWidth < 768 ? 'mobile' : 'desktop';
+            }
+        }
+
+        // Run tests
+        const tester = new BrowserTester();
+        const config = {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            fallbackPosition: { x: 100, y: 100 }
+        };
+        const service = new LocalStorageService(config);
+
+        // Clear any existing test data
+        service.clearAllPositions();
+
+        tester.test('LocalStorage availability', () => {
+            tester.expect(service.isLocalStorageAvailable()).toBeTruthy();
+        });
+
+        tester.test('Basic save and load', () => {
+            const testData = { message: 'Hello, World!', number: 42 };
+            const saveResult = service.save('test-key', testData);
+            const loadResult = service.load('test-key');
+            
+            tester.expect(saveResult).toBeTruthy();
+            tester.expect(loadResult).toEqual(testData);
+            
+            service.remove('test-key');
+        });
+
+        tester.test('Position save and load', () => {
+            const position = {
+                x: 150,
+                y: 250,
+                timestamp: Date.now(),
+                screenSize: { width: 1920, height: 1080 }
+            };
+            
+            const saveResult = service.savePosition('test-problem', position);
+            const loadResult = service.loadPosition('test-problem');
+            
+            tester.expect(saveResult).toBeTruthy();
+            tester.expect(loadResult).toEqual(position);
+        });
+
+        tester.test('Expiration handling', () => {
+            const expiredTimestamp = Date.now() - (25 * 60 * 60 * 1000); // 25 hours ago
+            const validTimestamp = Date.now() - (1 * 60 * 60 * 1000); // 1 hour ago
+            
+            tester.expect(service.isExpired(expiredTimestamp)).toBeTruthy();
+            tester.expect(service.isExpired(validTimestamp)).toBeFalsy();
+        });
+
+        tester.test('Invalid data handling', () => {
+            const nullResult = service.save('null-test', null);
+            const undefinedResult = service.save('undefined-test', undefined);
+            
+            tester.expect(nullResult).toBeFalsy();
+            tester.expect(undefinedResult).toBeFalsy();
+        });
+
+        tester.test('Device type detection', () => {
+            const deviceType = service.getDeviceType();
+            tester.expect(deviceType === 'mobile' || deviceType === 'desktop').toBeTruthy();
+        });
+
+        // Clean up
+        service.clearAllPositions();
+
+        tester.addResult('All Tests', 'info', 'Test suite completed. Check results above.');
+    </script>
+</body>
+</html>

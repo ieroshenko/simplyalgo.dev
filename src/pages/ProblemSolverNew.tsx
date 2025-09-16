@@ -47,6 +47,7 @@ import CoachProgress from "@/components/coaching/CoachProgress";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
+import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,16 @@ const ProblemSolverNew = () => {
     getScrollTop: () => number;
     getVisibleRanges: () => unknown[];
   } | null>(null);
+
+  // Initialize OverlayPositionManager for coaching overlay positioning
+  const overlayPositionManager = useRef<OverlayPositionManager | null>(null);
+  
+  // Initialize position manager when problem ID is available
+  useEffect(() => {
+    if (problemId) {
+      overlayPositionManager.current = new OverlayPositionManager(problemId);
+    }
+  }, [problemId]);
 
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
@@ -986,6 +997,9 @@ const ProblemSolverNew = () => {
               highlightedLine={coachingState.session.highlightArea?.startLine}
               editorHeight={600}
               editorRef={codeEditorRef}
+              // New positioning system props
+              positionManager={overlayPositionManager.current}
+              problemId={problemId}
             />
           )}
         </>

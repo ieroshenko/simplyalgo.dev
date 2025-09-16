@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle, Zap, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { OverlayPositionManager, type OverlayPosition, type EditorBounds } from '../../services/overlayPositionManager';
+import { EditorBoundsCalculator, type MonacoEditor } from '../../services/editorBoundsCalculator';
 
 // Blurred hint component with click-to-reveal
 const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
@@ -69,7 +71,7 @@ interface SimpleOverlayProps {
       reason?: string;
     };
   } | null;
-  // Enhanced positioning
+  // Enhanced positioning with OverlayPositionManager
   highlightedLine?: number;
   editorHeight?: number;
   // Monaco editor reference for coordinate transformation
@@ -78,6 +80,11 @@ interface SimpleOverlayProps {
     getScrollTop?: () => number;
     getPosition?: () => { lineNumber: number; column: number } | null;
   } | null>;
+  // Enhanced positioning system props
+  positionManager?: OverlayPositionManager; // Centralized positioning manager
+  problemId?: string; // Required for position persistence when using positionManager
+  // Legacy positioning props (maintained for backward compatibility)
+  onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
 }
 
 const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
@@ -101,6 +108,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   onStartOptimization,
   onPositionChange,
   isOptimizable,
+  positionManager,
+  problemId,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -110,6 +119,86 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [showTextInput, setShowTextInput] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize EditorBoundsCalculator
+  const editorBoundsCalculator = useMemo(() => new EditorBoundsCalculator({
+    padding: { top: 5, right: 5, bottom: 5, left: 5 },
+    minWidth: 200,
+    minHeight: 150,
+  }), []);
+  
+  // Responsive positioning state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Initialize editor bounds calculator when editor reference is available
+  useEffect(() => {
+    if (editorRef?.current && editorBoundsCalculator) {
+      try {
+        // Cast the editor reference to MonacoEditor interface
+        const monacoEditor = editorRef.current as MonacoEditor;
+        editorBoundsCalculator.initialize(monacoEditor);
+        
+        // Set up bounds change listener for automatic position updates
+        const unsubscribe = editorBoundsCalculator.onBoundsChange((bounds) => {
+          // Only update position if we don't have a custom position set by user
+          if (!customPosition && positionManager && problemId) {
+            const newPosition = positionManager.getPositionWithFallback(bounds, highlightedLine);
+            setCustomPosition({ x: newPosition.x, y: newPosition.y });
+          }
+        });
+        
+        return () => {
+          unsubscribe();
+          editorBoundsCalculator.cleanup();
+        };
+      } catch (error) {
+        console.warn('Failed to initialize editor bounds calculator:', error);
+      }
+    }
+  }, [editorRef, editorBoundsCalculator, customPosition, positionManager, problemId, highlightedLine]);
+
+  // Helper function to get editor bounds using the calculator with fallback
+  const getEditorBounds = useCallback((): EditorBounds | null => {
+    // Try using the bounds calculator first
+    if (editorBoundsCalculator) {
+      try {
+        const bounds = editorBoundsCalculator.getEditorBounds();
+        if (bounds && editorBoundsCalculator.areBoundsValid(bounds)) {
+          return bounds;
+        }
+      } catch (error) {
+        console.warn('EditorBoundsCalculator failed:', error);
+      }
+    }
+    
+    // Fallback to manual calculation if calculator fails
+    try {
+      const editorDom = editorRef?.current?.getDomNode?.();
+      if (!editorDom) {
+        console.warn('Editor DOM node not available for bounds calculation');
+        return null;
+      }
+
+      const editorRect = editorDom.getBoundingClientRect();
+      
+      if (!editorRect || editorRect.width === 0 || editorRect.height === 0) {
+        console.warn('Invalid editor rect dimensions');
+        return null;
+      }
+
+      return {
+        left: editorRect.left,
+        top: editorRect.top,
+        right: editorRect.right,
+        bottom: editorRect.bottom,
+        width: editorRect.width,
+        height: editorRect.height,
+      };
+    } catch (error) {
+      console.warn('Manual editor bounds calculation failed:', error);
+      return null;
+    }
+  }, [editorBoundsCalculator, editorRef]);
 
   // Centralized overlay state management for cleaner UI logic
   const overlayState = useMemo(() => {
@@ -144,12 +233,106 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     }
   }, [isVisible]);
 
+  // Load saved position when overlay becomes visible
+  useEffect(() => {
+    if (isVisible && positionManager && problemId && !customPosition) {
+      try {
+        // Get current editor bounds using the calculator
+        const editorBounds = getEditorBounds();
+        
+        if (editorBounds) {
+          // Use OverlayPositionManager's comprehensive position resolution
+          const resolvedPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
+          
+          setCustomPosition({ x: resolvedPosition.x, y: resolvedPosition.y });
+          console.log('🎯 [SimpleOverlay] Loaded resolved position:', resolvedPosition);
+        } else {
+          // Use viewport fallback when editor bounds unavailable
+          const fallbackPosition = positionManager.getPositionWithFallback();
+          setCustomPosition({ x: fallbackPosition.x, y: fallbackPosition.y });
+          console.log('🎯 [SimpleOverlay] Loaded fallback position:', fallbackPosition);
+        }
+      } catch (error) {
+        console.warn('⚠️ [SimpleOverlay] Failed to load position, using default:', error);
+        // Don't set customPosition to allow getSmartPosition to handle fallback
+      }
+    }
+  }, [isVisible, positionManager, problemId, customPosition, highlightedLine, getEditorBounds]);
+
+  // Handle responsive positioning on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      // Use OverlayPositionManager's device detection if available
+      const newIsMobile = positionManager 
+        ? positionManager.getDeviceType() === 'mobile'
+        : window.innerWidth < 768;
+      
+      setIsMobile(newIsMobile);
+      
+      // If we have a position manager and the device type changed, recalculate position
+      if (positionManager && problemId && newIsMobile !== isMobile) {
+        try {
+          const editorBounds = getEditorBounds();
+          
+          if (editorBounds) {
+            
+            // Check if bounds are sufficient for overlay
+            if (!positionManager.areBoundsSufficient(editorBounds)) {
+              console.warn('⚠️ [SimpleOverlay] Editor bounds insufficient for overlay positioning');
+              return;
+            }
+            
+            // Get device-specific position using centralized positioning
+            const newPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
+            
+            setCustomPosition({ x: newPosition.x, y: newPosition.y });
+            console.log('🎯 [SimpleOverlay] Responsive position updated:', newPosition);
+            
+            // Save the new responsive position
+            positionManager.savePosition(newPosition);
+          } else {
+            // Use viewport fallback when editor bounds unavailable
+            const fallbackPosition = positionManager.getPositionWithFallback();
+            setCustomPosition({ x: fallbackPosition.x, y: fallbackPosition.y });
+            console.log('🎯 [SimpleOverlay] Responsive fallback position:', fallbackPosition);
+          }
+        } catch (error) {
+          console.warn('⚠️ [SimpleOverlay] Failed to update responsive position:', error);
+        }
+      }
+    };
+
+    // Debounce resize events to avoid excessive recalculations
+    let resizeTimeout: NodeJS.Timeout;
+    const debouncedHandleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(handleResize, 150);
+    };
+
+    window.addEventListener('resize', debouncedHandleResize);
+    return () => {
+      window.removeEventListener('resize', debouncedHandleResize);
+      clearTimeout(resizeTimeout);
+    };
+  }, [positionManager, problemId, isMobile, highlightedLine]);
+
   // Report current position to parent when it changes
   useEffect(() => {
     const pos = customPosition || position;
     if (onPositionChange && pos) onPositionChange(pos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customPosition, position?.x, position?.y]);
+
+  // Cleanup effect for position manager
+  useEffect(() => {
+    return () => {
+      // Clean up any pending debounced saves
+      if (debouncedSavePosition.current) {
+        clearTimeout(debouncedSavePosition.current);
+        debouncedSavePosition.current = null;
+      }
+    };
+  }, []);
 
 
 
@@ -158,80 +341,141 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   };
 
 
-  // Smart positioning logic - transforms Monaco coordinates to viewport and constrains within editor
+  // Enhanced positioning logic using OverlayPositionManager
   const getSmartPosition = () => {
     if (customPosition) return customPosition;
     
-    const isMobile = window.innerWidth < 768;
-    const overlayWidth = isMobile ? window.innerWidth - 32 : 420;
+    // If we have a position manager, use it for centralized positioning
+    if (positionManager && problemId) {
+      try {
+        // Get editor bounds using the calculator
+        const editorBounds = getEditorBounds();
+        
+        if (editorBounds) {
+          
+          // Use centralized positioning with fallback handling
+          const overlayPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
+          
+          console.log('🎯 [SimpleOverlay] Using OverlayPositionManager position:', overlayPosition);
+          return { x: overlayPosition.x, y: overlayPosition.y };
+        } else {
+          // Editor bounds not available, use viewport fallback
+          const fallbackPosition = positionManager.getPositionWithFallback();
+          console.log('🎯 [SimpleOverlay] Using viewport fallback position:', fallbackPosition);
+          return { x: fallbackPosition.x, y: fallbackPosition.y };
+        }
+      } catch (error) {
+        console.warn('⚠️ [SimpleOverlay] OverlayPositionManager failed, using fallback:', error);
+        // Use position manager's viewport fallback if available
+        try {
+          const fallbackPosition = positionManager.getPositionWithFallback();
+          return { x: fallbackPosition.x, y: fallbackPosition.y };
+        } catch (fallbackError) {
+          console.warn('⚠️ [SimpleOverlay] Fallback positioning also failed:', fallbackError);
+        }
+      }
+    }
+    
+    // Final fallback to legacy positioning logic when OverlayPositionManager is not available
+    return getLegacyPosition();
+  };
+
+  // Enhanced error handling and fallback positioning
+  const getErrorRecoveryPosition = useCallback(() => {
+    console.warn('⚠️ [SimpleOverlay] Using error recovery positioning');
+    
+    // Try to get viewport dimensions safely
+    const viewportWidth = window.innerWidth || 1024;
+    const viewportHeight = window.innerHeight || 768;
+    
+    // Calculate safe fallback position
+    const overlayWidth = isMobile ? Math.min(viewportWidth - 32, 400) : 420;
     const overlayHeight = 280;
     
-    // Get Monaco editor's position in viewport
-    const editorDom = editorRef?.current?.getDomNode?.();
-    const editorRect = editorDom?.getBoundingClientRect();
-    
-    if (!editorRect) {
-      // Fallback if editor DOM not available
-      console.warn('⚠️ [SimpleOverlay] Editor DOM not available, using fallback positioning');
-      return {
-        x: isMobile ? 16 : 100,
-        y: isMobile ? window.innerHeight - 300 : 150,
-      };
+    return {
+      x: Math.max(16, (viewportWidth - overlayWidth) / 2),
+      y: Math.max(30, (viewportHeight - overlayHeight) / 2),
+    };
+  }, [isMobile]);
+
+  // Legacy positioning logic extracted for fallback
+  const getLegacyPosition = () => {
+    try {
+      const overlayWidth = isMobile ? window.innerWidth - 32 : 420;
+      const overlayHeight = 280;
+      
+      // Get Monaco editor's position in viewport using bounds calculator
+      const editorBounds = getEditorBounds();
+      
+      if (!editorBounds) {
+        // Fallback if editor bounds not available
+        console.warn('⚠️ [SimpleOverlay] Editor bounds not available, using error recovery positioning');
+        return getErrorRecoveryPosition();
+      }
+      
+      console.log('🎯 [SimpleOverlay] Editor bounds:', editorBounds);
+      console.log('🎯 [SimpleOverlay] Monaco position (editor-relative):', position);
+      
+      // Validate editor bounds dimensions
+      if (editorBounds.width <= 0 || editorBounds.height <= 0) {
+        console.warn('⚠️ [SimpleOverlay] Invalid editor dimensions, using error recovery positioning');
+        return getErrorRecoveryPosition();
+      }
+      
+      // Transform Monaco editor-relative coordinates to viewport coordinates
+      const viewportX = editorBounds.left + position.x;
+      const viewportY = editorBounds.top + position.y;
+      
+      console.log('🎯 [SimpleOverlay] Transformed to viewport:', { x: viewportX, y: viewportY });
+      
+      if (isMobile) {
+        // On mobile, dock at bottom but within editor bounds
+        return {
+          x: Math.max(editorRect.left + 16, 16),
+          y: Math.min(editorRect.bottom - 300, window.innerHeight - 300),
+        };
+      }
+      
+      // Smart offset to avoid covering the highlighted line
+      const verticalOffset = 80;
+      const horizontalPadding = 20;
+      
+      // Calculate ideal position with offset
+      let idealX = viewportX;
+      let idealY = viewportY + verticalOffset;
+      
+      // Constrain within editor bounds horizontally
+      const editorMinX = editorRect.left + horizontalPadding;
+      const editorMaxX = editorRect.right - overlayWidth - horizontalPadding;
+      
+      if (idealX < editorMinX) {
+        idealX = editorMinX;
+      } else if (idealX > editorMaxX) {
+        idealX = editorMaxX;
+      }
+      
+      // Constrain within editor bounds vertically
+      const editorMinY = editorRect.top + 20;
+      const editorMaxY = editorRect.bottom - overlayHeight - 20;
+      
+      if (idealY > editorMaxY) {
+        // Try placing above the highlighted line
+        const aboveY = viewportY - overlayHeight - 20;
+        idealY = aboveY >= editorMinY ? aboveY : editorMaxY;
+      }
+      
+      if (idealY < editorMinY) {
+        idealY = editorMinY;
+      }
+      
+      const finalPosition = { x: idealX, y: idealY };
+      console.log('🎯 [SimpleOverlay] Final legacy position:', finalPosition);
+      
+      return finalPosition;
+    } catch (error) {
+      console.error('🚨 [SimpleOverlay] Legacy positioning failed:', error);
+      return getErrorRecoveryPosition();
     }
-    
-    console.log('🎯 [SimpleOverlay] Editor rect:', editorRect);
-    console.log('🎯 [SimpleOverlay] Monaco position (editor-relative):', position);
-    
-    // Transform Monaco editor-relative coordinates to viewport coordinates
-    const viewportX = editorRect.left + position.x;
-    const viewportY = editorRect.top + position.y;
-    
-    console.log('🎯 [SimpleOverlay] Transformed to viewport:', { x: viewportX, y: viewportY });
-    
-    if (isMobile) {
-      // On mobile, dock at bottom but within editor bounds
-      return {
-        x: Math.max(editorRect.left + 16, 16),
-        y: Math.min(editorRect.bottom - 300, window.innerHeight - 300),
-      };
-    }
-    
-    // Smart offset to avoid covering the highlighted line
-    const verticalOffset = 80;
-    const horizontalPadding = 20;
-    
-    // Calculate ideal position with offset
-    let idealX = viewportX;
-    let idealY = viewportY + verticalOffset;
-    
-    // Constrain within editor bounds horizontally
-    const editorMinX = editorRect.left + horizontalPadding;
-    const editorMaxX = editorRect.right - overlayWidth - horizontalPadding;
-    
-    if (idealX < editorMinX) {
-      idealX = editorMinX;
-    } else if (idealX > editorMaxX) {
-      idealX = editorMaxX;
-    }
-    
-    // Constrain within editor bounds vertically
-    const editorMinY = editorRect.top + 20;
-    const editorMaxY = editorRect.bottom - overlayHeight - 20;
-    
-    if (idealY > editorMaxY) {
-      // Try placing above the highlighted line
-      const aboveY = viewportY - overlayHeight - 20;
-      idealY = aboveY >= editorMinY ? aboveY : editorMaxY;
-    }
-    
-    if (idealY < editorMinY) {
-      idealY = editorMinY;
-    }
-    
-    const finalPosition = { x: idealX, y: idealY };
-    console.log('🎯 [SimpleOverlay] Final position:', finalPosition);
-    
-    return finalPosition;
   };
 
   // Drag handlers
@@ -248,13 +492,76 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     }
   };
 
+  // Debounced position saving during drag operations
+  const debouncedSavePosition = useRef<NodeJS.Timeout | null>(null);
+  
+  const savePositionDebounced = useCallback((pos: { x: number; y: number }) => {
+    if (!positionManager || !problemId) return;
+    
+    // Clear existing timeout
+    if (debouncedSavePosition.current) {
+      clearTimeout(debouncedSavePosition.current);
+    }
+    
+    // Set new timeout for debounced save
+    debouncedSavePosition.current = setTimeout(() => {
+      try {
+        // Get editor bounds for validation using calculator
+        const editorBounds = getEditorBounds();
+        
+        if (editorBounds) {
+          
+          // Validate and constrain the position before saving
+          const overlayPosition: OverlayPosition = {
+            x: pos.x,
+            y: pos.y,
+            timestamp: Date.now(),
+            screenSize: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+          };
+          
+          const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
+          positionManager.savePosition(validatedPosition);
+          
+          // Update custom position with validated coordinates if needed
+          if (validatedPosition.x !== pos.x || validatedPosition.y !== pos.y) {
+            setCustomPosition({ x: validatedPosition.x, y: validatedPosition.y });
+          }
+          
+          console.log('🎯 [SimpleOverlay] Position saved via OverlayPositionManager (debounced):', validatedPosition);
+        } else {
+          // Save without validation if editor bounds unavailable
+          const overlayPosition: OverlayPosition = {
+            x: pos.x,
+            y: pos.y,
+            timestamp: Date.now(),
+            screenSize: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+          };
+          positionManager.savePosition(overlayPosition);
+          console.log('🎯 [SimpleOverlay] Position saved without validation (debounced):', overlayPosition);
+        }
+      } catch (error) {
+        console.warn('⚠️ [SimpleOverlay] Failed to save position via OverlayPositionManager (debounced):', error);
+      }
+    }, 300); // 300ms debounce delay
+  }, [positionManager, problemId, getEditorBounds]);
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        setCustomPosition({
+        const newPosition = {
           x: e.clientX - dragOffset.x,
           y: e.clientY - dragOffset.y,
-        });
+        };
+        setCustomPosition(newPosition);
+        
+        // Debounced save during drag for better performance
+        savePositionDebounced(newPosition);
       }
     };
 
@@ -262,7 +569,64 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       if (isDragging) {
         setIsDragging(false);
         const pos = customPosition || position;
-        if (pos && onPositionChange) onPositionChange(pos);
+        
+        // Clear any pending debounced save and save immediately on mouse up
+        if (debouncedSavePosition.current) {
+          clearTimeout(debouncedSavePosition.current);
+          debouncedSavePosition.current = null;
+        }
+        
+        // Save position using OverlayPositionManager if available
+        if (pos && positionManager && problemId) {
+          try {
+            // Get editor bounds for validation using calculator
+            const editorBounds = getEditorBounds();
+            
+            if (editorBounds) {
+              
+              // Validate and constrain the position before saving
+              const overlayPosition: OverlayPosition = {
+                x: pos.x,
+                y: pos.y,
+                timestamp: Date.now(),
+                screenSize: {
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                },
+              };
+              
+              const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
+              positionManager.savePosition(validatedPosition);
+              
+              // Update custom position with validated coordinates
+              if (validatedPosition.x !== pos.x || validatedPosition.y !== pos.y) {
+                setCustomPosition({ x: validatedPosition.x, y: validatedPosition.y });
+              }
+              
+              console.log('🎯 [SimpleOverlay] Position saved via OverlayPositionManager (final):', validatedPosition);
+            } else {
+              // Save without validation if editor bounds unavailable
+              const overlayPosition: OverlayPosition = {
+                x: pos.x,
+                y: pos.y,
+                timestamp: Date.now(),
+                screenSize: {
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                },
+              };
+              positionManager.savePosition(overlayPosition);
+              console.log('🎯 [SimpleOverlay] Position saved without validation (final):', overlayPosition);
+            }
+          } catch (error) {
+            console.warn('⚠️ [SimpleOverlay] Failed to save position via OverlayPositionManager (final):', error);
+          }
+        }
+        
+        // Also call the legacy callback for backward compatibility
+        if (pos && onPositionChange) {
+          onPositionChange(pos);
+        }
       }
     };
 
@@ -274,13 +638,17 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      // Clean up debounced save timeout
+      if (debouncedSavePosition.current) {
+        clearTimeout(debouncedSavePosition.current);
+        debouncedSavePosition.current = null;
+      }
     };
-  }, [isDragging, dragOffset, customPosition, position, onPositionChange]);
+  }, [isDragging, dragOffset, customPosition, position, onPositionChange, positionManager, problemId, savePositionDebounced]);
 
   if (!isVisible) return null;
 
   const smartPosition = getSmartPosition();
-  const isMobile = window.innerWidth < 768;
 
   return (
     <div

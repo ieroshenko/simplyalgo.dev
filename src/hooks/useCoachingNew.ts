@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from "react";
-import { CoachingState, CoachStep, CoachHighlightArea, InteractiveCoachSession } from "@/types";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import {  CoachStep, CoachHighlightArea, InteractiveCoachSession } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { OverlayPositionManager } from "../services/overlayPositionManager";
 
 interface UseCoachingProps {
   problemId: string;
@@ -46,9 +47,19 @@ interface CoachingState {
     sessionType?: 'optimization' | 'alternative';
     highlightArea?: CoachHighlightArea;
   };
+  // Enhanced positioning system
+  positionManager?: OverlayPositionManager;
 }
 
 export const useCoachingNew = ({ problemId, userId, problemDescription, editorRef, onCodeInsert }: UseCoachingProps) => {
+  // Initialize position manager for centralized overlay positioning
+  const positionManager = useMemo(() => {
+    if (problemId) {
+      return new OverlayPositionManager(problemId);
+    }
+    return undefined;
+  }, [problemId]);
+
   const [coachingState, setCoachingState] = useState<CoachingState>({
     session: null,
     isCoachModeActive: false,
@@ -64,6 +75,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       message: "",
       showConfetti: false,
     },
+    positionManager,
   });
 
   // Context tracking for Responses API optimization
@@ -76,6 +88,14 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     contextInitialized: false,
     lastCodeSnapshot: '',
   });
+
+  // Update position manager in coaching state when it changes
+  useEffect(() => {
+    setCoachingState(prev => ({
+      ...prev,
+      positionManager,
+    }));
+  }, [positionManager]);
 
   const highlightDecorationsRef = useRef<string[]>([]);
   const startTimeRef = useRef<Date | null>(null);
@@ -157,50 +177,45 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     }
   }, [editorRef]);
 
-  // Calculate position for overlay: always place below the last line in editor
+  // Calculate position for overlay using the new positioning system
   const getPositionBelowLastLine = useCallback(() => {
     try {
-      if (!editorRef.current) return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
-
-      const code = editorRef.current.getValue();
-      const totalLines = Math.max(1, (code || "").split('\n').length);
-      const pos = { lineNumber: totalLines, column: 1 };
-      const editorNode = editorRef.current.getDomNode?.();
-      const editorRect = editorNode?.getBoundingClientRect();
-      const linePos = editorRef.current.getScrolledVisiblePosition?.(pos);
-
-      if (linePos && editorRect) {
-        // Absolute coordinates for last line
-        const absLeft = editorRect.left + (linePos.left || 0);
-        const absTop = editorRect.top + (linePos.top || 0);
-        const absBelowY = absTop + (linePos.height || 20) + 16;
-        const editorMidY = editorRect.top + editorRect.height / 2;
-
-        // If last line is past the center of editor, center the overlay
-        if (absTop > editorMidY) {
-          const centerX = editorRect.left + editorRect.width / 2 - 200; // assume ~400px overlay width
-          const centerY = editorRect.top + editorRect.height / 2 - 130; // assume ~260px overlay height
-          return {
-            x: Math.max(24, Math.min(window.innerWidth - 420, centerX)),
-            y: Math.max(30, Math.min(window.innerHeight - 260, centerY)),
-          };
-        }
-
-        // Otherwise place just below the last line
-        return {
-          x: Math.max(24, Math.min(window.innerWidth - 420, absLeft + 8)),
-          y: Math.max(30, Math.min(window.innerHeight - 260, absBelowY)),
-        };
+      if (!editorRef.current || !positionManager) {
+        return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
       }
 
-      // Fallback: estimate based on line count
-      const estimatedY = Math.min(window.innerHeight - 260, 120 + totalLines * 20);
-      return { x: 24, y: Math.max(30, estimatedY) };
+      // Get editor bounds
+      const editorNode = editorRef.current.getDomNode?.();
+      const editorRect = editorNode?.getBoundingClientRect();
+      
+      if (!editorRect) {
+        // Use fallback positioning when editor bounds unavailable
+        const fallbackPosition = positionManager.getPositionWithFallback();
+        return { x: fallbackPosition.x, y: fallbackPosition.y };
+      }
+
+      const editorBounds = {
+        left: editorRect.left,
+        top: editorRect.top,
+        right: editorRect.right,
+        bottom: editorRect.bottom,
+        width: editorRect.width,
+        height: editorRect.height,
+      };
+
+      // Get the last line number for positioning
+      const code = editorRef.current.getValue();
+      const totalLines = Math.max(1, (code || "").split('\n').length);
+
+      // Use OverlayPositionManager for smart positioning
+      const position = positionManager.getPositionWithFallback(editorBounds, totalLines);
+      return { x: position.x, y: position.y };
     } catch (error) {
-      console.warn('Error calculating position for last line:', error);
+      console.warn('Error calculating position using OverlayPositionManager:', error);
+      // Fallback to basic positioning
       return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
     }
-  }, [editorRef]);
+  }, [editorRef, positionManager]);
 
   // Show interactive question overlay
   const showInteractiveQuestion = useCallback(({ question, hint, highlightArea }: {
@@ -960,6 +975,44 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     }
   }, [editorRef, problemId, userId, problemDescription, showInteractiveQuestion]);
 
+  // Handle position changes for persistence
+  const handlePositionChange = useCallback((position: { x: number; y: number }) => {
+    if (positionManager) {
+      try {
+        // Get editor bounds for validation
+        const editorNode = editorRef.current?.getDomNode?.();
+        const editorRect = editorNode?.getBoundingClientRect();
+        
+        if (editorRect) {
+          const editorBounds = {
+            left: editorRect.left,
+            top: editorRect.top,
+            right: editorRect.right,
+            bottom: editorRect.bottom,
+            width: editorRect.width,
+            height: editorRect.height,
+          };
+          
+          const overlayPosition = {
+            x: position.x,
+            y: position.y,
+            timestamp: Date.now(),
+            screenSize: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+          };
+          
+          // Validate and save position
+          const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
+          positionManager.savePosition(validatedPosition);
+        }
+      } catch (error) {
+        console.warn('Failed to save position:', error);
+      }
+    }
+  }, [positionManager, editorRef]);
+
   return {
     coachingState,
     startCoaching,
@@ -972,5 +1025,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     skipStep,
     startOptimization,
     getElapsedTime,
+    handlePositionChange,
   };
 };
