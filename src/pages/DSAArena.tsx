@@ -14,6 +14,8 @@ import ProblemTable from "@/components/ProblemTable";
 import DataStructureVault from "@/components/DataStructureVault";
 import CompanyIcon from "@/components/CompanyIcon";
 import { useState, useEffect, useMemo } from "react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getUserAvatarUrl, getUserInitials, getUserName } from "@/lib/userAvatar";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
@@ -197,6 +199,10 @@ const DSAArena = () => {
     return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=80`;
   };
 
+  const displayName = getUserName(user, profile);
+  const initials = getUserInitials(displayName);
+  const avatarUrl = getUserAvatarUrl(user, profile, 80);
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -218,14 +224,13 @@ const DSAArena = () => {
             onClick={() => navigate("/profile")}
             className="flex items-center space-x-3 px-4 py-2 hover:bg-secondary rounded-lg"
           >
-            <img
-              src={getUserAvatar()}
-              alt="Profile"
-              className="w-8 h-8 rounded-full object-cover"
-            />
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={avatarUrl} referrerPolicy="no-referrer" loading="lazy" />
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
             <div className="text-left">
               <div className="text-sm font-medium text-foreground">
-                {user.user_metadata?.full_name || profile.name || "User"}
+                {displayName}
               </div>
               <div className="text-xs text-muted-foreground">View Profile</div>
             </div>

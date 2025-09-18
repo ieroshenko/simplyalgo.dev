@@ -11,6 +11,7 @@ import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Survey from "./pages/Survey";
+import FlashcardDeck from "./pages/FlashcardDeck";
 import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -122,6 +123,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Survey />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/flashcards"
+              element={
+                <ProtectedRoute>
+                  <FlashcardDeck />
                 </ProtectedRoute>
               }
             />

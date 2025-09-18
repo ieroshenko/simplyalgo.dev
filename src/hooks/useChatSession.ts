@@ -405,9 +405,12 @@ export const useChatSession = ({
       messages,
       problemDescription,
       problemTestCases,
+      currentCode,
       isTyping,
       saveMessage,
       toast,
+      contextState.sessionId,
+      contextState.responseId,
     ],
   );
 

@@ -29,7 +29,7 @@ export default function FlowCanvas({
   return (
     <figure className={className}>
       <div
-        className="rounded-lg overflow-hidden border border-accent/30 bg-background"
+        className="w-full rounded-lg overflow-hidden border border-accent/30 bg-background"
         style={{ height }}
       >
         <ReactFlow nodes={nodes} edges={edges} fitView>

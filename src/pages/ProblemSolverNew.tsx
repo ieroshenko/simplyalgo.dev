@@ -6,7 +6,8 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import CodeEditor from "@/components/CodeEditor";
-import AIChat from "@/components/AIChat";
+import ChatBubbles from "@/components/chat/ChatBubbles";
+import ProblemPanel from "@/components/problem/ProblemPanel";
 import Notes, { NotesHandle } from "@/components/Notes";
 import {
   ArrowLeft,
@@ -52,59 +53,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
+import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 
-// Simple Tab Component - no Radix UI conflicts
-interface TabProps {
-  tabs: { id: string; label: string }[];
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  children: React.ReactNode;
-}
-
-const SimpleTabs = ({ tabs, activeTab, onTabChange, children }: TabProps) => (
-  <div className="h-full flex flex-col">
-    {/* Tab Headers */}
-    <div className="border-b border-border bg-background">
-      <div className="flex">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? "border-primary text-foreground bg-background"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    </div>
-    
-    {/* Tab Content - explicit height for scrolling */}
-    <div className="flex-1" style={{ height: "calc(100% - 49px)", overflow: "hidden" }}>
-      {children}
-    </div>
-  </div>
-);
-
-interface TabPanelProps {
-  value: string;
-  activeTab: string;
-  children: React.ReactNode;
-}
-
-const TabPanel = ({ value, activeTab, children }: TabPanelProps) => (
-  <div 
-    className={`h-full ${activeTab === value ? "block" : "hidden"}`}
-    style={{ height: "100%", overflowY: "auto" }}
-  >
-    <div className="p-6">
-      {children}
-    </div>
-  </div>
-);
 
 const ProblemSolverNew = () => {
   const { problemId } = useParams<{ problemId: string }>();
@@ -219,6 +170,7 @@ const ProblemSolverNew = () => {
     submissions,
     loading: subsLoading,
     error: subsError,
+    optimisticAdd,
   } = useSubmissions(user?.id, problem?.id);
   const { solutions, loading: solutionsLoading } = useSolutions(problemId);
 
@@ -457,9 +409,8 @@ const ProblemSolverNew = () => {
             snippet,
             cursorPosition,
             problemDescription: problem.description,
-            // Do NOT mark chat insertions as coaching. Destructive fixes
-            // are only allowed for explicit coaching flows.
-            message: "[ai-chat snippet insertion]",
+            // Enhanced context for better insertion decisions
+            message: `[ai-chat snippet insertion] Context: User asked for code fix/improvement. Current code may have bugs that need replacement rather than addition.`,
             conversationHistory: [],
           },
         });
@@ -530,58 +481,29 @@ const ProblemSolverNew = () => {
         return;
       }
 
-      // No-op handling: snippet already present or model suggested no change
-      if (newCodeFromBackend === currentCode || insertedAtLine === -1) {
-        console.log("ℹ️ No insertion needed; snippet already present or unchanged.", {
-          insertedAtLine,
+      // Only skip if the new code is identical to current code
+      if (newCodeFromBackend === currentCode) {
+        console.log("ℹ️ New code is identical to current code - no changes needed.", {
+          currentLength: currentCode.length,
+          newLength: newCodeFromBackend.length,
           rationale: backendRationale,
         });
-        toast.success("Snippet already present — no changes made.");
+        toast.success("Code is already correct — no changes made.");
         return;
       }
+
+      console.log("🔄 Updating editor with new code:", {
+        oldLength: currentCode.length,
+        newLength: newCodeFromBackend.length,
+        insertedAtLine,
+        rationale: backendRationale,
+        codePreview: newCodeFromBackend.substring(0, 300) + "..."
+      });
 
       editor.setValue(newCodeFromBackend);
       setCode(newCodeFromBackend);
 
-      // Set cursor position and add highlighting
-      setTimeout(() => {
-        const newPosition = {
-          lineNumber: (insertedAtLine || cursorPosition.line) + 1,
-          column: 1,
-        };
-
-        editor.setPosition(newPosition);
-        editor.focus();
-
-        // Add temporary highlight
-        const monaco = (window as any).monaco;
-        const linesAdded = snippet.code.split("\n").length;
-        const startLine = Math.max(1, newPosition.lineNumber - linesAdded + 1);
-        const endLine = startLine + linesAdded - 1;
-        const highlightRange = monaco?.Range
-          ? new monaco.Range(startLine, 1, endLine, 1)
-          : undefined;
-        
-        const decorations = editor.deltaDecorations(
-          [],
-          highlightRange
-            ? [
-                {
-                  range: highlightRange,
-                  options: {
-                    className: "inserted-code-highlight",
-                  },
-                },
-              ]
-            : [],
-        );
-
-        setTimeout(() => {
-          editor.deltaDecorations(decorations, []);
-        }, 2000);
-      }, 50);
-
-      toast.success("Code snippet inserted successfully!");
+      console.log("✅ Editor updated successfully");
     } catch (error) {
       console.error("❌ Failed to insert code snippet:", error);
       toast.error("Failed to insert code snippet");
@@ -615,12 +537,14 @@ const ProblemSolverNew = () => {
 
       if (passedCount === totalCount) {
         toast.success("All tests passed! 🎉");
-        await UserAttemptsService.markProblemSolved(
+        const saved = await UserAttemptsService.markProblemSolved(
           user.id,
           problem.id,
           code,
           response.results,
         );
+        // Optimistically add to submissions list for instant UI feedback
+        if (saved) optimisticAdd(saved);
         await handleProblemSolved(
           problem.difficulty as "Easy" | "Medium" | "Hard",
         );
@@ -732,6 +656,12 @@ const ProblemSolverNew = () => {
                 <StarOff className="w-4 h-4" />
               )}
             </Button>
+            <FlashcardButton
+              problemId={problem.id}
+              problemStatus={problem.status}
+              userId={user?.id}
+              className="ml-2"
+            />
           </div>
         </div>
       </div>
@@ -743,378 +673,16 @@ const ProblemSolverNew = () => {
           {showLeftPanel && (
             <>
               <ResizablePanel defaultSize={35} minSize={25}>
-                <SimpleTabs
-                  tabs={leftPanelTabs}
+                <ProblemPanel
+                  problem={problem}
+                  problemId={problemId}
+                  userId={user?.id}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
-                >
-                  {/* Question Tab */}
-                  <TabPanel value="question" activeTab={activeTab}>
-                    <div className="space-y-6">
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">
-                          Problem Description
-                        </h2>
-                        <div className="prose prose-sm max-w-none text-muted-foreground">
-                          <p>{problem.description}</p>
-                        </div>
-                      </div>
-
-                      {problem.examples && problem.examples.length > 0 && (
-                        <div>
-                          <h3 className="text-md font-semibold text-foreground mb-3">
-                            Examples
-                          </h3>
-                          <div className="space-y-4">
-                            {problem.examples.map((example, index) => (
-                              <div
-                                key={index}
-                                className="bg-muted/50 p-4 rounded-lg"
-                              >
-                                <div className="space-y-2 font-mono text-sm">
-                                  <div>
-                                    <span className="font-semibold">Input:</span>
-                                    <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-                                      {renderValue(example.input)}
-                                    </pre>
-                                  </div>
-                                  <div>
-                                    <span className="font-semibold">Output:</span>
-                                    <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-                                      {renderValue(example.output)}
-                                    </pre>
-                                  </div>
-                                  {example.explanation && (
-                                    <div>
-                                      <span className="font-semibold">
-                                        Explanation:
-                                      </span>{" "}
-                                      {example.explanation}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Constraints */}
-                      <div>
-                        <h3 className="text-md font-semibold text-foreground mb-3">
-                          Constraints
-                        </h3>
-                        {problem.constraints && problem.constraints.length > 0 ? (
-                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                            {problem.constraints.map((c, idx) => (
-                              <li key={idx}>{c}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <div className="text-sm text-muted-foreground">—</div>
-                        )}
-                      </div>
-
-                      {/* Recommended Complexity */}
-                      <div>
-                        <h3 className="text-md font-semibold text-foreground mb-3">
-                          Recommended Time & Space Complexity
-                        </h3>
-                        <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>
-                            • Time: {problem.recommendedTimeComplexity || "—"}
-                          </li>
-                          <li>
-                            • Space: {problem.recommendedSpaceComplexity || "—"}
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </TabPanel>
-
-                  {/* Solution Tab */}
-                  <TabPanel value="solution" activeTab={activeTab}>
-                    <div className="space-y-6">
-                      {solutionsLoading ? (
-                        <div className="text-sm text-muted-foreground">
-                          Loading solutions...
-                        </div>
-                      ) : solutions.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
-                          No curated solutions yet.
-                        </div>
-                      ) : (
-                        solutions.map((sol, idx) => (
-                          <div key={idx}>
-                            <h2 className="text-lg font-semibold text-foreground mb-4">
-                              {idx + 1}. {sol.title}
-                            </h2>
-                            <div className="bg-muted rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex space-x-2">
-                                  <Button variant="default" size="sm">
-                                    Python
-                                  </Button>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      openFullscreen(
-                                        sol.code,
-                                        "python",
-                                        `${problem.title} — ${sol.title}`,
-                                      )
-                                    }
-                                    className="h-7 px-2 text-xs"
-                                  >
-                                    Maximize
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleCopy(sol.code)}
-                                    className="h-7 px-2 text-xs"
-                                  >
-                                    Copy
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="border rounded overflow-hidden">
-                                <Editor
-                                  height={`${Math.max(120, Math.min(500, (sol.code.split('\n').length * 22) + 40))}px`}
-                                  defaultLanguage="python"
-                                  value={sol.code}
-                                  theme={currentTheme}
-                                  onMount={(editor, monaco) => {
-                                    defineCustomThemes(monaco);
-                                  }}
-                                  options={{
-                                    readOnly: true,
-                                    minimap: { enabled: false },
-                                    lineNumbers: "off",
-                                    folding: false,
-                                    scrollBeyondLastLine: false,
-                                    renderLineHighlight: "none",
-                                    fontSize: 15,
-                                    wordWrap: "on",
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div className="mt-4">
-                              <h3 className="font-semibold text-foreground mb-2">
-                                Time & Space Complexity
-                              </h3>
-                              <ul className="text-sm text-muted-foreground space-y-1">
-                                <li>• Time complexity: {sol.time_complexity}</li>
-                                <li>• Space complexity: {sol.space_complexity}</li>
-                              </ul>
-                              {sol.explanation && (
-                                <p className="text-sm text-muted-foreground mt-2">
-                                  {sol.explanation}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </TabPanel>
-
-                  {/* Submissions Tab */}
-                  <TabPanel value="submissions" activeTab={activeTab}>
-                    <div>
-                      <h2 className="text-lg font-semibold text-foreground mb-4">
-                        Submissions
-                      </h2>
-                      {subsLoading && (
-                        <div className="text-sm text-muted-foreground">
-                          Loading submissions...
-                        </div>
-                      )}
-                      {!subsLoading && subsError && (
-                        <div className="text-sm text-red-600">{subsError}</div>
-                      )}
-                      {!subsLoading &&
-                        !subsError &&
-                        submissions.length === 0 && (
-                          <div className="text-sm text-muted-foreground">
-                            No submissions yet.
-                          </div>
-                        )}
-                      {!subsLoading &&
-                        !subsError &&
-                        submissions.length > 0 && (
-                          <div className="space-y-3">
-                            {submissions.map((s) => (
-                              <div
-                                key={s.id}
-                                className="bg-muted/50 rounded-lg border border-border"
-                              >
-                                <button
-                                  onClick={() => toggleSubmission(s.id)}
-                                  className="w-full flex items-center justify-between p-3 hover:bg-muted/70 transition-colors"
-                                >
-                                  <div className="flex items-center space-x-3 text-left">
-                                    <span
-                                      className="text-sm font-medium"
-                                      style={{
-                                        color:
-                                          s.status === "passed"
-                                            ? "#388e3c"
-                                            : s.status === "failed"
-                                              ? "#d32f2f"
-                                              : "#555",
-                                      }}
-                                    >
-                                      {s.status === "passed"
-                                        ? "Accepted"
-                                        : s.status.charAt(0).toUpperCase() +
-                                          s.status.slice(1)}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                    <span>{s.language || "Python"}</span>
-                                    <span>
-                                      {formatRelativeTime(s.created_at)}
-                                    </span>
-                                  </div>
-                                </button>
-                                {expandedSubmissionId === s.id && (
-                                  <div className="px-3 pb-3">
-                                    <div className="bg-background border rounded">
-                                      <div className="flex items-center justify-between px-3 py-2 border-b">
-                                        <div className="text-xs text-muted-foreground">
-                                          {s.language || "Python"}
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                              openFullscreen(
-                                                s.code,
-                                                s.language || "python",
-                                                `${problem.title} — Submission`,
-                                              )
-                                            }
-                                            className="h-7 px-2 text-xs"
-                                          >
-                                            Maximize
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleCopy(s.code)}
-                                            className="h-7 px-2 text-xs"
-                                          >
-                                            Copy
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleAnalyzeComplexity(s.code, s.id)}
-                                            disabled={analyzingSubmissionId === s.id}
-                                            className="h-7 px-2 text-xs"
-                                          >
-                                            {analyzingSubmissionId === s.id ? (
-                                              "Analyzing..."
-                                            ) : (
-                                              "Analyze"
-                                            )}
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <Editor
-                                        height={`${Math.max(s.code.split('\n').length * 20 + 40, 100)}px`}
-                                        defaultLanguage={(
-                                          s.language || "python"
-                                        ).toLowerCase()}
-                                        value={s.code}
-                                        theme={currentTheme}
-                                        onMount={(editor, monaco) => {
-                                          defineCustomThemes(monaco);
-                                        }}
-                                        options={{
-                                          readOnly: true,
-                                          minimap: { enabled: false },
-                                          lineNumbers: "off",
-                                          folding: false,
-                                          scrollBeyondLastLine: false,
-                                          renderLineHighlight: "none",
-                                          fontSize: 15,
-                                          wordWrap: "on",
-                                        }}
-                                      />
-
-                                      {/* Complexity Analysis Results */}
-                                      {complexityResults[s.id] && (
-                                        <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
-                                          <h4 className="font-medium text-sm text-foreground mb-3">
-                                            Complexity Analysis
-                                          </h4>
-                                          <div className="space-y-3">
-                                            {/* Time Complexity */}
-                                            <div>
-                                              <div className="text-sm font-medium text-foreground mb-1">
-                                                Time Complexity: 
-                                                <Badge variant="outline" className="ml-2 text-xs">
-                                                  {complexityResults[s.id].time_complexity || "N/A"}
-                                                </Badge>
-                                              </div>
-                                              {complexityResults[s.id].time_explanation && (
-                                                <p className="text-sm text-foreground/80">
-                                                  {complexityResults[s.id].time_explanation}
-                                                </p>
-                                              )}
-                                            </div>
-
-                                            {/* Space Complexity */}
-                                            <div>
-                                              <div className="text-sm font-medium text-foreground mb-1">
-                                                Space Complexity: 
-                                                <Badge variant="outline" className="ml-2 text-xs">
-                                                  {complexityResults[s.id].space_complexity || "N/A"}
-                                                </Badge>
-                                              </div>
-                                              {complexityResults[s.id].space_explanation && (
-                                                <p className="text-sm text-foreground/80">
-                                                  {complexityResults[s.id].space_explanation}
-                                                </p>
-                                              )}
-                                            </div>
-
-                                            {/* Overall Analysis */}
-                                            {complexityResults[s.id].analysis && (
-                                              <div className="pt-3 border-t border-border">
-                                                <h5 className="text-sm font-medium text-foreground mb-2">
-                                                  Analysis Summary
-                                                </h5>
-                                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                                  {complexityResults[s.id].analysis}
-                                                </p>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-                  </TabPanel>
-
-                  {/* Notes Tab */}
-                  <TabPanel value="notes" activeTab={activeTab}>
-                    <Notes problemId={problemId} ref={notesRef} />
-                  </TabPanel>
-                </SimpleTabs>
+                  leftPanelTabs={leftPanelTabs}
+                  notesRef={notesRef}
+                  onFullscreenCode={openFullscreen}
+                />
               </ResizablePanel>
               <ResizableHandle withHandle />
             </>
@@ -1191,18 +759,18 @@ const ProblemSolverNew = () => {
                                     : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20";
                                 }
                                 return (
-                                  <button
-                                    key={index}
-                                    onClick={() => setActiveTestCase(index)}
+                                <button
+                                  key={index}
+                                  onClick={() => setActiveTestCase(index)}
                                     className={buttonClass}
-                                  >
-                                    {result.passed ? (
-                                      <Check className="w-3 h-3" />
-                                    ) : (
-                                      <X className="w-3 h-3" />
-                                    )}
-                                    <span>Case {index + 1}</span>
-                                  </button>
+                                >
+                                  {result.passed ? (
+                                    <Check className="w-3 h-3" />
+                                  ) : (
+                                    <X className="w-3 h-3" />
+                                  )}
+                                  <span>Case {index + 1}</span>
+                                </button>
                                 );
                               })}
                             </div>
@@ -1311,12 +879,12 @@ const ProblemSolverNew = () => {
               <ResizableHandle withHandle />
               <ResizablePanel
                 defaultSize={25}
-                minSize={20}
+                minSize={25}
                 onResize={(size) => {
                   localStorage.setItem("ai-chat-width", String(size));
                 }}
               >
-                <AIChat
+                <ChatBubbles
                   problemId={problem.id}
                   problemDescription={problem.description}
                   onInsertCodeSnippet={handleInsertCodeSnippet}

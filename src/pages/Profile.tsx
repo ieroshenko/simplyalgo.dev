@@ -3,13 +3,19 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Target, Clock, Trophy, Calendar } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowLeft, Target, Clock, Trophy, Calendar, Flame, CheckCircle2, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getUserAvatarUrl, getUserInitials, getUserName } from "@/lib/userAvatar";
+import { FlashcardStats } from "@/components/flashcards/FlashcardStats";
+import { FlashcardReviewInterface } from "@/components/flashcards/FlashcardReviewInterface";
+import { isFeatureEnabled } from "@/config/features";
 
 const Profile = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
+  const [showFlashcardReview, setShowFlashcardReview] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -32,33 +38,10 @@ const Profile = () => {
     return null;
   }
 
-  const getUserAvatar = () => {
-    // Try Google avatar from user metadata first
-    if (user.user_metadata?.avatar_url) {
-      return user.user_metadata.avatar_url;
-    }
-    // Fallback to profile avatar
-    if (profile.avatarUrl) {
-      return profile.avatarUrl;
-    }
-    // Generate initials avatar as fallback
-    const name = user.user_metadata?.full_name || profile.name || "User";
-    const initials = name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-    return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff&size=200`;
-  };
-
-  const getUserName = () => {
-    return user.user_metadata?.full_name || profile.name || "User";
-  };
-
-  const getUserEmail = () => {
-    return user.email || profile.email || "";
-  };
+  const displayName = getUserName(user, profile);
+  const initials = getUserInitials(displayName);
+  const avatarUrl = getUserAvatarUrl(user, profile, 200);
+  const userEmail = user.email || profile.email || "";
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -80,17 +63,16 @@ const Profile = () => {
         <Card className="p-8">
           <div className="flex items-center space-x-6">
             <div className="relative">
-              <img
-                src={getUserAvatar()}
-                alt={getUserName()}
-                className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
-              />
+              <Avatar className="w-24 h-24 border-4 border-primary/20">
+                <AvatarImage src={avatarUrl} referrerPolicy="no-referrer" loading="lazy" />
+                <AvatarFallback className="text-xl">{initials}</AvatarFallback>
+              </Avatar>
             </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                {getUserName()}
+                {displayName}
               </h2>
-              <p className="text-muted-foreground mb-4">{getUserEmail()}</p>
+              <p className="text-muted-foreground mb-4">{userEmail}</p>
               <div className="flex items-center space-x-4 text-sm">
                 <div className="flex items-center space-x-1">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -112,7 +94,7 @@ const Profile = () => {
           <Card className="p-6">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-success rounded-lg flex items-center justify-center">
-                <Target className="w-6 h-6 text-success-foreground" />
+                <CheckCircle2 className="w-6 h-6 text-success-foreground" />
               </div>
               <div>
                 <div className="text-3xl font-bold text-foreground">
@@ -127,8 +109,8 @@ const Profile = () => {
 
           <Card className="p-6">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-accent-foreground" />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-orange-100 dark:bg-orange-900/30">
+                <Flame className="w-6 h-6 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
                 <div className="text-3xl font-bold text-foreground">
@@ -158,7 +140,7 @@ const Profile = () => {
           <Card className="p-6">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                <Target className="w-6 h-6 text-muted-foreground" />
+                <TrendingUp className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
                 <div className="text-3xl font-bold text-foreground">
@@ -172,6 +154,15 @@ const Profile = () => {
             </div>
           </Card>
         </div>
+
+        {/* Flashcard Section */}
+        {isFeatureEnabled("FLASHCARDS") && user && (
+          <FlashcardStats
+            userId={user.id}
+            onStartReview={() => setShowFlashcardReview(true)}
+            onManageDeck={() => navigate("/flashcards")}
+          />
+        )}
 
         {/* Problem Breakdown */}
         <Card className="p-6">
@@ -216,6 +207,15 @@ const Profile = () => {
             </div>
           </div>
         </Card>
+
+        {/* Flashcard Review Interface */}
+        {isFeatureEnabled("FLASHCARDS") && user && (
+          <FlashcardReviewInterface
+            isOpen={showFlashcardReview}
+            onClose={() => setShowFlashcardReview(false)}
+            userId={user.id}
+          />
+        )}
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ interface SimpleOverlayProps {
   onCancel: () => void;
   onExitCoach?: () => void;
   onFinishCoaching?: () => void;
-  onInsertCorrectCode?: () => void; // New prop for inserting correct code
+  onInsertCorrectCode?: () => Promise<void> | void; // New prop for inserting correct code
   onStartOptimization?: (type: 'optimization' | 'alternative') => void; // Trigger optimization or alternative flow
   onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
   isValidating?: boolean;
@@ -108,6 +108,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [customPosition, setCustomPosition] = useState<{ x: number; y: number } | null>(null);
   const [studentExplanation, setStudentExplanation] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
+  const [isInserting, setIsInserting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Centralized overlay state management for cleaner UI logic
@@ -569,7 +570,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             <div className="flex gap-2">
               <Button
                 onClick={handleValidate}
-                disabled={isValidating}
+                disabled={isValidating || isInserting}
                 size="sm"
                 variant="outline"
                 className="border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900/20"
@@ -588,12 +589,29 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               </Button>
               {validationResult?.codeToAdd && onInsertCorrectCode && (
                 <Button
-                  onClick={onInsertCorrectCode}
+                  onClick={async () => {
+                    try {
+                      setIsInserting(true);
+                      await onInsertCorrectCode();
+                    } finally {
+                      setIsInserting(false);
+                    }
+                  }}
+                  disabled={isInserting}
                   size="sm"
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Use Correct Code
+                  {isInserting ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                      Applying fix...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Use Correct Code
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -602,7 +620,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {(overlayState === 'initial' || overlayState === 'validating') && (
             <Button
               onClick={handleValidate}
-              disabled={isValidating}
+              disabled={isValidating || isInserting}
               size="sm"
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >

@@ -29,6 +29,8 @@ export interface Problem {
   }>;
   testCases: TestCase[];
   companies?: string[]; // Array of company names
+  recommendedTimeComplexity?: string;
+  recommendedSpaceComplexity?: string;
 }
 
 export interface User {
