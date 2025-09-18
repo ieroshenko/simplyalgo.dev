@@ -6,11 +6,14 @@ import MissionStrip from "@/components/MissionStrip";
 import CoreBattleCards from "@/components/CoreBattleCards";
 import ProgressRadar from "@/components/ProgressRadar";
 import RecentActivity from "@/components/RecentActivity";
+import { PersonalPlanCard } from "@/components/PersonalPlanCard";
 import { useAuth } from "@/hooks/useAuth";
+import { useSurveyData } from "@/hooks/useSurveyData";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { surveyData } = useSurveyData();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,7 +45,11 @@ const Dashboard = () => {
             <RecentActivity />
           </div>
 
-          <div className="w-80 p-6">
+          <div className="w-80 p-6 space-y-6">
+            <PersonalPlanCard 
+              surveyData={surveyData}
+              onUpdatePlan={() => navigate('/survey/1')}
+            />
             <ProgressRadar />
           </div>
         </div>

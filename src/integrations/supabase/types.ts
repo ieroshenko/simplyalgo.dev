@@ -313,6 +313,113 @@ export type Database = {
         }
         Relationships: []
       }
+      flashcard_decks: {
+        Row: {
+          created_at: string | null
+          ease_factor: number | null
+          id: string
+          interval_days: number | null
+          last_reviewed_at: string | null
+          mastery_level: number | null
+          next_review_date: string
+          problem_id: string
+          review_count: number | null
+          solution_code: string | null
+          solution_id: string | null
+          solution_title: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          ease_factor?: number | null
+          id?: string
+          interval_days?: number | null
+          last_reviewed_at?: string | null
+          mastery_level?: number | null
+          next_review_date?: string
+          problem_id: string
+          review_count?: number | null
+          solution_code?: string | null
+          solution_id?: string | null
+          solution_title?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          ease_factor?: number | null
+          id?: string
+          interval_days?: number | null
+          last_reviewed_at?: string | null
+          mastery_level?: number | null
+          next_review_date?: string
+          problem_id?: string
+          review_count?: number | null
+          solution_code?: string | null
+          solution_id?: string | null
+          solution_title?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcard_decks_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flashcard_decks_solution_id_fkey"
+            columns: ["solution_id"]
+            isOneToOne: false
+            referencedRelation: "problem_solutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flashcard_reviews: {
+        Row: {
+          ai_evaluation: Json | null
+          ai_questions: Json
+          deck_id: string
+          id: string
+          notes: string | null
+          reviewed_at: string | null
+          time_spent_seconds: number | null
+          user_answers: Json
+          user_difficulty_rating: number
+        }
+        Insert: {
+          ai_evaluation?: Json | null
+          ai_questions?: Json
+          deck_id: string
+          id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          time_spent_seconds?: number | null
+          user_answers?: Json
+          user_difficulty_rating: number
+        }
+        Update: {
+          ai_evaluation?: Json | null
+          ai_questions?: Json
+          deck_id?: string
+          id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          time_spent_seconds?: number | null
+          user_answers?: Json
+          user_difficulty_rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcard_reviews_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "flashcard_decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           content: string | null
@@ -471,6 +578,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      survey_responses: {
+        Row: {
+          completed_at: string | null
+          completed_steps: number[]
+          created_at: string | null
+          id: string
+          survey_data: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_steps?: number[]
+          created_at?: string | null
+          id?: string
+          survey_data?: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_steps?: number[]
+          created_at?: string | null
+          id?: string
+          survey_data?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       test_cases: {
         Row: {
@@ -679,6 +816,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_cards_due_for_review: {
+        Args: { p_user_id: string }
+        Returns: {
+          days_overdue: number
+          deck_id: string
+          is_custom_solution: boolean
+          mastery_level: number
+          next_review_date: string
+          problem_id: string
+          problem_title: string
+          review_count: number
+          solution_code: string
+          solution_title: string
+        }[]
+      }
       migrate_test_case_to_json: {
         Args: {
           expected_text: string
@@ -689,6 +841,10 @@ export type Database = {
           expected_json: Json
           input_json: Json
         }[]
+      }
+      update_flashcard_schedule: {
+        Args: { p_deck_id: string; p_difficulty_rating: number }
+        Returns: undefined
       }
     }
     Enums: {

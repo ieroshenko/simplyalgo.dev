@@ -10,6 +10,7 @@ import DSAArena from "./pages/DSAArena";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Survey from "./pages/Survey";
 import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -113,6 +114,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/survey/:stepNumber"
+              element={
+                <ProtectedRoute>
+                  <Survey />
                 </ProtectedRoute>
               }
             />
