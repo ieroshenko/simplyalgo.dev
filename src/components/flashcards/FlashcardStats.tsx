@@ -76,7 +76,7 @@ export const FlashcardStats = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <CreditCard className="h-5 w-5" />
-          📚 Flashcards
+          Flashcards
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

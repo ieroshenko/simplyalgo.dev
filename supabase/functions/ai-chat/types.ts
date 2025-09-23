@@ -60,6 +60,8 @@ export interface RequestBody {
   // For coaching submission validation
   studentCode?: string;
   currentEditorCode?: string;
+  // Coaching mode selection
+  coachingMode?: "socratic" | "comprehensive";
 }
 
 export interface AIResponse {
