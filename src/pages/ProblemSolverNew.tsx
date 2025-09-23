@@ -97,6 +97,8 @@ const ProblemSolverNew = () => {
     }
   }, [problemId]);
 
+
+
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
     const saved = localStorage.getItem("showLeftPanel");
@@ -184,6 +186,13 @@ const ProblemSolverNew = () => {
     optimisticAdd,
   } = useSubmissions(user?.id, problem?.id);
   const { solutions, loading: solutionsLoading } = useSolutions(problemId);
+
+  // Initialize code when problem is loaded
+  useEffect(() => {
+    if (problem?.functionSignature && code === "") {
+      setCode(problem.functionSignature);
+    }
+  }, [problem?.functionSignature, code]);
 
   // Coaching system integration
   const {

@@ -248,3 +248,35 @@ export interface CoachingState {
     showConfetti: boolean;
   };
 }
+
+// AI Coaching Modes Types
+export type CoachingMode = 'socratic' | 'comprehensive';
+
+export interface CoachingModeState {
+  currentMode: CoachingMode;
+  isEnabled: boolean;
+  preferences: {
+    defaultMode: CoachingMode;
+    rememberChoice: boolean;
+  };
+}
+
+export interface CoachingModePreferences {
+  defaultMode: CoachingMode;
+  lastUsedMode: CoachingMode;
+  rememberChoice: boolean;
+  timestamp: number;
+}
+
+// Request body extensions for mode parameter
+export interface RequestBody {
+  message: string;
+  sessionId?: string;
+  problemId?: string;
+  currentCode?: string;
+  responseId?: string;
+}
+
+export interface ChatRequestBody extends RequestBody {
+  coachingMode?: CoachingMode;
+}

@@ -359,8 +359,14 @@ export function getOrCreateSessionContext(
   sessionId: string,
   contextType: 'chat' | 'coaching',
   initialCode: string = '',
+  coachingMode?: string,
 ): SessionContext {
-  const existing = sessionContextCache.get(sessionId);
+  // Include coaching mode in cache key for chat contexts to prevent mode mixing
+  const cacheKey = contextType === 'chat' && coachingMode 
+    ? `${sessionId}_${coachingMode}` 
+    : sessionId;
+  
+  const existing = sessionContextCache.get(cacheKey);
   
   if (existing && existing.contextType === contextType) {
     // Update last used timestamp
@@ -379,8 +385,8 @@ export function getOrCreateSessionContext(
     lastUsedAt: new Date().toISOString(),
   };
   
-  sessionContextCache.set(sessionId, context);
-  console.log(`[session-context] Created new context for ${contextType} session: ${sessionId}`);
+  sessionContextCache.set(cacheKey, context);
+  console.log(`[session-context] Created new context for ${contextType} session: ${cacheKey}`);
   
   return context;
 }
@@ -392,8 +398,11 @@ export function updateSessionContext(
   sessionId: string,
   responseId: string,
   codeState: string = '',
+  coachingMode?: string,
 ): void {
-  const context = sessionContextCache.get(sessionId);
+  // Use same cache key logic as getOrCreateSessionContext
+  const cacheKey = coachingMode ? `${sessionId}_${coachingMode}` : sessionId;
+  const context = sessionContextCache.get(cacheKey);
   
   if (context) {
     context.responseId = responseId;
@@ -448,9 +457,10 @@ export async function llmWithSessionContext(
     maxTokens?: number;
     responseFormat?: "json_object" | undefined;
     forceNewContext?: boolean;
+    coachingMode?: string;
   } = {},
 ): Promise<ContextualResponse> {
-  const sessionContext = getOrCreateSessionContext(sessionId, contextType, currentCode);
+  const sessionContext = getOrCreateSessionContext(sessionId, contextType, currentCode, opts.coachingMode);
   
   // Determine if we need a new context
   const needsNewContext = 
@@ -465,11 +475,11 @@ export async function llmWithSessionContext(
   if (needsNewContext) {
     console.log(`[session-context] Creating new context for ${contextType} session: ${sessionId}`);
     result = await createInitialContext(prompt, opts);
-    updateSessionContext(sessionId, result.responseId, currentCode);
+    updateSessionContext(sessionId, result.responseId, currentCode, opts.coachingMode);
   } else {
     console.log(`[session-context] Continuing with existing context for ${contextType} session: ${sessionId}`);
     result = await continueWithContext(prompt, sessionContext.responseId!, opts);
-    updateSessionContext(sessionId, result.responseId, currentCode);
+    updateSessionContext(sessionId, result.responseId, currentCode, opts.coachingMode);
     
     // Estimate tokens saved (rough calculation)
     tokensSaved = Math.floor(prompt.length * 0.6); // Assuming 60% reduction

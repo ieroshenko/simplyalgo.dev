@@ -34,6 +34,7 @@ import {
   insertSnippetSmart, 
   generateVisualizationComponent 
 } from "./code-analysis.ts";
+import { validateCoachingMode } from "./prompts.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
@@ -99,7 +100,11 @@ serve(async (req) => {
       userResponse,
       studentCode,
       currentEditorCode,
+      coachingMode,
     } = body;
+
+    // Validate coaching mode and ensure fallback to comprehensive for invalid/missing mode
+    const validatedCoachingMode = validateCoachingMode(coachingMode);
 
     // Initialize OpenAI client with error handling
     try {
@@ -831,6 +836,7 @@ Conversation: ${JSON.stringify(conversationHistory)}`;
           chatSessionId, // Pass session ID for context management
           {
             previousResponseId: typeof previousResponseId === 'string' ? previousResponseId : null,
+            coachingMode: validatedCoachingMode,
           },
         ),
         analyzeCodeSnippets(

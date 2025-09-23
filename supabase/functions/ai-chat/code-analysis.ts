@@ -1,39 +1,10 @@
 import { llmText, llmJson, llmJsonFast, llmWithSessionContext, getOrCreateSessionContext, updateSessionContext } from "./openai-utils.ts";
 import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
+import { generateModeSpecificPrompt, validateCoachingMode, type CoachingMode } from "./prompts.ts";
 
-/**
- * Parse problem constraints from problem description for constraint-aware analysis
- * Returns the extracted constraints for validation context
- */
-function parseConstraints(problemDescription: string): {
-  constraints: string[];
-  numericalConstraints: { min: number; max: number; variable: string }[];
-} {
-  const constraints: string[] = [];
-  const numericalConstraints: { min: number; max: number; variable: string }[] = [];
-  
-  // Look for constraint sections
-  const constraintMatch = problemDescription.match(/(?:Constraints?|Constraint)\s*:?\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
-  if (constraintMatch) {
-    const constraintText = constraintMatch[1];
-    constraints.push(constraintText.trim());
-    
-    // Extract numerical constraints like "-1000 <= a, b <= 1000"
-    const numericalMatches = constraintText.matchAll(/(-?\d+)\s*<=?\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*<=?\s*(-?\d+)/g);
-    for (const match of numericalMatches) {
-      const [, minStr, variables, maxStr] = match;
-      const min = parseInt(minStr);
-      const max = parseInt(maxStr);
-      const varList = variables.split(',').map(v => v.trim());
-      
-      for (const variable of varList) {
-        numericalConstraints.push({ min, max, variable });
-      }
-    }
-  }
-  
-  return { constraints, numericalConstraints };
-}
+
+
+
 
 /**
  * Lightweight sanitizer to fix common TSX issues in generated components before returning to client.
@@ -135,12 +106,38 @@ export async function generateConversationResponse(
   testCases?: unknown[],
   currentCode?: string,
   sessionId?: string, // context management key
-  options?: { previousResponseId?: string | null; forceNewContext?: boolean },
+  options?: { previousResponseId?: string | null; forceNewContext?: boolean; coachingMode?: "socratic" | "comprehensive" },
 ): Promise<string> {
   // Check if we can use context-aware approach or need to fallback
   if (!sessionId) {
     console.log("[chat] No session ID provided, using legacy approach");
-    return await generateLegacyChatResponse(message, problemDescription, conversationHistory, testCases, currentCode);
+    // For legacy approach, validate and use coaching mode
+    const validatedMode = validateCoachingMode(options?.coachingMode);
+    const serializedTests = Array.isArray(testCases) && testCases.length > 0 
+        ? JSON.stringify(testCases)
+        : undefined;
+    
+    const prompt = generateModeSpecificPrompt(validatedMode, problemDescription, serializedTests, currentCode);
+    
+    const fullPrompt = `${prompt}
+
+RECENT CONVERSATION:
+${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
+
+STUDENT MESSAGE: "${message}"
+
+Analyze their current code and respond naturally based on their question.`;
+
+    try {
+      const response = await llmText(fullPrompt, {
+        temperature: 0.3,
+        maxTokens: 220,
+      });
+      return response || "I'm sorry, I couldn't generate a response. Please try again.";
+    } catch (error) {
+      console.error("[chat] Legacy generation failed:", error);
+      return "Sorry, I hit a snag generating a response. Please try again.";
+    }
   }
 
   // Use context-aware approach for optimal token usage
@@ -150,53 +147,14 @@ export async function generateConversationResponse(
 
   let contextualResponse: ContextualResponse;
   
-  // Parse constraints from problem description for constraint-aware analysis
-  const { constraints, numericalConstraints } = parseConstraints(problemDescription);
+
 
   try {
-    // Simplified context approach maintaining response ID efficiency
-    const chatContext = `You are SimplyAlgo's friendly AI coding coach. Help students discover solutions through guided questioning.
-
-CRITICAL COACHING RULES:
-1. FIRST: Always look at their current editor code and reference it directly
-2. DEFAULT RESPONSE: Ask ONE specific guiding question to help them think through the next step
-3. NEVER give full solutions, templates, or complete code blocks unless they explicitly ask "show me the code" or "give me the solution"
-4. When they say "I understand but don't know how to code it" → Ask what specific part they're stuck on
-5. Use their existing code style (function name, variable names, structure) - NOT "class Solution" format
-
-EXECUTION ENVIRONMENT:
-- Code runs on Judge0 with automatic imports (List, Optional, etc.)
-- NEVER include import statements in suggestions
-- Use proper Python syntax with type hints when showing small snippets
-- ALWAYS format code properly with newlines, NEVER use semicolons to separate Python statements
-
-${constraints.length > 0 ? `PROBLEM CONSTRAINTS: ${constraints.join('; ')}
-Focus on solutions that work within these constraints.
-
-` : ""}RESPONSE PATTERNS:
-- Student asks for FULL SOLUTION ("show me solution", "how to solve this", "give me the code"): Provide complete working solution in proper python code blocks
-- Student asks for CODE SNIPPET ("give me snippet", "what's next", "help with this part", "give me some code"): Provide ONLY the next logical step in proper python code blocks, NO follow-up questions
-- Student says "I understand the approach but don't know how to code it": Ask "What's the first step you'd take? What would you check or do with the input?"  
-- Student explains their understanding: Ask "That's right! What would be your base case?" or "How would you handle the recursive calls?"
-- Student asks for explanation: Give brief explanation then ask "What part would you tackle first?"
-- All other cases: Ask ONE guiding question
-
-CODE FORMATTING RULES:
-- ALWAYS use proper markdown code blocks with python language tag for any code (never inline code)
-- When providing code, do NOT ask follow-up questions - just give the code
-- Match the student's existing function signature exactly
-
-PYTHON CODE FORMATTING:
-- Match the student's function signature and style from their editor
-- Use proper type hints: def function_name(param: TreeNode) -> TreeNode:
-- Use newlines, never semicolons: each statement on its own line
-- Only show tiny snippets unless they ask for full code
-
-PROBLEM CONTEXT:
-${problemDescription}
-
-${serializedTests ? `TEST CASES:\n${serializedTests}\n` : ""}
-${currentCode ? `CURRENT CODE IN EDITOR:\n\`\`\`python\n${currentCode}\n\`\`\`\n` : ""}
+    // Get coaching mode from options, validate and default to comprehensive
+    const validatedMode = validateCoachingMode(options?.coachingMode);
+    
+    // Generate mode-specific prompt
+    const chatContext = `${generateModeSpecificPrompt(validatedMode, problemDescription, serializedTests, currentCode)}
 
 RECENT CONVERSATION:
 ${conversationHistory.slice(-3).map((msg) => `${msg.role}: ${msg.content}`).join("\n")}
@@ -209,8 +167,8 @@ Analyze their current code and respond naturally based on their question.`;
     // If client provided a previousResponseId (e.g., after cold start), seed the session cache
     if (options?.previousResponseId) {
       // Ensure context exists then update with provided response id and current code snapshot
-      getOrCreateSessionContext(session, 'chat', currentCode || '');
-      updateSessionContext(session, options.previousResponseId, currentCode || '');
+      getOrCreateSessionContext(session, 'chat', currentCode || '', validatedMode);
+      updateSessionContext(session, options.previousResponseId, currentCode || '', validatedMode);
     }
 
     contextualResponse = await llmWithSessionContext(
@@ -222,6 +180,7 @@ Analyze their current code and respond naturally based on their question.`;
         temperature: 0.3,
         maxTokens: 220,
         forceNewContext: options?.forceNewContext === true,
+        coachingMode: validatedMode,
       }
     );
 

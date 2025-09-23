@@ -56,9 +56,9 @@ done
 curl -fsS "http://localhost:${API_PORT}/health" >/dev/null || { echo -e "${RED}❌ API failed to start${NC}"; exit 1; }
 
 echo -e "${YELLOW}📦 Installing frontend deps...${NC}"
-bun install --no-audit --silent
+npm install --no-audit --no-fund --silent
 echo -e "${YELLOW}🚀 Starting frontend dev server on :${FRONTEND_PORT}...${NC}"
-bun run dev &
+npm run dev &
 FRONTEND_PID=$!
 
 # Wait for frontend readiness (60s)

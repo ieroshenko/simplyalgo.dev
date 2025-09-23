@@ -16,6 +16,9 @@ import { useState, useEffect, useRef } from "react";
 // Using a lightweight custom fullscreen overlay instead of Radix Dialog to avoid MIME issues in some dev setups
 import { useChatSession } from "@/hooks/useChatSession";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useCoachingMode } from "@/hooks/useCoachingMode";
+import { CoachingModeToggle } from "@/components/coaching/CoachingModeToggle";
+import { CoachingModeErrorBoundary } from "@/components/coaching/CoachingModeErrorBoundary";
 import TextareaAutosize from "react-textarea-autosize";
 import { CodeSnippet, Problem } from "@/types";
 import Mermaid from "@/components/diagram/Mermaid";
@@ -61,6 +64,18 @@ const AIChat = ({
   // Canvas state
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
+  
+  // Coaching mode state
+  const { 
+    mode: coachingMode, 
+    setMode: setCoachingMode, 
+    isLoading: coachingModeLoading,
+    lastError: coachingModeError,
+    clearError: clearCoachingModeError
+  } = useCoachingMode();
+  
+
+  
   const {
     session,
     messages,
@@ -74,6 +89,7 @@ const AIChat = ({
     problemDescription,
     problemTestCases,
     currentCode,
+    coachingMode,
   });
 
   // Speech-to-text functionality
@@ -375,28 +391,58 @@ const AIChat = ({
   return (
     <Card className="h-full flex flex-col border-l border-border rounded-none shadow-none min-w-0">
       {/* Chat Header */}
-      <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+      <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between min-w-0">
+        <div className="flex items-center space-x-2 min-w-0 flex-1">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <Bot className="w-4 h-4 text-primary-foreground" />
           </div>
-          <div>
-            <div className="font-medium text-foreground">AI Coach</div>
-            <div className="text-xs text-muted-foreground">
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-foreground truncate">AI Coach</div>
+            <div className="text-xs text-muted-foreground truncate">
               {loading ? "Loading chat..." : session ? "Chat loaded" : "Online"}
             </div>
           </div>
         </div>
-        {session && messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearConversation}
-            className="text-muted-foreground hover:text-destructive"
+        
+        <div className="flex items-center gap-4">
+          {/* Coaching Mode Toggle */}
+          <CoachingModeErrorBoundary 
+            fallbackMode={coachingMode}
+            onError={(error, errorInfo) => {
+              console.error('Coaching mode component error:', error, errorInfo);
+              // Clear any existing coaching mode errors
+              if (coachingModeError) {
+                clearCoachingModeError();
+              }
+            }}
           >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        )}
+            <CoachingModeToggle
+              currentMode={coachingMode}
+              onModeChange={setCoachingMode}
+              disabled={coachingModeLoading || loading}
+              className="text-xs"
+              onError={(error) => {
+                console.error('Coaching mode toggle error:', error);
+                // Error is already handled by the toggle component with toast
+                // Just clear the error from the hook if needed
+                if (coachingModeError) {
+                  clearCoachingModeError();
+                }
+              }}
+            />
+          </CoachingModeErrorBoundary>
+          
+          {session && messages.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearConversation}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}

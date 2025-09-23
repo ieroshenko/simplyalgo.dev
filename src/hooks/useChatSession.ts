@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage, ChatSession, CodeSnippet, FlowGraph } from "@/types";
+import { ChatMessage, ChatSession, CodeSnippet, FlowGraph, CoachingMode } from "@/types";
+import { validateCoachingModeWithRecovery, logCoachingModeError } from "@/services/coachingModeErrorRecovery";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
 import { logger } from "@/utils/logger";
@@ -109,6 +110,7 @@ interface UseChatSessionProps {
   problemDescription: string;
   problemTestCases?: unknown[];
   currentCode?: string;
+  coachingMode?: CoachingMode;
 }
 
 export const useChatSession = ({
@@ -116,6 +118,7 @@ export const useChatSession = ({
   problemDescription,
   problemTestCases,
   currentCode,
+  coachingMode = 'comprehensive',
 }: UseChatSessionProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -305,6 +308,25 @@ export const useChatSession = ({
           content: msg.content,
         }));
 
+        // Validate coaching mode before sending request with error recovery
+        const { mode: validatedCoachingMode, error: coachingModeError } = validateCoachingModeWithRecovery(
+          coachingMode, 
+          'comprehensive'
+        );
+        
+        if (coachingModeError) {
+          logCoachingModeError(coachingModeError, { 
+            context: 'sendMessage',
+            sessionId: session?.id,
+            userId: user?.id 
+          });
+        }
+
+
+
+        // Debug: Log what mode is being sent
+        console.log('🎯 Coaching mode being sent:', validatedCoachingMode);
+
         // Call AI function with context tracking
         const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
@@ -317,6 +339,8 @@ export const useChatSession = ({
             // Context tracking for token optimization
             sessionId: contextState.sessionId,
             previousResponseId: contextState.responseId,
+            // Coaching mode support with validation
+            coachingMode: validatedCoachingMode,
           },
         });
 
@@ -411,6 +435,7 @@ export const useChatSession = ({
       toast,
       contextState.sessionId,
       contextState.responseId,
+      coachingMode,
     ],
   );
 
@@ -480,6 +505,20 @@ export const useChatSession = ({
           role: msg.role,
           content: msg.content,
         }));
+        // Validate coaching mode for diagram requests with error recovery
+        const { mode: validatedCoachingMode, error: coachingModeError } = validateCoachingModeWithRecovery(
+          coachingMode, 
+          'comprehensive'
+        );
+        
+        if (coachingModeError) {
+          logCoachingModeError(coachingModeError, { 
+            context: 'requestDiagram',
+            sessionId: session?.id,
+            sourceText: sourceText.substring(0, 100) 
+          });
+        }
+
         const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
             message: sourceText,
@@ -487,6 +526,7 @@ export const useChatSession = ({
             conversationHistory,
             diagram: true,
             preferredEngines: ["reactflow", "mermaid"],
+            coachingMode: validatedCoachingMode,
           },
         });
         if (error) throw error;
@@ -523,7 +563,7 @@ export const useChatSession = ({
         setIsTyping(false);
       }
     },
-    [session, isTyping, messages, problemDescription, saveMessage, toast],
+    [session, isTyping, messages, problemDescription, saveMessage, toast, coachingMode],
   );
 
   return {
