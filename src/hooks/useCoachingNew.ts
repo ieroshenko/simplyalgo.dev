@@ -806,7 +806,10 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       if (!codeContainsSnippet(before, codeToInsert)) {
         const lines = codeToInsert.split('\n').filter(l => l.trim().length > 0);
         const looksLarge = lines.length > 8 || /\b(def\s+\w+\s*\(|class\s+\w+|if\s+__name__\s*==)/.test(codeToInsert);
-        let insertionType: 'smart' | 'replace' = 'smart';
+        
+        // For coaching corrections, default to 'replace' mode to fix incorrect code
+        let insertionType: 'smart' | 'replace' = 'replace';
+        
         if (looksLarge) {
           const ok = window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
           if (!ok) {
@@ -816,7 +819,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             }));
             return;
           }
-          insertionType = 'replace';
+        } else {
+          // For smaller corrections, use smart replacement without confirmation
+          console.log("🎯 [COACHING] Using smart replacement for code correction");
         }
         console.log("🎯 [INSERT CODE] Using smart insertion for correct code");
         
@@ -842,8 +847,11 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         try {
           console.log("🔧 [COACHING] Using shared insertion logic for consistency with chat mode");
           
-          // Use the shared onCodeInsert callback which uses handleInsertCodeSnippet
-          await onCodeInsert(codeToInsert, cursorPosition, insertionType);
+          // Use the shared onCodeInsert callback with coaching context
+          await onCodeInsert(codeToInsert, cursorPosition, insertionType, {
+            isCoachingCorrection: true,
+            feedback: coachingState.lastValidation.feedback
+          });
           
           console.log("✅ [COACHING] Shared insertion completed successfully");
         } catch (error) {

@@ -79,6 +79,8 @@ export const FlashcardReviewInterface = ({
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<Date>(new Date());
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentSessionIdRef = useRef<string>("");
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -91,6 +93,25 @@ export const FlashcardReviewInterface = ({
       startNewCard();
     }
   }, [isOpen, dueCards]);
+
+  // Cleanup on unmount or modal close
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Cleanup when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      currentSessionIdRef.current = "";
+    }
+  }, [isOpen]);
 
   // Debug logging - moved to top to fix hooks order
   useEffect(() => {
@@ -120,6 +141,21 @@ export const FlashcardReviewInterface = ({
     }
 
     const card = dueCards[currentCardIndex];
+    if (!card) {
+      console.error('No card found at index', currentCardIndex);
+      setSessionComplete(true);
+      return;
+    }
+
+    // Cancel any ongoing AI requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new session ID to track this specific card session
+    const sessionId = `${currentCardIndex}-${Date.now()}`;
+    currentSessionIdRef.current = sessionId;
+    
     startTimeRef.current = new Date();
     
     // Fetch problem data for display
@@ -159,13 +195,18 @@ export const FlashcardReviewInterface = ({
     setShowRatingOptions(false);
     setUserInput("");
     setShowSolution(false); // Reset card flip state
+    setIsLoadingAI(false); // Reset loading state
 
     // Start the AI conversation, passing the problem data directly
-    await sendInitialAIMessage(newSession, problemData);
+    await sendInitialAIMessage(newSession, problemData, sessionId);
   };
 
   // Send initial AI message to start the review
-  const sendInitialAIMessage = async (session: ReviewSession, problemData: any = null) => {
+  const sendInitialAIMessage = async (session: ReviewSession, problemData: any = null, sessionId: string) => {
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     setIsLoadingAI(true);
     const currentCard = dueCards[currentCardIndex];
     
@@ -197,6 +238,7 @@ export const FlashcardReviewInterface = ({
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
         body: JSON.stringify(requestBody),
+        signal: abortController.signal, // Add abort signal
       });
 
       if (!response.ok) {
@@ -216,6 +258,12 @@ export const FlashcardReviewInterface = ({
 
       console.log('AI endpoint response data:', data);
 
+      // Check if this response is still for the current session
+      if (currentSessionIdRef.current !== sessionId) {
+        console.log('Ignoring response for old session:', sessionId, 'current:', currentSessionIdRef.current);
+        return;
+      }
+
       const aiMessage: AIMessage = {
         role: "assistant",
         content: data.response || data.message || data.content || 'Let\'s start reviewing your solution!',
@@ -228,7 +276,19 @@ export const FlashcardReviewInterface = ({
       } : null);
       
     } catch (error) {
+      // Don't show error if request was aborted (user navigated away)
+      if (error.name === 'AbortError') {
+        console.log('AI request aborted for session:', sessionId);
+        return;
+      }
+      
       console.error("Error getting AI response:", error);
+      
+      // Check if this error is still for the current session
+      if (currentSessionIdRef.current !== sessionId) {
+        return;
+      }
+      
       toast.error("Failed to start AI review. Please try again.");
       
       // Fallback to static message
@@ -254,6 +314,16 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
   // Send user message and get AI response
   const sendMessage = async () => {
     if (!userInput.trim() || !currentSession) return;
+
+    // Cancel any ongoing AI requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const sessionId = currentSessionIdRef.current;
 
     const userMessage: AIMessage = {
       role: "user",
@@ -303,6 +373,7 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
           questionType: isLastQuestion ? 'evaluation' : 'followup',
           userResponse: inputToSend
         }),
+        signal: abortController.signal, // Add abort signal
       });
 
       if (!response.ok) {
@@ -319,6 +390,12 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
       }
       
       const data = JSON.parse(responseText);
+
+      // Check if this response is still for the current session
+      if (currentSessionIdRef.current !== sessionId) {
+        console.log('Ignoring sendMessage response for old session:', sessionId, 'current:', currentSessionIdRef.current);
+        return;
+      }
 
       const aiMessage: AIMessage = {
         role: "assistant",
@@ -338,6 +415,17 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
       }
       
     } catch (error) {
+      // Don't show error if request was aborted (user navigated away)
+      if (error.name === 'AbortError') {
+        console.log('sendMessage request aborted for session:', sessionId);
+        return;
+      }
+      
+      // Check if this error is still for the current session
+      if (currentSessionIdRef.current !== sessionId) {
+        return;
+      }
+      
       console.error("Error getting AI response:", error);
       toast.error("Failed to get AI response. Using fallback.");
       
@@ -416,11 +504,7 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
     }
   };
 
-  // Skip current card
-  const skipCard = () => {
-    setCurrentCardIndex(prev => prev + 1);
-    startNewCard();
-  };
+  // Skip current card (moved to navigation controls)
 
   // Handle session completion
   const handleSessionComplete = () => {
@@ -489,7 +573,58 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
           
           <div className="space-y-2 mt-4">
             <div className="flex items-center justify-between text-sm">
-              <span>Card {currentCardIndex + 1} of {dueCards.length}</span>
+              <div className="flex items-center gap-2">
+                <span>Card {currentCardIndex + 1} of {dueCards.length}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Navigate:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (currentCardIndex > 0) {
+                        // Cancel any ongoing requests
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                        }
+                        setCurrentCardIndex(prev => prev - 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setUserInput("");
+                        setIsLoadingAI(false);
+                        setTimeout(() => startNewCard(), 100);
+                      }
+                    }}
+                    disabled={currentCardIndex === 0 || isLoadingAI}
+                    className="h-6 w-6 p-0"
+                    title="Previous card"
+                  >
+                    ←
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (currentCardIndex < dueCards.length - 1) {
+                        // Cancel any ongoing requests
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                        }
+                        setCurrentCardIndex(prev => prev + 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setUserInput("");
+                        setIsLoadingAI(false);
+                        setTimeout(() => startNewCard(), 100);
+                      }
+                    }}
+                    disabled={currentCardIndex >= dueCards.length - 1 || isLoadingAI}
+                    className="h-6 w-6 p-0"
+                    title="Next card"
+                  >
+                    →
+                  </Button>
+                </div>
+              </div>
               <span>{Math.round(progress)}% Complete</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -709,6 +844,81 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
               </div>
             )}
 
+            {/* Navigation Controls */}
+            <div className="p-4 border-t bg-muted/10">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (currentCardIndex > 0) {
+                        // Cancel any ongoing requests
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                        }
+                        setCurrentCardIndex(prev => prev - 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setUserInput("");
+                        setIsLoadingAI(false);
+                        setTimeout(() => startNewCard(), 100);
+                      }
+                    }}
+                    disabled={currentCardIndex === 0 || isLoadingAI}
+                    title="Previous card"
+                  >
+                    ← Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const nextIndex = currentCardIndex + 1;
+                      if (nextIndex < dueCards.length) {
+                        // Cancel any ongoing requests
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                        }
+                        setCurrentCardIndex(nextIndex);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setUserInput("");
+                        setIsLoadingAI(false);
+                        setTimeout(() => startNewCard(), 100);
+                      }
+                    }}
+                    disabled={currentCardIndex >= dueCards.length - 1 || isLoadingAI}
+                    title="Next card"
+                  >
+                    Next →
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Cancel any ongoing requests
+                    if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                    }
+                    // Skip to next card without rating
+                    const nextIndex = currentCardIndex + 1;
+                    setCurrentCardIndex(nextIndex);
+                    setCurrentSession(null);
+                    setShowRatingOptions(false);
+                    setUserInput("");
+                    setIsLoadingAI(false);
+                    setTimeout(() => startNewCard(), 100);
+                  }}
+                  disabled={isLoadingAI}
+                  title="Skip this card (no rating)"
+                >
+                  Skip Card
+                </Button>
+              </div>
+            </div>
+
             {/* Input Area */}
             {!showRatingOptions && (
               <div className="p-6 border-t">
@@ -733,13 +943,6 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                       size="sm"
                     >
                       <Send className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={skipCard}
-                      size="sm"
-                    >
-                      <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
