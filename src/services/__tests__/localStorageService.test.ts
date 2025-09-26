@@ -424,9 +424,9 @@ describe('LocalStorageService', () => {
 // Mock jest functions if not available (for environments without jest)
 if (typeof jest === 'undefined') {
   (global as any).jest = {
-    fn: (implementation?: Function) => {
+    fn: (implementation?: (...args: any[]) => any) => {
       const mockFn = implementation || (() => {});
-      (mockFn as any).mockImplementation = (impl: Function) => {
+      (mockFn as any).mockImplementation = (impl: (...args: any[]) => any) => {
         Object.setPrototypeOf(mockFn, impl);
         return mockFn;
       };
@@ -436,14 +436,14 @@ if (typeof jest === 'undefined') {
 }
 
 if (typeof describe === 'undefined') {
-  (global as any).describe = (name: string, fn: Function) => {
+  (global as any).describe = (name: string, fn: () => void) => {
     console.log(`Test Suite: ${name}`);
     fn();
   };
 }
 
 if (typeof test === 'undefined') {
-  (global as any).test = (name: string, fn: Function) => {
+  (global as any).test = (name: string, fn: () => void) => {
     try {
       fn();
       console.log(`✓ ${name}`);
@@ -490,7 +490,7 @@ if (typeof expect === 'undefined') {
 }
 
 if (typeof beforeEach === 'undefined') {
-  (global as any).beforeEach = (fn: Function) => {
+  (global as any).beforeEach = (fn: () => void) => {
     // In a real test environment, this would run before each test
     // For now, we'll just call it once
     fn();

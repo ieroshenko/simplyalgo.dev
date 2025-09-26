@@ -706,40 +706,62 @@ Respond in JSON format:
         let questionPrompt = "";
 
         if (questionType === "initial") {
-          systemPrompt = `You are an AI tutor helping a student review their solution to a coding problem through active recall. Your role is to ask thoughtful questions that help them remember and explain their solution without giving away answers.
+          systemPrompt = `You are an AI tutor helping a student recall the core solution technique for a coding problem. Your goal is to test if they remember the key insight/approach that makes this problem solvable.
 
 Guidelines:
-- Ask one question at a time
-- Focus on understanding, not memorization
+- Ask about the core technique, pattern, or key insight (not implementation details)
+- Focus on the "aha moment" or main strategy
 - Be encouraging and supportive
-- Don't provide the solution - guide them to recall it
-- Keep questions conversational and clear
+- Don't give away the answer - help them recall the technique
+- Keep it focused on the essential problem-solving approach
 
 Problem: ${problemDescription}
 Solution to review: ${solutionTitle || "User's solution"}`;
 
-          questionPrompt = `Start a flashcard review session for this problem. Ask the student about the main algorithmic approach they used to solve this problem. Be friendly and encouraging.`;
+          questionPrompt = `Ask the student to recall the core technique or key insight they used to solve this problem. What was the main strategy or pattern that made this problem solvable? Focus on the essential approach, not implementation details.`;
         } else if (questionType === "followup") {
-          systemPrompt = `You are continuing a flashcard review session. The student is recalling their solution to a coding problem. Based on their previous response, ask a follow-up question about time/space complexity, edge cases, or implementation details.
+          systemPrompt = `You are helping a student recall the core technique for a coding problem. Based on their previous response, decide if they understood the core technique or need more help.
+
+IMPORTANT DECISION LOGIC:
+- If they correctly identified the core technique (even if incomplete), respond with "MOVE_TO_EDGE_CASES:" followed by an edge cases question
+- If they got both the core technique AND edge cases in their first answer, respond with "COMPLETE:" followed by positive feedback
+- If they were completely wrong or vague, provide ONE specific hint and ask them to try again
+- Be generous - if they show understanding of the main idea, move to edge cases
+- Keep it concise - maximum 2 follow-ups before moving to edge cases
 
 Problem: ${problemDescription}
 Solution: ${solutionTitle || "User's solution"}
 Previous conversation: ${JSON.stringify(conversationHistory)}`;
 
-          if (currentQuestionIndex === 1) {
-            questionPrompt = `The student explained their approach. Now ask them about the time and space complexity of their solution and why it has that complexity.`;
-          } else if (currentQuestionIndex === 2) {
-            questionPrompt = `The student explained complexity. Now ask them about 1-2 key edge cases they considered when implementing this Python solution. Keep it focused and specific to Python programming.`;
-          } else {
-            questionPrompt = `Provide encouraging feedback on their understanding and let them know they can now rate their recall of this solution.`;
-          }
+          questionPrompt = `Evaluate the student's response about the core technique. Be generous in your assessment:
+- If they show understanding of the main approach (even if not perfect), start with "MOVE_TO_EDGE_CASES:" and ask about edge cases
+- If they got both technique AND edge cases, start with "COMPLETE:" and give positive feedback
+- If they were too vague or wrong, give ONE specific hint and ask them to try again
+- Keep responses concise and focused.`;
+        } else if (questionType === "edge_cases") {
+          systemPrompt = `The student has successfully recalled the core technique. Now evaluate their response about edge cases.
+
+IMPORTANT DECISION LOGIC:
+- If they mentioned ANY relevant edge cases, respond with "COMPLETE:" followed by positive feedback
+- If they missed ALL edge cases, provide a brief hint about 1-2 key edge cases, then respond with "COMPLETE:"
+- Be generous - any reasonable edge case thinking should be considered sufficient
+- Keep feedback concise and positive
+
+Problem: ${problemDescription}
+Solution: ${solutionTitle || "User's solution"}
+Previous conversation: ${JSON.stringify(conversationHistory)}`;
+
+          questionPrompt = `Evaluate their response about edge cases. Be generous:
+- If they mentioned any relevant edge cases, start with "COMPLETE:" and give positive feedback
+- If they missed edge cases, briefly mention 1-2 key ones, then start with "COMPLETE:" and positive feedback
+- Keep it concise and encouraging.`;
         } else if (questionType === "evaluation") {
-          systemPrompt = `You are evaluating a student's understanding of their coding solution during a flashcard review. Based on their responses, provide encouraging feedback and help them assess their recall.
+          systemPrompt = `You are wrapping up a flashcard review session. The student has gone through the core technique and edge cases. Provide encouraging feedback.
 
 Problem: ${problemDescription}
 Conversation: ${JSON.stringify(conversationHistory)}`;
 
-          questionPrompt = `Based on the student's responses, provide positive feedback on what they remembered well and gently point out any areas they might want to review. Be encouraging and supportive.`;
+          questionPrompt = `Provide positive, encouraging feedback on their recall. Acknowledge what they remembered well and gently mention any key points they might want to review. Keep it brief and supportive.`;
         }
 
         const completionParams = {
