@@ -55,11 +55,11 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
   // Filter flashcards based on search and mastery level
   const filteredCards = flashcards.filter((card) => {
     const matchesSearch = card.problem_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         card.solution_title?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesMastery = masteryFilter === "all" || 
-                          card.mastery_level.toString() === masteryFilter;
-                          
+      card.solution_title?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesMastery = masteryFilter === "all" ||
+      card.mastery_level.toString() === masteryFilter;
+
     return matchesSearch && matchesMastery;
   });
 
@@ -76,7 +76,12 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
     }
   };
 
-  const getMasteryLabel = (level: number) => {
+  const getMasteryLabel = (level: number, reviewCount: number) => {
+    // If card has been reviewed but still shows as level 0, it should be Learning
+    if (level === 0 && reviewCount > 0) {
+      return { label: "Learning", color: "bg-blue-100 text-blue-800" };
+    }
+
     switch (level) {
       case 0: return { label: "New", color: "bg-gray-100 text-gray-800" };
       case 1: return { label: "Learning", color: "bg-blue-100 text-blue-800" };
@@ -90,7 +95,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
     const reviewDate = new Date(date);
     const today = new Date();
     const diffDays = Math.ceil((reviewDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 0) {
       return `${Math.abs(diffDays)} days overdue`;
     } else if (diffDays === 0) {
@@ -188,7 +193,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                 <Star className="h-5 w-5 text-blue-600" />
                 <div>
                   <div className="text-2xl font-bold">
-                    {flashcards.length > 0 
+                    {flashcards.length > 0
                       ? (flashcards.reduce((sum, card) => sum + card.ease_factor, 0) / flashcards.length).toFixed(1)
                       : "0.0"
                     }
@@ -243,7 +248,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                 {flashcards.length === 0 ? "No Flashcards Yet" : "No Cards Match Your Filters"}
               </h3>
               <p className="text-muted-foreground mb-6">
-                {flashcards.length === 0 
+                {flashcards.length === 0
                   ? "Start by solving problems and adding them to your flashcard deck!"
                   : "Try adjusting your search terms or filters to find cards."
                 }
@@ -254,12 +259,23 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                   Solve Problems
                 </Button>
               )}
+              {flashcards.length > 0 && filteredCards.length === 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setMasteryFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCards.map((card) => {
-              const mastery = getMasteryLabel(card.mastery_level);
+              const mastery = getMasteryLabel(card.mastery_level, card.review_count);
               return (
                 <Card key={card.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-2">
@@ -273,6 +289,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                         onClick={() => handleDeleteCard(card)}
                         disabled={isRemovingFromFlashcards}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Remove from flashcards"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -282,7 +299,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                     <div className="text-sm text-muted-foreground">
                       Solution: {card.solution_title}
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className={mastery.color}>
                         {mastery.label}
@@ -291,16 +308,16 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                         {card.review_count} reviews
                       </div>
                     </div>
-                    
+
                     <div className="text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3 inline mr-1" />
                       {formatNextReview(card.next_review_date)}
                     </div>
-                    
+
                     <div className="text-xs text-muted-foreground">
                       Ease factor: {card.ease_factor.toFixed(2)}
                     </div>
-                    
+
                     <div className="text-xs text-muted-foreground">
                       Added: {new Date(card.created_at).toLocaleDateString()}
                     </div>
@@ -322,15 +339,15 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowDeleteDialog(false)}
                 disabled={isRemovingFromFlashcards}
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={confirmDelete}
                 disabled={isRemovingFromFlashcards}
               >

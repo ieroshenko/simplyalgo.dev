@@ -30,13 +30,13 @@ function parseConstraints(problemDescription: string): {
 } {
   const constraints: string[] = [];
   const numericalConstraints: { min: number; max: number; variable: string }[] = [];
-  
+
   // Look for constraint sections
   const constraintMatch = problemDescription.match(/(?:Constraints?|Constraint)\s*:?\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
   if (constraintMatch) {
     const constraintText = constraintMatch[1];
     constraints.push(constraintText.trim());
-    
+
     // Extract numerical constraints like "-1000 <= a, b <= 1000"
     const numericalMatches = constraintText.matchAll(/(-?\d+)\s*<=?\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*<=?\s*(-?\d+)/g);
     for (const match of numericalMatches) {
@@ -44,13 +44,13 @@ function parseConstraints(problemDescription: string): {
       const min = parseInt(minStr);
       const max = parseInt(maxStr);
       const varList = variables.split(',').map(v => v.trim());
-      
+
       for (const variable of varList) {
         numericalConstraints.push({ min, max, variable });
       }
     }
   }
-  
+
   return { constraints, numericalConstraints };
 }
 
@@ -97,7 +97,7 @@ export async function startInteractiveCoaching(
 ) {
   logger.coaching("Starting context-aware coaching", { problemId, userId, difficulty, action: "start_interactive_coaching" });
   const sessionId = crypto.randomUUID();
-  
+
   // Analyze current code to determine an insertion line inside the active function
   const codeLines = (currentCode || '').split('\n');
   const computeNextLineNumber = () => {
@@ -226,10 +226,10 @@ Be encouraging and guide them step by step with specific, actionable advice focu
   // Use context-aware AI call to create initial coaching context
   let stepData;
   let contextualResponse: ContextualResponse;
-  
+
   try {
     logger.coaching("Creating initial coaching context", { sessionId, action: "create_context" });
-    
+
     // Use the new context-aware function to create initial context
     contextualResponse = await llmWithSessionContext(
       sessionId,
@@ -248,9 +248,9 @@ Be encouraging and guide them step by step with specific, actionable advice focu
 
     const rawContent = contextualResponse.content;
     let cleanContent = rawContent.trim();
-    
+
     logger.debug("Raw AI response received", { sessionId, responseLength: rawContent?.length });
-    
+
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
         .replace(/^```(?:json)?\n?/m, "")
@@ -259,15 +259,15 @@ Be encouraging and guide them step by step with specific, actionable advice focu
     }
 
     logger.debug("Response cleaned and processed", { sessionId, cleanContentLength: cleanContent.length });
-    
+
     if (!cleanContent || cleanContent === "{}") {
       logger.error("Empty response from AI", undefined, { sessionId, action: "start_interactive_coaching" });
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
-    
+
     stepData = JSON.parse(cleanContent);
     logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData.question, hasHighlightArea: !!stepData.highlightArea });
-    
+
     // Validate required fields
     if (!stepData.question || !stepData.highlightArea) {
       logger.error("Missing required fields in step data", undefined, { sessionId, stepData, action: "validate_step_data" });
@@ -305,7 +305,7 @@ Be encouraging and guide them step by step with specific, actionable advice focu
       logger.error("Database error creating session", sessionError, { sessionId, problemId, userId, action: "create_session" });
       throw new Error("Failed to create coaching session");
     }
-    
+
     // Store the initial step
     await supabaseAdmin
       .from("coaching_responses")
@@ -318,10 +318,10 @@ Be encouraging and guide them step by step with specific, actionable advice focu
         created_at: new Date().toISOString(),
         response_id: contextualResponse.responseId, // Store response ID for this step
       });
-    
+
     logger.coaching("Session created successfully", { sessionId, responseId: contextualResponse.responseId, problemId, userId });
     logger.debug("Token optimization status", { sessionId, tokensSaved: contextualResponse.tokensSaved || 0 });
-    
+
     return {
       sessionId,
       question: stepData.question,
@@ -351,7 +351,7 @@ export async function generateNextCoachingStep(
   previousResponse?: string
 ): Promise<CoachingStep> {
   logger.coaching("Generating next coaching step", { sessionId, action: "generate_next_step" });
-  
+
   const prompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
 CRITICAL EXECUTION CONTEXT:
@@ -374,9 +374,9 @@ ${currentCode || "# No code written yet"}
 ${previousResponse ? `PREVIOUS STUDENT RESPONSE: ${previousResponse}` : ''}
 
 STUDENT PROGRESS ANALYSIS:
-${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
+${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1
+      ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+      : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
@@ -419,7 +419,7 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
   try {
     logger.debug("Initializing OpenAI for coaching step", { sessionId });
     const openai = getOpenAI();
-    
+
     logger.llmCall("gpt-5-mini", 0, { sessionId, action: "generate_coaching_step" });
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
@@ -430,13 +430,13 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
     logger.debug("API call completed successfully", { sessionId });
     const rawContent = response.choices[0]?.message?.content || "{}";
     let cleanContent = rawContent.trim();
-    
+
     logger.debug("Raw AI response received", { sessionId, responseLength: rawContent?.length });
     logger.debug("Response details", { sessionId, choiceCount: response.choices?.length });
     logger.llmResponse("gpt-5-mini", response.usage?.prompt_tokens || 0, response.usage?.completion_tokens || 0, 0, { sessionId });
     logger.debug("Model used", { sessionId, model: response.model });
     logger.debug("Response structure", { sessionId, responseKeys: Object.keys(response) });
-    
+
     // Remove markdown code blocks if present
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
@@ -444,34 +444,34 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
         .replace(/```$/m, "")
         .trim();
     }
-    
+
     logger.debug("Response cleaned", { sessionId, cleanContentLength: cleanContent.length });
-    
+
     if (!cleanContent || cleanContent === "{}") {
       logger.error("Empty or invalid response from AI", undefined, { sessionId, action: "generate_next_step" });
       logger.error("Raw response details", undefined, { sessionId, rawResponse: rawContent });
       logger.debug("Response choices info", { sessionId, choicesLength: response.choices?.length });
       console.error("🚨 [generateNextCoachingStep] First choice:", JSON.stringify(response.choices?.[0], null, 2));
       console.error("🚨 [generateNextCoachingStep] API response object:", JSON.stringify(response, null, 2));
-      
-      
+
+
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
-    
+
     const step = JSON.parse(cleanContent);
     logger.debug("Step parsed successfully", { sessionId, hasQuestion: !!step.question, hasHint: !!step.hint });
-    
+
     // Validate required fields
     if (!step.question || !step.hint) {
       logger.error("Missing required fields in step", undefined, { sessionId, step, action: "validate_step" });
       throw new Error("Step missing required fields");
     }
-    
+
     logger.coaching("Step generation successful", { sessionId });
     return step;
   } catch (error) {
     logger.error("Step generation failed", error, { sessionId, action: "generate_next_step" });
-    
+
     // Don't return fallback - let the error propagate to frontend for proper handling
     throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
   }
@@ -487,7 +487,7 @@ export async function validateCoachingSubmission(
   currentEditorCode: string
 ): Promise<CoachingValidation> {
   console.log("🎯 [validateCoachingSubmission] Validating...", { sessionId, studentCode: studentCode.slice(0, 100) + "..." });
-  
+
   // Get session data
   const { data: session, error: sessionError } = await supabaseAdmin
     .from("coaching_sessions")
@@ -522,8 +522,8 @@ CONSTRAINT-AWARE VALIDATION INSTRUCTIONS:
 - Do not flag theoretical edge cases that cannot occur due to problem constraints
 - Focus on practical correctness within the problem scope
 
-` : ""}${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area" 
-  ? `STUDENT RESPONSE: "${studentResponse}"
+` : ""}${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area"
+      ? `STUDENT RESPONSE: "${studentResponse}"
 
 ` : ""}VALIDATION REQUEST:
 Analyze the student's current code implementation within the context of the problem constraints. Has their algorithm improved? What should happen next?
@@ -540,21 +540,22 @@ CRITICAL ANALYSIS POINTS:
 - Focus on what's MISSING from their algorithm, not what exists
 - Only consider edge cases that can actually occur within the given constraints
 
-CONTEXT-AWARE SNIPPET GENERATION:
-- Analyze existing code structure, variables, and function scope before generating codeToAdd
-- Generate patches that build incrementally on current code - never jump ahead multiple logical steps
+CONTEXT-AWARE CODE CORRECTION:
+- Analyze existing code to identify SPECIFIC incorrect lines or logic
+- Generate targeted fixes that REPLACE incorrect code with correct implementation
 - Reference existing variables, functions, and patterns when possible (e.g., if student has 'nums' array, reference 'nums[i]')
-- Ensure snippet teaches ONE specific concept/technique at a time
+- Focus on fixing ONE specific mistake at a time (wrong loop condition, incorrect assignment, missing logic)
 - Must integrate seamlessly with existing code structure and indentation
 - Never provide complete solutions or full function rewrites
 
-SNIPPET QUALITY RULES:
-- Maximum 2 lines of actual code (excluding whitespace/comments)
-- Must not duplicate any existing logic or variables already defined
-- Should demonstrate the next logical step in algorithm development
+CODE CORRECTION RULES:
+- Maximum 3-4 lines of corrected code that directly fixes the identified issue
+- Must REPLACE incorrect logic, not just add to it
+- Should fix the specific mistake mentioned in the feedback
 - Use student's existing variable names and coding style
-- Focus on teaching one concept: loop structure, condition, calculation, return statement, etc.
-- Example good snippets: "for i in range(len(nums)):" or "if target - num in seen:"
+- Focus on correcting one issue: wrong loop condition, incorrect pointer updates, missing edge case handling
+- Example corrections: Replace "curr = head" with "curr = head.next" or fix loop condition from "while curr" to "while curr.next"
+- IMPORTANT: Provide the corrected version of the problematic code, not additional code
 
 Return JSON in this exact format:
 {
@@ -570,7 +571,7 @@ Return JSON in this exact format:
     "recommendedTime": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
     "recommendedSpace": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other"
   },
-  "codeToAdd": "contextual 1-2 line patch that builds incrementally on existing code, references student variables, teaches one concept (no 'def', imports, or complete solutions)",
+  "codeToAdd": "corrected version of the specific incorrect code that fixes the identified issue (3-4 lines max, replaces wrong logic, uses student's variables, no 'def' or imports)",
   "nextStep": {
     "question": "next guiding question for the student",
     "expectedCodeType": "variable" | "loop" | "condition" | "expression" | "return" | "any",
@@ -579,10 +580,10 @@ Return JSON in this exact format:
 }`;
 
   let contextualResponse: ContextualResponse;
-  
+
   try {
     console.log("🎯 [validateCoachingSubmission] Using context-aware validation...");
-    
+
     // Use context continuation instead of sending full coaching rules again
     contextualResponse = await llmWithSessionContext(
       sessionId,
@@ -602,9 +603,9 @@ Return JSON in this exact format:
 
     const rawContent = contextualResponse.content;
     let cleanContent = rawContent.trim();
-    
+
     console.log("🎯 [validateCoachingSubmission] Raw AI response:", rawContent);
-    
+
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
         .replace(/^```(?:json)?\n?/m, "")
@@ -613,16 +614,16 @@ Return JSON in this exact format:
     }
 
     console.log("🎯 [validateCoachingSubmission] Cleaned response:", cleanContent);
-    
+
     if (!cleanContent || cleanContent === "{}") {
       console.error("🚨 [validateCoachingSubmission] Empty or invalid response from AI");
       console.error("🚨 [validateCoachingSubmission] Raw response was:", JSON.stringify(rawContent));
       console.error("🚨 [validateCoachingSubmission] Context response ID:", contextualResponse.responseId);
       console.error("🚨 [validateCoachingSubmission] Is new context:", contextualResponse.isNewContext);
-      
+
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
-    
+
     const validation = JSON.parse(cleanContent);
 
     // Add optimization detect flag to inform UI about Learn Optimization button visibility
@@ -641,13 +642,13 @@ Return JSON in this exact format:
     // If correct but not optimal, we no longer inject any default next step text.
     // Rendering logic on the frontend hides the Next Step card when empty.
     console.log("🎯 [validateCoachingSubmission] Parsed validation:", validation);
-    
+
     // Validate required fields
     if (!validation.feedback || !validation.nextStep) {
       console.error("🚨 [validateCoachingSubmission] Missing required fields:", validation);
       throw new Error("Validation missing required fields");
     }
-    
+
     // Store the response in database with context information
     await supabaseAdmin
       .from("coaching_responses")
@@ -676,22 +677,22 @@ Return JSON in this exact format:
       sessionUpdateData.session_state = 'completed';
       sessionUpdateData.awaiting_submission = false;
       sessionUpdateData.current_question = "";
-      
+
       await supabaseAdmin
         .from("coaching_sessions")
         .update(sessionUpdateData)
         .eq("id", sessionId);
-        
+
     } else if (validation.isCorrect && validation.nextAction === "insert_and_continue") {
       sessionUpdateData.current_step_number = session.current_step_number + 1;
       sessionUpdateData.current_question = validation.nextStep?.question || "";
       sessionUpdateData.awaiting_submission = true;
-      
+
       await supabaseAdmin
         .from("coaching_sessions")
         .update(sessionUpdateData)
         .eq("id", sessionId);
-        
+
     } else {
       // For any other case, just update the context information
       await supabaseAdmin
@@ -704,7 +705,7 @@ Return JSON in this exact format:
     return validation;
   } catch (error) {
     console.error("🚨 [validateCoachingSubmission] Error:", error);
-    
+
     // Don't return fallback - let the error propagate to frontend
     throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
   }
@@ -723,7 +724,7 @@ export async function startOptimizationCoaching(
   const sessionId = crypto.randomUUID();
 
   const analysis = await analyzeOptimizationWithAI(currentCode, problemDescription);
-  
+
   if (!analysis.isOptimizable && !analysis.hasAlternative) {
     return {
       sessionId,
@@ -750,10 +751,10 @@ ANALYSIS CONTEXT:
 - Reason: ${analysis.reason}
 
 GOAL:
-${analysis.isOptimizable 
-  ? `- Show a concrete optimization step toward better complexity
+${analysis.isOptimizable
+      ? `- Show a concrete optimization step toward better complexity
      - Focus on algorithmic improvements that reduce time/space complexity`
-  : `- Show an alternative approach with same complexity but different trade-offs
+      : `- Show an alternative approach with same complexity but different trade-offs
      - Explain the benefits of the alternative approach`}
 
 Return JSON only:
@@ -785,7 +786,7 @@ export async function validateOptimizationStep(
   },
 ) {
   const analysis = await analyzeOptimizationWithAI(currentEditorCode, problemDescription);
-  
+
   if (!analysis.isOptimizable && !analysis.hasAlternative) {
     return {
       isCorrect: true,
@@ -840,7 +841,7 @@ export async function generateCoachingSession(
 ) {
   console.log("🎯 [generateCoachingSession] Starting...", { problemId, userId, difficulty });
   const sessionId = crypto.randomUUID();
-  
+
   const prompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
 
 CRITICAL EXECUTION CONTEXT:
@@ -861,9 +862,9 @@ ${currentCode || "# No code written yet"}
 ${"```"}
 
 STUDENT PROGRESS ANALYSIS:
-${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1 
-  ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
-  : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
+${currentCode.trim() === "" || currentCode.includes("def ") && currentCode.split('\n').length === 1
+      ? "🔍 BEGINNER STATE: Student needs guidance on algorithm approach and core implementation steps."
+      : "🔄 IN PROGRESS: Student has started implementing. Analyze their algorithm logic for correctness and next steps."}
 
 Difficulty level: ${difficulty}
 
@@ -923,10 +924,10 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
 
   try {
     console.log("🎯 [generateCoachingSession] Raw OpenAI content:", rawContent.slice(0, 200) + "...");
-    
+
     // Clean the response to remove markdown code fences
     cleanContent = rawContent.trim();
-    
+
     // Remove markdown code blocks if present
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
@@ -934,15 +935,15 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
         .replace(/```$/m, "")
         .trim();
     }
-    
+
     console.log("🎯 [generateCoachingSession] Cleaned content:", cleanContent.slice(0, 500) + "...");
     console.log("🎯 [generateCoachingSession] Full cleaned content:", cleanContent);
-    
+
     const sessionData = JSON.parse(cleanContent);
     console.log("🎯 [generateCoachingSession] Parsed session data:", JSON.stringify(sessionData, null, 2));
     console.log("🎯 [generateCoachingSession] sessionData.steps type:", typeof sessionData.steps);
     console.log("🎯 [generateCoachingSession] sessionData.steps value:", sessionData.steps);
-    
+
     // Validate the session data structure
     if (!sessionData || !Array.isArray(sessionData.steps)) {
       console.error("🚨 [generateCoachingSession] Invalid session data structure:", JSON.stringify(sessionData, null, 2));
@@ -950,9 +951,9 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, rea
       console.error("🚨 [generateCoachingSession] Got steps type:", typeof sessionData.steps);
       throw new Error("AI response does not contain valid coaching steps");
     }
-    
+
     console.log("🎯 [generateCoachingSession] Steps found:", sessionData.steps.length);
-    
+
     // Store session in database
     try {
       const { data, error } = await supabaseAdmin
@@ -1049,7 +1050,7 @@ RULES:
       temperature: 0.1,
       maxTokens: 400,
     });
-    
+
     return JSON.parse(response);
   } catch (error) {
     console.error("AI optimization analysis failed:", error);
@@ -1072,7 +1073,7 @@ export async function startAlternativeCoaching(
   const sessionId = crypto.randomUUID();
 
   const analysis = await analyzeOptimizationWithAI(currentCode, problemDescription);
-  
+
   if (!analysis.hasAlternative) {
     return {
       sessionId,

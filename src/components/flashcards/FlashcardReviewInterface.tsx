@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -10,17 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Send,
-  RotateCcw,
   CheckCircle,
-  AlertCircle,
-  Clock,
   Brain,
-  ArrowRight,
-  Lightbulb,
   Code,
-  Bot,
-  User,
+  Lightbulb,
 } from "lucide-react";
 import { useFlashcards, type FlashcardDeck } from "@/hooks/useFlashcards";
 import { toast } from "sonner";
@@ -34,22 +26,33 @@ interface FlashcardReviewInterfaceProps {
   userId: string;
 }
 
-interface AIMessage {
-  role: "assistant" | "user";
-  content: string;
-  timestamp: Date;
-}
-
 interface ReviewSession {
   deckId: string;
   problemTitle: string;
   solutionTitle: string;
-  messages: AIMessage[];
   startTime: Date;
   currentQuestionIndex: number;
   totalQuestions: number;
-  aiEvaluation?: any;
+  cardData: any; // Store the complete card data to avoid sync issues
 }
+
+const REVIEW_QUESTIONS = [
+  {
+    id: 1,
+    question: "What is the main trick and technique to solve this problem?",
+    description: "Think about the core algorithmic approach or pattern"
+  },
+  {
+    id: 2,
+    question: "What data structures did you use?",
+    description: "Arrays, hash maps, trees, etc."
+  },
+  {
+    id: 3,
+    question: "What are the time and space complexities?",
+    description: "You can check the solution to remember"
+  }
+];
 
 const DIFFICULTY_OPTIONS = [
   { value: 1, label: "Again", color: "bg-red-500", description: "I didn't remember this well" },
@@ -66,24 +69,16 @@ export const FlashcardReviewInterface = ({
   const { dueCards, submitReview, isSubmittingReview } = useFlashcards(userId);
   const { currentTheme: editorTheme, defineCustomThemes } = useEditorTheme();
   const [isEditorReady, setIsEditorReady] = useState(false);
-  
+
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [currentSession, setCurrentSession] = useState<ReviewSession | null>(null);
-  const [userInput, setUserInput] = useState("");
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showRatingOptions, setShowRatingOptions] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [completedCards, setCompletedCards] = useState(0);
   const [currentProblemData, setCurrentProblemData] = useState<any>(null);
   const [showSolution, setShowSolution] = useState(false);
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const startTimeRef = useRef<Date>(new Date());
 
-  // Auto-scroll to bottom of messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [currentSession?.messages]);
+  const startTimeRef = useRef<Date>(new Date());
 
   // Initialize session when modal opens
   useEffect(() => {
@@ -92,36 +87,52 @@ export const FlashcardReviewInterface = ({
     }
   }, [isOpen, dueCards]);
 
-  // Debug logging - moved to top to fix hooks order
+  // Start new card when currentCardIndex changes (for navigation/skip)
   useEffect(() => {
-    const currentCard = dueCards[currentCardIndex];
-    if (currentCard) {
-      console.log('Current card data:', {
-        deck_id: currentCard.deck_id,
-        problem_id: currentCard.problem_id,
-        solution_code: currentCard.solution_code ? 'EXISTS' : 'MISSING',
-        solution_code_length: currentCard.solution_code?.length || 0,
-        solution_title: currentCard.solution_title,
-        is_custom_solution: currentCard.is_custom_solution,
-        allKeys: Object.keys(currentCard)
-      });
-      
-      if (currentCard.solution_code) {
-        console.log('Solution code preview:', currentCard.solution_code.substring(0, 200) + '...');
-      }
+    if (isOpen && dueCards.length > 0 && currentSession === null) {
+      console.log('currentCardIndex changed to:', currentCardIndex, 'starting new card');
+      // Add a small delay to ensure state is properly updated
+      setTimeout(() => {
+        startNewCard();
+      }, 50);
     }
-  }, [dueCards, currentCardIndex]);
+  }, [currentCardIndex]);
+
+  // Cleanup when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentSession(null);
+    }
+  }, [isOpen]);
 
   // Start a new card review
   const startNewCard = async () => {
+    console.log('startNewCard called with currentCardIndex:', currentCardIndex);
+
     if (currentCardIndex >= dueCards.length) {
       setSessionComplete(true);
       return;
     }
 
     const card = dueCards[currentCardIndex];
-    startTimeRef.current = new Date();
-    
+    console.log('Using card:', {
+      index: currentCardIndex,
+      problemId: card?.problem_id,
+      problemTitle: card?.problem_title,
+      solutionTitle: card?.solution_title,
+      solutionCodeLength: card?.solution_code?.length,
+      solutionCodePreview: card?.solution_code?.substring(0, 100) + '...'
+    });
+
+    if (!card) {
+      console.error('No card found at index', currentCardIndex);
+      setSessionComplete(true);
+      return;
+    }
+
+    // Clear old problem data first to prevent stale data
+    setCurrentProblemData(null);
+
     // Fetch problem data for display
     let problemData = null;
     try {
@@ -136,241 +147,56 @@ export const FlashcardReviewInterface = ({
       console.log('Fetched problem data for card index', currentCardIndex, ':', {
         problemId: card.problem_id,
         title: problemData?.title,
-        descriptionLength: problemData?.description?.length
+        descriptionLength: problemData?.description?.length,
+        cardTitle: card.problem_title
       });
       setCurrentProblemData(problemData);
+      console.log('Set currentProblemData to:', problemData?.title);
     } catch (error) {
       console.error("Error fetching problem data:", error);
       setCurrentProblemData(null);
     }
-    
+
+    startTimeRef.current = new Date();
+
     const newSession: ReviewSession = {
       deckId: card.deck_id,
-      problemTitle: card.problem_title || card.problem_id,
+      problemTitle: problemData?.title || card.problem_title || card.problem_id,
       solutionTitle: card.solution_title || "Solution",
-      messages: [],
       startTime: startTimeRef.current,
       currentQuestionIndex: 0,
-      totalQuestions: 3, // We'll ask 3 questions per card
-      aiEvaluation: null,
+      totalQuestions: 3, // 3 hardcoded questions
+      cardData: card, // Store the card data to avoid sync issues
     };
+
+    console.log('Creating new session with:', {
+      cardIndex: currentCardIndex,
+      cardProblemId: card.problem_id,
+      problemDataTitle: problemData?.title,
+      cardTitle: card.problem_title,
+      finalTitle: newSession.problemTitle
+    });
 
     setCurrentSession(newSession);
     setShowRatingOptions(false);
-    setUserInput("");
     setShowSolution(false); // Reset card flip state
-
-    // Start the AI conversation, passing the problem data directly
-    await sendInitialAIMessage(newSession, problemData);
   };
 
-  // Send initial AI message to start the review
-  const sendInitialAIMessage = async (session: ReviewSession, problemData: any = null) => {
-    setIsLoadingAI(true);
-    const currentCard = dueCards[currentCardIndex];
-    
-    try {
-      const description = problemData?.description || currentProblemData?.description || 'Problem description';
-      console.log('Problem description source:', {
-        fromParameter: problemData?.description,
-        fromState: currentProblemData?.description,
-        final: description
-      });
+  // Move to next question or show rating
+  const nextQuestion = () => {
+    if (!currentSession) return;
 
-      const requestBody = {
-        action: 'flashcard_conversation',
-        problemId: currentCard.problem_id,
-        problemDescription: description,
-        solutionCode: currentCard.solution_code || currentCard.code || 'No code available',
-        solutionTitle: currentCard.solution_title || 'Solution',
-        conversationHistory: [],
-        currentQuestionIndex: 0,
-        questionType: 'initial'
-      };
+    const nextIndex = currentSession.currentQuestionIndex + 1;
 
-      console.log('Sending flashcard conversation request:', requestBody);
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('AI endpoint error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to generate AI question'}`);
-      }
-
-      const responseText = await response.text();
-      console.log('Raw AI endpoint response:', responseText);
-      
-      if (!responseText.trim()) {
-        throw new Error('Empty response from AI endpoint');
-      }
-      
-      const data = JSON.parse(responseText);
-
-      console.log('AI endpoint response data:', data);
-
-      const aiMessage: AIMessage = {
-        role: "assistant",
-        content: data.response || data.message || data.content || 'Let\'s start reviewing your solution!',
-        timestamp: new Date(),
-      };
-
+    if (nextIndex >= currentSession.totalQuestions) {
+      // All questions completed, show rating options
+      setShowRatingOptions(true);
+    } else {
+      // Move to next question for the same card
       setCurrentSession(prev => prev ? {
         ...prev,
-        messages: [...prev.messages, aiMessage]
+        currentQuestionIndex: nextIndex
       } : null);
-      
-    } catch (error) {
-      console.error("Error getting AI response:", error);
-      toast.error("Failed to start AI review. Please try again.");
-      
-      // Fallback to static message
-      const fallbackMessage: AIMessage = {
-        role: "assistant",
-        content: `Hi! Let's review your solution for "${session.problemTitle}". 
-
-I'm going to ask you a few questions to help you recall the key concepts. Don't worry about writing code - just explain your thinking in your own words.
-
-**Question 1:** What was the main algorithmic approach you used to solve this problem?`,
-        timestamp: new Date(),
-      };
-
-      setCurrentSession(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, fallbackMessage]
-      } : null);
-    } finally {
-      setIsLoadingAI(false);
-    }
-  };
-
-  // Send user message and get AI response
-  const sendMessage = async () => {
-    if (!userInput.trim() || !currentSession) return;
-
-    const userMessage: AIMessage = {
-      role: "user",
-      content: userInput,
-      timestamp: new Date(),
-    };
-
-    // Add user message
-    setCurrentSession(prev => prev ? {
-      ...prev,
-      messages: [...prev.messages, userMessage]
-    } : null);
-    
-    const inputToSend = userInput;
-    setUserInput("");
-    setIsLoadingAI(true);
-
-    const currentCard = dueCards[currentCardIndex];
-
-    try {
-      // Build conversation history for context
-      const conversationHistory = [
-        ...currentSession.messages,
-        userMessage
-      ].map(msg => ({
-        role: msg.role === "assistant" ? "assistant" : "user",
-        content: msg.content
-      }));
-
-      const nextQuestionIndex = currentSession.currentQuestionIndex + 1;
-      const isLastQuestion = nextQuestionIndex >= currentSession.totalQuestions;
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'flashcard_conversation',
-          problemId: currentCard.problem_id,
-          problemDescription: currentProblemData?.description || 'Problem description',
-          solutionCode: currentCard.solution_code || currentCard.code || 'No code available',
-          solutionTitle: currentCard.solution_title || 'Solution',
-          conversationHistory,
-          currentQuestionIndex: nextQuestionIndex,
-          questionType: isLastQuestion ? 'evaluation' : 'followup',
-          userResponse: inputToSend
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('AI endpoint error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to generate AI response'}`);
-      }
-
-      const responseText = await response.text();
-      console.log('Raw AI endpoint response:', responseText);
-      
-      if (!responseText.trim()) {
-        throw new Error('Empty response from AI endpoint');
-      }
-      
-      const data = JSON.parse(responseText);
-
-      const aiMessage: AIMessage = {
-        role: "assistant",
-        content: data.response || data.message || 'Great response!',
-        timestamp: new Date(),
-      };
-
-      setCurrentSession(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, aiMessage],
-        currentQuestionIndex: nextQuestionIndex
-      } : null);
-
-      // Show rating options if this was the last question
-      if (isLastQuestion) {
-        setShowRatingOptions(true);
-      }
-      
-    } catch (error) {
-      console.error("Error getting AI response:", error);
-      toast.error("Failed to get AI response. Using fallback.");
-      
-      // Fallback logic
-      const nextQuestionIndex = currentSession.currentQuestionIndex + 1;
-      let aiResponse = "";
-      
-      if (nextQuestionIndex < currentSession.totalQuestions) {
-        const questions = [
-          "Great! Now, can you explain the time and space complexity of your solution and why?",
-          "Excellent! Finally, what edge cases did you consider when implementing this solution?"
-        ];
-        aiResponse = `Good response! 
-
-**Question ${nextQuestionIndex + 1}:** ${questions[nextQuestionIndex - 1]}`;
-      } else {
-        aiResponse = `Perfect! You've demonstrated a solid understanding. You're ready to rate how well you remembered this solution.`;
-        setShowRatingOptions(true);
-      }
-
-      const aiMessage: AIMessage = {
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date(),
-      };
-
-      setCurrentSession(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, aiMessage],
-        currentQuestionIndex: nextQuestionIndex
-      } : null);
-    } finally {
-      setIsLoadingAI(false);
     }
   };
 
@@ -381,12 +207,12 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
     const timeSpent = Math.round((new Date().getTime() - startTimeRef.current.getTime()) / 1000);
 
     try {
-      // Submit the review and wait for completion
+      // Submit the review
       submitReview({
         deckId: currentSession.deckId,
-        aiQuestions: currentSession.messages.filter(m => m.role === "assistant").map(m => m.content),
-        userAnswers: currentSession.messages.filter(m => m.role === "user").map(m => m.content),
-        aiEvaluation: { overallUnderstanding: "good" }, // TODO: Get from AI
+        aiQuestions: REVIEW_QUESTIONS.map(q => q.question),
+        userAnswers: ["Self-evaluated"], // No actual answers since it's self-evaluation
+        aiEvaluation: { overallUnderstanding: "self-evaluated" },
         difficultyRating: rating,
         timeSpent,
       });
@@ -394,32 +220,21 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
       // Update counters and advance to next card
       setCompletedCards(prev => prev + 1);
       const nextIndex = currentCardIndex + 1;
-      
-      console.log('Moving to next card:', { currentIndex: currentCardIndex, nextIndex, totalCards: dueCards.length });
-      
+
       setCurrentCardIndex(nextIndex);
-      
+
       // Reset UI state for next card
       setCurrentSession(null);
       setShowRatingOptions(false);
-      setUserInput("");
       setShowSolution(false);
-      
-      // Small delay to ensure state updates, then start next card
-      setTimeout(() => {
-        startNewCard();
-      }, 500);
-      
+      setCurrentProblemData(null);
+
+      // The useEffect will trigger startNewCard when currentCardIndex changes
+
     } catch (error) {
       console.error('Error submitting review:', error);
       toast.error('Failed to submit review. Please try again.');
     }
-  };
-
-  // Skip current card
-  const skipCard = () => {
-    setCurrentCardIndex(prev => prev + 1);
-    startNewCard();
   };
 
   // Handle session completion
@@ -474,7 +289,17 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
   }
 
   const progress = ((currentCardIndex + 1) / dueCards.length) * 100;
-  const currentCard = dueCards[currentCardIndex];
+  const currentCard = currentSession?.cardData || dueCards[currentCardIndex];
+  const currentQuestion = REVIEW_QUESTIONS[currentSession?.currentQuestionIndex || 0];
+
+  // Debug: Log what card is being rendered
+  console.log('Rendering with currentCard:', {
+    index: currentCardIndex,
+    problemId: currentCard?.problem_id,
+    solutionCodePreview: currentCard?.solution_code?.substring(0, 50) + '...',
+    problemDataTitle: currentProblemData?.title,
+    usingSessionCard: !!currentSession?.cardData
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -486,10 +311,55 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
               Flashcard Review
             </DialogTitle>
           </div>
-          
+
           <div className="space-y-2 mt-4">
             <div className="flex items-center justify-between text-sm">
-              <span>Card {currentCardIndex + 1} of {dueCards.length}</span>
+              <div className="flex items-center gap-2">
+                <span>Card {currentCardIndex + 1} of {dueCards.length}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Navigate:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (currentCardIndex > 0) {
+                        console.log('Previous button clicked, moving from', currentCardIndex, 'to', currentCardIndex - 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setCurrentProblemData(null);
+                        setShowSolution(false);
+                        setCurrentCardIndex(prev => prev - 1);
+                        // The useEffect will trigger startNewCard when currentCardIndex changes
+                      }
+                    }}
+                    disabled={currentCardIndex === 0}
+                    className="h-6 w-6 p-0"
+                    title="Previous card"
+                  >
+                    ←
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (currentCardIndex < dueCards.length - 1) {
+                        console.log('Next button clicked, moving from', currentCardIndex, 'to', currentCardIndex + 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setCurrentProblemData(null);
+                        setShowSolution(false);
+                        setCurrentCardIndex(prev => prev + 1);
+                        // The useEffect will trigger startNewCard when currentCardIndex changes
+                      }
+                    }}
+                    disabled={currentCardIndex >= dueCards.length - 1}
+                    className="h-6 w-6 p-0"
+                    title="Next card"
+                  >
+                    →
+                  </Button>
+                </div>
+              </div>
               <span>{Math.round(progress)}% Complete</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -508,17 +378,17 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                   {currentSession?.solutionTitle}
                 </Badge>
               </div>
-              
+
               {/* Problem Description */}
-              {currentProblemData && (
+              {currentProblemData ? (
                 <div className="space-y-4">
                   <div className="prose prose-sm max-w-none">
-                    <div 
+                    <div
                       className="text-sm text-muted-foreground"
                       dangerouslySetInnerHTML={{ __html: currentProblemData.description }}
                     />
                   </div>
-                  
+
                   {/* Examples */}
                   {currentProblemData.examples && currentProblemData.examples.length > 0 && (
                     <div>
@@ -537,9 +407,17 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                     </div>
                   )}
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                  </div>
+                </div>
               )}
-              
-              {/* Solution Code Display - Anki Card Style */}
+
+              {/* Solution Code Display */}
               {currentCard && (currentCard.solution_code || currentCard.solution_title) && (
                 <div className="mt-6">
                   <div className="flex items-center justify-between mb-3">
@@ -553,13 +431,17 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowSolution(!showSolution)}
+                      onClick={() => {
+                        const newShowSolution = !showSolution;
+                        console.log('Toggling solution visibility:', newShowSolution, 'for card:', currentCard?.problem_id);
+                        setShowSolution(newShowSolution);
+                      }}
                       className="text-xs"
                     >
                       {showSolution ? "Hide Solution" : "Show Solution"}
                     </Button>
                   </div>
-                  
+
                   {!showSolution ? (
                     <div className="rounded border bg-muted/20 p-8 text-center">
                       <div className="text-muted-foreground">
@@ -573,6 +455,7 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                       {currentCard.solution_code ? (
                         <div className="rounded overflow-hidden border">
                           <Editor
+                            key={`${currentCard.problem_id}-${currentCardIndex}`}
                             height="300px"
                             language="python"
                             theme={editorTheme}
@@ -600,147 +483,111 @@ I'm going to ask you a few questions to help you recall the key concepts. Don't 
                           <p className="text-sm text-red-600 dark:text-red-400">
                             No solution code available for this card.
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            This might indicate the database migration hasn't been applied yet.
-                          </p>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-              
+
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                 <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 mb-2">
                   <Lightbulb className="h-4 w-4" />
                   <span className="font-medium">Review Tip</span>
                 </div>
                 <p className="text-sm text-blue-600 dark:text-blue-400">
-                  Focus on explaining the concepts in your own words rather than memorizing code.
-                  The AI will guide you through key aspects of your solution.
+                  Think through each question carefully. You can check your solution code to help remember the details.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* AI Conversation Panel */}
+          {/* Questions Panel */}
           <div className="w-1/2 flex flex-col">
-            {/* Messages */}
-            <div className="flex-1 p-6 overflow-y-auto">
-              <div className="space-y-4">
-                {currentSession?.messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {message.role === "assistant" && (
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
-                        <Bot className="w-4 h-4" />
+            {!showRatingOptions ? (
+              <>
+                {/* Current Question */}
+                <div className="flex-1 p-6">
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="text-sm text-muted-foreground mb-2">
+                        Question {(currentSession?.currentQuestionIndex || 0) + 1} of {REVIEW_QUESTIONS.length}
                       </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        message.role === "user"
-                          ? "border border-primary/60 bg-card text-foreground"
-                          : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap text-sm">
-                        {message.content}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        {message.timestamp.toLocaleTimeString()}
-                      </div>
+                      <h3 className="text-xl font-semibold mb-2">
+                        {currentQuestion?.question}
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {currentQuestion?.description}
+                      </p>
                     </div>
-                    {message.role === "user" && (
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary text-primary-foreground">
-                        <User className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                
-                {isLoadingAI && (
-                  <div className="flex justify-start gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                    <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
 
-            {/* Rating Options */}
-            {showRatingOptions && (
-              <div className="p-6 border-t bg-muted/20">
-                <h4 className="font-medium mb-3">How well did you remember this solution?</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {DIFFICULTY_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      variant="outline"
-                      onClick={() => handleRatingSelection(option.value)}
-                      disabled={isSubmittingReview}
-                      className={`h-auto p-3 text-left ${option.color.replace('bg-', 'hover:bg-').replace('500', '50')}`}
-                    >
-                      <div>
-                        <div className="font-medium">{option.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {option.description}
-                        </div>
-                      </div>
-                    </Button>
-                  ))}
+                    {/* <div className="bg-muted/20 rounded-lg p-6 text-center">
+                      <p className="text-lg font-medium mb-2">Think it through</p>
+                      <p className="text-sm text-muted-foreground">
+                        Take your time to recall the answer. You can check your solution code if needed.
+                      </p>
+                    </div> */}
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Input Area */}
-            {!showRatingOptions && (
-              <div className="p-6 border-t">
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="Explain your thinking..."
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendMessage();
+                {/* Next Question Button */}
+                <div className="p-6 border-t">
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        // Skip to next card without rating (no penalty to spaced repetition)
+                        console.log('Skip button clicked, moving from', currentCardIndex, 'to', currentCardIndex + 1);
+                        setCurrentSession(null);
+                        setShowRatingOptions(false);
+                        setShowSolution(false);
+                        setCurrentProblemData(null);
+                        setCurrentCardIndex(prev => prev + 1);
+                        // The useEffect will trigger startNewCard when currentCardIndex changes
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Skip Card
+                    </Button>
+
+                    <Button onClick={nextQuestion}>
+                      {(currentSession?.currentQuestionIndex || 0) < REVIEW_QUESTIONS.length - 1
+                        ? "Next Question"
+                        : "Rate My Memory"
                       }
-                    }}
-                    className="min-h-[60px]"
-                    disabled={isLoadingAI}
-                  />
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      onClick={sendMessage}
-                      disabled={!userInput.trim() || isLoadingAI}
-                      size="sm"
-                    >
-                      <Send className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={skipCard}
-                      size="sm"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Rating Options */
+              <div className="flex-1 p-6">
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold mb-2">How well did you remember this solution?</h3>
+                    <p className="text-muted-foreground">
+                      Rate your overall recall of the technique, data structures, and complexity.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {DIFFICULTY_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant="outline"
+                        onClick={() => handleRatingSelection(option.value)}
+                        disabled={isSubmittingReview}
+                        className={`h-auto p-4 text-left flex flex-col items-start justify-start hover:${option.color.replace('bg-', 'bg-').replace('500', '50')} hover:border-${option.color.replace('bg-', '').replace('500', '300')}`}
+                      >
+                        <div className="w-full">
+                          <div className="font-medium text-sm mb-1">{option.label}</div>
+                          <div className="text-xs text-muted-foreground leading-tight">
+                            {option.description}
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
                   </div>
                 </div>
               </div>

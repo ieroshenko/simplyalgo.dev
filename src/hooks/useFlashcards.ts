@@ -64,8 +64,8 @@ export const useFlashcards = (userId?: string) => {
         .from("flashcard_decks")
         .select(`
           *,
-          problems!inner(title),
-          problem_solutions!inner(title)
+          problems(title),
+          problem_solutions(title, code)
         `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -75,7 +75,8 @@ export const useFlashcards = (userId?: string) => {
       return ((data as any[]) ?? []).map((deck: any) => ({
         ...deck,
         problem_title: deck.problems?.title,
-        solution_title: deck.problem_solutions?.title,
+        solution_title: deck.problem_solutions?.title || deck.solution_title,
+        is_custom_solution: !deck.solution_id,
       })) as FlashcardDeck[];
     },
     enabled: !!userId,

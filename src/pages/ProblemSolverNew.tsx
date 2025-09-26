@@ -209,18 +209,20 @@ const ProblemSolverNew = () => {
     userId: user?.id || "anonymous",
     problemDescription: problem?.description || "",
     editorRef: codeEditorRef,
-    onCodeInsert: async (code: string) => {
+    onCodeInsert: async (code: string, cursorPosition?: any, insertionType?: string, context?: any) => {
       // Wrap the code string in a CodeSnippet for the existing handler
       const snippet: CodeSnippet = {
         id: `coaching-${Date.now()}`,
         code,
         language: "python",
         isValidated: true,
-        insertionType: "smart",
+        insertionType: (insertionType as any) || "smart",
         insertionHint: {
           type: "statement",
           scope: "function", 
-          description: "AI coaching generated code"
+          description: context?.isCoachingCorrection 
+            ? `AI coaching correction: ${context.feedback || 'Code fix'}`
+            : "AI coaching generated code"
         }
       };
       await handleInsertCodeSnippet(snippet);
@@ -430,7 +432,9 @@ const ProblemSolverNew = () => {
             cursorPosition,
             problemDescription: problem.description,
             // Enhanced context for better insertion decisions
-            message: `[ai-chat snippet insertion] Context: User asked for code fix/improvement. Current code may have bugs that need replacement rather than addition.`,
+            message: snippet.insertionHint?.description?.includes('coaching correction') 
+              ? `[coaching correction] Fix specific issue: ${snippet.insertionHint.description}. Replace incorrect code with corrected version.`
+              : `[ai-chat snippet insertion] Context: User asked for code fix/improvement. Current code may have bugs that need replacement rather than addition.`,
             conversationHistory: [],
           },
         });
