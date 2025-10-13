@@ -21,15 +21,19 @@ import { PlanGenerationIntroStep } from '@/components/survey/steps/PlanGeneratio
 import { ProgressAnimationStep } from '@/components/survey/steps/ProgressAnimationStep';
 import { CongratulationsStep } from '@/components/survey/steps/CongratulationsStep';
 import { CustomizedResultsStep } from '@/components/survey/steps/CustomizedResultsStep';
+import { PaywallStep } from '@/components/survey/steps/PaywallStep';
 import { useSurveyData } from '@/hooks/useSurveyData';
+import { useAuth } from '@/hooks/useAuth';
 
-const TOTAL_STEPS = 19;
+const TOTAL_STEPS = 20;
 
 const Survey: React.FC = () => {
   const { stepNumber } = useParams<{ stepNumber: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const currentStep = parseInt(stepNumber || '1', 10);
   
+  // Get survey data, passing user as parameter
   const { 
     surveyData, 
     completedSteps, 
@@ -38,7 +42,7 @@ const Survey: React.FC = () => {
     updateSurveyData,
     saveToLocalStorage,
     saveToDatabase
-  } = useSurveyData();
+  } = useSurveyData(user);
 
   // Validate step access
   useEffect(() => {
@@ -95,6 +99,16 @@ const Survey: React.FC = () => {
     }
   };
 
+  const handlePaymentSuccess = () => {
+    // Payment successful, redirect to dashboard
+    navigate('/dashboard');
+  };
+
+  const handlePaymentError = (error: string) => {
+    console.error('Payment error:', error);
+    // You could show a toast notification here
+  };
+
   const handleBack = () => {
     if (currentStep > 1) {
       navigate(`/survey/${currentStep - 1}`);
@@ -124,6 +138,12 @@ const Survey: React.FC = () => {
       surveyData: surveyData
     };
 
+    const paywallProps = {
+      ...stepProps,
+      onPaymentSuccess: handlePaymentSuccess,
+      onPaymentError: handlePaymentError
+    };
+
     switch (currentStep) {
       case 1: return <CurrentRoleStep {...stepProps} />;
       case 2: return <InterviewFrequencyStep {...stepProps} />;
@@ -144,6 +164,7 @@ const Survey: React.FC = () => {
       case 17: return <ProgressAnimationStep {...stepProps} />;
       case 18: return <CongratulationsStep {...stepProps} />;
       case 19: return <CustomizedResultsStep {...customizedResultsProps} />;
+      case 20: return <PaywallStep {...paywallProps} />;
       default: return <CurrentRoleStep {...stepProps} />;
     }
   };
@@ -158,8 +179,8 @@ const Survey: React.FC = () => {
     ? surveyData[currentStep] && surveyData[currentStep].trim() !== ''
     : true;
 
-  const showHeader = ![17].includes(currentStep);
-  const showFooter = ![17].includes(currentStep);
+  const showHeader = ![17, 20].includes(currentStep);
+  const showFooter = ![17, 20].includes(currentStep);
 
   // Show loading state while data is being loaded
   if (isLoading) {

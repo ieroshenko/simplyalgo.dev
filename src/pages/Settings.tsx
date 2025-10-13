@@ -9,6 +9,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Sidebar from "@/components/Sidebar";
+import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { useTheme } from "@/hooks/useTheme";
 import { Monitor, Moon, Sun, Palette, User, Bell, Shield } from "lucide-react";
 
@@ -50,6 +51,9 @@ const Settings = () => {
         </div>
 
         <div className="grid gap-6 max-w-4xl">
+          {/* Subscription Management */}
+          <SubscriptionManagement />
+
           {/* Appearance Settings */}
           <Card>
             <CardHeader>

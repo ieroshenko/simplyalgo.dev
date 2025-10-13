@@ -807,6 +807,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          plan: 'monthly' | 'yearly'
+          status: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          plan: 'monthly' | 'yearly'
+          status: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string
+          plan?: 'monthly' | 'yearly'
+          status?: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

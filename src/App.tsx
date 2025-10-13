@@ -15,6 +15,7 @@ import FlashcardDeck from "./pages/FlashcardDeck";
 import DataStructureDetail from "./components/DataStructureDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
+import { PaywallGuard } from "./components/PaywallGuard";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -27,7 +28,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/" replace />;
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <PaywallGuard>
+      {children}
+    </PaywallGuard>
+  );
 };
 
 const queryClient = new QueryClient();
