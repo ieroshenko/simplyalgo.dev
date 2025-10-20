@@ -878,6 +878,7 @@ app.use(helmet());
 const corsOptions = {
   origin: [
     "http://localhost:8080",
+    "http://localhost:8081",
     "http://localhost:5173",
     "https://preview--leetcoach-ai-guide.lovable.app",
   ],
