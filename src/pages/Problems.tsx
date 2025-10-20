@@ -31,7 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
 
-const DSAArena = () => {
+const Problems = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const {
@@ -212,7 +212,7 @@ const DSAArena = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              DSA Arena
+              Data Structures and Algorithms
             </h1>
             <p className="text-muted-foreground mt-1">
               Master coding patterns and solve problems to sharpen your skills
@@ -434,4 +434,4 @@ const DSAArena = () => {
   );
 };
 
-export default DSAArena;
+export default Problems;

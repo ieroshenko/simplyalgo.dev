@@ -10,3 +10,7 @@ export type FeatureFlag = keyof typeof FEATURE_FLAGS;
 export const isFeatureEnabled = (feature: FeatureFlag): boolean => {
   return FEATURE_FLAGS[feature];
 };
+
+export const isFeatureEnabledBooleal = (isEnabled: boolean): boolean => {
+  return isEnabled;
+};

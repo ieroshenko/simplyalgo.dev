@@ -46,7 +46,7 @@ const DataStructureDetail = () => {
           <p className="text-muted-foreground mb-4">
             The requested data structure could not be found.
           </p>
-          <Button onClick={() => navigate("/DSA")}>
+          <Button onClick={() => navigate("/problems")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to DSA Arena
           </Button>
@@ -76,7 +76,7 @@ const DataStructureDetail = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/DSA")}
+            onClick={() => navigate("/problems")}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back

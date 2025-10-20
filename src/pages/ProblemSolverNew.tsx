@@ -262,7 +262,7 @@ const ProblemSolverNew = () => {
           <h1 className="text-2xl font-bold text-foreground mb-2">
             Problem not found
           </h1>
-          <Button onClick={() => navigate("/DSA")}>
+          <Button onClick={() => navigate("/problems")}>
             Back to Problems
           </Button>
         </div>
@@ -634,7 +634,7 @@ const ProblemSolverNew = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/DSA")}
+              onClick={() => navigate("/problems")}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back

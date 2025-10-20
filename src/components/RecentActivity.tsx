@@ -52,86 +52,65 @@ const RecentActivity = () => {
 
   const quickActions = useMemo(
     () => [
-      {
-        title: "Random Pattern Drill",
-        icon: Plus,
-        action: () => console.log("Random Pattern Drill"),
-      },
-      {
-        title: "Random LC Problem",
-        icon: Plus,
-        action: () => console.log("Random LC Problem"),
-      },
+      // {
+      //   title: "Random Pattern Drill",
+      //   icon: Plus,
+      //   action: () => console.log("Random Pattern Drill"),
+      // },
+      // {
+      //   title: "Random LC Problem",
+      //   icon: Plus,
+      //   action: () => console.log("Random LC Problem"),
+      // },
     ],
     [],
   );
 
   return (
-    <div className="flex gap-6 p-6">
-      {/* Recent Activity */}
-      <Card className="flex-1">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-foreground">
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {loading ? (
-              <div className="text-sm text-muted-foreground">Loading...</div>
-            ) : items.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No recent activity yet.</div>
-            ) : (
-              items.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                  onClick={() => navigate(`/problem/${a.problem_id}`)}
-                  role="button"
-                  aria-label={`Open ${a.title}`}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">
-                      {a.status === "passed"
-                        ? "Solved"
-                        : a.status === "failed"
-                        ? "Attempt failed"
-                        : "Attempted"}
-                      : {a.title}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {a.difficulty ? `${a.difficulty} • ` : ""}
-                      {formatTimeAgo(a.updated_at)}
-                    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg font-bold text-foreground">
+          Recent Activity
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {loading ? (
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          ) : items.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No recent activity yet.</div>
+          ) : (
+            items.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                onClick={() => navigate(`/problem/${a.problem_id}`)}
+                role="button"
+                aria-label={`Open ${a.title}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground truncate">
+                    {a.status === "passed"
+                      ? "Solved"
+                      : a.status === "failed"
+                      ? "Attempt failed"
+                      : "Attempted"}
+                    : {a.title}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <div className="text-sm text-muted-foreground">
+                    {a.difficulty ? `${a.difficulty} • ` : ""}
+                    {formatTimeAgo(a.updated_at)}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <div className="w-80 space-y-3">
-        {quickActions.map((action, index) => {
-          const Icon = action.icon;
-          return (
-            <Button
-              key={index}
-              variant="outline"
-              className="w-full justify-start h-auto p-4 border-dashed hover:bg-accent/5 hover:border-accent transition-colors"
-              onClick={action.action}
-            >
-              <Icon className="w-4 h-4 mr-3 text-accent" />
-              <span className="font-medium">{action.title}</span>
-            </Button>
-          );
-        })}
-      </div>
-    </div>
+                <div className="flex items-center space-x-2 flex-shrink-0">
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

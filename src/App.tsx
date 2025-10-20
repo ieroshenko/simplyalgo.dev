@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import DSAArena from "./pages/DSAArena";
+import Problems from "./pages/Problems";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -64,10 +64,10 @@ const App = () => (
               }
             />
             <Route
-              path="/DSA"
+              path="/problems"
               element={
                 <ProtectedRoute>
-                  <DSAArena />
+                  <Problems />
                 </ProtectedRoute>
               }
             />
@@ -75,7 +75,7 @@ const App = () => (
               path="/arena"
               element={
                 <ProtectedRoute>
-                  <DSAArena />
+                  <Problems />
                 </ProtectedRoute>
               }
             />
@@ -88,7 +88,7 @@ const App = () => (
               }
             />
             <Route
-              path="/DSA/data-structures/:slug"
+              path="/problems/data-structures/:slug"
               element={
                 <ProtectedRoute>
                   <DataStructureDetail />

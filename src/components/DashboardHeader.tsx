@@ -19,7 +19,7 @@ const DashboardHeader = () => {
           <div className="p-2 bg-accent/10 rounded-lg">
             <div className="w-6 h-6 bg-accent rounded-md"></div>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-muted-foreground">Dashboard</h1>
         </div>
       </div>
 

@@ -48,16 +48,16 @@ const Sidebar = () => {
   // No per-category icons in progress list (simplified UI)
 
   return (
-    <div className="w-64 bg-background border-r border-border h-full flex flex-col">
+    <div className="w-64 bg-background border-r border-border h-screen flex flex-col sticky top-0 z-10">
       {/* Logo */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center space-x-2">
+      <div className="pt-7 pb-7 pl-5 border-b border-border">
+        <div className="flex items-center space-x-3">
           <img
             src="/src/assets/simplyalgo-logo.png"
             alt="SimplyAlgo Logo"
             className="w-8 h-8 rounded-lg object-contain"
           />
-          <span className="text-lg font-bold text-foreground">SimplyAlgo</span>
+          <span className="text-2xl font-bold text-foreground">SimplyAlgo.dev</span>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ const Sidebar = () => {
       </div>
 
       {/* Category Progress - Only show on DSA Arena pages */}
-      {(location.pathname === "/DSA" ||
+      {(location.pathname === "/problems" ||
         location.pathname === "/arena") && (
         <div className="px-4 pb-4 flex-1">
           <Card className="p-4 space-y-4">

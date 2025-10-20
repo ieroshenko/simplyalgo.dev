@@ -42,15 +42,14 @@ const Dashboard = () => {
           <div className="flex-1 space-y-6">
             <MissionStrip />
             <CoreBattleCards />
-            <RecentActivity />
           </div>
 
           <div className="w-full xl:w-80 xl:flex-shrink-0 space-y-6">
             <PersonalPlanCard 
               surveyData={surveyData}
-              onUpdatePlan={() => navigate('/survey/1')}
             />
             <ProgressRadar />
+            <RecentActivity />
           </div>
         </div>
       </div>

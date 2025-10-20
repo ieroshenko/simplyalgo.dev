@@ -54,7 +54,7 @@ const DataStructureVault = () => {
   };
 
   const handleCardClick = (slug: string) => {
-    navigate(`/DSA/data-structures/${slug}`);
+    navigate(`/problems/data-structures/${slug}`);
   };
 
   return (
