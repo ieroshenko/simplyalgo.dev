@@ -802,7 +802,7 @@ const ProblemSolverNew = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 px-4 pb-4">
+                          <div className="flex-1 px-4 pb-4 overflow-y-auto">
                             {testResults[activeTestCase] && (
                               <div
                                 className={`p-4 rounded-lg border-2 ${
