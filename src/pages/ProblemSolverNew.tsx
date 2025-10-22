@@ -34,6 +34,7 @@ import { TestResult, CodeSnippet } from "@/types";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Timer from "@/components/Timer";
+import FeedbackButton from "@/components/FeedbackButton";
 import { supabase } from "@/integrations/supabase/client";
 // Removed unused insertion utilities - only using AI smart insertion now
 import { useCoachingNew } from "@/hooks/useCoachingNew";
@@ -653,6 +654,7 @@ const ProblemSolverNew = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            <FeedbackButton />
             <Timer />
             <ShortcutsHelp />
             <Button
