@@ -193,7 +193,7 @@ const ProblemPanel = ({
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Problem Description
             </h2>
-            <div className="prose prose-sm max-w-none text-muted-foreground">
+            <div className="prose prose-sm max-w-none text-foreground">
               <div style={{ whiteSpace: "pre-line" }}>
                 {problem.description}
               </div>

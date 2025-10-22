@@ -179,11 +179,20 @@ ${currentCode}
 
 ALGORITHM-FOCUSED COACHING APPROACH:
 - Examine existing algorithm implementation (ignore signatures)
-- If they have data structures initialized, guide to the next algorithmic step  
+- If they have data structures initialized, guide to the next algorithmic step
 - Focus on core logic: iteration patterns, bit manipulation, counting, etc.
 - Ask about algorithmic approach, not code formatting or imports
 - Reference line ${nextLineNumber} for where they should add algorithm code, and mention existing symbol names (e.g., variables) when applicable
 - Be specific about algorithmic steps, not boilerplate code
+
+CRITICAL: CHECK IF SOLUTION IS ALREADY COMPLETE
+Before asking any questions, analyze if the student's code already solves the problem:
+1. Does it have all necessary components (initialization, loop, logic, return statement)?
+2. Would this code produce correct output for the problem?
+3. If YES to both → Set isCompleted: true and provide completion message instead of a question
+4. If NO → Identify what's missing and ask about that specific piece
+
+DO NOT start coaching if the solution is already functionally complete. Instead, acknowledge their solution and mark session as complete.
 
 Now analyze this student's current code and generate the FIRST coaching step.
 
@@ -192,10 +201,10 @@ Return JSON object with:
 - A concrete hint that guides them to the solution logic  
 - The correct highlight area for where they should add code
 
-Required JSON format:
+Required JSON format (if solution is INCOMPLETE):
 {
   "question": "[Specific question about next algorithm step based on current code]",
-  "hint": "[Specific actionable hint about algorithm logic they should implement]", 
+  "hint": "[Specific actionable hint about algorithm logic they should implement]",
   "highlightArea": {
     "startLine": ${nextLineNumber},
     "startColumn": 1,
@@ -208,18 +217,41 @@ Required JSON format:
   "isCompleted": false
 }
 
+Required JSON format (if solution is ALREADY COMPLETE):
+{
+  "question": "Great work! Your solution is already complete.",
+  "hint": "You can test your solution or explore optimizations.",
+  "highlightArea": null,
+  "difficulty": "${difficulty}",
+  "currentStepNumber": 1,
+  "awaitingSubmission": false,
+  "isCompleted": true
+}
+
+
+QUESTION GRANULARITY - CRITICAL:
+- Break down the algorithm into SMALL, ATOMIC steps
+- Each question should ask for 1-3 lines of code maximum
+- Don't ask broad questions like "How will you solve this problem?"
+- Ask specific questions like "What variables will you initialize?" or "How will you iterate?"
 
 Examples of good Socratic questions/hints (guide discovery, don't give solutions):
-- Question: "What data structure would be appropriate to store results for each number from 0 to n?"
-- Hint: "Think about what type of collection can hold multiple values and allows access by index"
+- Question: "What variables will you need to track the sliding window boundaries?"
+- Hint: "You'll need two pointers to mark the start and end of the window"
 
-- Question: "How would you systematically process each number from 0 to n?"  
-- Hint: "What Python construct allows you to repeat an operation for a sequence of numbers?"
+- Question: "What data structure will track character frequencies?"
+- Hint: "Think about a structure that maps characters to their counts"
 
-- Question: "What approach could you use to count bits in a number's binary representation?"
-- Hint: "Consider what Python functions might help convert numbers to different representations"
+- Question: "How will you iterate through the string with the right pointer?"
+- Hint: "Use a for loop to move the right pointer through each character"
 
-CRITICAL: Do NOT provide direct code solutions in hints. Ask guiding questions that help them think through the problem step by step.
+- Question: "What condition determines when to shrink the window?"
+- Hint: "Check when the number of replacements needed exceeds k"
+
+CRITICAL:
+- Ask questions that can be answered with 1-3 lines of code
+- Do NOT ask questions that require multiple algorithmic steps
+- Each question = one small atomic step
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
 
@@ -266,12 +298,18 @@ Be encouraging and guide them step by step with specific, actionable advice focu
     }
 
     stepData = JSON.parse(cleanContent);
-    logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData.question, hasHighlightArea: !!stepData.highlightArea });
+    logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData.question, hasHighlightArea: !!stepData.highlightArea, isCompleted: !!stepData.isCompleted });
 
-    // Validate required fields
-    if (!stepData.question || !stepData.highlightArea) {
+    // Validate required fields (highlightArea can be null if session is already completed)
+    if (!stepData.question) {
       logger.error("Missing required fields in step data", undefined, { sessionId, stepData, action: "validate_step_data" });
       throw new Error("Invalid coaching step data");
+    }
+
+    // If not completed, highlightArea is required
+    if (!stepData.isCompleted && !stepData.highlightArea) {
+      logger.error("Missing highlightArea for incomplete session", undefined, { sessionId, stepData, action: "validate_step_data" });
+      throw new Error("Invalid coaching step data: missing highlightArea");
     }
   } catch (error) {
     logger.error("AI generation failed", error, { sessionId, action: "start_interactive_coaching" });
@@ -503,6 +541,9 @@ export async function validateCoachingSubmission(
   const problemDescription = session.problem_description || "";
   const { constraints, numericalConstraints } = parseConstraints(problemDescription);
 
+  // Get the current question being validated
+  const currentQuestion = session.current_question || "";
+
   // Create constraint-aware validation prompt
   const contextContinuationPrompt = `STUDENT CODE UPDATE (GROUND IN CURRENT CODE and REFERENCE LINES/SYMBOLS):
 \`\`\`python
@@ -514,31 +555,89 @@ ${problemDescription}
 
 ${constraints.length > 0 ? `PROBLEM CONSTRAINTS:
 ${constraints.join('\n')}
+` : ""}
+CURRENT COACHING QUESTION BEING VALIDATED:
+"${currentQuestion}"
 
-CONSTRAINT-AWARE VALIDATION INSTRUCTIONS:
-- FIRST: Check if the solution works correctly within the stated problem constraints
-- Consider constraints when evaluating edge cases - only flag issues that can actually occur within constraint bounds
-- If test cases pass and solution handles all inputs within constraints, the solution is CORRECT
-- Do not flag theoretical edge cases that cannot occur due to problem constraints
-- Focus on practical correctness within the problem scope
+VALIDATION MODE: Step-by-step coaching (NOT final solution validation)
 
-` : ""}${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area"
-      ? `STUDENT RESPONSE: "${studentResponse}"
+CRITICAL STEP-BY-STEP VALIDATION INSTRUCTIONS:
+- VALIDATE ONLY if the student answered the CURRENT QUESTION above
+- DO NOT check if the entire solution is complete
+- DO NOT validate against the final complete solution
+- DO NOT penalize for missing code that wasn't asked for in the current question
+- Focus EXCLUSIVELY on: Did they implement what the CURRENT QUESTION asked for?
+- If they correctly answered the current question (even partially), mark as correct and provide next step
+- If they didn't answer the current question, provide targeted feedback ONLY about THIS question
+
+EXAMPLES OF CORRECT STEP-BY-STEP VALIDATION:
+- Question: "What sliding window variables will you initialize?"
+  Student writes: "left = 0; char_count = {}"
+  Validation: ✅ CORRECT - They initialized the variables asked for. Provide next step.
+
+- Question: "How would you iterate through the string?"
+  Student writes: "for i in range(len(s)):"
+  Validation: ✅ CORRECT - They added the iteration asked for. Provide next step.
+
+- Question: "What condition would you check to expand the window?"
+  Student writes: "if char_count[s[right]] < k:"
+  Validation: ✅ CORRECT - They added the condition. Provide next step.
+
+${studentResponse && studentResponse.trim() && studentResponse !== "Code validation from highlighted area"
+      ? `STUDENT EXPLANATION: "${studentResponse}"
 
 ` : ""}VALIDATION REQUEST:
-Analyze the student's current code implementation within the context of the problem constraints. Has their algorithm improved? What should happen next?
+Did the student answer the CURRENT QUESTION ("${currentQuestion}")?
 
-Determine if:
-1. Code is correct/complete within constraint bounds → session can end or offer optimization
-2. Code has issues that can occur within constraints → provide specific algorithmic guidance  
-3. Code needs more implementation → guide next step
+BREAK DOWN THE CURRENT QUESTION:
+- Parse what SPECIFIC code elements the question is asking for
+- Example: "How will you maintain a sliding window?" → Asking for: window variables (left, right) and loop structure
+- Example: "What variables will you initialize?" → Asking for: variable declarations only
+- Example: "How will you update the frequency?" → Asking for: freq[char] update logic only
 
-CRITICAL ANALYSIS POINTS:
-- CONSTRAINT-FIRST VALIDATION: Validate solution against actual problem constraints, not theoretical edge cases
-- Check if the code already has all necessary algorithmic components
-- If algorithm is complete and correct within constraints, indicate session completion
-- Focus on what's MISSING from their algorithm, not what exists
-- Only consider edge cases that can actually occur within the given constraints
+VALIDATION APPROACH:
+1. Identify the MINIMAL code that answers the current question
+2. Check if student's code contains those minimal elements (FUNCTIONALLY, not exact placement)
+3. If yes → Mark CORRECT and provide next step
+4. If no → Mark INCORRECT with feedback about what's missing FOR THIS QUESTION ONLY
+
+FUNCTIONAL CORRECTNESS - CRITICAL:
+- Focus on WHAT the code does, not WHERE it's placed (unless order matters for correctness)
+- If student's code achieves the same result, accept it even if placement differs
+- Example: window_size calculation before or after max_num update is FINE if both work
+- Don't be pedantic about code style or exact ordering unless it causes bugs
+- If the logic is correct but just in different order, mark as CORRECT
+
+COMMON VALIDATION MISTAKES TO AVOID:
+❌ WRONG: Question asks "How will you maintain a sliding window?" → Expecting full window logic (update, shrink, etc.)
+✅ RIGHT: Question asks "How will you maintain a sliding window?" → Just need window variables + loop structure
+
+❌ WRONG: Question asks "What variables will you initialize?" → Expecting those variables to be used correctly
+✅ RIGHT: Question asks "What variables will you initialize?" → Just need variable declarations
+
+❌ WRONG: Checking if entire solution works
+✅ RIGHT: Checking if THIS SPECIFIC STEP is present
+
+❌ WRONG: Rejecting code because variable assignment is before instead of after another line (when order doesn't matter)
+✅ RIGHT: Accepting code if it's functionally correct regardless of minor ordering differences
+
+DETERMINE:
+- What is the MINIMUM code the current question asks for?
+- Did the student write that minimum code?
+- If yes: isCorrect = true, provide nextStep
+- If no: isCorrect = false, explain what's missing FOR THIS QUESTION ONLY
+
+CHECKING IF SESSION SHOULD COMPLETE:
+- Only mark session as complete (nextAction: "complete_session") if ALL of these are true:
+  1. The solution has a proper return statement
+  2. All algorithmic components are present (initialization, loop, logic, return)
+  3. The code would actually solve the problem correctly
+- DO NOT complete the session if:
+  - Missing return statement
+  - Missing key algorithmic steps
+  - Code is incomplete or wouldn't work
+- When checking if code already exists: Look at ACTUAL current code, not what you expect to see
+- If student already implemented what the question asks, acknowledge it and move to next step
 
 CONTEXT-AWARE CODE CORRECTION:
 - Analyze existing code to identify SPECIFIC incorrect lines or logic
@@ -548,7 +647,7 @@ CONTEXT-AWARE CODE CORRECTION:
 - Must integrate seamlessly with existing code structure and indentation
 - Never provide complete solutions or full function rewrites
 
-CODE CORRECTION RULES:
+CODE CORRECTION RULES (ONLY when student's answer is INCORRECT):
 - Maximum 3-4 lines of corrected code that directly fixes the identified issue
 - Must REPLACE incorrect logic, not just add to it
 - Should fix the specific mistake mentioned in the feedback
@@ -556,6 +655,20 @@ CODE CORRECTION RULES:
 - Focus on correcting one issue: wrong loop condition, incorrect pointer updates, missing edge case handling
 - Example corrections: Replace "curr = head" with "curr = head.next" or fix loop condition from "while curr" to "while curr.next"
 - IMPORTANT: Provide the corrected version of the problematic code, not additional code
+- **CRITICAL: If student answered the current question CORRECTLY, set codeToAdd to empty string ""**
+- Only provide codeToAdd when student's answer is INCORRECT or incomplete for the current question
+
+ANTI-LOOP SAFETY CHECK:
+- Before marking code as incorrect, check if the student's code is FUNCTIONALLY equivalent to what you'd provide
+- If student's code has the same logic but different ordering/style, mark as CORRECT instead
+- DO NOT provide codeToAdd if the code you'd provide is already present (even if in different order)
+- If you notice you're rejecting code that's essentially correct, accept it and move forward
+
+NEXT STEP RULES - CRITICAL:
+- **If isCorrect = true**: Provide nextStep with the next question
+- **If isCorrect = false**: Set nextStep to empty object {} or omit it entirely
+- DO NOT provide nextStep when the student's answer is incorrect
+- Student must answer the current question correctly before seeing the next question
 
 Return JSON in this exact format:
 {
@@ -571,13 +684,25 @@ Return JSON in this exact format:
     "recommendedTime": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other",
     "recommendedSpace": "O(1)|O(log n)|O(n)|O(n log n)|O(n^2)|other"
   },
-  "codeToAdd": "corrected version of the specific incorrect code that fixes the identified issue (3-4 lines max, replaces wrong logic, uses student's variables, no 'def' or imports)",
+  "codeToAdd": "corrected version of the specific incorrect code (ONLY if isCorrect = false)",
   "nextStep": {
-    "question": "next guiding question for the student",
-    "expectedCodeType": "variable" | "loop" | "condition" | "expression" | "return" | "any",
-    "hint": "helpful hint for the next step"
+    "question": "next guiding question (ONLY if isCorrect = true)",
+    "expectedCodeType": "variable|loop|condition|expression|return|any (ONLY if isCorrect = true)",
+    "hint": "helpful hint for the next step (ONLY if isCorrect = true)"
   }
-}`;
+}
+
+IMPORTANT VALIDATION LOGIC:
+- If isCorrect = true AND codeToAdd is empty → nextStep must be provided
+- If isCorrect = true AND codeToAdd has code → nextStep must be provided (will show after code insertion)
+- If isCorrect = false → nextStep must be empty {} or omitted entirely
+
+CRITICAL NEXT STEP GENERATION:
+- Before generating nextStep question, analyze what code student already has
+- DO NOT ask questions about code that already exists in the editor
+- nextStep should ask about the NEXT missing piece, not existing code
+- Example: If student has shrinking logic, don't ask "How will you shrink?" - ask about what comes NEXT
+- If all algorithmic components are present, mark session complete instead of generating more questions`;
 
   let contextualResponse: ContextualResponse;
 

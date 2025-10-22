@@ -199,6 +199,12 @@ async function fetchTestCasesFromDB(problemId) {
       console.log("Final inputParams:", inputParams);
       console.log("Final expectedOutput:", expectedOutput);
 
+      // For class-based problems, extract the clean array from nested structure
+      if (expectedOutput && expectedOutput.expected_outputs) {
+        expectedOutput = expectedOutput.expected_outputs;
+        console.log("Extracted expected_outputs for class-based problem:", expectedOutput);
+      }
+
       return {
         input: inputParams,
         expected: expectedOutput,
@@ -457,7 +463,7 @@ class ListNode:
 
   // Add TreeNode definition if needed (for binary tree problems)
   console.log("Checking if TreeNode definition is needed...");
-  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/ .test(userCode);
+  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/.test(userCode);
   if (needsTreeNode && !userCode.includes("class TreeNode")) {
     console.log("Adding TreeNode class definition");
     const treeNodeDef = `# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
@@ -514,9 +520,16 @@ def listnode_to_array(head):
     );
   }
 
+  // Check if this is a class-based problem (has class definition with __init__)
+  // But exclude problems that are just using a class for organization (like Codec)
+  // Class-based problems have test cases with "operations" array
+  const hasClassWithInit = userCode.includes('class ') && userCode.includes('def __init__');
+  const isClassBasedProblem = hasClassWithInit && testCases.some(tc => tc.input && tc.input.operations);
+
   // Check if code has methods with 'self' parameter - wrap in Solution class
+  // BUT don't wrap if it's a class-based problem (user already defined their own class)
   const hasSelfParam = /def\s+\w+\s*\([^)]*self[^)]*\)/.test(userCode);
-  if (hasSelfParam && !userCode.includes("class Solution")) {
+  if (hasSelfParam && !userCode.includes("class Solution") && !isClassBasedProblem) {
     console.log("Code has self parameter, wrapping in Solution class");
 
     // Extract imports, ListNode definition, and helper functions to keep them global
@@ -627,25 +640,39 @@ def listnode_to_array(head):
     console.log("Restructured code with Solution class");
   }
 
-  // Extract function name from the code
-  const functionMatch = userCode.match(/def\s+(\w+)\s*\(/);
-  if (!functionMatch) {
-    throw new Error("No function definition found in Python code");
+  // Determine function name
+  let functionName;
+
+  if (isClassBasedProblem) {
+    console.log("Detected class-based problem");
+    // For class-based problems, we'll handle them specially in the execution code
+    functionName = 'class_based';
+  } else {
+    // Extract function name from the code
+    const functionMatch = userCode.match(/def\s+(\w+)\s*\(/);
+    if (!functionMatch) {
+      throw new Error("No function definition found in Python code");
+    }
+    functionName = functionMatch[1];
+    console.log(`Detected function: ${functionName}`);
   }
 
-  const functionName = functionMatch[1];
-  console.log(`Detected function: ${functionName}`);
-
-  // Analyze function signature to determine input format
-  const signatureMatch = userCode.match(/def\s+\w+\s*\([^)]+\)/);
+  // Analyze function signature to determine input format (including return type)
+  const signatureMatch = userCode.match(/def\s+\w+\s*\([^)]+\)(?:\s*->\s*[^:]+)?:/);
   const signature = signatureMatch ? signatureMatch[0] : "";
 
-  // Special-case detection: encode/decode pair problems
-  // Only enable encode/decode chaining for the specific problem id
+  // Special-case detection: encode/decode and serialize/deserialize pair problems
   const isEncodeDecode = problemId === "encode-and-decode-strings";
+  const isSerializeDeserialize = problemId === "serialize-and-deserialize-binary-tree" ||
+    (userCode.includes('serialize') && userCode.includes('deserialize'));
   if (isEncodeDecode) {
     console.log(
       "🔎 Detected encode/decode pair — will validate decode(encode(strs))",
+    );
+  }
+  if (isSerializeDeserialize) {
+    console.log(
+      "🔎 Detected serialize/deserialize pair — will validate deserialize(serialize(root))",
     );
   }
 
@@ -654,7 +681,12 @@ def listnode_to_array(head):
     functionName,
     signature,
     testCases,
-    { encodeDecode: isEncodeDecode },
+    {
+      encodeDecode: isEncodeDecode,
+      serializeDeserialize: isSerializeDeserialize,
+      problemId: problemId,
+      isClassBasedProblem: isClassBasedProblem
+    },
   );
 
   // Combine user code with test execution
@@ -668,7 +700,7 @@ ${testExecutionCode}`;
 
 // Generate test execution code with dynamic test cases
 function generateTestExecutionCode(functionName, signature, testCases, options = {}) {
-  const { encodeDecode = false } = options;
+  const { encodeDecode = false, serializeDeserialize = false, problemId = '', isClassBasedProblem = false } = options;
   // Convert test cases to Python format
   const pythonTestCases = testCases.map((tc) => {
     console.log(
@@ -678,9 +710,29 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       typeof tc.expected,
     );
 
+    // For class-based problems, extract the clean array from nested structure
+    let expectedOutput = tc.expected;
+    if (isClassBasedProblem && tc.expected && tc.expected.expected_outputs) {
+      expectedOutput = tc.expected.expected_outputs;
+      console.log("Extracted expected_outputs for class-based problem:", expectedOutput);
+    }
+
+    // Normalize class-based problem input: ensure we have "values" key
+    let normalizedInput = { ...tc.input };
+    if (isClassBasedProblem) {
+      // If we have "args" but not "values", copy args to values
+      if (normalizedInput.args && !normalizedInput.values) {
+        normalizedInput.values = normalizedInput.args;
+      }
+      // If we have "values" but not "args", copy values to args (for backwards compatibility)
+      if (normalizedInput.values && !normalizedInput.args) {
+        normalizedInput.args = normalizedInput.values;
+      }
+    }
+
     return {
-      ...tc.input,
-      expected: tc.expected, // Keep as-is - don't convert to string!
+      ...normalizedInput,
+      expected: expectedOutput, // Keep as-is - don't convert to string!
     };
   });
 
@@ -695,9 +747,9 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
   const paramMatch = signature.match(/def\s+\w+\s*\(([^)]+)\)/);
   const params = paramMatch
     ? paramMatch[1]
-        .split(",")
-        .map((p) => p.split(":")[0].trim())
-        .filter((p) => p !== "self")
+      .split(",")
+      .map((p) => p.split(":")[0].trim())
+      .filter((p) => p !== "self")
     : [];
 
   // Generate function call based on parameters - handle both standalone and method calls
@@ -710,32 +762,68 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
   // Check if this is a ListNode/TreeNode problem and if the return type is a node
   console.log("Function signature for ListNode/TreeNode detection:", signature);
   const isListNodeProblem = /\bListNode\b/.test(signature);
-  const isTreeNodeProblem = /\bTreeNode\b|['\"]TreeNode['\"]/ .test(signature);
+  const isTreeNodeProblem = /\bTreeNode\b|['\"]TreeNode['\"]/.test(signature);
   const returnsListNode = /->\s*[^\n#]*ListNode/.test(signature);
   const returnsTreeNode = /->\s*[^\n#]*TreeNode/.test(signature);
+
+  // Check if function returns None (in-place modification)
+  const returnsNone = /->\s*None\s*:/.test(signature);
+
+  // Check if this is a Linked List Cycle problem
+  const isLinkedListCycleProblem = problemId === 'linked-list-cycle' || functionName === 'hasCycle';
   console.log("Is ListNode problem:", isListNodeProblem);
   console.log("Is TreeNode problem:", isTreeNodeProblem);
+  console.log("Is Linked List Cycle problem:", isLinkedListCycleProblem);
   console.log("Returns ListNode:", returnsListNode);
   console.log("Returns TreeNode:", returnsTreeNode);
+  console.log("Returns None (in-place):", returnsNone);
   console.log("Function has self param:", hasSelfParam);
   console.log("Function parameters:", params);
 
-  if (hasSelfParam) {
-    // If function was defined with 'self', we need to create a class instance and call it as a method
+  if (hasSelfParam || isClassBasedProblem) {
+    // If function was defined with 'self' or it's a class-based problem, we need to create a class instance and call it as a method
     const className = "Solution";
-    if (encodeDecode) {
+    if (isClassBasedProblem) {
+      // For class-based problems, we need to execute the operations sequence
+      functionCall = `execute_class_operations(tc["operations"], tc["values"])`;
+      console.log("Generated class-based operations call:", functionCall);
+    } else if (encodeDecode) {
       // Expect first param to be the list of strings (e.g., 'strs')
       const arg = params[0] ? `tc["${params[0]}"]` : "tc.get('strs')";
       functionCall = `${className}().decode(${className}().encode(${arg}))`;
       console.log("Generated encode/decode pipeline call:", functionCall);
+    } else if (serializeDeserialize) {
+      // For serialize/deserialize problems, convert array to tree, serialize, deserialize, convert back
+      // Always use 'root' as the parameter name for these problems
+      functionCall = `treenode_to_array(${className}().Codec().deserialize(${className}().Codec().serialize(array_to_treenode(tc["root"]))))`;
+      console.log("Generated serialize/deserialize pipeline call:", functionCall);
     } else if (isListNodeProblem) {
       console.log("Generating ListNode function call for method");
       // Convert arrays to ListNodes for function call
-      const paramList = params
-        .map((p) => `array_to_listnode(tc["${p}"])`)
-        .join(", ");
-      const call = `${className}().${functionName}(${paramList})`;
-      functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+      let paramList;
+      if (isLinkedListCycleProblem) {
+        // For cycle problems, use the cycle-aware helper
+        paramList = params
+          .map((p) => `array_to_listnode_with_cycle(tc["head"], tc.get("pos", -1))`)
+          .join(", ");
+      } else {
+        paramList = params
+          .map((p) => `array_to_listnode(tc["${p}"])`)
+          .join(", ");
+      }
+
+      // Handle in-place modification for ListNode problems
+      if (returnsNone && params.length === 1) {
+        // For in-place modification, call function and return the modified list
+        const param = params[0];
+        const listVar = `list_${param}`;
+        functionCall = `(lambda: (setattr(__import__('types').SimpleNamespace(), '${listVar}', array_to_listnode(tc["${param}"])), ${className}().${functionName}(getattr(__import__('types').SimpleNamespace(), '${listVar}')), listnode_to_array(getattr(__import__('types').SimpleNamespace(), '${listVar}')))[2])()`;
+        // Simpler approach using a helper
+        functionCall = `(lambda ${listVar}: (${className}().${functionName}(${listVar}), listnode_to_array(${listVar}))[1])(array_to_listnode(tc["${param}"]))`;
+      } else {
+        const call = `${className}().${functionName}(${paramList})`;
+        functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+      }
       console.log("Generated function call:", functionCall);
     } else if (isTreeNodeProblem) {
       console.log("Generating TreeNode function call for method");
@@ -745,6 +833,10 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       const call = `${className}().${functionName}(${paramList})`;
       functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
       console.log("Generated function call:", functionCall);
+    } else if (returnsNone && params.length === 1) {
+      // For in-place modification, call function and return the modified parameter
+      const param = params[0];
+      functionCall = `(lambda: (${className}().${functionName}(tc["${param}"]), tc["${param}"])[1])()`;
     } else if (params.length === 1) {
       functionCall = `${className}().${functionName}(tc["${params[0]}"])`;
     } else if (params.length === 2) {
@@ -761,9 +853,17 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       console.log("Generated encode/decode pipeline call (standalone):", functionCall);
     } else if (isListNodeProblem) {
       // Convert arrays to ListNodes for function call
-      const paramList = params
-        .map((p) => `array_to_listnode(tc["${p}"])`)
-        .join(", ");
+      let paramList;
+      if (isLinkedListCycleProblem) {
+        // For cycle problems, use the cycle-aware helper
+        paramList = params
+          .map((p) => `array_to_listnode_with_cycle(tc["head"], tc.get("pos", -1))`)
+          .join(", ");
+      } else {
+        paramList = params
+          .map((p) => `array_to_listnode(tc["${p}"])`)
+          .join(", ");
+      }
       const call = `${functionName}(${paramList})`;
       functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
     } else if (isTreeNodeProblem) {
@@ -772,6 +872,10 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
         .join(", ");
       const call = `${functionName}(${paramList})`;
       functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
+    } else if (returnsNone && params.length === 1) {
+      // For in-place modification, call function and return the modified parameter
+      const param = params[0];
+      functionCall = `(lambda: (${functionName}(tc["${param}"]), tc["${param}"])[1])()`;
     } else if (params.length === 1) {
       functionCall = `${functionName}(tc["${params[0]}"])`;
     } else if (params.length === 2) {
@@ -806,6 +910,25 @@ def array_to_listnode(arr):
     for x in arr:
         cur.next = ListNode(x)
         cur = cur.next
+    return dummy.next
+
+def array_to_listnode_with_cycle(arr, pos):
+    if arr is None or len(arr) == 0:
+        return None
+    
+    # Create the linked list
+    dummy = ListNode(0)
+    cur = dummy
+    nodes = []
+    for x in arr:
+        cur.next = ListNode(x)
+        cur = cur.next
+        nodes.append(cur)
+    
+    # Create cycle if pos is valid
+    if 0 <= pos < len(nodes):
+        nodes[-1].next = nodes[pos]
+    
     return dummy.next
 
 def listnode_to_array(head):
@@ -853,6 +976,35 @@ def treenode_to_array(root):
     while res and res[-1] is None:
         res.pop()
     return res
+
+def execute_class_operations(operations, values):
+    """Execute class-based operations for problems like MedianFinder, WordDictionary, etc."""
+    obj = None
+    results = []
+    
+    for i, (op, val) in enumerate(zip(operations, values)):
+        if i == 0:
+            # First operation is always the constructor
+            class_name = op
+            # Try to get the class from global namespace first, then Solution namespace
+            try:
+                cls = globals()[class_name]
+            except KeyError:
+                cls = getattr(Solution, class_name)
+            obj = cls()
+            results.append(None)
+        else:
+            # Call the method with the provided arguments
+            method = getattr(obj, op)
+            if val:
+                # If there are arguments, unpack them
+                result = method(*val) if isinstance(val, list) else method(val)
+            else:
+                # No arguments
+                result = method()
+            results.append(result)
+    
+    return results
 
 if 0 <= test_case_index < len(test_cases):
     tc = test_cases[test_case_index]

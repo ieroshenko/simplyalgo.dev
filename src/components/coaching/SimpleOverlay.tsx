@@ -10,7 +10,7 @@ const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
   const [isRevealed, setIsRevealed] = useState(false);
 
   return (
-    <div 
+    <div
       className="relative cursor-pointer text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md border-l-4 border-blue-200 dark:border-blue-600"
       onClick={() => setIsRevealed(!isRevealed)}
     >
@@ -43,7 +43,6 @@ interface SimpleOverlayProps {
   onFinishCoaching?: () => void;
   onInsertCorrectCode?: () => Promise<void> | void; // New prop for inserting correct code
   onStartOptimization?: (type: 'optimization' | 'alternative') => void; // Trigger optimization or alternative flow
-  onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
   isValidating?: boolean;
   hasError?: boolean;
   // Offer optimization action when session is completed and optimization is available
@@ -83,8 +82,7 @@ interface SimpleOverlayProps {
   // Enhanced positioning system props
   positionManager?: OverlayPositionManager; // Centralized positioning manager
   problemId?: string; // Required for position persistence when using positionManager
-  // Legacy positioning props (maintained for backward compatibility)
-  onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position
+  onPositionChange?: (pos: { x: number; y: number }) => void; // Persist user position (callback for parent)
 }
 
 const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
@@ -119,14 +117,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [showTextInput, setShowTextInput] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  
+
   // Initialize EditorBoundsCalculator
   const editorBoundsCalculator = useMemo(() => new EditorBoundsCalculator({
     padding: { top: 5, right: 5, bottom: 5, left: 5 },
     minWidth: 200,
     minHeight: 150,
   }), []);
-  
+
   // Responsive positioning state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -137,7 +135,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         // Cast the editor reference to MonacoEditor interface
         const monacoEditor = editorRef.current as MonacoEditor;
         editorBoundsCalculator.initialize(monacoEditor);
-        
+
         // Set up bounds change listener for automatic position updates
         const unsubscribe = editorBoundsCalculator.onBoundsChange((bounds) => {
           // Only update position if we don't have a custom position set by user
@@ -146,7 +144,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             setCustomPosition({ x: newPosition.x, y: newPosition.y });
           }
         });
-        
+
         return () => {
           unsubscribe();
           editorBoundsCalculator.cleanup();
@@ -170,7 +168,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         console.warn('EditorBoundsCalculator failed:', error);
       }
     }
-    
+
     // Fallback to manual calculation if calculator fails
     try {
       const editorDom = editorRef?.current?.getDomNode?.();
@@ -180,7 +178,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       }
 
       const editorRect = editorDom.getBoundingClientRect();
-      
+
       if (!editorRect || editorRect.width === 0 || editorRect.height === 0) {
         console.warn('Invalid editor rect dimensions');
         return null;
@@ -224,26 +222,28 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   }, [isSessionCompleted, isValidating, question, validationResult]);
 
   // Reset state when overlay is hidden
+  // NOTE: We DON'T reset customPosition here to preserve user's drag position
   useEffect(() => {
     if (!isVisible) {
       setIsMinimized(false);
-      setCustomPosition(null);
+      // Don't reset customPosition - preserve user's manual positioning
       setStudentExplanation("");
       setShowTextInput(false);
     }
   }, [isVisible]);
 
-  // Load saved position when overlay becomes visible
+  // Load saved position when overlay becomes visible (only if no custom position exists)
   useEffect(() => {
+    // Only load position if we don't already have one (first time showing overlay)
     if (isVisible && positionManager && problemId && !customPosition) {
       try {
         // Get current editor bounds using the calculator
         const editorBounds = getEditorBounds();
-        
+
         if (editorBounds) {
           // Use OverlayPositionManager's comprehensive position resolution
           const resolvedPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
-          
+
           setCustomPosition({ x: resolvedPosition.x, y: resolvedPosition.y });
           console.log('🎯 [SimpleOverlay] Loaded resolved position:', resolvedPosition);
         } else {
@@ -257,49 +257,21 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         // Don't set customPosition to allow getSmartPosition to handle fallback
       }
     }
-  }, [isVisible, positionManager, problemId, customPosition, highlightedLine, getEditorBounds]);
+  }, [isVisible, positionManager, problemId, highlightedLine, getEditorBounds]); // Removed customPosition from deps to prevent re-triggering
 
   // Handle responsive positioning on window resize
+  // Only update mobile state, don't force position recalculation on resize
   useEffect(() => {
     const handleResize = () => {
       // Use OverlayPositionManager's device detection if available
-      const newIsMobile = positionManager 
+      const newIsMobile = positionManager
         ? positionManager.getDeviceType() === 'mobile'
         : window.innerWidth < 768;
-      
+
       setIsMobile(newIsMobile);
-      
-      // If we have a position manager and the device type changed, recalculate position
-      if (positionManager && problemId && newIsMobile !== isMobile) {
-        try {
-          const editorBounds = getEditorBounds();
-          
-          if (editorBounds) {
-            
-            // Check if bounds are sufficient for overlay
-            if (!positionManager.areBoundsSufficient(editorBounds)) {
-              console.warn('⚠️ [SimpleOverlay] Editor bounds insufficient for overlay positioning');
-              return;
-            }
-            
-            // Get device-specific position using centralized positioning
-            const newPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
-            
-            setCustomPosition({ x: newPosition.x, y: newPosition.y });
-            console.log('🎯 [SimpleOverlay] Responsive position updated:', newPosition);
-            
-            // Save the new responsive position
-            positionManager.savePosition(newPosition);
-          } else {
-            // Use viewport fallback when editor bounds unavailable
-            const fallbackPosition = positionManager.getPositionWithFallback();
-            setCustomPosition({ x: fallbackPosition.x, y: fallbackPosition.y });
-            console.log('🎯 [SimpleOverlay] Responsive fallback position:', fallbackPosition);
-          }
-        } catch (error) {
-          console.warn('⚠️ [SimpleOverlay] Failed to update responsive position:', error);
-        }
-      }
+
+      // Don't automatically recalculate position on resize - let user's drag position persist
+      // The overlay will naturally constrain itself if it goes out of bounds via getSmartPosition
     };
 
     // Debounce resize events to avoid excessive recalculations
@@ -314,7 +286,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       window.removeEventListener('resize', debouncedHandleResize);
       clearTimeout(resizeTimeout);
     };
-  }, [positionManager, problemId, isMobile, highlightedLine]);
+  }, [positionManager]);
 
   // Report current position to parent when it changes
   useEffect(() => {
@@ -344,18 +316,18 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   // Enhanced positioning logic using OverlayPositionManager
   const getSmartPosition = () => {
     if (customPosition) return customPosition;
-    
+
     // If we have a position manager, use it for centralized positioning
     if (positionManager && problemId) {
       try {
         // Get editor bounds using the calculator
         const editorBounds = getEditorBounds();
-        
+
         if (editorBounds) {
-          
+
           // Use centralized positioning with fallback handling
           const overlayPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
-          
+
           console.log('🎯 [SimpleOverlay] Using OverlayPositionManager position:', overlayPosition);
           return { x: overlayPosition.x, y: overlayPosition.y };
         } else {
@@ -375,7 +347,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         }
       }
     }
-    
+
     // Final fallback to legacy positioning logic when OverlayPositionManager is not available
     return getLegacyPosition();
   };
@@ -383,15 +355,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   // Enhanced error handling and fallback positioning
   const getErrorRecoveryPosition = useCallback(() => {
     console.warn('⚠️ [SimpleOverlay] Using error recovery positioning');
-    
+
     // Try to get viewport dimensions safely
     const viewportWidth = window.innerWidth || 1024;
     const viewportHeight = window.innerHeight || 768;
-    
+
     // Calculate safe fallback position
     const overlayWidth = isMobile ? Math.min(viewportWidth - 32, 400) : 420;
     const overlayHeight = 280;
-    
+
     return {
       x: Math.max(16, (viewportWidth - overlayWidth) / 2),
       y: Math.max(30, (viewportHeight - overlayHeight) / 2),
@@ -403,31 +375,31 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     try {
       const overlayWidth = isMobile ? window.innerWidth - 32 : 420;
       const overlayHeight = 280;
-      
+
       // Get Monaco editor's position in viewport using bounds calculator
       const editorBounds = getEditorBounds();
-      
+
       if (!editorBounds) {
         // Fallback if editor bounds not available
         console.warn('⚠️ [SimpleOverlay] Editor bounds not available, using error recovery positioning');
         return getErrorRecoveryPosition();
       }
-      
+
       console.log('🎯 [SimpleOverlay] Editor bounds:', editorBounds);
       console.log('🎯 [SimpleOverlay] Monaco position (editor-relative):', position);
-      
+
       // Validate editor bounds dimensions
       if (editorBounds.width <= 0 || editorBounds.height <= 0) {
         console.warn('⚠️ [SimpleOverlay] Invalid editor dimensions, using error recovery positioning');
         return getErrorRecoveryPosition();
       }
-      
+
       // Transform Monaco editor-relative coordinates to viewport coordinates
       const viewportX = editorBounds.left + position.x;
       const viewportY = editorBounds.top + position.y;
-      
+
       console.log('🎯 [SimpleOverlay] Transformed to viewport:', { x: viewportX, y: viewportY });
-      
+
       if (isMobile) {
         // On mobile, dock at bottom but within editor bounds
         return {
@@ -435,42 +407,42 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           y: Math.min(editorRect.bottom - 300, window.innerHeight - 300),
         };
       }
-      
+
       // Smart offset to avoid covering the highlighted line
       const verticalOffset = 80;
       const horizontalPadding = 20;
-      
+
       // Calculate ideal position with offset
       let idealX = viewportX;
       let idealY = viewportY + verticalOffset;
-      
+
       // Constrain within editor bounds horizontally
       const editorMinX = editorRect.left + horizontalPadding;
       const editorMaxX = editorRect.right - overlayWidth - horizontalPadding;
-      
+
       if (idealX < editorMinX) {
         idealX = editorMinX;
       } else if (idealX > editorMaxX) {
         idealX = editorMaxX;
       }
-      
+
       // Constrain within editor bounds vertically
       const editorMinY = editorRect.top + 20;
       const editorMaxY = editorRect.bottom - overlayHeight - 20;
-      
+
       if (idealY > editorMaxY) {
         // Try placing above the highlighted line
         const aboveY = viewportY - overlayHeight - 20;
         idealY = aboveY >= editorMinY ? aboveY : editorMaxY;
       }
-      
+
       if (idealY < editorMinY) {
         idealY = editorMinY;
       }
-      
+
       const finalPosition = { x: idealX, y: idealY };
       console.log('🎯 [SimpleOverlay] Final legacy position:', finalPosition);
-      
+
       return finalPosition;
     } catch (error) {
       console.error('🚨 [SimpleOverlay] Legacy positioning failed:', error);
@@ -494,23 +466,23 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
   // Debounced position saving during drag operations
   const debouncedSavePosition = useRef<NodeJS.Timeout | null>(null);
-  
+
   const savePositionDebounced = useCallback((pos: { x: number; y: number }) => {
     if (!positionManager || !problemId) return;
-    
+
     // Clear existing timeout
     if (debouncedSavePosition.current) {
       clearTimeout(debouncedSavePosition.current);
     }
-    
+
     // Set new timeout for debounced save
     debouncedSavePosition.current = setTimeout(() => {
       try {
         // Get editor bounds for validation using calculator
         const editorBounds = getEditorBounds();
-        
+
         if (editorBounds) {
-          
+
           // Validate and constrain the position before saving
           const overlayPosition: OverlayPosition = {
             x: pos.x,
@@ -521,15 +493,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               height: window.innerHeight,
             },
           };
-          
+
           const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
           positionManager.savePosition(validatedPosition);
-          
+
           // Update custom position with validated coordinates if needed
           if (validatedPosition.x !== pos.x || validatedPosition.y !== pos.y) {
             setCustomPosition({ x: validatedPosition.x, y: validatedPosition.y });
           }
-          
+
           console.log('🎯 [SimpleOverlay] Position saved via OverlayPositionManager (debounced):', validatedPosition);
         } else {
           // Save without validation if editor bounds unavailable
@@ -559,9 +531,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           y: e.clientY - dragOffset.y,
         };
         setCustomPosition(newPosition);
-        
-        // Debounced save during drag for better performance
-        savePositionDebounced(newPosition);
+
+        // Don't save during drag - only save on mouse up for better performance
       }
     };
 
@@ -569,60 +540,47 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       if (isDragging) {
         setIsDragging(false);
         const pos = customPosition || position;
-        
-        // Clear any pending debounced save and save immediately on mouse up
+
+        // Clear any pending debounced save
         if (debouncedSavePosition.current) {
           clearTimeout(debouncedSavePosition.current);
           debouncedSavePosition.current = null;
         }
-        
-        // Save position using OverlayPositionManager if available
+
+        // Save position immediately on mouse up using OverlayPositionManager
         if (pos && positionManager && problemId) {
           try {
             // Get editor bounds for validation using calculator
             const editorBounds = getEditorBounds();
-            
+
+            const overlayPosition: OverlayPosition = {
+              x: pos.x,
+              y: pos.y,
+              timestamp: Date.now(),
+              screenSize: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+              },
+            };
+
             if (editorBounds) {
-              
-              // Validate and constrain the position before saving
-              const overlayPosition: OverlayPosition = {
-                x: pos.x,
-                y: pos.y,
-                timestamp: Date.now(),
-                screenSize: {
-                  width: window.innerWidth,
-                  height: window.innerHeight,
-                },
-              };
-              
-              const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
-              positionManager.savePosition(validatedPosition);
-              
-              // Update custom position with validated coordinates
-              if (validatedPosition.x !== pos.x || validatedPosition.y !== pos.y) {
-                setCustomPosition({ x: validatedPosition.x, y: validatedPosition.y });
+              // Validate position but don't force it back into bounds
+              // Allow user to place overlay wherever they want
+              const isValid = positionManager.isPositionValid(overlayPosition, editorBounds);
+
+              if (!isValid) {
+                console.log('🎯 [SimpleOverlay] User placed overlay outside editor bounds - allowing it');
               }
-              
-              console.log('🎯 [SimpleOverlay] Position saved via OverlayPositionManager (final):', validatedPosition);
-            } else {
-              // Save without validation if editor bounds unavailable
-              const overlayPosition: OverlayPosition = {
-                x: pos.x,
-                y: pos.y,
-                timestamp: Date.now(),
-                screenSize: {
-                  width: window.innerWidth,
-                  height: window.innerHeight,
-                },
-              };
-              positionManager.savePosition(overlayPosition);
-              console.log('🎯 [SimpleOverlay] Position saved without validation (final):', overlayPosition);
             }
+
+            // Save the exact position the user chose
+            positionManager.savePosition(overlayPosition);
+            console.log('🎯 [SimpleOverlay] User drag position saved:', overlayPosition);
           } catch (error) {
-            console.warn('⚠️ [SimpleOverlay] Failed to save position via OverlayPositionManager (final):', error);
+            console.warn('⚠️ [SimpleOverlay] Failed to save position:', error);
           }
         }
-        
+
         // Also call the legacy callback for backward compatibility
         if (pos && onPositionChange) {
           onPositionChange(pos);
@@ -644,7 +602,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         debouncedSavePosition.current = null;
       }
     };
-  }, [isDragging, dragOffset, customPosition, position, onPositionChange, positionManager, problemId, savePositionDebounced]);
+  }, [isDragging, dragOffset, customPosition, position, onPositionChange, positionManager, problemId, getEditorBounds]);
 
   if (!isVisible) return null;
 
@@ -677,7 +635,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       className="transition-all duration-300 ease-in-out bg-card text-card-foreground border border-border shadow-lg rounded-xl"
     >
       {/* Header with compact design */}
-      <div 
+      <div
         className="drag-handle p-3 border-b border-border bg-muted/50 rounded-t-xl flex justify-between items-center"
       >
         <div className="flex items-center gap-2">
@@ -688,7 +646,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
@@ -697,7 +655,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           >
             <Minimize2 className="w-3 h-3 text-muted-foreground hover:text-foreground" />
           </button>
-          <div 
+          <div
             title="Drag to move"
             className="p-1 hover:bg-accent hover:text-accent-foreground rounded cursor-move drag-handle"
           >
@@ -708,7 +666,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
       {/* Scrollable Content Area */}
       {!isMinimized && (
-        <div 
+        <div
           className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
         >
           {/* Question section - using centralized state management */}
@@ -727,7 +685,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {overlayState === 'completed' && (
             <div className="p-4 text-center">
               <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-2">
-                 Session Complete!
+                Session Complete!
               </div>
               <div className="text-sm text-muted-foreground">
                 You've successfully completed this coaching session.
@@ -737,9 +695,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Validation Result Section - don't show if session is completed */}
           {validationResult && !isSessionCompleted && (
-            <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${
-              validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-            }`}>
+            <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+              }`}>
               <div className="flex items-start gap-3">
                 {validationResult.isCorrect ? (
                   <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
@@ -747,60 +704,59 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                 )}
                 <div className="flex-1">
-                  <div className={`text-sm font-medium mb-1 ${
-                    validationResult.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-                  }`}>
+                  <div className={`text-sm font-medium mb-1 ${validationResult.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                    }`}>
                     {validationResult.isCorrect ? 'Great work! ✨' : 'Not quite right'}
                   </div>
-                  <div className={`text-sm ${
-                    validationResult.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-                  }`}>
+                  <div className={`text-sm ${validationResult.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                    }`}>
                     {validationResult.feedback}
                   </div>
                   {(() => {
                     const q = (validationResult.nextStep?.question || "").trim();
                     const h = (validationResult.nextStep?.hint || "").trim();
-                    return Boolean(q || h) && !isSessionCompleted;
+                    // Only show next step if answer was CORRECT and not session completed
+                    return Boolean(q || h) && validationResult.isCorrect && !isSessionCompleted;
                   })() && (
-                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
-                      <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
-                        Next Step:
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                        <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                          Next Step:
+                        </div>
+                        {validationResult.nextStep?.question?.trim() && (
+                          <div className="text-sm text-blue-700 dark:text-blue-300">
+                            {validationResult.nextStep?.question}
+                          </div>
+                        )}
+                        {validationResult.nextStep?.hint?.trim() && (
+                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
+                            💡 {validationResult.nextStep.hint}
+                          </div>
+                        )}
+                        {(() => {
+                          const q = validationResult.nextStep?.question || "";
+                          const h = validationResult.nextStep?.hint || "";
+                          const f = validationResult.feedback || "";
+                          const text = `${q} ${h} ${f}`;
+                          // Remove "alternative\s+approach" from regex - only look for true optimizations
+                          const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|better\s+complexity|more\s+efficient)/i.test(text);
+                          const hasNext = Boolean(q || h);
+                          const shouldShow = validationResult.isCorrect && hasNext && (validationResult.isOptimizable || mentionsOptimize);
+                          return shouldShow;
+                        })() ? (
+                          <Button
+                            onClick={() => {
+                              if (onStartOptimization) onStartOptimization();
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                          >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Learn Optimization
+                          </Button>
+                        ) : null}
                       </div>
-                      {validationResult.nextStep?.question?.trim() && (
-                        <div className="text-sm text-blue-700 dark:text-blue-300">
-                          {validationResult.nextStep?.question}
-                        </div>
-                      )}
-                      {validationResult.nextStep?.hint?.trim() && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
-                          💡 {validationResult.nextStep.hint}
-                        </div>
-                      )}
-                      {(() => {
-                        const q = validationResult.nextStep?.question || "";
-                        const h = validationResult.nextStep?.hint || "";
-                        const f = validationResult.feedback || "";
-                        const text = `${q} ${h} ${f}`;
-                        // Remove "alternative\s+approach" from regex - only look for true optimizations
-                        const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|better\s+complexity|more\s+efficient)/i.test(text);
-                        const hasNext = Boolean(q || h);
-                        const shouldShow = validationResult.isCorrect && hasNext && (validationResult.isOptimizable || mentionsOptimize);
-                        return shouldShow;
-                      })() ? (
-                        <Button
-                          onClick={() => {
-                            if (onStartOptimization) onStartOptimization();
-                          }}
-                          size="sm"
-                          variant="outline"
-                          className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
-                        >
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Learn Optimization
-                        </Button>
-                      ) : null}
-                    </div>
-                  )}
+                    )}
                 </div>
               </div>
             </div>
@@ -812,7 +768,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               <div className="text-sm text-muted-foreground mb-3">
                 Write your code in the highlighted area above, then click <strong>Check Code</strong> to validate.
               </div>
-              
+
               {/* Optional explanation input */}
               <div className="space-y-2">
                 <button
@@ -822,7 +778,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   <ChevronDown className={`w-3 h-3 transition-transform ${showTextInput ? 'rotate-180' : ''}`} />
                   {showTextInput ? 'Hide explanation' : 'Add explanation (optional)'}
                 </button>
-                
+
                 {showTextInput && (
                   <div className="space-y-2">
                     <textarea
@@ -911,7 +867,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               </Button>
             </div>
           )}
-          
+
           {overlayState === 'correct' && (
             <Button
               onClick={() => {
@@ -933,7 +889,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               Finish
             </Button>
           )}
-          
+
           {overlayState === 'incorrect' && (
             <div className="flex gap-2">
               <Button
@@ -984,7 +940,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               )}
             </div>
           )}
-          
+
           {(overlayState === 'initial' || overlayState === 'validating') && (
             <Button
               onClick={handleValidate}
@@ -1032,7 +988,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* Minimized state - compact */}
       {isMinimized && (
         <div className="px-4 py-3 text-center">

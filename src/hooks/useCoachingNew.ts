@@ -225,48 +225,8 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
   }) => {
     console.log("🎯 [SHOW QUESTION] Showing interactive question:", { question, hint, highlightArea });
 
-    // Normalize highlight to next blank line within same function, if needed
-    let finalHighlight = highlightArea || null;
-    try {
-      if (highlightArea && editorRef.current) {
-        const code = editorRef.current.getValue();
-        const lines = (code || '').split('\n');
-        const start = Math.max(1, Math.min(lines.length, highlightArea.startLine));
-        const startIdx = start - 1;
-        // Find enclosing function def above
-        let defIdx = -1; let defIndent = 0;
-        for (let i = startIdx; i >= 0; i--) {
-          const m = lines[i].match(/^(\s*)def\s+\w+\s*\(/);
-          if (m) { defIdx = i; defIndent = m[1]?.length || 0; break; }
-        }
-        let candidate = startIdx;
-        if (defIdx !== -1) {
-          // Limit search to this function body
-          let endIdx = lines.length - 1;
-          for (let j = defIdx + 1; j < lines.length; j++) {
-            const indent = (lines[j].match(/^\s*/)?.[0] || '').length;
-            if (/^\s*def\s+\w+\s*\(/.test(lines[j]) && indent <= defIndent) { endIdx = j - 1; break; }
-          }
-          // If current line not blank, move to next blank within function
-          if (lines[candidate].trim() !== '') {
-            for (let k = candidate; k <= endIdx; k++) {
-              if (lines[k].trim() === '') { candidate = k; break; }
-            }
-          }
-        } else {
-          // No function found: pick next blank anywhere
-          if (lines[candidate].trim() !== '') {
-            for (let k = candidate; k < lines.length; k++) {
-              if (lines[k].trim() === '') { candidate = k; break; }
-            }
-          }
-        }
-        finalHighlight = { startLine: candidate + 1, endLine: candidate + 1 };
-      }
-    } catch (e) {
-      // ignore normalization errors; use original
-      finalHighlight = highlightArea || null;
-    }
+    // Use the highlight area provided by the AI backend - it already calculates the correct insertion point
+    const finalHighlight = highlightArea || null;
 
     // Apply highlight if provided
     if (finalHighlight) {
@@ -342,6 +302,37 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         contextInitialized: !!data.responseId,
         lastCodeSnapshot: currentCode,
       });
+
+      // Check if session started as already completed
+      if (data.isCompleted) {
+        console.log("✅ [COACHING] Solution already complete at session start");
+
+        // Initialize session state as completed
+        setCoachingState(prev => ({
+          ...prev,
+          session: {
+            id: data.sessionId,
+            currentStepNumber: 1,
+            isCompleted: true,
+            currentQuestion: '',
+            currentHint: undefined,
+            highlightArea: null,
+          } as InteractiveCoachSession,
+          isCoachModeActive: true,
+          showInputOverlay: true,
+          inputPosition: getPositionBelowLastLine(),
+          isWaitingForResponse: false,
+          currentHighlight: null,
+          feedback: {
+            show: true,
+            type: "success",
+            message: "🎉 Your solution is already complete! You can test it or explore optimizations.",
+            showConfetti: true,
+          },
+        }));
+
+        return;
+      }
 
       // Initialize session state locally
       setCoachingState(prev => ({
@@ -666,17 +657,27 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               console.log("[COACHING] Suggested code already present; skipping insertion.");
             }
 
-            // After insertion, just show success message - don't auto-generate next step
-            setCoachingState(prev => ({ 
-              ...prev, 
-              isWaitingForResponse: false,
-              feedback: {
-                show: true,
-                type: "success",
-                message: "✅ Code inserted successfully! Continue working or validate your solution.",
-                showConfetti: false,
-              },
-            }));
+            // After insertion, show next question if available
+            if (data.nextStep?.question) {
+              console.log("🎯 [COACHING] Showing next question after code insertion");
+              showInteractiveQuestion({
+                question: data.nextStep.question,
+                hint: data.nextStep.hint,
+                highlightArea: data.nextStep.highlightArea,
+              });
+            } else {
+              // No next question - just show success message
+              setCoachingState(prev => ({
+                ...prev,
+                isWaitingForResponse: false,
+                feedback: {
+                  show: true,
+                  type: "success",
+                  message: "✅ Code inserted successfully! Continue working or validate your solution.",
+                  showConfetti: false,
+                },
+              }));
+            }
           } catch (insertError) {
             console.error("🚨 [COACHING] Insertion/revalidation failed:", insertError);
             setCoachingState(prev => ({
@@ -690,12 +691,26 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             }));
           }
         } else {
+          // No code to add, student's answer was correct
+          console.log("✅ [COACHING] Answer correct, no code to add");
+
+          // Store validation result to show feedback
+          setCoachingState(prev => ({
+            ...prev,
+            lastValidation: data,
+            showInputOverlay: true,
+            isWaitingForResponse: false,
+          }));
+
+          // Show next question after a brief moment to let user see success feedback
           if (data.nextStep?.question) {
-            showInteractiveQuestion({
-              question: data.nextStep.question,
-              hint: data.nextStep.hint,
-              highlightArea: data.nextStep.highlightArea,
-            });
+            setTimeout(() => {
+              showInteractiveQuestion({
+                question: data.nextStep.question,
+                hint: data.nextStep.hint,
+                highlightArea: data.nextStep.highlightArea,
+              });
+            }, 2000); // 2 second delay to show success feedback
           } else {
             // Step completed without next step - finish session
             console.log("🎉 [COACHING] Step completed, ending session");

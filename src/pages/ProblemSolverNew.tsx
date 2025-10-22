@@ -555,7 +555,7 @@ const ProblemSolverNew = () => {
         problemId: problem.id,
       });
       setTestResults(response.results);
-      setTestPanelSize(150); // Expand test panel when results are received
+      setTestPanelSize(250); // Expand test panel when results are received
 
       const passedCount = response.results.filter((r) => r.passed).length;
       const totalCount = response.results.length;
