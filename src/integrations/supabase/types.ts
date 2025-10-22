@@ -313,6 +313,39 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          admin_notes: string | null
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          category: string
+          content: string
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       flashcard_decks: {
         Row: {
           created_at: string | null
@@ -809,44 +842,36 @@ export type Database = {
       }
       user_subscriptions: {
         Row: {
+          created_at: string | null
           id: string
-          user_id: string
+          plan: string
+          status: string
           stripe_customer_id: string
           stripe_subscription_id: string
-          plan: 'monthly' | 'yearly'
-          status: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
-          created_at: string
-          updated_at: string
+          updated_at: string | null
+          user_id: string
         }
         Insert: {
+          created_at?: string | null
           id?: string
-          user_id: string
+          plan: string
+          status: string
           stripe_customer_id: string
           stripe_subscription_id: string
-          plan: 'monthly' | 'yearly'
-          status: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id: string
         }
         Update: {
+          created_at?: string | null
           id?: string
-          user_id?: string
+          plan?: string
+          status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string
-          plan?: 'monthly' | 'yearly'
-          status?: 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid'
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
     }
     Views: {

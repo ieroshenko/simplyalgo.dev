@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import FeedbackModal from "@/components/FeedbackModal";
 import {
   Home,
   BarChart3,
@@ -29,6 +30,7 @@ import {
   Calculator,
   Binary,
   User,
+  MessageSquare,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -83,6 +85,17 @@ const Sidebar = () => {
             </Button>
           );
         })}
+        
+        {/* Feedback Modal Trigger */}
+        <FeedbackModal>
+          <Button
+            variant="ghost"
+            className="w-full justify-start hover:bg-secondary text-foreground"
+          >
+            <MessageSquare className="w-4 h-4 mr-3" />
+            Leave Feedback
+          </Button>
+        </FeedbackModal>
       </div>
 
       {/* Category Progress - Only show on DSA Arena pages */}
