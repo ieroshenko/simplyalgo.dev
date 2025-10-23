@@ -25,14 +25,14 @@ export const PersonalPlanCard: React.FC<PersonalPlanCardProps> = ({
   }
 
   return (
-    <Card className="w-full bg-gradient-to-br from-white to-blue-50/30 dark:from-gray-900 dark:to-blue-950/20 border-blue-200/50 dark:border-blue-800/50 shadow-lg">
+    <Card className="w-full max-w-sm">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
               <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <CardTitle className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <CardTitle className="text-lg font-semibold bg-clip-text">
               Your Personal Plan
             </CardTitle>
           </div>
@@ -92,7 +92,7 @@ export const PersonalPlanCard: React.FC<PersonalPlanCardProps> = ({
                 {userFocusAreas.map((area, index) => (
                   <div 
                     key={index} 
-                    className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 text-green-800 dark:text-green-200 px-3 py-2 rounded-xl text-sm border border-green-200 dark:border-green-800/50 shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 text-green-800 dark:text-green-200 px-3 py-2 rounded-xl text-sm border border-green-200 dark:border-green-800/50 shadow-sm transition-shadow"
                   >
                     {area}
                   </div>
