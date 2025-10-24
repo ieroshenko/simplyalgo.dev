@@ -11,11 +11,7 @@ export const useSubscription = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) {
-      setSubscription(null);
-      setIsLoading(false);
-      return;
-    }
+    if (!user) return;
 
     const fetchSubscription = async () => {
       try {

@@ -30,7 +30,6 @@ const TOTAL_STEPS = 20;
 const Survey: React.FC = () => {
   const { stepNumber } = useParams<{ stepNumber: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const currentStep = parseInt(stepNumber || '1', 10);
   
   // Get survey data, passing user as parameter
@@ -42,7 +41,7 @@ const Survey: React.FC = () => {
     updateSurveyData,
     saveToLocalStorage,
     saveToDatabase
-  } = useSurveyData(user);
+  } = useSurveyData();
 
   // Validate step access
   useEffect(() => {
