@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { CoachingMode } from '@/types';
@@ -32,14 +31,16 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
   
 
 
-  const handleToggle = async (checked: boolean) => {
-    const newMode: CoachingMode = checked ? 'socratic' : 'comprehensive';
+  const handleModeChange = async (newMode: CoachingMode) => {
     const previousMode = currentMode;
     
-    console.log('🔄 Toggle clicked:', { previousMode, newMode, checked });
+    console.log('🔄 Mode button clicked:', { previousMode, newMode });
     
-    // Prevent rapid toggling
+    // Prevent rapid clicking
     if (isToggling) return;
+    
+    // Don't change if already in the selected mode
+    if (newMode === currentMode) return;
     
     try {
       setIsToggling(true);
@@ -67,7 +68,7 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
       });
       
     } catch (error) {
-      const toggleError = error instanceof Error && 'code' in error 
+      const modeChangeError = error instanceof Error && 'code' in error 
         ? error as CoachingModeError
         : createCoachingModeError(
             `Failed to change coaching mode: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -76,15 +77,14 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
             newMode
           );
       
-      logCoachingModeError(toggleError, { 
+      logCoachingModeError(modeChangeError, { 
         component: 'CoachingModeToggle',
         previousMode,
-        newMode,
-        checked 
+        newMode
       });
       
       // Get user-friendly error message
-      const errorMessage = getCoachingModeErrorMessage(toggleError);
+      const errorMessage = getCoachingModeErrorMessage(modeChangeError);
       
       // Provide user feedback for mode change failure
       toast({
@@ -96,7 +96,7 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
       
       // Call error handler if provided
       if (onError) {
-        onError(toggleError);
+        onError(modeChangeError);
       }
       
       // Note: We don't need to revert the UI state since onModeChange should handle validation
@@ -108,16 +108,31 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
 
   return (
     <TooltipProvider>
-      <div className={cn("flex items-center gap-3", className)}>
-        {/* Mode Labels */}
-        <div className="flex items-center gap-2 text-sm">
+      <div className={cn("flex items-center gap-2", className)}>
+        {/* Mode Text Buttons */}
+        <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span 
+              <span
+                onClick={() => handleModeChange('comprehensive')}
                 className={cn(
-                  "font-medium transition-colors cursor-help",
-                  !isSocratic ? "text-primary" : "text-muted-foreground"
+                  "text-sm font-medium cursor-pointer transition-colors duration-200",
+                  "hover:text-primary focus:outline-none focus:text-primary",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  !isSocratic 
+                    ? "text-primary" 
+                    : "text-muted-foreground"
                 )}
+                aria-label="Switch to comprehensive coaching mode"
+                aria-describedby="coaching-mode-description"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleModeChange('comprehensive');
+                  }
+                }}
               >
                 Comprehensive
               </span>
@@ -127,32 +142,30 @@ export const CoachingModeToggle: React.FC<CoachingModeToggleProps> = ({
             </TooltipContent>
           </Tooltip>
 
-          {/* Toggle Switch */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center">
-                <Switch
-                  checked={isSocratic}
-                  onCheckedChange={handleToggle}
-                  disabled={disabled || isToggling}
-                  aria-label={`Switch to ${isSocratic ? 'comprehensive' : 'socratic'} coaching mode`}
-                  aria-describedby="coaching-mode-description"
-                  className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300"
-                />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p>Toggle between coaching modes</p>
-            </TooltipContent>
-          </Tooltip>
+          <span className="text-gray-300">|</span>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <span 
+              <span
+                onClick={() => handleModeChange('socratic')}
                 className={cn(
-                  "font-medium transition-colors cursor-help",
-                  isSocratic ? "text-primary" : "text-muted-foreground"
+                  "text-sm font-medium cursor-pointer transition-colors duration-200",
+                  "hover:text-primary focus:outline-none focus:text-primary",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  isSocratic 
+                    ? "text-primary" 
+                    : "text-muted-foreground"
                 )}
+                aria-label="Switch to socratic coaching mode"
+                aria-describedby="coaching-mode-description"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleModeChange('socratic');
+                  }
+                }}
               >
                 Socratic
               </span>

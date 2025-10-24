@@ -254,7 +254,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
                 }
               </p>
               {flashcards.length === 0 && (
-                <Button onClick={() => navigate("/arena")}>
+                <Button onClick={() => navigate("/problems")}>
                   <CreditCard className="h-4 w-4 mr-2" />
                   Solve Problems
                 </Button>
