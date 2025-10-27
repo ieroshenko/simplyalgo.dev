@@ -10,6 +10,9 @@ import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -193,10 +196,33 @@ const ProblemPanel = ({
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Problem Description
             </h2>
-            <div className="prose prose-sm max-w-none text-foreground">
-              <div style={{ whiteSpace: "pre-line" }}>
+            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground">
+              <ReactMarkdown
+                components={{
+                  code({ inline, className, children }) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    const codeString = String(children).replace(/\n$/, "");
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                        customStyle={{
+                          margin: 0,
+                          borderRadius: "0.375rem",
+                          fontSize: "0.875rem",
+                        }}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className}>{children}</code>
+                    );
+                  },
+                }}
+              >
                 {problem.description}
-              </div>
+              </ReactMarkdown>
             </div>
           </div>
           {problem.examples && problem.examples.length > 0 && (
