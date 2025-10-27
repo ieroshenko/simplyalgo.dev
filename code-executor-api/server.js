@@ -371,7 +371,7 @@ function parseTestCaseInput(inputString, functionSignature) {
             // Remove quotes if it's a quoted string (handle both escaped and unescaped quotes)
             let cleanValue = cleanParamValue;
             // First try to remove escaped quotes: \"abc\" -> abc
-            cleanValue = cleanValue.replace(/^\\"(.*)\\"/,"$1");
+            cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
             // Then try to remove regular quotes: "abc" -> abc
             cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
             inputParams[cleanParamName] = cleanValue;
@@ -448,7 +448,7 @@ function processPythonCode(userCode, testCases, problemId) {
   // This handles cases where users submit code with commented class definitions
   // We'll remove them and let the logic below add proper definitions if needed
   let processedCode = userCode;
-  
+
   // Remove commented TreeNode definition block
   if (/^#\s*class TreeNode:/m.test(processedCode)) {
     console.log("Removing commented TreeNode class definition");
@@ -458,7 +458,7 @@ function processPythonCode(userCode, testCases, problemId) {
       ''
     );
   }
-  
+
   // Remove commented ListNode definition block
   if (/^#\s*class ListNode:/m.test(processedCode)) {
     console.log("Removing commented ListNode class definition");
@@ -697,11 +697,11 @@ def listnode_to_array(head):
     const validFunctions = allFunctionMatches
       .map(match => match[1])
       .filter(name => !name.startsWith('__')); // Exclude dunder methods
-    
+
     if (validFunctions.length === 0) {
       throw new Error("No function definition found in Python code");
     }
-    
+
     // Use the first non-dunder function found
     functionName = validFunctions[0];
     console.log(`Detected function: ${functionName}`);
@@ -710,21 +710,21 @@ def listnode_to_array(head):
   // Analyze function signature to determine input format (including return type)
   // Use a balanced-parentheses scanner to handle complex nested type annotations
   const signature = extractFunctionSignature(userCode, functionName);
-  
+
   // Helper function to extract function signature with balanced parentheses
   function extractFunctionSignature(code, funcName) {
     // Find the start of the function definition
     const defPattern = new RegExp(`def\\s+${funcName}\\s*\\(`, 'g');
     const match = defPattern.exec(code);
-    
+
     if (!match) {
       console.warn(`Could not find function definition for ${funcName}`);
       return "";
     }
-    
+
     const startIndex = match.index;
     let i = match.index + match[0].length; // Start after 'def funcName('
-    
+
     // Count nested parentheses, brackets, and braces
     let parenDepth = 1; // We're already inside the opening (
     let bracketDepth = 0;
@@ -732,23 +732,23 @@ def listnode_to_array(head):
     let inString = false;
     let stringChar = null;
     let escaped = false;
-    
+
     // Scan until we find the matching closing parenthesis
     while (i < code.length && parenDepth > 0) {
       const char = code[i];
-      
+
       if (escaped) {
         escaped = false;
         i++;
         continue;
       }
-      
+
       if (char === '\\') {
         escaped = true;
         i++;
         continue;
       }
-      
+
       // Handle strings
       if ((char === '"' || char === "'") && !inString) {
         inString = true;
@@ -757,7 +757,7 @@ def listnode_to_array(head):
         inString = false;
         stringChar = null;
       }
-      
+
       // Only count brackets when not in a string
       if (!inString) {
         if (char === '(') parenDepth++;
@@ -767,48 +767,48 @@ def listnode_to_array(head):
         else if (char === '{') braceDepth++;
         else if (char === '}') braceDepth--;
       }
-      
+
       i++;
     }
-    
+
     // Now we're at the closing ), look for optional return type annotation
     let endIndex = i;
-    
+
     // Skip whitespace
     while (i < code.length && /\s/.test(code[i])) {
       i++;
     }
-    
+
     // Check for return type annotation (->)
     if (i + 1 < code.length && code[i] === '-' && code[i + 1] === '>') {
       i += 2; // Skip ->
-      
+
       // Skip whitespace
       while (i < code.length && /\s/.test(code[i])) {
         i++;
       }
-      
+
       // Scan the return type until we hit ':'
       let returnTypeDepth = 0;
       inString = false;
       stringChar = null;
       escaped = false;
-      
+
       while (i < code.length && (code[i] !== ':' || returnTypeDepth > 0 || inString)) {
         const char = code[i];
-        
+
         if (escaped) {
           escaped = false;
           i++;
           continue;
         }
-        
+
         if (char === '\\') {
           escaped = true;
           i++;
           continue;
         }
-        
+
         if ((char === '"' || char === "'") && !inString) {
           inString = true;
           stringChar = char;
@@ -816,27 +816,27 @@ def listnode_to_array(head):
           inString = false;
           stringChar = null;
         }
-        
+
         if (!inString) {
           if (char === '[' || char === '(' || char === '{') returnTypeDepth++;
           else if (char === ']' || char === ')' || char === '}') returnTypeDepth--;
         }
-        
+
         i++;
       }
-      
+
       endIndex = i;
     }
-    
+
     // Find the colon
     while (endIndex < code.length && code[endIndex] !== ':') {
       endIndex++;
     }
-    
+
     if (endIndex < code.length && code[endIndex] === ':') {
       endIndex++; // Include the colon
     }
-    
+
     const extractedSignature = code.substring(startIndex, endIndex);
     console.log(`Extracted signature for ${funcName}:`, extractedSignature);
     return extractedSignature;
@@ -908,11 +908,11 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
         const ops = normalizedInput.operations;
         const parsedOps = [];
         const parsedValues = [];
-        
+
         // First element is always the constructor
         parsedOps.push(ops[0]);
         parsedValues.push([]);
-        
+
         // Parse remaining elements - alternate between method and argument
         for (let i = 1; i < ops.length; i += 2) {
           if (i < ops.length) {
@@ -925,14 +925,14 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
             }
           }
         }
-        
+
         console.log("Parsed operations:", parsedOps);
         console.log("Parsed values:", parsedValues);
-        
+
         normalizedInput.operations = parsedOps;
         normalizedInput.values = parsedValues;
       }
-      
+
       // If we have "args" but not "values", copy args to values
       if (normalizedInput.args && !normalizedInput.values) {
         normalizedInput.values = normalizedInput.args;
@@ -1016,11 +1016,11 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       console.log("Generated serialize/deserialize pipeline call:", functionCall);
     } else if (isListNodeProblem) {
       console.log("Generating ListNode function call for method");
-      
+
       // Special handling for merge-k-sorted-lists where input is list of lists
-      const isMergeKLists = functionName.toLowerCase().includes('mergeklists') || 
-                            functionName.toLowerCase().includes('merge_k_lists');
-      
+      const isMergeKLists = functionName.toLowerCase().includes('mergeklists') ||
+        functionName.toLowerCase().includes('merge_k_lists');
+
       if (isMergeKLists && params.length === 1) {
         // For mergeKLists: lists is a list of arrays, each needs to be converted to ListNode
         const param = params[0]; // Usually 'lists'
@@ -1066,11 +1066,11 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       }
     } else if (isTreeNodeProblem) {
       console.log("Generating TreeNode function call for method");
-      
+
       // Special handling for LCA problems where p and q are node values, not arrays
-      const isLCAProblem = functionName.toLowerCase().includes('lowestcommonancestor') || 
-                           functionName.toLowerCase().includes('lca');
-      
+      const isLCAProblem = functionName.toLowerCase().includes('lowestcommonancestor') ||
+        functionName.toLowerCase().includes('lca');
+
       if (isLCAProblem && params.length === 3) {
         // For LCA: root is array, p and q are node values
         // Build tree once and reuse it to find p and q nodes
@@ -1078,7 +1078,7 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
         const rootParam = params[0]; // Usually 'root'
         const pParam = params[1];    // Usually 'p'
         const qParam = params[2];    // Usually 'q'
-        
+
         functionCall = `(lambda tree: ${className}().${functionName}(tree, find_node(tree, tc["${pParam}"]), find_node(tree, tc["${qParam}"])).val)(array_to_treenode(tc["${rootParam}"]))`;
       } else {
         // Standard TreeNode problem - check which params should be converted

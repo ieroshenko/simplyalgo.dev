@@ -13,6 +13,8 @@ import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { vs } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -45,11 +47,15 @@ const ProblemPanel = ({
     loading: solutionsLoading,
   } = useSolutions(problemId);
   const { currentTheme, defineCustomThemes } = useEditorTheme();
-  
+  const { isDark } = useTheme();
+
   const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
   const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
   const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
+  
+  // Select syntax highlighting theme based on current color scheme
+  const syntaxTheme = isDark ? vscDarkPlus : vs;
 
   const toggleSubmission = (id: string) => {
     setExpandedSubmissionId((prev) => (prev === id ? null : id));
@@ -108,10 +114,10 @@ const ProblemPanel = ({
       }
 
       const result = await response.json();
-      
+
       // Handle the response structure from the backend
       const analysis = result.complexityAnalysis || result;
-      
+
       setComplexityResults(prev => ({
         ...prev,
         [submissionId]: {
@@ -199,12 +205,12 @@ const ProblemPanel = ({
             <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground">
               <ReactMarkdown
                 components={{
-                  code({ inline, className, children }) {
+                  code({ inline, className, children }: any) {
                     const match = /language-(\w+)/.exec(className || "");
                     const codeString = String(children).replace(/\n$/, "");
                     return !inline && match ? (
                       <SyntaxHighlighter
-                        style={vscDarkPlus}
+                        style={syntaxTheme}
                         language={match[1]}
                         PreTag="div"
                         customStyle={{
@@ -263,7 +269,7 @@ const ProblemPanel = ({
               </div>
             </div>
           )}
-          
+
           {/* Recommended Complexity */}
           <div>
             <h3 className="text-md font-semibold text-foreground mb-3">
@@ -421,7 +427,7 @@ const ProblemPanel = ({
                           {s.status === "passed"
                             ? "Accepted"
                             : s.status.charAt(0).toUpperCase() +
-                              s.status.slice(1)}
+                            s.status.slice(1)}
                         </span>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
@@ -517,7 +523,7 @@ const ProblemPanel = ({
                                 {/* Time Complexity */}
                                 <div>
                                   <div className="text-sm font-medium text-foreground mb-1">
-                                    Time Complexity: 
+                                    Time Complexity:
                                     <Badge variant="outline" className="ml-2 text-xs">
                                       {complexityResults[s.id].time_complexity || "N/A"}
                                     </Badge>
@@ -532,7 +538,7 @@ const ProblemPanel = ({
                                 {/* Space Complexity */}
                                 <div>
                                   <div className="text-sm font-medium text-foreground mb-1">
-                                    Space Complexity: 
+                                    Space Complexity:
                                     <Badge variant="outline" className="ml-2 text-xs">
                                       {complexityResults[s.id].space_complexity || "N/A"}
                                     </Badge>
