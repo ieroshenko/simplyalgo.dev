@@ -708,10 +708,139 @@ def listnode_to_array(head):
   }
 
   // Analyze function signature to determine input format (including return type)
-  // Find the signature for the detected function (not __init__ or other dunder methods)
-  const signatureRegex = new RegExp(`def\\s+${functionName}\\s*\\([^)]+\\)(?:\\s*->\\s*[^:]+)?:`, 'g');
-  const signatureMatch = userCode.match(signatureRegex);
-  const signature = signatureMatch ? signatureMatch[0] : "";
+  // Use a balanced-parentheses scanner to handle complex nested type annotations
+  const signature = extractFunctionSignature(userCode, functionName);
+  
+  // Helper function to extract function signature with balanced parentheses
+  function extractFunctionSignature(code, funcName) {
+    // Find the start of the function definition
+    const defPattern = new RegExp(`def\\s+${funcName}\\s*\\(`, 'g');
+    const match = defPattern.exec(code);
+    
+    if (!match) {
+      console.warn(`Could not find function definition for ${funcName}`);
+      return "";
+    }
+    
+    const startIndex = match.index;
+    let i = match.index + match[0].length; // Start after 'def funcName('
+    
+    // Count nested parentheses, brackets, and braces
+    let parenDepth = 1; // We're already inside the opening (
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    let inString = false;
+    let stringChar = null;
+    let escaped = false;
+    
+    // Scan until we find the matching closing parenthesis
+    while (i < code.length && parenDepth > 0) {
+      const char = code[i];
+      
+      if (escaped) {
+        escaped = false;
+        i++;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escaped = true;
+        i++;
+        continue;
+      }
+      
+      // Handle strings
+      if ((char === '"' || char === "'") && !inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar && inString) {
+        inString = false;
+        stringChar = null;
+      }
+      
+      // Only count brackets when not in a string
+      if (!inString) {
+        if (char === '(') parenDepth++;
+        else if (char === ')') parenDepth--;
+        else if (char === '[') bracketDepth++;
+        else if (char === ']') bracketDepth--;
+        else if (char === '{') braceDepth++;
+        else if (char === '}') braceDepth--;
+      }
+      
+      i++;
+    }
+    
+    // Now we're at the closing ), look for optional return type annotation
+    let endIndex = i;
+    
+    // Skip whitespace
+    while (i < code.length && /\s/.test(code[i])) {
+      i++;
+    }
+    
+    // Check for return type annotation (->)
+    if (i + 1 < code.length && code[i] === '-' && code[i + 1] === '>') {
+      i += 2; // Skip ->
+      
+      // Skip whitespace
+      while (i < code.length && /\s/.test(code[i])) {
+        i++;
+      }
+      
+      // Scan the return type until we hit ':'
+      let returnTypeDepth = 0;
+      inString = false;
+      stringChar = null;
+      escaped = false;
+      
+      while (i < code.length && (code[i] !== ':' || returnTypeDepth > 0 || inString)) {
+        const char = code[i];
+        
+        if (escaped) {
+          escaped = false;
+          i++;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escaped = true;
+          i++;
+          continue;
+        }
+        
+        if ((char === '"' || char === "'") && !inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar && inString) {
+          inString = false;
+          stringChar = null;
+        }
+        
+        if (!inString) {
+          if (char === '[' || char === '(' || char === '{') returnTypeDepth++;
+          else if (char === ']' || char === ')' || char === '}') returnTypeDepth--;
+        }
+        
+        i++;
+      }
+      
+      endIndex = i;
+    }
+    
+    // Find the colon
+    while (endIndex < code.length && code[endIndex] !== ':') {
+      endIndex++;
+    }
+    
+    if (endIndex < code.length && code[endIndex] === ':') {
+      endIndex++; // Include the colon
+    }
+    
+    const extractedSignature = code.substring(startIndex, endIndex);
+    console.log(`Extracted signature for ${funcName}:`, extractedSignature);
+    return extractedSignature;
+  }
 
   // Special-case detection: encode/decode and serialize/deserialize pair problems
   const isEncodeDecode = problemId === "encode-and-decode-strings";
@@ -910,7 +1039,8 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
           paramList = params
             .map((p) => {
               // Check if parameter name suggests it's a ListNode
-              if (/^(head|list|l\d+)$/i.test(p)) {
+              // Match: head, list, list1, list2, l1, l2, l3, etc.
+              if (/^(head|list\d*|l\d+)$/i.test(p)) {
                 return `array_to_listnode(tc["${p}"])`;
               } else {
                 // For other parameters (like n, k, val), pass them directly
