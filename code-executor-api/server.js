@@ -1085,9 +1085,9 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
         const paramList = params
           .map((p) => {
             // Only convert parameters that are likely to be tree structures
-            // Parameters like 'root', 'tree' should be converted
-            // Parameters like 'preorder', 'inorder', 'postorder', 'val', 'key' should NOT
-            if (/^(root|tree)$/i.test(p)) {
+            // Match: root, tree, subRoot, root1, root2, tree1, tree2, p, q, s, t, etc.
+            // Don't match: preorder, inorder, postorder, val, key, target, etc.
+            if (/^(root\d*|tree\d*|subroot|p|q|s|t)$/i.test(p)) {
               return `array_to_treenode(tc["${p}"])`;
             } else {
               // For other parameters (like preorder, inorder, val), pass directly
