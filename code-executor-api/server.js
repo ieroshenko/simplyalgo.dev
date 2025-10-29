@@ -368,11 +368,13 @@ function parseTestCaseInput(inputString, functionSignature) {
           try {
             inputParams[cleanParamName] = JSON.parse(cleanParamValue);
           } catch {
-            // Remove quotes if it's a quoted string
-            inputParams[cleanParamName] = cleanParamValue.replace(
-              /^"(.*)"$/,
-              "$1",
-            );
+            // Remove quotes if it's a quoted string (handle both escaped and unescaped quotes)
+            let cleanValue = cleanParamValue;
+            // First try to remove escaped quotes: \"abc\" -> abc
+            cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+            // Then try to remove regular quotes: "abc" -> abc
+            cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
+            inputParams[cleanParamName] = cleanValue;
           }
         }
       }
@@ -386,7 +388,13 @@ function parseTestCaseInput(inputString, functionSignature) {
           try {
             inputParams[cleanParamName] = JSON.parse(paramValue);
           } catch {
-            inputParams[cleanParamName] = paramValue.replace(/^"(.*)"$/, "$1");
+            // Remove quotes (handle both escaped and unescaped quotes)
+            let cleanValue = paramValue;
+            // First try to remove escaped quotes: \"abc\" -> abc
+            cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+            // Then try to remove regular quotes: "abc" -> abc
+            cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
+            inputParams[cleanParamName] = cleanValue;
           }
         }
       }
@@ -406,7 +414,12 @@ function parseTestCaseInput(inputString, functionSignature) {
       } catch (e) {
         console.warn(`JSON parse failed for ${paramValue}:`, e.message);
         // If JSON parsing fails, treat as string (remove quotes if present)
-        inputParams[paramName] = paramValue.replace(/^"(.*)"$/, "$1");
+        let cleanValue = paramValue;
+        // First try to remove escaped quotes: \"abc\" -> abc
+        cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+        // Then try to remove regular quotes: "abc" -> abc
+        cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
+        inputParams[paramName] = cleanValue;
       }
     }
   }
@@ -431,24 +444,54 @@ function parseTestCaseInput(inputString, functionSignature) {
 
 // Process Python code to add imports and test case execution
 function processPythonCode(userCode, testCases, problemId) {
-  // Add typing imports if needed
-  const needsTyping = /\b(List|Dict|Set|Tuple|Optional|Union)\b/.test(userCode);
+  // Remove commented TreeNode/ListNode definitions if they exist
+  // This handles cases where users submit code with commented class definitions
+  // We'll remove them and let the logic below add proper definitions if needed
   let processedCode = userCode;
 
-  if (needsTyping && !userCode.includes("from typing import")) {
-    processedCode = `from typing import List, Dict, Set, Tuple, Optional, Union\n${userCode}`;
+  // Remove commented TreeNode definition block
+  if (/^#\s*class TreeNode:/m.test(processedCode)) {
+    console.log("Removing commented TreeNode class definition");
+    // Remove the entire commented TreeNode block (class line + __init__ + attributes)
+    processedCode = processedCode.replace(
+      /^#\s*Definition for a binary tree node\.\s*\n^#\s*class TreeNode:\s*\n(?:^#\s*.*\n)*/gm,
+      ''
+    );
+  }
+
+  // Remove commented ListNode definition block
+  if (/^#\s*class ListNode:/m.test(processedCode)) {
+    console.log("Removing commented ListNode class definition");
+    // Remove the entire commented ListNode block
+    processedCode = processedCode.replace(
+      /^#\s*Definition for singly-linked list\.\s*\n^#\s*class ListNode:\s*\n(?:^#\s*.*\n)*/gm,
+      ''
+    );
+  }
+
+  // Add typing imports if needed
+  const needsTyping = /\b(List|Dict|Set|Tuple|Optional|Union)\b/.test(processedCode);
+
+  if (needsTyping && !processedCode.includes("from typing import")) {
+    processedCode = `from typing import List, Dict, Set, Tuple, Optional, Union\n${processedCode}`;
+  }
+
+  // Add collections import if needed (for deque, defaultdict, Counter, etc.)
+  const needsCollections = /\b(deque|defaultdict|Counter|OrderedDict|namedtuple)\b/.test(processedCode);
+  if (needsCollections && !processedCode.includes("from collections import")) {
+    processedCode = `from collections import deque, defaultdict, Counter\n${processedCode}`;
   }
 
   // Add ListNode definition if needed
   console.log("Checking if ListNode definition is needed...");
-  console.log("User code contains ListNode:", /\bListNode\b/.test(userCode));
+  console.log("User code contains ListNode:", /\bListNode\b/.test(processedCode));
   console.log(
     "User code already has ListNode class:",
-    userCode.includes("class ListNode"),
+    processedCode.includes("class ListNode"),
   );
 
-  const needsListNode = /\bListNode\b/.test(userCode);
-  if (needsListNode && !userCode.includes("class ListNode")) {
+  const needsListNode = /\bListNode\b/.test(processedCode);
+  if (needsListNode && !processedCode.includes("class ListNode")) {
     console.log("Adding ListNode class definition");
     const listNodeDef = `# Definition for singly-linked list.
 class ListNode:
@@ -463,8 +506,8 @@ class ListNode:
 
   // Add TreeNode definition if needed (for binary tree problems)
   console.log("Checking if TreeNode definition is needed...");
-  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/.test(userCode);
-  if (needsTreeNode && !userCode.includes("class TreeNode")) {
+  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/.test(processedCode);
+  if (needsTreeNode && !processedCode.includes("class TreeNode")) {
     console.log("Adding TreeNode class definition");
     const treeNodeDef = `# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
     processedCode = treeNodeDef + processedCode;
@@ -648,18 +691,156 @@ def listnode_to_array(head):
     // For class-based problems, we'll handle them specially in the execution code
     functionName = 'class_based';
   } else {
-    // Extract function name from the code
-    const functionMatch = userCode.match(/def\s+(\w+)\s*\(/);
-    if (!functionMatch) {
+    // Extract function name from the code (exclude __init__ and other dunder methods)
+    // Look for all function definitions and filter out __init__, __str__, etc.
+    const allFunctionMatches = [...userCode.matchAll(/def\s+(\w+)\s*\(/g)];
+    const validFunctions = allFunctionMatches
+      .map(match => match[1])
+      .filter(name => !name.startsWith('__')); // Exclude dunder methods
+
+    if (validFunctions.length === 0) {
       throw new Error("No function definition found in Python code");
     }
-    functionName = functionMatch[1];
+
+    // Use the first non-dunder function found
+    functionName = validFunctions[0];
     console.log(`Detected function: ${functionName}`);
   }
 
   // Analyze function signature to determine input format (including return type)
-  const signatureMatch = userCode.match(/def\s+\w+\s*\([^)]+\)(?:\s*->\s*[^:]+)?:/);
-  const signature = signatureMatch ? signatureMatch[0] : "";
+  // Use a balanced-parentheses scanner to handle complex nested type annotations
+  const signature = extractFunctionSignature(userCode, functionName);
+
+  // Helper function to extract function signature with balanced parentheses
+  function extractFunctionSignature(code, funcName) {
+    // Find the start of the function definition
+    const defPattern = new RegExp(`def\\s+${funcName}\\s*\\(`, 'g');
+    const match = defPattern.exec(code);
+
+    if (!match) {
+      console.warn(`Could not find function definition for ${funcName}`);
+      return "";
+    }
+
+    const startIndex = match.index;
+    let i = match.index + match[0].length; // Start after 'def funcName('
+
+    // Count nested parentheses, brackets, and braces
+    let parenDepth = 1; // We're already inside the opening (
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    let inString = false;
+    let stringChar = null;
+    let escaped = false;
+
+    // Scan until we find the matching closing parenthesis
+    while (i < code.length && parenDepth > 0) {
+      const char = code[i];
+
+      if (escaped) {
+        escaped = false;
+        i++;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        i++;
+        continue;
+      }
+
+      // Handle strings
+      if ((char === '"' || char === "'") && !inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar && inString) {
+        inString = false;
+        stringChar = null;
+      }
+
+      // Only count brackets when not in a string
+      if (!inString) {
+        if (char === '(') parenDepth++;
+        else if (char === ')') parenDepth--;
+        else if (char === '[') bracketDepth++;
+        else if (char === ']') bracketDepth--;
+        else if (char === '{') braceDepth++;
+        else if (char === '}') braceDepth--;
+      }
+
+      i++;
+    }
+
+    // Now we're at the closing ), look for optional return type annotation
+    let endIndex = i;
+
+    // Skip whitespace
+    while (i < code.length && /\s/.test(code[i])) {
+      i++;
+    }
+
+    // Check for return type annotation (->)
+    if (i + 1 < code.length && code[i] === '-' && code[i + 1] === '>') {
+      i += 2; // Skip ->
+
+      // Skip whitespace
+      while (i < code.length && /\s/.test(code[i])) {
+        i++;
+      }
+
+      // Scan the return type until we hit ':'
+      let returnTypeDepth = 0;
+      inString = false;
+      stringChar = null;
+      escaped = false;
+
+      while (i < code.length && (code[i] !== ':' || returnTypeDepth > 0 || inString)) {
+        const char = code[i];
+
+        if (escaped) {
+          escaped = false;
+          i++;
+          continue;
+        }
+
+        if (char === '\\') {
+          escaped = true;
+          i++;
+          continue;
+        }
+
+        if ((char === '"' || char === "'") && !inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar && inString) {
+          inString = false;
+          stringChar = null;
+        }
+
+        if (!inString) {
+          if (char === '[' || char === '(' || char === '{') returnTypeDepth++;
+          else if (char === ']' || char === ')' || char === '}') returnTypeDepth--;
+        }
+
+        i++;
+      }
+
+      endIndex = i;
+    }
+
+    // Find the colon
+    while (endIndex < code.length && code[endIndex] !== ':') {
+      endIndex++;
+    }
+
+    if (endIndex < code.length && code[endIndex] === ':') {
+      endIndex++; // Include the colon
+    }
+
+    const extractedSignature = code.substring(startIndex, endIndex);
+    console.log(`Extracted signature for ${funcName}:`, extractedSignature);
+    return extractedSignature;
+  }
 
   // Special-case detection: encode/decode and serialize/deserialize pair problems
   const isEncodeDecode = problemId === "encode-and-decode-strings";
@@ -720,6 +901,38 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
     // Normalize class-based problem input: ensure we have "values" key
     let normalizedInput = { ...tc.input };
     if (isClassBasedProblem) {
+      // If we only have operations but no values/args, we need to parse the operations array
+      // Some test cases have operations and arguments mixed: ["Class", "method", "arg", "method", "arg"]
+      if (normalizedInput.operations && !normalizedInput.values && !normalizedInput.args) {
+        console.log("Parsing mixed operations/values array");
+        const ops = normalizedInput.operations;
+        const parsedOps = [];
+        const parsedValues = [];
+
+        // First element is always the constructor
+        parsedOps.push(ops[0]);
+        parsedValues.push([]);
+
+        // Parse remaining elements - alternate between method and argument
+        for (let i = 1; i < ops.length; i += 2) {
+          if (i < ops.length) {
+            parsedOps.push(ops[i]); // method name
+            // Next element is the argument (if it exists)
+            if (i + 1 < ops.length) {
+              parsedValues.push([ops[i + 1]]);
+            } else {
+              parsedValues.push([]);
+            }
+          }
+        }
+
+        console.log("Parsed operations:", parsedOps);
+        console.log("Parsed values:", parsedValues);
+
+        normalizedInput.operations = parsedOps;
+        normalizedInput.values = parsedValues;
+      }
+
       // If we have "args" but not "values", copy args to values
       if (normalizedInput.args && !normalizedInput.values) {
         normalizedInput.values = normalizedInput.args;
@@ -759,12 +972,14 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
   const originalSignature = signature;
   const hasSelfParam = originalSignature.includes("self");
 
-  // Check if this is a ListNode/TreeNode problem and if the return type is a node
-  console.log("Function signature for ListNode/TreeNode detection:", signature);
+  // Check if this is a ListNode/TreeNode/Node problem and if the return type is a node
+  console.log("Function signature for ListNode/TreeNode/Node detection:", signature);
   const isListNodeProblem = /\bListNode\b/.test(signature);
   const isTreeNodeProblem = /\bTreeNode\b|['\"]TreeNode['\"]/.test(signature);
+  const isGraphProblem = /\bNode\b|['\"]Node['\"]/.test(signature) && !isListNodeProblem && !isTreeNodeProblem;
   const returnsListNode = /->\s*[^\n#]*ListNode/.test(signature);
   const returnsTreeNode = /->\s*[^\n#]*TreeNode/.test(signature);
+  const returnsNode = /->\s*[^\n#]*['\"]?Node['\"]?/.test(signature) && !returnsListNode && !returnsTreeNode;
 
   // Check if function returns None (in-place modification)
   const returnsNone = /->\s*None\s*:/.test(signature);
@@ -773,9 +988,11 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
   const isLinkedListCycleProblem = problemId === 'linked-list-cycle' || functionName === 'hasCycle';
   console.log("Is ListNode problem:", isListNodeProblem);
   console.log("Is TreeNode problem:", isTreeNodeProblem);
+  console.log("Is Graph problem:", isGraphProblem);
   console.log("Is Linked List Cycle problem:", isLinkedListCycleProblem);
   console.log("Returns ListNode:", returnsListNode);
   console.log("Returns TreeNode:", returnsTreeNode);
+  console.log("Returns Node (graph):", returnsNode);
   console.log("Returns None (in-place):", returnsNone);
   console.log("Function has self param:", hasSelfParam);
   console.log("Function parameters:", params);
@@ -799,39 +1016,99 @@ function generateTestExecutionCode(functionName, signature, testCases, options =
       console.log("Generated serialize/deserialize pipeline call:", functionCall);
     } else if (isListNodeProblem) {
       console.log("Generating ListNode function call for method");
-      // Convert arrays to ListNodes for function call
-      let paramList;
-      if (isLinkedListCycleProblem) {
-        // For cycle problems, use the cycle-aware helper
-        paramList = params
-          .map((p) => `array_to_listnode_with_cycle(tc["head"], tc.get("pos", -1))`)
-          .join(", ");
-      } else {
-        paramList = params
-          .map((p) => `array_to_listnode(tc["${p}"])`)
-          .join(", ");
-      }
 
-      // Handle in-place modification for ListNode problems
-      if (returnsNone && params.length === 1) {
-        // For in-place modification, call function and return the modified list
-        const param = params[0];
-        const listVar = `list_${param}`;
-        functionCall = `(lambda: (setattr(__import__('types').SimpleNamespace(), '${listVar}', array_to_listnode(tc["${param}"])), ${className}().${functionName}(getattr(__import__('types').SimpleNamespace(), '${listVar}')), listnode_to_array(getattr(__import__('types').SimpleNamespace(), '${listVar}')))[2])()`;
-        // Simpler approach using a helper
-        functionCall = `(lambda ${listVar}: (${className}().${functionName}(${listVar}), listnode_to_array(${listVar}))[1])(array_to_listnode(tc["${param}"]))`;
+      // Special handling for merge-k-sorted-lists where input is list of lists
+      const isMergeKLists = functionName.toLowerCase().includes('mergeklists') ||
+        functionName.toLowerCase().includes('merge_k_lists');
+
+      if (isMergeKLists && params.length === 1) {
+        // For mergeKLists: lists is a list of arrays, each needs to be converted to ListNode
+        const param = params[0]; // Usually 'lists'
+        functionCall = `listnode_to_array(${className}().${functionName}([array_to_listnode(arr) for arr in tc["${param}"]]))`;
+        console.log("Generated merge-k-lists function call:", functionCall);
       } else {
-        const call = `${className}().${functionName}(${paramList})`;
-        functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+        // Convert arrays to ListNodes for function call
+        let paramList;
+        if (isLinkedListCycleProblem) {
+          // For cycle problems, use the cycle-aware helper
+          paramList = params
+            .map((p) => `array_to_listnode_with_cycle(tc["head"], tc.get("pos", -1))`)
+            .join(", ");
+        } else {
+          // Only convert parameters that are likely to be lists (contain 'head', 'list', 'l1', 'l2', etc.)
+          paramList = params
+            .map((p) => {
+              // Check if parameter name suggests it's a ListNode
+              // Match: head, list, list1, list2, l1, l2, l3, etc.
+              if (/^(head|list\d*|l\d+)$/i.test(p)) {
+                return `array_to_listnode(tc["${p}"])`;
+              } else {
+                // For other parameters (like n, k, val), pass them directly
+                return `tc["${p}"]`;
+              }
+            })
+            .join(", ");
+        }
+
+        // Handle in-place modification for ListNode problems
+        if (returnsNone && params.length === 1) {
+          // For in-place modification, call function and return the modified list
+          const param = params[0];
+          const listVar = `list_${param}`;
+          functionCall = `(lambda: (setattr(__import__('types').SimpleNamespace(), '${listVar}', array_to_listnode(tc["${param}"])), ${className}().${functionName}(getattr(__import__('types').SimpleNamespace(), '${listVar}')), listnode_to_array(getattr(__import__('types').SimpleNamespace(), '${listVar}')))[2])()`;
+          // Simpler approach using a helper
+          functionCall = `(lambda ${listVar}: (${className}().${functionName}(${listVar}), listnode_to_array(${listVar}))[1])(array_to_listnode(tc["${param}"]))`;
+        } else {
+          const call = `${className}().${functionName}(${paramList})`;
+          functionCall = returnsListNode ? `listnode_to_array(${call})` : call;
+        }
+        console.log("Generated function call:", functionCall);
       }
-      console.log("Generated function call:", functionCall);
     } else if (isTreeNodeProblem) {
       console.log("Generating TreeNode function call for method");
-      const paramList = params
-        .map((p) => `array_to_treenode(tc["${p}"])`)
-        .join(", ");
+
+      // Special handling for LCA problems where p and q are node values, not arrays
+      const isLCAProblem = functionName.toLowerCase().includes('lowestcommonancestor') ||
+        functionName.toLowerCase().includes('lca');
+
+      if (isLCAProblem && params.length === 3) {
+        // For LCA: root is array, p and q are node values
+        // Build tree once and reuse it to find p and q nodes
+        // Return just the node's value, not the entire subtree
+        const rootParam = params[0]; // Usually 'root'
+        const pParam = params[1];    // Usually 'p'
+        const qParam = params[2];    // Usually 'q'
+
+        functionCall = `(lambda tree: ${className}().${functionName}(tree, find_node(tree, tc["${pParam}"]), find_node(tree, tc["${qParam}"])).val)(array_to_treenode(tc["${rootParam}"]))`;
+      } else {
+        // Standard TreeNode problem - check which params should be converted
+        const paramList = params
+          .map((p) => {
+            // Only convert parameters that are likely to be tree structures
+            // Parameters like 'root', 'tree' should be converted
+            // Parameters like 'preorder', 'inorder', 'postorder', 'val', 'key' should NOT
+            if (/^(root|tree)$/i.test(p)) {
+              return `array_to_treenode(tc["${p}"])`;
+            } else {
+              // For other parameters (like preorder, inorder, val), pass directly
+              return `tc["${p}"]`;
+            }
+          })
+          .join(", ");
+        const call = `${className}().${functionName}(${paramList})`;
+        functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
+      }
+      console.log("Generated function call:", functionCall);
+    } else if (isGraphProblem) {
+      console.log("Generating Graph function call for method");
+      // For graph problems like clone-graph, convert adjList to Node and back
+      // The parameter name might be 'node' but test case has 'adjList'
+      const paramList = params.map((p) => {
+        // Check if test case has adjList instead of node
+        return `adjlist_to_node(tc.get("adjList", tc.get("${p}")))`;
+      }).join(", ");
       const call = `${className}().${functionName}(${paramList})`;
-      functionCall = returnsTreeNode ? `treenode_to_array(${call})` : call;
+      functionCall = returnsNode ? `node_to_adjlist(${call})` : call;
       console.log("Generated function call:", functionCall);
     } else if (returnsNone && params.length === 1) {
       // For in-place modification, call function and return the modified parameter
@@ -976,6 +1253,73 @@ def treenode_to_array(root):
     while res and res[-1] is None:
         res.pop()
     return res
+
+def find_node(root, val):
+    """Find and return the node with the given value in the tree"""
+    if root is None:
+        return None
+    if root.val == val:
+        return root
+    # Search in left subtree
+    left_result = find_node(root.left, val)
+    if left_result is not None:
+        return left_result
+    # Search in right subtree
+    return find_node(root.right, val)
+
+# Graph helpers (for clone-graph problem)
+class Node:
+    def __init__(self, val=0, neighbors=None):
+        self.val = val
+        self.neighbors = neighbors if neighbors is not None else []
+
+def adjlist_to_node(adjList):
+    """Convert adjacency list to graph Node"""
+    if not adjList:
+        return None
+    
+    # Create all nodes first
+    nodes = {}
+    for i in range(len(adjList)):
+        nodes[i + 1] = Node(i + 1)
+    
+    # Add neighbors
+    for i, neighbors in enumerate(adjList):
+        node = nodes[i + 1]
+        for neighbor_val in neighbors:
+            node.neighbors.append(nodes[neighbor_val])
+    
+    return nodes.get(1)  # Return first node
+
+def node_to_adjlist(node):
+    """Convert graph Node to adjacency list"""
+    if not node:
+        return []
+    
+    # BFS to collect all nodes in order by their val
+    visited = set()
+    queue = [node]
+    visited.add(node)
+    nodes_by_val = {node.val: node}
+    
+    while queue:
+        curr = queue.pop(0)
+        for neighbor in curr.neighbors:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                nodes_by_val[neighbor.val] = neighbor
+                queue.append(neighbor)
+    
+    # Build adjacency list in order of node values
+    max_val = max(nodes_by_val.keys())
+    adjList = []
+    for i in range(1, max_val + 1):
+        if i in nodes_by_val:
+            n = nodes_by_val[i]
+            neighbors = sorted([neighbor.val for neighbor in n.neighbors])
+            adjList.append(neighbors)
+    
+    return adjList
 
 def execute_class_operations(operations, values):
     """Execute class-based operations for problems like MedianFinder, WordDictionary, etc."""
