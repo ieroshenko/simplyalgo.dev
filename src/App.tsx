@@ -65,6 +65,14 @@ const App = () => (
               }
             />
             <Route
+              path="/problems/:problemId"
+              element={
+                <ProtectedRoute>
+                  <ProblemSolverNew />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/problems/data-structures/:slug"
               element={
                 <ProtectedRoute>

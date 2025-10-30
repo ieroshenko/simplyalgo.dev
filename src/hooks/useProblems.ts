@@ -99,6 +99,10 @@ export const useProblems = (userId?: string) => {
 
       const { data: problemsData, error: problemsError } = await query;
 
+      console.log('🔍 useProblems: Fetched problems count:', problemsData?.length);
+      console.log('🔍 useProblems: Looking for implement-linked-list:', 
+        problemsData?.find((p: any) => p.id === 'implement-linked-list'));
+
       if (problemsError) throw problemsError;
 
       // Fetch user-specific data separately if userId exists
@@ -152,6 +156,10 @@ export const useProblems = (userId?: string) => {
           companies: (problem.companies || []) as string[],
         };
       });
+
+      console.log('🔍 useProblems: Formatted problems count:', formattedProblems.length);
+      console.log('🔍 useProblems: implement-linked-list in formatted:', 
+        formattedProblems.find(p => p.id === 'implement-linked-list'));
 
       setProblems(formattedProblems);
     } catch (err: unknown) {

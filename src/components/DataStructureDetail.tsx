@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,6 @@ import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import dataStructures from "@/data/dataStructures.json";
 
-type Language = "python" | "javascript";
 type Difficulty = "Easy" | "Medium" | "Hard";
 
 interface DataStructure {
@@ -29,7 +27,6 @@ interface DataStructure {
 const DataStructureDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>("python");
   const { currentTheme, defineCustomThemes } = useEditorTheme();
 
   const structure = dataStructures.find((ds) => ds.slug === slug) as
@@ -72,25 +69,35 @@ const DataStructureDetail = () => {
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/problems")}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">
-              {structure.name}
-            </h1>
-            <Badge
-              className={getDifficultyColor(structure.difficulty as Difficulty)}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/problems")}
             >
-              {structure.difficulty}
-            </Badge>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">
+                {structure.name}
+              </h1>
+              <Badge
+                className={getDifficultyColor(structure.difficulty as Difficulty)}
+              >
+                {structure.difficulty}
+              </Badge>
+            </div>
           </div>
+          <Button
+            size="lg"
+            onClick={() => navigate(`/problems/implement-${slug}`)}
+            className="gap-2"
+          >
+            <Code className="w-4 h-4" />
+            Practice Implementation
+          </Button>
         </div>
 
         {/* Overview Section */}
@@ -127,39 +134,17 @@ const DataStructureDetail = () => {
         {/* Code Section */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Code className="w-5 h-5" />
-                Implementation
-              </CardTitle>
-              <div className="flex gap-2">
-                <Button
-                  variant={
-                    selectedLanguage === "python" ? "default" : "outline"
-                  }
-                  size="sm"
-                  onClick={() => setSelectedLanguage("python")}
-                >
-                  Python
-                </Button>
-                <Button
-                  variant={
-                    selectedLanguage === "javascript" ? "default" : "outline"
-                  }
-                  size="sm"
-                  onClick={() => setSelectedLanguage("javascript")}
-                >
-                  JavaScript
-                </Button>
-              </div>
-            </div>
+            <CardTitle className="flex items-center gap-2">
+              <Code className="w-5 h-5" />
+              Implementation
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg overflow-hidden">
               <Editor
                 height="400px"
-                language={selectedLanguage}
-                value={structure.code[selectedLanguage]}
+                language="python"
+                value={structure.code.python}
                 theme={currentTheme}
                 onMount={(editor, monaco) => {
                   defineCustomThemes(monaco);
@@ -203,21 +188,28 @@ const DataStructureDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {structure.relatedProblems.map((problem, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      // This would navigate to the specific problem if we had the mapping
-                      console.log(`Navigate to problem: ${problem}`);
-                    }}
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    {problem}
-                  </Button>
-                ))}
+                {structure.relatedProblems.map((problem, index) => {
+                  // Convert problem name to slug format (lowercase, hyphens)
+                  const problemSlug = problem
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+
+                  return (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        navigate(`/problems/${problemSlug}`);
+                      }}
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      {problem}
+                    </Button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

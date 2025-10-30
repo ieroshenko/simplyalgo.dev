@@ -179,7 +179,14 @@ const ProblemSolverNew = () => {
     }
   }, []);
 
+  console.log('🔍 ProblemSolverNew: problemId:', problemId);
+  console.log('🔍 ProblemSolverNew: problems count:', problems.length);
+  console.log('🔍 ProblemSolverNew: problems ids:', problems.map(p => p.id));
+  
   const problem = problems.find((p) => p.id === problemId);
+  
+  console.log('🔍 ProblemSolverNew: found problem:', problem?.title);
+  
   const {
     submissions,
     loading: subsLoading,

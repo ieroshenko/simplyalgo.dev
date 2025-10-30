@@ -16,11 +16,12 @@
       "javascript": "// Array operations\nconst arr = [1, 2, 3, 4, 5];\n// Access\nconst first = arr[0];  // O(1)\n// Insert\narr.push(6);  // O(1) at end\narr.unshift(0);  // O(n) at beginning"
     },
     "useCases": [
-      "Data storage",
-      "Matrix operations",
-      "Dynamic programming tables"
+      "Storing sequential data in memory",
+      "Image pixel data representation",
+      "Dynamic programming memoization tables",
+      "Database record storage"
     ],
-    "relatedProblems": ["Two Sum", "Best Time to Buy and Sell Stock"]
+    "relatedProblems": ["Two Sum", "Best Time to Buy and Sell Stock", "Contains Duplicate", "Product of Array Except Self", "Maximum Subarray"]
   },
   {
     "slug": "linked-list",
@@ -39,11 +40,12 @@
       "javascript": "class ListNode {\n    constructor(val = 0, next = null) {\n        this.val = val;\n        this.next = next;\n    }\n}\n\n// Create linked list\nconst head = new ListNode(1);\nhead.next = new ListNode(2);"
     },
     "useCases": [
-      "Dynamic size collections",
-      "Undo functionality",
-      "Music playlists"
+      "Browser history navigation (back/forward)",
+      "Music playlist management",
+      "Undo/redo functionality in applications",
+      "Memory allocation in operating systems"
     ],
-    "relatedProblems": ["Reverse Linked List", "Merge Two Sorted Lists"]
+    "relatedProblems": ["Reverse Linked List", "Merge Two Sorted Lists", "Linked List Cycle", "Reorder List", "Remove Nth Node From End of List"]
   },
   {
     "slug": "stack",
@@ -62,11 +64,12 @@
       "javascript": "// Stack using array\nconst stack = [];\nstack.push(1);  // push\nstack.push(2);\nconst top = stack.pop();  // pop\nconst peek = stack[stack.length - 1];"
     },
     "useCases": [
-      "Function call management",
-      "Undo operations",
-      "Expression evaluation"
+      "Function call stack in programming languages",
+      "Browser back button implementation",
+      "Expression evaluation and syntax parsing",
+      "Undo operations in text editors"
     ],
-    "relatedProblems": ["Valid Parentheses", "Min Stack"]
+    "relatedProblems": ["Valid Parentheses", "Min Stack", "Evaluate Reverse Polish Notation", "Daily Temperatures", "Largest Rectangle in Histogram"]
   },
   {
     "slug": "queue",
@@ -84,8 +87,13 @@
       "python": "from collections import deque\nqueue = deque()\nqueue.append(1)  # enqueue\nqueue.append(2)\nfront = queue.popleft()  # dequeue",
       "javascript": "// Queue using array (inefficient)\nconst queue = [];\nqueue.push(1);  // enqueue\nqueue.push(2);\nconst front = queue.shift();  // dequeue"
     },
-    "useCases": ["BFS traversal", "Task scheduling", "Print queues"],
-    "relatedProblems": ["Binary Tree Level Order Traversal", "Rotting Oranges"]
+    "useCases": [
+      "Task scheduling in operating systems",
+      "Print job management",
+      "Breadth-first search in graphs",
+      "Message queues in distributed systems"
+    ],
+    "relatedProblems": ["Binary Tree Level Order Traversal", "Rotting Oranges", "Number of Islands"]
   },
   {
     "slug": "deque",
@@ -104,13 +112,13 @@
       "javascript": "// Deque simulation with array\nclass Deque {\n    constructor() { this.items = []; }\n    pushFront(item) { this.items.unshift(item); }\n    pushBack(item) { this.items.push(item); }\n    popFront() { return this.items.shift(); }\n    popBack() { return this.items.pop(); }\n}"
     },
     "useCases": [
-      "Sliding window problems",
-      "Palindrome checking",
-      "Browser history"
+      "Sliding window algorithms",
+      "Browser history with forward/back",
+      "Work stealing in thread pools",
+      "Palindrome checking algorithms"
     ],
     "relatedProblems": [
-      "Sliding Window Maximum",
-      "Shortest Subarray with Sum at Least K"
+      "Sliding Window Maximum"
     ]
   },
   {
@@ -129,8 +137,13 @@
       "python": "# Hash map using dict\nhash_map = {}\nhash_map['key'] = 'value'\nvalue = hash_map.get('key')\ndel hash_map['key']",
       "javascript": "// Hash map using Map\nconst map = new Map();\nmap.set('key', 'value');\nconst value = map.get('key');\nmap.delete('key');"
     },
-    "useCases": ["Caching", "Counting frequencies", "Database indexing"],
-    "relatedProblems": ["Two Sum", "Group Anagrams"]
+    "useCases": [
+      "Database indexing for fast lookups",
+      "Caching systems (Redis, Memcached)",
+      "Symbol tables in compilers",
+      "Counting word frequencies in documents"
+    ],
+    "relatedProblems": ["Two Sum", "Group Anagrams", "Longest Consecutive Sequence", "Valid Anagram"]
   },
   {
     "slug": "trie",
@@ -148,8 +161,13 @@
       "python": "class TrieNode:\n    def __init__(self):\n        self.children = {}\n        self.is_end = False\n\nclass Trie:\n    def __init__(self):\n        self.root = TrieNode()\n    \n    def insert(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                node.children[char] = TrieNode()\n            node = node.children[char]\n        node.is_end = True",
       "javascript": "class TrieNode {\n    constructor() {\n        this.children = {};\n        this.isEnd = false;\n    }\n}\n\nclass Trie {\n    constructor() {\n        this.root = new TrieNode();\n    }\n    \n    insert(word) {\n        let node = this.root;\n        for (const char of word) {\n            if (!node.children[char]) {\n                node.children[char] = new TrieNode();\n            }\n            node = node.children[char];\n        }\n        node.isEnd = true;\n    }\n}"
     },
-    "useCases": ["Autocomplete", "Spell checkers", "IP routing"],
-    "relatedProblems": ["Implement Trie", "Word Search II"]
+    "useCases": [
+      "Autocomplete in search engines",
+      "Spell checkers and dictionaries",
+      "IP routing tables",
+      "T9 predictive text on phones"
+    ],
+    "relatedProblems": ["Implement Trie (Prefix Tree)", "Word Search II", "Design Add and Search Words Data Structure"]
   },
   {
     "slug": "string",
@@ -167,10 +185,18 @@
       "python": "# String operations\ns = \"hello\"\nchar = s[0]  # Access\nfound = 'e' in s  # Search\nsubstr = s[1:4]  # Substring\nconcated = s + \" world\"  # Concatenation",
       "javascript": "// String operations\nconst s = \"hello\";\nconst char = s[0];  // Access\nconst found = s.includes('e');  // Search\nconst substr = s.substring(1, 4);  // Substring\nconst concated = s + \" world\";  // Concatenation"
     },
-    "useCases": ["Text processing", "Pattern matching", "Data parsing"],
+    "useCases": [
+      "Text processing and manipulation",
+      "DNA sequence analysis",
+      "Log file parsing",
+      "URL and path handling"
+    ],
     "relatedProblems": [
       "Longest Substring Without Repeating Characters",
-      "Valid Anagram"
+      "Valid Anagram",
+      "Valid Palindrome",
+      "Longest Palindromic Substring",
+      "Group Anagrams"
     ]
   },
   {
@@ -189,10 +215,18 @@
       "python": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n# Inorder traversal\ndef inorder(root):\n    if root:\n        inorder(root.left)\n        print(root.val)\n        inorder(root.right)",
       "javascript": "class TreeNode {\n    constructor(val = 0, left = null, right = null) {\n        this.val = val;\n        this.left = left;\n        this.right = right;\n    }\n}\n\n// Inorder traversal\nfunction inorder(root) {\n    if (root) {\n        inorder(root.left);\n        console.log(root.val);\n        inorder(root.right);\n    }\n}"
     },
-    "useCases": ["File systems", "Expression parsing", "Database indexing"],
+    "useCases": [
+      "File system directory structures",
+      "Expression trees in compilers",
+      "Decision trees in machine learning",
+      "Huffman coding for compression"
+    ],
     "relatedProblems": [
-      "Binary Tree Inorder Traversal",
-      "Maximum Depth of Binary Tree"
+      "Maximum Depth of Binary Tree",
+      "Invert Binary Tree",
+      "Binary Tree Level Order Traversal",
+      "Validate Binary Search Tree",
+      "Lowest Common Ancestor of a Binary Search Tree"
     ]
   },
   {
@@ -211,10 +245,17 @@
       "python": "import heapq\n\n# Min heap\nmin_heap = []\nheapq.heappush(min_heap, 3)\nheapq.heappush(min_heap, 1)\nheapq.heappush(min_heap, 4)\nmin_val = heapq.heappop(min_heap)",
       "javascript": "// JavaScript doesn't have built-in heap\n// Using array representation\nclass MinHeap {\n    constructor() {\n        this.heap = [];\n    }\n    \n    insert(val) {\n        this.heap.push(val);\n        this.bubbleUp();\n    }\n    \n    bubbleUp() {\n        let idx = this.heap.length - 1;\n        while (idx > 0) {\n            let parentIdx = Math.floor((idx - 1) / 2);\n            if (this.heap[parentIdx] <= this.heap[idx]) break;\n            [this.heap[parentIdx], this.heap[idx]] = [this.heap[idx], this.heap[parentIdx]];\n            idx = parentIdx;\n        }\n    }\n}"
     },
-    "useCases": ["Priority queues", "Dijkstra's algorithm", "Job scheduling"],
+    "useCases": [
+      "Priority queues in task scheduling",
+      "Dijkstra shortest path algorithm",
+      "Event-driven simulation",
+      "Top K problems in data streams"
+    ],
     "relatedProblems": [
       "Kth Largest Element in an Array",
-      "Merge k Sorted Lists"
+      "Merge k Sorted Lists",
+      "Find Median from Data Stream",
+      "Top K Frequent Elements"
     ]
   },
   {
@@ -233,8 +274,13 @@
       "python": "# Adjacency list representation\ngraph = {\n    'A': ['B', 'C'],\n    'B': ['A', 'D'],\n    'C': ['A', 'D'],\n    'D': ['B', 'C']\n}\n\n# DFS traversal\ndef dfs(graph, node, visited=set()):\n    if node not in visited:\n        visited.add(node)\n        for neighbor in graph[node]:\n            dfs(graph, neighbor, visited)",
       "javascript": "// Adjacency list representation\nconst graph = {\n    'A': ['B', 'C'],\n    'B': ['A', 'D'],\n    'C': ['A', 'D'],\n    'D': ['B', 'C']\n};\n\n// DFS traversal\nfunction dfs(graph, node, visited = new Set()) {\n    if (!visited.has(node)) {\n        visited.add(node);\n        for (const neighbor of graph[node]) {\n            dfs(graph, neighbor, visited);\n        }\n    }\n}"
     },
-    "useCases": ["Social networks", "Route planning", "Dependency resolution"],
-    "relatedProblems": ["Number of Islands", "Course Schedule"]
+    "useCases": [
+      "Social network connections",
+      "Google Maps route planning",
+      "Network topology and routing",
+      "Recommendation systems"
+    ],
+    "relatedProblems": ["Number of Islands", "Clone Graph", "Course Schedule", "Pacific Atlantic Water Flow", "Graph Valid Tree"]
   },
   {
     "slug": "lru-cache",
@@ -252,8 +298,13 @@
       "python": "class LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.cache = {}  # key -> node\n        self.head = ListNode(0, 0)\n        self.tail = ListNode(0, 0)\n        self.head.next = self.tail\n        self.tail.prev = self.head\n    \n    def get(self, key):\n        if key in self.cache:\n            node = self.cache[key]\n            self._remove(node)\n            self._add(node)\n            return node.value\n        return -1",
       "javascript": "class LRUCache {\n    constructor(capacity) {\n        this.capacity = capacity;\n        this.cache = new Map();\n    }\n    \n    get(key) {\n        if (this.cache.has(key)) {\n            const value = this.cache.get(key);\n            this.cache.delete(key);\n            this.cache.set(key, value);\n            return value;\n        }\n        return -1;\n    }\n    \n    put(key, value) {\n        if (this.cache.has(key)) {\n            this.cache.delete(key);\n        } else if (this.cache.size >= this.capacity) {\n            const firstKey = this.cache.keys().next().value;\n            this.cache.delete(firstKey);\n        }\n        this.cache.set(key, value);\n    }\n}"
     },
-    "useCases": ["CPU caches", "Web caching", "Database buffers"],
-    "relatedProblems": ["LRU Cache", "LFU Cache"]
+    "useCases": [
+      "CPU cache management",
+      "Web browser cache",
+      "Database query result caching",
+      "CDN content caching"
+    ],
+    "relatedProblems": ["LRU Cache"]
   },
   {
     "slug": "union-find",
@@ -272,11 +323,12 @@
       "javascript": "class UnionFind {\n    constructor(n) {\n        this.parent = Array.from({length: n}, (_, i) => i);\n        this.rank = new Array(n).fill(0);\n    }\n    \n    find(x) {\n        if (this.parent[x] !== x) {\n            this.parent[x] = this.find(this.parent[x]);\n        }\n        return this.parent[x];\n    }\n    \n    union(x, y) {\n        const px = this.find(x);\n        const py = this.find(y);\n        if (px === py) return;\n        \n        if (this.rank[px] < this.rank[py]) {\n            this.parent[px] = py;\n        } else if (this.rank[px] > this.rank[py]) {\n            this.parent[py] = px;\n        } else {\n            this.parent[py] = px;\n            this.rank[px]++;\n        }\n    }\n}"
     },
     "useCases": [
-      "Network connectivity",
-      "Image processing",
-      "Kruskal's algorithm"
+      "Network connectivity detection",
+      "Kruskal minimum spanning tree",
+      "Image segmentation",
+      "Social network friend groups"
     ],
-    "relatedProblems": ["Number of Connected Components", "Accounts Merge"]
+    "relatedProblems": ["Number of Connected Components in an Undirected Graph", "Graph Valid Tree", "Redundant Connection"]
   },
   {
     "slug": "bloom-filter",
@@ -294,8 +346,13 @@
       "python": "import hashlib\n\nclass BloomFilter:\n    def __init__(self, size, hash_count):\n        self.size = size\n        self.hash_count = hash_count\n        self.bit_array = [0] * size\n    \n    def _hash(self, item, seed):\n        hash_obj = hashlib.md5((str(item) + str(seed)).encode())\n        return int(hash_obj.hexdigest(), 16) % self.size\n    \n    def add(self, item):\n        for i in range(self.hash_count):\n            index = self._hash(item, i)\n            self.bit_array[index] = 1\n    \n    def check(self, item):\n        for i in range(self.hash_count):\n            index = self._hash(item, i)\n            if self.bit_array[index] == 0:\n                return False\n        return True",
       "javascript": "class BloomFilter {\n    constructor(size, hashCount) {\n        this.size = size;\n        this.hashCount = hashCount;\n        this.bitArray = new Array(size).fill(0);\n    }\n    \n    hash(item, seed) {\n        let hash = 0;\n        const str = item + seed;\n        for (let i = 0; i < str.length; i++) {\n            hash = ((hash << 5) - hash + str.charCodeAt(i)) & 0xffffffff;\n        }\n        return Math.abs(hash) % this.size;\n    }\n    \n    add(item) {\n        for (let i = 0; i < this.hashCount; i++) {\n            const index = this.hash(item, i);\n            this.bitArray[index] = 1;\n        }\n    }\n    \n    check(item) {\n        for (let i = 0; i < this.hashCount; i++) {\n            const index = this.hash(item, i);\n            if (this.bitArray[index] === 0) {\n                return false;\n            }\n        }\n        return true;\n    }\n}"
     },
-    "useCases": ["Web crawling", "Database systems", "Distributed systems"],
-    "relatedProblems": ["Design HashSet", "Random Pick with Blacklist"]
+    "useCases": [
+      "Web crawlers avoiding duplicate URLs",
+      "Database query optimization",
+      "Spam filtering",
+      "Bitcoin wallet address checking"
+    ],
+    "relatedProblems": ["Design HashSet"]
   },
   {
     "slug": "prefix-map",
@@ -314,13 +371,15 @@
       "javascript": "class PrefixMap {\n    constructor() {\n        this.map = new Map();\n    }\n    \n    insert(word, value) {\n        this.map.set(word, value);\n    }\n    \n    search(word) {\n        return this.map.get(word);\n    }\n    \n    startsWith(prefix) {\n        const result = [];\n        for (const [word, value] of this.map) {\n            if (word.startsWith(prefix)) {\n                result.push([word, value]);\n            }\n        }\n        return result;\n    }\n}"
     },
     "useCases": [
-      "Autocomplete systems",
-      "URL routing",
-      "Configuration management"
+      "Autocomplete search suggestions",
+      "URL routing in web frameworks",
+      "Configuration key-value stores",
+      "Command-line argument parsing"
     ],
     "relatedProblems": [
       "Word Search II",
-      "Design Add and Search Words Data Structure"
+      "Design Add and Search Words Data Structure",
+      "Implement Trie (Prefix Tree)"
     ]
   },
   {
@@ -340,13 +399,13 @@
       "javascript": "class SegmentTree {\n    constructor(arr) {\n        this.n = arr.length;\n        this.tree = new Array(4 * this.n);\n        this.build(arr, 0, 0, this.n - 1);\n    }\n    \n    build(arr, node, start, end) {\n        if (start === end) {\n            this.tree[node] = arr[start];\n        } else {\n            const mid = Math.floor((start + end) / 2);\n            this.build(arr, 2*node+1, start, mid);\n            this.build(arr, 2*node+2, mid+1, end);\n            this.tree[node] = this.tree[2*node+1] + this.tree[2*node+2];\n        }\n    }\n    \n    query(node, start, end, l, r) {\n        if (r < start || end < l) {\n            return 0;\n        }\n        if (l <= start && end <= r) {\n            return this.tree[node];\n        }\n        const mid = Math.floor((start + end) / 2);\n        const leftSum = this.query(2*node+1, start, mid, l, r);\n        const rightSum = this.query(2*node+2, mid+1, end, l, r);\n        return leftSum + rightSum;\n    }\n}"
     },
     "useCases": [
-      "Range sum queries",
-      "Range minimum/maximum",
-      "Computational geometry"
+      "Range query operations in databases",
+      "Computational geometry problems",
+      "Game development collision detection",
+      "Stock market range analysis"
     ],
     "relatedProblems": [
-      "Range Sum Query - Mutable",
-      "Count of Smaller Numbers After Self"
+      "Range Sum Query - Mutable"
     ]
   },
   {
@@ -365,10 +424,14 @@
       "python": "class FenwickTree:\n    def __init__(self, n):\n        self.n = n\n        self.tree = [0] * (n + 1)\n    \n    def update(self, i, delta):\n        while i <= self.n:\n            self.tree[i] += delta\n            i += i & (-i)\n    \n    def query(self, i):\n        result = 0\n        while i > 0:\n            result += self.tree[i]\n            i -= i & (-i)\n        return result\n    \n    def range_query(self, l, r):\n        return self.query(r) - self.query(l - 1)",
       "javascript": "class FenwickTree {\n    constructor(n) {\n        this.n = n;\n        this.tree = new Array(n + 1).fill(0);\n    }\n    \n    update(i, delta) {\n        while (i <= this.n) {\n            this.tree[i] += delta;\n            i += i & (-i);\n        }\n    }\n    \n    query(i) {\n        let result = 0;\n        while (i > 0) {\n            result += this.tree[i];\n            i -= i & (-i);\n        }\n        return result;\n    }\n    \n    rangeQuery(l, r) {\n        return this.query(r) - this.query(l - 1);\n    }\n}"
     },
-    "useCases": ["Frequency tables", "Inversion counting", "2D range queries"],
+    "useCases": [
+      "Frequency table updates",
+      "Cumulative frequency analysis",
+      "Inversion count in arrays",
+      "2D range sum queries"
+    ],
     "relatedProblems": [
-      "Range Sum Query - Mutable",
-      "Count of Smaller Numbers After Self"
+      "Range Sum Query - Mutable"
     ]
   },
   {
@@ -387,8 +450,13 @@
       "python": "def build_suffix_array(s):\n    n = len(s)\n    suffixes = [(s[i:], i) for i in range(n)]\n    suffixes.sort()\n    return [suffix[1] for suffix in suffixes]\n\ndef build_lcp_array(s, suffix_array):\n    n = len(s)\n    rank = [0] * n\n    for i in range(n):\n        rank[suffix_array[i]] = i\n    \n    lcp = [0] * (n - 1)\n    h = 0\n    for i in range(n):\n        if rank[i] > 0:\n            j = suffix_array[rank[i] - 1]\n            while (i + h < n and j + h < n and s[i + h] == s[j + h]):\n                h += 1\n            lcp[rank[i] - 1] = h\n            if h > 0:\n                h -= 1\n    return lcp",
       "javascript": "function buildSuffixArray(s) {\n    const n = s.length;\n    const suffixes = [];\n    for (let i = 0; i < n; i++) {\n        suffixes.push([s.substring(i), i]);\n    }\n    suffixes.sort((a, b) => a[0].localeCompare(b[0]));\n    return suffixes.map(suffix => suffix[1]);\n}\n\nfunction buildLCPArray(s, suffixArray) {\n    const n = s.length;\n    const rank = new Array(n);\n    for (let i = 0; i < n; i++) {\n        rank[suffixArray[i]] = i;\n    }\n    \n    const lcp = new Array(n - 1);\n    let h = 0;\n    for (let i = 0; i < n; i++) {\n        if (rank[i] > 0) {\n            const j = suffixArray[rank[i] - 1];\n            while (i + h < n && j + h < n && s[i + h] === s[j + h]) {\n                h++;\n            }\n            lcp[rank[i] - 1] = h;\n            if (h > 0) h--;\n        }\n    }\n    return lcp;\n}"
     },
-    "useCases": ["Pattern matching", "Bioinformatics", "Data compression"],
-    "relatedProblems": ["Longest Repeated Substring", "Shortest Superstring"]
+    "useCases": [
+      "DNA sequence matching in bioinformatics",
+      "Plagiarism detection",
+      "Data compression algorithms",
+      "Full-text search engines"
+    ],
+    "relatedProblems": ["Longest Repeating Substring"]
   },
   {
     "slug": "avl-tree",
@@ -407,13 +475,14 @@
       "javascript": "class AVLNode {\n    constructor(val) {\n        this.val = val;\n        this.left = null;\n        this.right = null;\n        this.height = 1;\n    }\n}\n\nclass AVLTree {\n    getHeight(node) {\n        return node ? node.height : 0;\n    }\n    \n    getBalance(node) {\n        return node ? this.getHeight(node.left) - this.getHeight(node.right) : 0;\n    }\n    \n    rotateRight(y) {\n        const x = y.left;\n        const T2 = x.right;\n        x.right = y;\n        y.left = T2;\n        y.height = 1 + Math.max(this.getHeight(y.left), this.getHeight(y.right));\n        x.height = 1 + Math.max(this.getHeight(x.left), this.getHeight(x.right));\n        return x;\n    }\n}"
     },
     "useCases": [
-      "Database indexing",
-      "Memory management",
-      "Graphics applications"
+      "Database indexing with guaranteed balance",
+      "In-memory sorted collections",
+      "File system organization",
+      "Graphics rendering scene graphs"
     ],
     "relatedProblems": [
-      "Binary Search Tree Iterator",
-      "Validate Binary Search Tree"
+      "Validate Binary Search Tree",
+      "Kth Smallest Element in a BST"
     ]
   },
   {
@@ -432,7 +501,12 @@
       "python": "class BTreeNode:\n    def __init__(self, t, leaf=False):\n        self.t = t  # minimum degree\n        self.keys = []\n        self.children = []\n        self.leaf = leaf\n    \n    def search(self, key):\n        i = 0\n        while i < len(self.keys) and key > self.keys[i]:\n            i += 1\n        \n        if i < len(self.keys) and key == self.keys[i]:\n            return self\n        elif self.leaf:\n            return None\n        else:\n            return self.children[i].search(key)\n\nclass BTree:\n    def __init__(self, t):\n        self.root = BTreeNode(t, True)\n        self.t = t",
       "javascript": "class BTreeNode {\n    constructor(t, leaf = false) {\n        this.t = t;  // minimum degree\n        this.keys = [];\n        this.children = [];\n        this.leaf = leaf;\n    }\n    \n    search(key) {\n        let i = 0;\n        while (i < this.keys.length && key > this.keys[i]) {\n            i++;\n        }\n        \n        if (i < this.keys.length && key === this.keys[i]) {\n            return this;\n        } else if (this.leaf) {\n            return null;\n        } else {\n            return this.children[i].search(key);\n        }\n    }\n}\n\nclass BTree {\n    constructor(t) {\n        this.root = new BTreeNode(t, true);\n        this.t = t;\n    }\n}"
     },
-    "useCases": ["Database systems", "File systems", "Large-scale storage"],
-    "relatedProblems": ["Design In-Memory File System", "LRU Cache"]
+    "useCases": [
+      "Database management systems (MySQL, PostgreSQL)",
+      "File system implementations (NTFS, ext4)",
+      "Large-scale data storage",
+      "Multi-level indexing"
+    ],
+    "relatedProblems": ["LRU Cache"]
   }
 ]
