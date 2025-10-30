@@ -101,7 +101,18 @@ export const useSubmissions = (
             attempt?.user_id === userId &&
             attempt?.problem_id === problemId
           ) {
-            addOrUpdateIfPassed(attempt);
+            // For updates, always update the submission (including complexity_analysis)
+            setSubmissions((prev) => {
+              const next = [...prev];
+              const idx = next.findIndex((s) => s.id === attempt.id);
+              if (idx !== -1) {
+                next[idx] = attempt;
+              } else if (attempt.status === "passed") {
+                // If it's a new passed submission, add it
+                addOrUpdateIfPassed(attempt);
+              }
+              return next;
+            });
           }
         },
       )

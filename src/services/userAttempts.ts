@@ -321,4 +321,38 @@ export class UserAttemptsService {
 
     return uniqueSubmissions;
   }
+
+  // Save complexity analysis for a submission
+  static async saveComplexityAnalysis(
+    submissionId: string,
+    analysis: {
+      time_complexity: string;
+      time_explanation: string;
+      space_complexity: string;
+      space_explanation: string;
+      analysis: string;
+    }
+  ): Promise<UserAttempt | null> {
+    console.log('💾 [UserAttemptsService] Saving analysis for submission:', submissionId);
+    console.log('📝 [UserAttemptsService] Analysis:', analysis);
+    
+    const { data, error } = (await supabase
+      .from("user_problem_attempts")
+      .update({
+        complexity_analysis: analysis as unknown as Json,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", submissionId)
+      .select()
+      .single()) as SupabaseQueryResult<UserAttempt>;
+
+    if (error) {
+      console.error("❌ [UserAttemptsService] Error saving complexity analysis:", error);
+      return null;
+    }
+
+    console.log('✅ [UserAttemptsService] Successfully saved analysis');
+    console.log('📊 [UserAttemptsService] Updated submission:', data);
+    return data;
+  }
 }

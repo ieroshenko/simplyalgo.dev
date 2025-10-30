@@ -19,6 +19,14 @@ export interface NotesData {
   updated_at: string | null;
 }
 
+export interface ComplexityAnalysis {
+  time_complexity: string;
+  time_explanation: string;
+  space_complexity: string;
+  space_explanation: string;
+  analysis: string;
+}
+
 export interface UserAttempt {
   id: string;
   user_id: string;
@@ -31,6 +39,7 @@ export interface UserAttempt {
   memory_usage: number | null;
   created_at: string;
   updated_at: string;
+  complexity_analysis: ComplexityAnalysis | null;
 }
 
 // Generic type for Supabase query results with proper error handling

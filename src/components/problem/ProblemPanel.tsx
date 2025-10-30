@@ -5,7 +5,7 @@ import { Problem } from "@/types";
 import Notes, { NotesHandle } from "@/components/Notes";
 import { useSubmissions } from "@/hooks/useSubmissions";
 import { useSolutions } from "@/hooks/useSolutions";
-import { useState } from "react";
+import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
@@ -56,6 +56,23 @@ const ProblemPanel = ({
   
   // Select syntax highlighting theme based on current color scheme
   const syntaxTheme = isDark ? vscDarkPlus : vs;
+
+  // Load existing complexity analysis from submissions
+  React.useEffect(() => {
+    console.log('🔍 [ProblemPanel] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    if (submissions && submissions.length > 0) {
+      const results: Record<string, any> = {};
+      submissions.forEach(submission => {
+        console.log('📊 [ProblemPanel] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        if (submission.complexity_analysis) {
+          console.log('✅ [ProblemPanel] Loading analysis:', submission.complexity_analysis);
+          results[submission.id] = submission.complexity_analysis;
+        }
+      });
+      console.log('✅ [ProblemPanel] Total loaded analysis:', Object.keys(results).length);
+      setComplexityResults(results);
+    }
+  }, [submissions]);
 
   const toggleSubmission = (id: string) => {
     setExpandedSubmissionId((prev) => (prev === id ? null : id));
@@ -118,16 +135,30 @@ const ProblemPanel = ({
       // Handle the response structure from the backend
       const analysis = result.complexityAnalysis || result;
 
+      const analysisData = {
+        time_complexity: analysis.timeComplexity,
+        time_explanation: analysis.timeExplanation,
+        space_complexity: analysis.spaceComplexity,
+        space_explanation: analysis.spaceExplanation,
+        analysis: analysis.overallAnalysis
+      };
+
+      // Save to state for immediate display
       setComplexityResults(prev => ({
         ...prev,
-        [submissionId]: {
-          time_complexity: analysis.timeComplexity,
-          time_explanation: analysis.timeExplanation,
-          space_complexity: analysis.spaceComplexity,
-          space_explanation: analysis.spaceExplanation,
-          analysis: analysis.overallAnalysis
-        }
+        [submissionId]: analysisData
       }));
+
+      // Save to database for persistence
+      console.log('💾 [ProblemPanel] Saving analysis for submission:', submissionId);
+      console.log('📝 [ProblemPanel] Analysis data:', analysisData);
+      const { UserAttemptsService } = await import("@/services/userAttempts");
+      const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
+      console.log('✅ [ProblemPanel] Save result:', saved ? 'Success' : 'Failed');
+
+      if (!saved) {
+        console.error('❌ [ProblemPanel] Failed to save analysis to database');
+      }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {

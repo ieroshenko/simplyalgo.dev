@@ -195,6 +195,23 @@ const ProblemSolverNew = () => {
   } = useSubmissions(user?.id, problem?.id);
   const { solutions, loading: solutionsLoading } = useSolutions(problemId);
 
+  // Load existing complexity analysis from submissions
+  useEffect(() => {
+    console.log('🔍 [ProblemSolverNew] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    if (submissions && submissions.length > 0) {
+      const results: Record<string, any> = {};
+      submissions.forEach(submission => {
+        console.log('📊 [ProblemSolverNew] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        if (submission.complexity_analysis) {
+          console.log('✅ [ProblemSolverNew] Loading analysis:', submission.complexity_analysis);
+          results[submission.id] = submission.complexity_analysis;
+        }
+      });
+      console.log('✅ [ProblemSolverNew] Total loaded analysis:', Object.keys(results).length);
+      setComplexityResults(results);
+    }
+  }, [submissions]);
+
   // Initialize code when problem is loaded
   useEffect(() => {
     if (problem?.functionSignature && code === "") {
@@ -337,16 +354,29 @@ const ProblemSolverNew = () => {
       // Handle the response structure from the backend
       const analysis = result.complexityAnalysis || result;
       
+      const analysisData = {
+        time_complexity: analysis.timeComplexity,
+        time_explanation: analysis.timeExplanation,
+        space_complexity: analysis.spaceComplexity,
+        space_explanation: analysis.spaceExplanation,
+        analysis: analysis.overallAnalysis
+      };
+
+      // Save to state for immediate display
       setComplexityResults(prev => ({
         ...prev,
-        [submissionId]: {
-          time_complexity: analysis.timeComplexity,
-          time_explanation: analysis.timeExplanation,
-          space_complexity: analysis.spaceComplexity,
-          space_explanation: analysis.spaceExplanation,
-          analysis: analysis.overallAnalysis
-        }
+        [submissionId]: analysisData
       }));
+
+      // Save to database for persistence
+      console.log('💾 [ProblemSolverNew] Saving analysis for submission:', submissionId);
+      console.log('📝 [ProblemSolverNew] Analysis data:', analysisData);
+      const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
+      console.log('✅ [ProblemSolverNew] Save result:', saved ? 'Success' : 'Failed');
+
+      if (!saved) {
+        console.error('❌ [ProblemSolverNew] Failed to save analysis to database');
+      }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {
