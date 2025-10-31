@@ -17,10 +17,14 @@ FRONTEND_PORT="8080"
 # Ensure cleanup on exit
 API_PID=""
 FRONTEND_PID=""
+NGROK_PID=""
 cleanup() {
   echo -e "${YELLOW}🧹 Cleaning up processes...${NC}"
   if [[ -n "${API_PID}" ]]; then kill ${API_PID} 2>/dev/null || true; fi
   if [[ -n "${FRONTEND_PID}" ]]; then kill ${FRONTEND_PID} 2>/dev/null || true; fi
+  if [[ -n "${NGROK_PID}" ]]; then kill ${NGROK_PID} 2>/dev/null || true; fi
+  # Clean up PID files
+  rm -f /tmp/code-executor.pid /tmp/ngrok.pid /tmp/code-executor.log /tmp/ngrok.log
 }
 trap cleanup EXIT INT TERM
 
@@ -55,6 +59,32 @@ for i in {1..60}; do
 done
 curl -fsS "http://localhost:${API_PORT}/health" >/dev/null || { echo -e "${RED}❌ API failed to start${NC}"; exit 1; }
 
+# Start ngrok tunnel
+echo -e "${YELLOW}🌐 Starting ngrok tunnel...${NC}"
+ngrok http ${API_PORT} > /tmp/ngrok.log 2>&1 &
+NGROK_PID=$!
+echo "${NGROK_PID}" > /tmp/ngrok.pid
+
+# Wait for ngrok to initialize
+sleep 3
+
+# Get ngrok URL from API
+NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o 'https://[a-zA-Z0-9.-]*\.ngrok-free\.app' | head -1)
+
+if [[ -n "${NGROK_URL}" ]]; then
+  echo -e "${GREEN}✅ ngrok tunnel: ${NGROK_URL}${NC}"
+  
+  # Update Supabase secret
+  echo -e "${YELLOW}🔐 Updating Supabase secret...${NC}"
+  if npx supabase secrets set CODE_EXECUTOR_URL="${NGROK_URL}" 2>/dev/null; then
+    echo -e "${GREEN}✅ Supabase secret updated${NC}"
+  else
+    echo -e "${YELLOW}⚠️  Could not update Supabase secret (may need to run 'npx supabase login')${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠️  ngrok tunnel not available (continuing without it)${NC}"
+fi
+
 echo -e "${YELLOW}📦 Installing frontend deps...${NC}"
 npm install --no-audit --no-fund --silent
 echo -e "${YELLOW}🚀 Starting frontend dev server on :${FRONTEND_PORT}...${NC}"
@@ -72,11 +102,18 @@ done
 curl -fsS "http://localhost:${FRONTEND_PORT}/" >/dev/null || { echo -e "${RED}❌ Frontend failed to start${NC}"; exit 1; }
 
 echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}🎉 Dev environment is ready!${NC}"
-echo -e "${GREEN}📱 Frontend:${NC} http://localhost:${FRONTEND_PORT}"
-echo -e "${GREEN}🔧 API:${NC} http://localhost:${API_PORT} (health at /health)"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${YELLOW}Press Ctrl+C to stop both servers${NC}"
+echo -e "${GREEN}📱 Frontend:${NC}        http://localhost:${FRONTEND_PORT}"
+echo -e "${GREEN}🔧 API:${NC}            http://localhost:${API_PORT}/health"
+if [[ -n "${NGROK_URL}" ]]; then
+  echo -e "${GREEN}🌐 Public API:${NC}     ${NGROK_URL}"
+  echo -e "${GREEN}📈 ngrok Dashboard:${NC} http://localhost:4040"
+fi
+echo ""
+echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
 
-# Wait on both
-wait ${API_PID} ${FRONTEND_PID}
+# Wait on all processes
+wait ${API_PID} ${FRONTEND_PID} ${NGROK_PID}

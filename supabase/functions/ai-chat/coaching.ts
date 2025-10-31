@@ -55,37 +55,6 @@ function parseConstraints(problemDescription: string): {
 }
 
 /**
- * Compute a reasonable insert/highlight line inside the current function body
- */
-function computeSuggestedInsertLine(code: string): number {
-  const lines = (code || "").split('\n');
-  if (lines.length === 0) return 2;
-  let defLine = -1;
-  let defIndent = 0;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const m = lines[i].match(/^(\s*)def\s+\w+\s*\(/);
-    if (m) { defLine = i; defIndent = m[1]?.length || 0; break; }
-  }
-  if (defLine === -1) return Math.max(2, lines.length + 1);
-  let bodyStart = defLine + 1;
-  while (bodyStart < lines.length) {
-    const indent = (lines[bodyStart].match(/^\s*/)?.[0] || '').length;
-    if (indent > defIndent) break;
-    bodyStart++;
-  }
-  if (bodyStart >= lines.length) return defLine + 2;
-  // Next blank within body, else last body + 1
-  let firstBlank = -1, last = bodyStart;
-  for (let i = bodyStart; i < lines.length; i++) {
-    const indent = (lines[i].match(/^\s*/)?.[0] || '').length;
-    if (/^\s*def\s+\w+\s*\(/.test(lines[i]) && indent <= defIndent) break;
-    last = i;
-    if (firstBlank === -1 && lines[i].trim() === '') firstBlank = i;
-  }
-  const target = firstBlank !== -1 ? firstBlank + 1 : last + 2;
-  return Math.max(2, target);
-}
-/**
  * Start an interactive coaching session - generates first question
  */
 export async function startInteractiveCoaching(
@@ -97,6 +66,82 @@ export async function startInteractiveCoaching(
 ) {
   logger.coaching("Starting context-aware coaching", { problemId, userId, difficulty, action: "start_interactive_coaching" });
   const sessionId = crypto.randomUUID();
+
+  // CHECK IF SOLUTION IS ALREADY COMPLETE - Run tests before asking questions
+  const hasReturn = /return\s+/.test(currentCode);
+  const looksComplete = hasReturn && currentCode.trim().length > 50;
+
+  if (looksComplete) {
+    console.log("🧪 [startInteractiveCoaching] Solution looks complete, running tests before starting session...");
+
+    try {
+      // Fetch problem and test cases
+      const { data: problem } = await supabaseAdmin
+        .from("problems")
+        .select("*, test_cases(*)")
+        .eq("id", problemId)
+        .single();
+
+      if (problem && problem.test_cases && problem.test_cases.length > 0) {
+        // Call code executor API
+        const codeExecutorUrl = Deno.env.get("CODE_EXECUTOR_URL") || "http://localhost:3001";
+        const testResponse = await fetch(`${codeExecutorUrl}/execute`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: currentCode,
+            language: "python",
+            problemId: problemId,
+            testCases: problem.test_cases.map((tc: any) => ({
+              input: tc.input_json,
+              expected: tc.expected_json,
+            })),
+          }),
+        });
+
+        console.log("🧪 [startInteractiveCoaching] Test response status:", testResponse.status);
+
+        if (testResponse.ok) {
+          const testResults = await testResponse.json();
+          console.log("🧪 [startInteractiveCoaching] Test results:", JSON.stringify(testResults));
+
+          // Check if all tests passed
+          const allPassed = testResults.results?.every((r: any) => r.passed) || false;
+          const passedCount = testResults.results?.filter((r: any) => r.passed).length || 0;
+          const totalCount = testResults.results?.length || 0;
+
+          console.log(`🧪 [startInteractiveCoaching] Test summary: ${passedCount}/${totalCount} passed, allPassed=${allPassed}`);
+
+          if (allPassed && totalCount > 0) {
+            console.log("✅ [startInteractiveCoaching] All tests passed! Solution is already complete. RETURNING COMPLETION.");
+
+            // Return completion message instead of starting coaching
+            return {
+              sessionId,
+              question: `🎉 **Congratulations!** Your solution is correct!\n\nAll ${totalCount} test cases passed! ✅\n\nYour code successfully handles all edge cases and produces the expected output. Great work!`,
+              hint: "🌟 Your solution is complete and ready to submit. Feel free to explore optimizations or move on to the next challenge!",
+              highlightArea: null,
+              difficulty,
+              currentStepNumber: 1,
+              awaitingSubmission: false,
+              isCompleted: true,
+              responseId: null,
+              contextInitialized: false
+            };
+          } else {
+            console.log(`⚠️ [startInteractiveCoaching] Tests failed: ${passedCount}/${totalCount} passed - will provide coaching`);
+          }
+        } else {
+          console.error(`❌ [startInteractiveCoaching] Test execution failed with status: ${testResponse.status}`);
+          const errorText = await testResponse.text();
+          console.error(`❌ [startInteractiveCoaching] Error response: ${errorText}`);
+        }
+      }
+    } catch (testError) {
+      console.error("⚠️ [startInteractiveCoaching] Test execution failed:", testError);
+      // Continue with coaching if test execution fails
+    }
+  }
 
   // Analyze current code to determine an insertion line inside the active function
   const codeLines = (currentCode || '').split('\n');
@@ -522,9 +567,11 @@ export async function validateCoachingSubmission(
   sessionId: string,
   studentCode: string,
   studentResponse: string,
-  currentEditorCode: string
+  currentEditorCode: string,
+  problemId?: string,
+  userId?: string
 ): Promise<CoachingValidation> {
-  console.log("🎯 [validateCoachingSubmission] Validating...", { sessionId, studentCode: studentCode.slice(0, 100) + "..." });
+  console.log("🎯 [validateCoachingSubmission] Validating...", { sessionId, studentCode: studentCode.slice(0, 100) + "...", problemId });
 
   // Get session data
   const { data: session, error: sessionError } = await supabaseAdmin
@@ -665,9 +712,11 @@ ANTI-LOOP SAFETY CHECK:
 - If you notice you're rejecting code that's essentially correct, accept it and move forward
 
 NEXT STEP RULES - CRITICAL:
-- **If isCorrect = true**: Provide nextStep with the next question
+- **If isCorrect = true AND there are more steps needed**: Provide nextStep with the next question
+- **If isCorrect = true AND solution is complete**: Set nextAction to "complete_session" and OMIT nextStep
 - **If isCorrect = false**: Set nextStep to empty object {} or omit it entirely
 - DO NOT provide nextStep when the student's answer is incorrect
+- DO NOT provide nextStep when the solution is complete - use "complete_session" instead
 - Student must answer the current question correctly before seeing the next question
 
 Return JSON in this exact format:
@@ -693,16 +742,20 @@ Return JSON in this exact format:
 }
 
 IMPORTANT VALIDATION LOGIC:
-- If isCorrect = true AND codeToAdd is empty → nextStep must be provided
-- If isCorrect = true AND codeToAdd has code → nextStep must be provided (will show after code insertion)
+- If isCorrect = true AND solution is INCOMPLETE → nextStep must be provided
+- If isCorrect = true AND solution is COMPLETE → nextAction = "complete_session", OMIT nextStep
 - If isCorrect = false → nextStep must be empty {} or omitted entirely
+- Check if all required components exist before generating nextStep
+- If student has all the logic needed, mark as complete instead of asking more questions
 
 CRITICAL NEXT STEP GENERATION:
 - Before generating nextStep question, analyze what code student already has
 - DO NOT ask questions about code that already exists in the editor
 - nextStep should ask about the NEXT missing piece, not existing code
 - Example: If student has shrinking logic, don't ask "How will you shrink?" - ask about what comes NEXT
-- If all algorithmic components are present, mark session complete instead of generating more questions`;
+- **MOST IMPORTANT**: If all algorithmic components are present and solution is complete, set nextAction = "complete_session" and DO NOT provide nextStep
+- Only provide nextStep if there is genuinely more work to be done
+- Completing the solution should end the session, not generate another question`;
 
   let contextualResponse: ContextualResponse;
 
@@ -789,6 +842,87 @@ CRITICAL NEXT STEP GENERATION:
         tokens_saved: contextualResponse.tokensSaved || 0,
         context_continued: !contextualResponse.isNewContext
       });
+
+    // AUTO-TEST EXECUTION: If solution looks complete, run test cases
+    if (validation.isCorrect && problemId && userId) {
+      console.log("🧪 [validateCoachingSubmission] Solution looks complete, checking if we should run tests...");
+
+      // Check if solution has return statement and looks complete
+      const hasReturn = /return\s+/.test(currentEditorCode);
+      const looksComplete = hasReturn && currentEditorCode.trim().length > 50;
+
+      if (looksComplete) {
+        console.log("🧪 [validateCoachingSubmission] Running test cases to verify solution...");
+
+        try {
+          // Fetch problem and test cases
+          const { data: problem } = await supabaseAdmin
+            .from("problems")
+            .select("*, test_cases(*)")
+            .eq("id", problemId)
+            .single();
+
+          if (problem && problem.test_cases && problem.test_cases.length > 0) {
+            // Call code executor API
+            const codeExecutorUrl = Deno.env.get("CODE_EXECUTOR_URL") || "http://localhost:3001";
+            const testResponse = await fetch(`${codeExecutorUrl}/execute`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                code: currentEditorCode,
+                language: "python",
+                problemId: problemId,
+                testCases: problem.test_cases.map((tc: any) => ({
+                  input: tc.input_json,
+                  expected: tc.expected_json,
+                })),
+              }),
+            });
+
+            if (testResponse.ok) {
+              const testResults = await testResponse.json();
+              console.log("🧪 [validateCoachingSubmission] Test results:", testResults);
+
+              // Check if all tests passed
+              const allPassed = testResults.results?.every((r: any) => r.passed) || false;
+              const passedCount = testResults.results?.filter((r: any) => r.passed).length || 0;
+              const totalCount = testResults.results?.length || 0;
+
+              if (allPassed) {
+                console.log("✅ [validateCoachingSubmission] All tests passed! Marking session as complete.");
+
+                // Override validation to mark as complete
+                validation.nextAction = "complete_session";
+                validation.feedback = `🎉 Excellent work! Your solution passes all ${totalCount} test cases and meets the complexity requirements. Well done!`;
+                validation.nextStep = {}; // Clear next step
+
+              } else {
+                console.log(`⚠️ [validateCoachingSubmission] Tests failed: ${passedCount}/${totalCount} passed`);
+
+                // Provide feedback about failed tests
+                const failedTests = testResults.results?.filter((r: any) => !r.passed) || [];
+                const firstFailed = failedTests[0];
+
+                validation.isCorrect = false;
+                validation.nextAction = "retry";
+                validation.feedback = `Your solution looks complete, but ${totalCount - passedCount} test case(s) failed. 
+
+Test Case ${firstFailed?.testNumber || 1}:
+Input: ${JSON.stringify(firstFailed?.input)}
+Expected: ${JSON.stringify(firstFailed?.expected)}
+Got: ${JSON.stringify(firstFailed?.actual)}
+
+${firstFailed?.error || "Review your logic and try again."}`;
+                validation.nextStep = {};
+              }
+            }
+          }
+        } catch (testError) {
+          console.error("⚠️ [validateCoachingSubmission] Test execution failed:", testError);
+          // Continue with AI validation if test execution fails
+        }
+      }
+    }
 
     // Update session state and context information
     const sessionUpdateData: any = {

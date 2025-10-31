@@ -307,15 +307,15 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       if (data.isCompleted) {
         console.log("✅ [COACHING] Solution already complete at session start");
 
-        // Initialize session state as completed
+        // Initialize session state as completed - show the congratulations message in overlay
         setCoachingState(prev => ({
           ...prev,
           session: {
             id: data.sessionId,
             currentStepNumber: 1,
             isCompleted: true,
-            currentQuestion: '',
-            currentHint: undefined,
+            currentQuestion: data.question || '🎉 Your solution is correct!',
+            currentHint: data.hint,
             highlightArea: null,
           } as InteractiveCoachSession,
           isCoachModeActive: true,
@@ -326,7 +326,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           feedback: {
             show: true,
             type: "success",
-            message: "🎉 Your solution is already complete! You can test it or explore optimizations.",
+            message: "🎉 All test cases passed!",
             showConfetti: true,
           },
         }));
@@ -702,8 +702,11 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             isWaitingForResponse: false,
           }));
 
-          // Show next question after a brief moment to let user see success feedback
-          if (data.nextStep?.question) {
+          // Check if solution is complete or if there's a next step
+          const isComplete = data.nextAction === "complete_session" || !data.nextStep?.question;
+          
+          if (!isComplete && data.nextStep?.question) {
+            // Show next question after a brief moment to let user see success feedback
             setTimeout(() => {
               showInteractiveQuestion({
                 question: data.nextStep.question,
@@ -713,7 +716,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             }, 2000); // 2 second delay to show success feedback
           } else {
             // Step completed without next step - finish session
-            console.log("🎉 [COACHING] Step completed, ending session");
+            console.log("🎉 [COACHING] Solution complete, ending session");
             
             setCoachingState(prev => ({
               ...prev,
@@ -731,12 +734,12 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               feedback: {
                 show: true,
                 type: "success",
-                message: "🎉 Well done! This step is complete.",
+                message: "🎉 Well done! Solution complete. Check if there are optimizations available.",
                 showConfetti: true,
               },
             }));
             
-            console.log("🎯 [STATE] Step completed - state updated:", {
+            console.log("🎯 [STATE] Solution completed - state updated:", {
               isCompleted: true,
               currentQuestion: "",
               showInputOverlay: false,

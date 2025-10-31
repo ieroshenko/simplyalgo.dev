@@ -683,13 +683,20 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {/* Session completed notification - using centralized state management */}
           {overlayState === 'completed' && (
-            <div className="p-4 text-center">
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-2">
+            <div className="p-4">
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-3 text-center">
                 Session Complete!
               </div>
-              <div className="text-sm text-muted-foreground">
-                You've successfully completed this coaching session.
-              </div>
+              {question && (
+                <div className="text-sm text-foreground mb-3 leading-relaxed whitespace-pre-line">
+                  {question}
+                </div>
+              )}
+              {hint && (
+                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md border-l-4 border-blue-200 dark:border-blue-600">
+                  {hint}
+                </div>
+              )}
             </div>
           )}
 

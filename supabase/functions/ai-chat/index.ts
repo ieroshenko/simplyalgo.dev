@@ -246,7 +246,9 @@ serve(async (req) => {
           sessionId,
           studentCode,
           userResponse || "",
-          currentEditorCode
+          currentEditorCode,
+          problemId, // Pass problemId for test execution
+          userId     // Pass userId for test execution
         );
         console.log("🎯 [COACHING] Validation result:", validation);
         
