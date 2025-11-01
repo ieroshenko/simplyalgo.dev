@@ -10,6 +10,8 @@ export const useSubmissions = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollDeadlineRef = useRef<number>(0);
 
   const addOrUpdateIfPassed = (attempt: UserAttempt | null | undefined) => {
     if (!attempt || attempt.status !== "passed") return;
@@ -130,6 +132,10 @@ export const useSubmissions = (
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
     };
   }, [userId, problemId]);
 
@@ -158,5 +164,41 @@ export const useSubmissions = (
     addOrUpdateIfPassed(attempt || undefined);
   };
 
-  return { submissions, loading, error, refetch, optimisticAdd };
+  // Lightweight polling fallback: use when backend updates may lag or realtime is disabled
+  const watchForAcceptance = (timeoutMs = 60_000, intervalMs = 2_000) => {
+    if (!userId || !problemId) return;
+    // Reset any prior polling
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    pollDeadlineRef.current = Date.now() + timeoutMs;
+    pollTimerRef.current = setInterval(async () => {
+      if (Date.now() > pollDeadlineRef.current) {
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+        return;
+      }
+      try {
+        const data = await UserAttemptsService.getAcceptedSubmissions(userId, problemId);
+        // If a new item arrived, update and stop polling
+        setSubmissions((prev) => {
+          const prevIds = new Set(prev.map((p) => p.id));
+          const next = [...data];
+          const hasNew = next.some((n) => !prevIds.has(n.id));
+          if (hasNew && pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          return next;
+        });
+      } catch {
+        // ignore transient errors
+      }
+    }, intervalMs);
+  };
+
+  return { submissions, loading, error, refetch, optimisticAdd, watchForAcceptance };
 };

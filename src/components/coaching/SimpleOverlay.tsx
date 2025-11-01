@@ -134,10 +134,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const logDebug = useCallback((...args: unknown[]) => {
     try {
       if (localStorage.getItem('coach_overlay_debug') === '1') {
-        // eslint-disable-next-line no-console
         console.log('[COACH][overlay]', ...args);
       }
-    } catch {}
+    } catch {
+      void 0; // ignore
+    }
   }, []);
 
   // Initialize EditorBoundsCalculator
@@ -238,7 +239,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const applyPreset = useCallback((preset: PositionPreset) => {
     logDebug('applyPreset', preset);
     setPositionPreset(preset);
-    try { localStorage.setItem('coach_overlay_position_preset', preset); } catch {}
+    try { localStorage.setItem('coach_overlay_position_preset', preset); } catch { void 0; }
     if (preset !== 'custom') {
       setCustomPosition(null);
     }
@@ -481,7 +482,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         viewport: { w: window.innerWidth, h: window.innerHeight },
         at: Date.now(),
       }));
-    } catch {}
+    } catch {
+      void 0;
+    }
   }, [isVisible, positionPreset, customPosition, isMobile, highlightedLine, question, validationResult?.isCorrect]);
 
   // Enhanced error handling and fallback positioning
@@ -586,7 +589,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('drag-handle')) {
       // Switch to custom preset when user starts dragging
-      try { localStorage.setItem('coach_overlay_position_preset', 'custom'); } catch {}
+      try { localStorage.setItem('coach_overlay_position_preset', 'custom'); } catch { void 0; }
       setPositionPreset('custom');
       setIsDragging(true);
       const rect = overlayRef.current?.getBoundingClientRect();
@@ -739,8 +742,6 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     };
   }, [isDragging, dragOffset, customPosition, position, onPositionChange, positionManager, problemId, getEditorBounds]);
 
-  if (!isVisible) return null;
-
   const resolvedPosition = useMemo(() => {
     // Explicit presets take precedence and bypass manager
     if (positionPreset !== 'auto' && positionPreset !== 'custom') {
@@ -757,6 +758,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     return p;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positionPreset, customPosition, isMobile, highlightedLine, question, validationResult?.isCorrect]);
+
+  if (!isVisible) return null;
 
   return (
     <div
@@ -863,9 +866,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {/* Session completed notification - using centralized state management */}
           {overlayState === 'completed' && (
             <div className="p-4">
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-3 text-center">
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400 mb-1 text-center">
                 Session Complete!
               </div>
+              {isOptimizable && (
+                <div className="text-sm text-muted-foreground mb-3 text-center">
+                  Your solution passes all tests. There’s room to optimize time/space — click Optimize to learn and improve.
+                </div>
+              )}
               {question && (
                 <div className="text-sm text-foreground mb-3 leading-relaxed whitespace-pre-line">
                   {question}

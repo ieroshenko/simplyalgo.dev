@@ -607,6 +607,8 @@ const ProblemSolverNew = () => {
         );
         // Optimistically add to submissions list for instant UI feedback
         if (saved) optimisticAdd(saved);
+        // Ensure the submissions tab reflects this run even if realtime misses
+        watchForAcceptance(30_000, 2_000);
         await handleProblemSolved(
           problem.difficulty as "Easy" | "Medium" | "Hard",
         );
@@ -626,6 +628,8 @@ const ProblemSolverNew = () => {
     try {
       await UserAttemptsService.submitCode(user.id, problem.id, code);
       toast.success("Solution submitted successfully!");
+      // Start watching for the asynchronous grader to mark as accepted
+      watchForAcceptance(60_000, 2_000);
     } catch (error) {
       toast.error("Failed to submit solution");
     }

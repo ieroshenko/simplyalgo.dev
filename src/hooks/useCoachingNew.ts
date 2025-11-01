@@ -512,8 +512,8 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
         setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
 
-        if (data?.nextAction === 'complete_optimization') {
-          // Show completed overlay (no question), allow Finish
+        if (data?.nextAction === 'complete_optimization' && data?.isCorrect === true) {
+          // Only complete optimization when the step is actually correct
           applyHighlight(null);
           const pos = getPositionBelowLastLine();
           setCoachingState(prev => ({
@@ -754,7 +754,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             setTimeout(stopCoaching, 1500);
           }
         }
-      } else if (data.nextAction === "complete_session") {
+      } else if (data.isCorrect !== false && data.nextAction === "complete_session") {
         console.log("🎉 [COACHING] Session completed!");
         
         // CRITICAL: Clear all overlay state when completing
