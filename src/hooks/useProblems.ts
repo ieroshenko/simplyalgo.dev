@@ -65,21 +65,21 @@ type ProblemRowWithRelations = {
   difficulty: "Easy" | "Medium" | "Hard";
   description: string;
   function_signature: string;
-  examples?: Array<{ input: string; output: string; explanation?: string }>|null;
-  constraints?: string[]|null;
+  examples?: Array<{ input: string; output: string; explanation?: string }> | null;
+  constraints?: string[] | null;
   categories: { name: string; color: string };
-  test_cases: TestCaseRow[]|null;
-  likes?: number|null;
-  dislikes?: number|null;
-  acceptance_rate?: number|null;
-  recommended_time_complexity?: string|null;
-  recommended_space_complexity?: string|null;
-  companies?: string[]|null; // JSONB array of company names
+  test_cases: TestCaseRow[] | null;
+  likes?: number | null;
+  dislikes?: number | null;
+  acceptance_rate?: number | null;
+  recommended_time_complexity?: string | null;
+  recommended_space_complexity?: string | null;
+  companies?: string[] | null; // JSONB array of company names
 };
 
 type ProblemIdWithCategory = {
   id: string;
-  categories: { name: string|null }|null;
+  categories: { name: string | null } | null;
 };
 
 export const useProblems = (userId?: string) => {
@@ -100,7 +100,7 @@ export const useProblems = (userId?: string) => {
       const { data: problemsData, error: problemsError } = await query;
 
       console.log('🔍 useProblems: Fetched problems count:', problemsData?.length);
-      console.log('🔍 useProblems: Looking for implement-linked-list:', 
+      console.log('🔍 useProblems: Looking for implement-linked-list:',
         problemsData?.find((p: any) => p.id === 'implement-linked-list'));
 
       if (problemsError) throw problemsError;
@@ -158,7 +158,7 @@ export const useProblems = (userId?: string) => {
       });
 
       console.log('🔍 useProblems: Formatted problems count:', formattedProblems.length);
-      console.log('🔍 useProblems: implement-linked-list in formatted:', 
+      console.log('🔍 useProblems: implement-linked-list in formatted:',
         formattedProblems.find(p => p.id === 'implement-linked-list'));
 
       setProblems(formattedProblems);

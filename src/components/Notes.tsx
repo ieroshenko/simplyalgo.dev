@@ -283,11 +283,11 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     <div className="flex-1 flex flex-col h-full">
       <h2 className="text-lg font-semibold text-foreground mb-4">Notes</h2>
 
-      <div className="bg-muted/50 rounded-lg p-4 flex-1 min-h-[400px] flex">
+      <div className="bg-muted/50 rounded-lg p-4 h-[500px]">
         <textarea
           value={content}
           onChange={handleContentChange}
-          className="w-full h-full bg-transparent border-none outline-none resize-none text-sm flex-1 placeholder-muted-foreground"
+          className="w-full h-full bg-transparent border-none outline-none resize-none text-sm placeholder-muted-foreground"
           placeholder="Start writing your notes..."
         />
       </div>

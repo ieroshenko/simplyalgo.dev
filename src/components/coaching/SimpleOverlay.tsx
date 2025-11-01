@@ -1,6 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '../ui/button';
-import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle, Zap, BookOpen } from 'lucide-react';
+import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle, Zap, BookOpen, MapPin } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import confetti from 'canvas-confetti';
 import { OverlayPositionManager, type OverlayPosition, type EditorBounds } from '../../services/overlayPositionManager';
 import { EditorBoundsCalculator, type MonacoEditor } from '../../services/editorBoundsCalculator';
@@ -109,6 +119,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   positionManager,
   problemId,
 }) => {
+  type PositionPreset = 'auto' | 'center' | 'center-bottom' | 'left-top' | 'right-top' | 'right-bottom' | 'left-bottom' | 'custom';
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -116,7 +127,18 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const [studentExplanation, setStudentExplanation] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
+  const [positionPreset, setPositionPreset] = useState<PositionPreset>('auto');
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Debug logger (enable via localStorage key: coach_overlay_debug = '1')
+  const logDebug = useCallback((...args: unknown[]) => {
+    try {
+      if (localStorage.getItem('coach_overlay_debug') === '1') {
+        // eslint-disable-next-line no-console
+        console.log('[COACH][overlay]', ...args);
+      }
+    } catch {}
+  }, []);
 
   // Initialize EditorBoundsCalculator
   const editorBoundsCalculator = useMemo(() => new EditorBoundsCalculator({
@@ -198,6 +220,87 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     }
   }, [editorBoundsCalculator, editorRef]);
 
+  // Load and persist position preset preference
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('coach_overlay_position_preset') as PositionPreset | null;
+      if (saved) {
+        setPositionPreset(saved);
+      } else {
+        // Default to center for predictable first render
+        setPositionPreset('center');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const applyPreset = useCallback((preset: PositionPreset) => {
+    logDebug('applyPreset', preset);
+    setPositionPreset(preset);
+    try { localStorage.setItem('coach_overlay_position_preset', preset); } catch {}
+    if (preset !== 'custom') {
+      setCustomPosition(null);
+    }
+  }, []);
+
+  const getPresetPosition = useCallback((preset: PositionPreset) => {
+    const viewportW = window.innerWidth || 1280;
+    const viewportH = window.innerHeight || 720;
+    // Measure actual overlay size if possible for accurate placement
+    const rect = overlayRef.current?.getBoundingClientRect();
+    const w = rect?.width || (isMobile ? Math.min(viewportW - 32, 500) : 500);
+    const h = rect?.height || 300;
+    const margin = 24;
+
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+
+    let x = (viewportW - w) / 2;
+    let y = (viewportH - h) / 2;
+
+    switch (preset) {
+      case 'center':
+        break;
+      case 'center-bottom':
+        y = viewportH - h - margin;
+        break;
+      case 'left-top':
+        x = margin; y = margin; break;
+      case 'right-top':
+        x = viewportW - w - margin; y = margin; break;
+      case 'right-bottom':
+        x = viewportW - w - margin; y = viewportH - h - margin; break;
+      case 'left-bottom':
+        x = margin; y = viewportH - h - margin; break;
+      default:
+        break;
+    }
+
+    const final = { x: clamp(Math.round(x), margin, Math.max(margin, viewportW - w - margin)), y: clamp(Math.round(y), margin, Math.max(margin, viewportH - h - margin)) };
+    logDebug('getPresetPosition', { preset, viewportW, viewportH, w, h, final });
+    return final;
+  }, [isMobile]);
+
+  // Recompute and set a concrete position when preset changes
+  useEffect(() => {
+    if (positionPreset === 'auto') {
+      // Let smart positioning manage it
+      setCustomPosition(null);
+      return;
+    }
+    if (positionPreset === 'custom') {
+      // Keep user's dragged position
+      return;
+    }
+    // Compute after layout to get accurate dimensions
+    const raf = requestAnimationFrame(() => {
+      const p = getPresetPosition(positionPreset);
+      logDebug('preset effect -> setCustomPosition', positionPreset, p);
+      setCustomPosition(p);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [positionPreset, getPresetPosition]);
+
   // Centralized overlay state management for cleaner UI logic
   const overlayState = useMemo(() => {
     if (isSessionCompleted) return 'completed';
@@ -232,8 +335,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     }
   }, [isVisible]);
 
-  // Load saved position when overlay becomes visible (only if no custom position exists)
+  // Load saved position when overlay becomes visible (AUTO mode only)
   useEffect(() => {
+    if (positionPreset !== 'auto') return; // Only auto uses manager persistence
     // Only load position if we don't already have one (first time showing overlay)
     if (isVisible && positionManager && problemId && !customPosition) {
       try {
@@ -257,7 +361,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         // Don't set customPosition to allow getSmartPosition to handle fallback
       }
     }
-  }, [isVisible, positionManager, problemId, highlightedLine, getEditorBounds]); // Removed customPosition from deps to prevent re-triggering
+  }, [isVisible, positionPreset, positionManager, problemId, highlightedLine, getEditorBounds]); // Removed customPosition from deps to prevent re-triggering
 
   // Handle responsive positioning on window resize
   // Only update mobile state, don't force position recalculation on resize
@@ -317,6 +421,18 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const getSmartPosition = () => {
     if (customPosition) return customPosition;
 
+    // If user selected a preset, compute it immediately for deterministic behavior
+    if (positionPreset !== 'auto' && positionPreset !== 'custom') {
+      const p = getPresetPosition(positionPreset);
+      logDebug('getSmartPosition -> preset immediate', positionPreset, p);
+      return p;
+    }
+    // Custom dragged position
+    if (positionPreset === 'custom' && customPosition) {
+      logDebug('getSmartPosition -> custom', customPosition);
+      return customPosition;
+    }
+
     // If we have a position manager, use it for centralized positioning
     if (positionManager && problemId) {
       try {
@@ -344,6 +460,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           return { x: fallbackPosition.x, y: fallbackPosition.y };
         } catch (fallbackError) {
           console.warn('⚠️ [SimpleOverlay] Fallback positioning also failed:', fallbackError);
+          return getPresetPosition('center');
         }
       }
     }
@@ -351,6 +468,21 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     // Final fallback to legacy positioning logic when OverlayPositionManager is not available
     return getLegacyPosition();
   };
+
+  // Persist the resolved position frequently for debugging/traceability
+  useEffect(() => {
+    if (!isVisible) return;
+    const p = getSmartPosition();
+    logDebug('persist resolved position', { preset: positionPreset, p });
+    try {
+      localStorage.setItem('coach_overlay_position_last', JSON.stringify({
+        preset: positionPreset,
+        position: p,
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        at: Date.now(),
+      }));
+    } catch {}
+  }, [isVisible, positionPreset, customPosition, isMobile, highlightedLine, question, validationResult?.isCorrect]);
 
   // Enhanced error handling and fallback positioning
   const getErrorRecoveryPosition = useCallback(() => {
@@ -453,6 +585,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('drag-handle')) {
+      // Switch to custom preset when user starts dragging
+      try { localStorage.setItem('coach_overlay_position_preset', 'custom'); } catch {}
+      setPositionPreset('custom');
       setIsDragging(true);
       const rect = overlayRef.current?.getBoundingClientRect();
       if (rect) {
@@ -606,7 +741,22 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
   if (!isVisible) return null;
 
-  const smartPosition = getSmartPosition();
+  const resolvedPosition = useMemo(() => {
+    // Explicit presets take precedence and bypass manager
+    if (positionPreset !== 'auto' && positionPreset !== 'custom') {
+      const p = getPresetPosition(positionPreset);
+      logDebug('resolve -> preset', positionPreset, p);
+      return p;
+    }
+    if (positionPreset === 'custom' && customPosition) {
+      logDebug('resolve -> custom', customPosition);
+      return customPosition;
+    }
+    const p = getSmartPosition();
+    logDebug('resolve -> auto(manager/legacy)', p);
+    return p;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionPreset, customPosition, isMobile, highlightedLine, question, validationResult?.isCorrect]);
 
   return (
     <div
@@ -616,10 +766,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       tabIndex={0}
       aria-modal="true"
       aria-label="AI Coach Overlay"
+      data-coach-overlay-version="2025-11-01-continue-cta"
+      data-coach-overlay-preset={positionPreset}
+      data-coach-overlay-left={resolvedPosition.x}
+      data-coach-overlay-top={resolvedPosition.y}
       style={{
         position: "fixed",
-        left: smartPosition.x,
-        top: smartPosition.y,
+        left: resolvedPosition.x,
+        top: resolvedPosition.y,
         zIndex: 1000,
         borderRadius: "12px",
         minWidth: isMobile ? "calc(100vw - 32px)" : "420px",
@@ -648,6 +802,31 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="p-1 hover:bg-accent hover:text-accent-foreground rounded transition-colors"
+                title="Overlay position"
+              >
+                <MapPin className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44 z-[2001]">
+              <DropdownMenuLabel>Overlay Position</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup value={positionPreset} onValueChange={(v) => applyPreset(v as any)}>
+                <DropdownMenuRadioItem value="auto">Auto (smart)</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="center">Center</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="center-bottom">Center bottom</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="left-top">Top left</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="right-top">Top right</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="right-bottom">Bottom right</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="left-bottom">Bottom left</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { applyPreset('custom'); }}>Use dragged position</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             onClick={() => setIsMinimized(!isMinimized)}
             className="p-1 hover:bg-accent hover:text-accent-foreground rounded transition-colors"
@@ -706,9 +885,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               }`}>
               <div className="flex items-start gap-3">
                 {validationResult.isCorrect ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                 ) : (
-                  <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                 )}
                 <div className="flex-1">
                   <div className={`text-sm font-medium mb-1 ${validationResult.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
@@ -739,29 +918,9 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                             💡 {validationResult.nextStep.hint}
                           </div>
                         )}
-                        {(() => {
-                          const q = validationResult.nextStep?.question || "";
-                          const h = validationResult.nextStep?.hint || "";
-                          const f = validationResult.feedback || "";
-                          const text = `${q} ${h} ${f}`;
-                          // Remove "alternative\s+approach" from regex - only look for true optimizations
-                          const mentionsOptimize = /(optimi[sz]|xor|reduce\s+space|o\(1\)\s*space|better\s+complexity|more\s+efficient)/i.test(text);
-                          const hasNext = Boolean(q || h);
-                          const shouldShow = validationResult.isCorrect && hasNext && (validationResult.isOptimizable || mentionsOptimize);
-                          return shouldShow;
-                        })() ? (
-                          <Button
-                            onClick={() => {
-                              if (onStartOptimization) onStartOptimization();
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="mt-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
-                          >
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Learn Optimization
-                          </Button>
-                        ) : null}
+                        {/* Optimization button intentionally hidden inside Next Step.
+                            It should only appear after full solution completion
+                            via the actions bar below. */}
                       </div>
                     )}
                 </div>
@@ -877,23 +1036,13 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
           {overlayState === 'correct' && (
             <Button
-              onClick={() => {
-                confetti({
-                  particleCount: 100,
-                  spread: 70,
-                  origin: { y: 0.6 }
-                });
-                if (onFinishCoaching) {
-                  setTimeout(() => { onFinishCoaching(); }, 1000);
-                } else {
-                  setTimeout(() => { onCancel(); }, 1000);
-                }
-              }}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-green-50 px-6"
+              onClick={handleValidate}
+              disabled={isValidating}
+              size='sm'
+              className='bg-green-600 hover:bg-green-700 text-green-50 px-6'
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Finish
+              <Sparkles className='w-4 h-4 mr-2' />
+              Continue
             </Button>
           )}
 
