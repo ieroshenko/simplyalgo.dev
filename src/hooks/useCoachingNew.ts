@@ -512,6 +512,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
         setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
 
+        // Require explicit success to complete optimization; upstream may omit isCorrect
         if (data?.nextAction === 'complete_optimization' && data?.isCorrect === true) {
           // Only complete optimization when the step is actually correct
           applyHighlight(null);
@@ -754,7 +755,8 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             setTimeout(stopCoaching, 1500);
           }
         }
-      } else if (data.isCorrect !== false && data.nextAction === "complete_session") {
+      // Require explicit success to complete session; avoids completing on undefined/null
+      } else if (data.isCorrect === true && data.nextAction === "complete_session") {
         console.log("🎉 [COACHING] Session completed!");
         
         // CRITICAL: Clear all overlay state when completing

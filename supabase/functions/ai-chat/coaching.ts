@@ -118,7 +118,7 @@ export async function startInteractiveCoaching(
             // Return completion message instead of starting coaching
             return {
               sessionId,
-              question: `🎉 Cngratulations! Your solution is correct!\n\nAll ${totalCount} test cases passed! ✅\n\nYour code successfully handles all edge cases and produces the expected output. Great work!`,
+              question: `🎉 Congratulations! Your solution is correct!\n\nAll ${totalCount} test cases passed! ✅\n\nYour code successfully handles all edge cases and produces the expected output. Great work!`,
               hint: "🌟 Your solution is complete and ready to submit. Feel free to explore optimizations or move on to the next challenge!",
               highlightArea: null,
               difficulty,
