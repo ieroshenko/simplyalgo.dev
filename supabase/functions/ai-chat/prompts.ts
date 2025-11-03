@@ -208,8 +208,8 @@ export function validateCoachingMode(mode?: string): CoachingMode {
 
   // Log invalid mode for debugging
   if (mode && mode !== 'socratic' && mode !== 'comprehensive') {
-    console.warn(`[prompts] Invalid coaching mode received: ${mode}, using comprehensive as fallback`);
+    console.warn(`[prompts] Invalid coaching mode received: ${mode}, using socratic as fallback`);
   }
 
-  return 'comprehensive';
+  return 'socratic';
 }

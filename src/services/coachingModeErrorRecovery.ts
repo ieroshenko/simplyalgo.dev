@@ -50,7 +50,7 @@ export function createCoachingModeError(
  */
 export function validateCoachingModeWithRecovery(
   mode: unknown,
-  currentMode: CoachingMode = 'comprehensive'
+  currentMode: CoachingMode = 'socratic'
 ): { mode: CoachingMode; error?: CoachingModeError } {
   try {
     // Handle null/undefined
@@ -71,7 +71,7 @@ export function validateCoachingModeWithRecovery(
       mode as CoachingMode
     );
     
-    return { mode: 'comprehensive', error };
+    return { mode: 'socratic', error };
     
   } catch (validationError) {
     const error = createCoachingModeError(
@@ -81,8 +81,8 @@ export function validateCoachingModeWithRecovery(
       mode as CoachingMode
     );
     
-    return { mode: 'comprehensive', error };
-  }
+    return { mode: 'socratic', error };
+}
 }
 
 /**
@@ -99,25 +99,25 @@ export function handleCoachingModeError(
   switch (error.recoveryAction) {
     case 'FALLBACK_TO_COMPREHENSIVE':
       if (onFallback) {
-        onFallback('comprehensive');
+        onFallback('socratic');
       }
-      return 'comprehensive';
+      return 'socratic';
       
     case 'RETRY':
       if (onRetry) {
         onRetry();
       }
-      return error.originalMode || 'comprehensive';
+      return error.originalMode || 'socratic';
       
     case 'MAINTAIN_CURRENT':
       if (onMaintain) {
         onMaintain();
       }
-      return error.originalMode || 'comprehensive';
+      return error.originalMode || 'socratic';
       
     default:
-      return 'comprehensive';
-  }
+      return 'socratic';
+}
 }
 
 /**
@@ -132,7 +132,7 @@ export function getCoachingModeErrorMessage(error: CoachingModeError): {
     case 'INVALID_MODE':
       return {
         title: 'Invalid Coaching Mode',
-        description: `The requested mode is not supported. Switched to Comprehensive mode.`,
+        description: `The requested mode is not supported. Switched to Socratic mode.`,
         action: 'Try switching modes again'
       };
       
@@ -153,14 +153,14 @@ export function getCoachingModeErrorMessage(error: CoachingModeError): {
     case 'VALIDATION_ERROR':
       return {
         title: 'Mode Validation Error',
-        description: 'There was an issue validating the coaching mode. Using Comprehensive mode.',
+        description: 'There was an issue validating the coaching mode. Using Socratic mode.',
         action: 'Try refreshing the page if issues persist'
       };
       
     default:
       return {
         title: 'Coaching Mode Error',
-        description: 'An unexpected error occurred with coaching modes. Using Comprehensive mode.',
+        description: 'An unexpected error occurred with coaching modes. Using Socratic mode.',
         action: 'Please try again or refresh the page'
       };
   }

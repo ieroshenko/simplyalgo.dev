@@ -98,7 +98,12 @@ export const FlashcardButton = ({
       <Button
         variant="outline"
         size="sm"
-        className={`text-green-600 border-green-600 hover:bg-green-50 ${className}`}
+        className={`
+          border-emerald-600 text-emerald-700 bg-emerald-50
+          dark:border-emerald-500 dark:text-emerald-200 dark:bg-emerald-900/30
+          disabled:opacity-100 disabled:pointer-events-none
+          ${className}
+        `}
         disabled
       >
         <CheckCircle className="h-4 w-4 mr-2" />

@@ -16,9 +16,7 @@ import { useState, useEffect, useRef } from "react";
 // Using a lightweight custom fullscreen overlay instead of Radix Dialog to avoid MIME issues in some dev setups
 import { useChatSession } from "@/hooks/useChatSession";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
-import { useCoachingMode } from "@/hooks/useCoachingMode";
-import { CoachingModeToggle } from "@/components/coaching/CoachingModeToggle";
-import { CoachingModeErrorBoundary } from "@/components/coaching/CoachingModeErrorBoundary";
+import type { CoachingMode } from "@/types";
 import TextareaAutosize from "react-textarea-autosize";
 import { CodeSnippet, Problem } from "@/types";
 import Mermaid from "@/components/diagram/Mermaid";
@@ -66,13 +64,8 @@ const AIChat = ({
   const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
   
   // Coaching mode state
-  const { 
-    mode: coachingMode, 
-    setMode: setCoachingMode, 
-    isLoading: coachingModeLoading,
-    lastError: coachingModeError,
-    clearError: clearCoachingModeError
-  } = useCoachingMode();
+  // Single coaching mode: Socratic (toggle removed)
+  const coachingMode: CoachingMode = 'socratic';
   
 
   
@@ -405,33 +398,6 @@ const AIChat = ({
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Coaching Mode Toggle */}
-          <CoachingModeErrorBoundary 
-            fallbackMode={coachingMode}
-            onError={(error, errorInfo) => {
-              console.error('Coaching mode component error:', error, errorInfo);
-              // Clear any existing coaching mode errors
-              if (coachingModeError) {
-                clearCoachingModeError();
-              }
-            }}
-          >
-            <CoachingModeToggle
-              currentMode={coachingMode}
-              onModeChange={setCoachingMode}
-              disabled={coachingModeLoading || loading}
-              className="text-xs"
-              onError={(error) => {
-                console.error('Coaching mode toggle error:', error);
-                // Error is already handled by the toggle component with toast
-                // Just clear the error from the hook if needed
-                if (coachingModeError) {
-                  clearCoachingModeError();
-                }
-              }}
-            />
-          </CoachingModeErrorBoundary>
-          
           {session && messages.length > 0 && (
             <Button
               variant="ghost"

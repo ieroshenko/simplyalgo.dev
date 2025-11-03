@@ -54,7 +54,8 @@ const DataStructureVault = () => {
   };
 
   const handleCardClick = (slug: string) => {
-    navigate(`/problems/data-structures/${slug}`);
+    // Directly navigate to the implementation problem for the selected data structure
+    navigate(`/problems/implement-${slug}`);
   };
 
   return (

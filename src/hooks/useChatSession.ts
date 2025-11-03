@@ -118,7 +118,7 @@ export const useChatSession = ({
   problemDescription,
   problemTestCases,
   currentCode,
-  coachingMode = 'comprehensive',
+  coachingMode = 'socratic',
 }: UseChatSessionProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -311,7 +311,7 @@ export const useChatSession = ({
         // Validate coaching mode before sending request with error recovery
         const { mode: validatedCoachingMode, error: coachingModeError } = validateCoachingModeWithRecovery(
           coachingMode, 
-          'comprehensive'
+          'socratic'
         );
         
         if (coachingModeError) {
@@ -508,7 +508,7 @@ export const useChatSession = ({
         // Validate coaching mode for diagram requests with error recovery
         const { mode: validatedCoachingMode, error: coachingModeError } = validateCoachingModeWithRecovery(
           coachingMode, 
-          'comprehensive'
+          'socratic'
         );
         
         if (coachingModeError) {

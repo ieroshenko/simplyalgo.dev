@@ -12,7 +12,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Survey from "./pages/Survey";
 import FlashcardDeck from "./pages/FlashcardDeck";
-import DataStructureDetail from "./components/DataStructureDetail";
+import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 
@@ -76,7 +76,7 @@ const App = () => (
               path="/problems/data-structures/:slug"
               element={
                 <ProtectedRoute>
-                  <DataStructureDetail />
+                  <DataStructureRedirect />
                 </ProtectedRoute>
               }
             />
