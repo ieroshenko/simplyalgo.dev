@@ -192,6 +192,7 @@ const ProblemSolverNew = () => {
     loading: subsLoading,
     error: subsError,
     optimisticAdd,
+    watchForAcceptance,
   } = useSubmissions(user?.id, problem?.id);
   const { solutions, loading: solutionsLoading } = useSolutions(problemId);
 
@@ -606,7 +607,9 @@ const ProblemSolverNew = () => {
           response.results,
         );
         // Optimistically add to submissions list for instant UI feedback
-        if (saved) optimisticAdd(saved);
+        if (saved) {
+          optimisticAdd(saved);
+        }
         // Ensure the submissions tab reflects this run even if realtime misses
         watchForAcceptance(30_000, 2_000);
         await handleProblemSolved(

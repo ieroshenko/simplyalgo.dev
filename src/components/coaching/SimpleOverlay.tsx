@@ -891,7 +891,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {validationResult && !isSessionCompleted && (
             <div className={`px-4 py-3 border-t border-gray-200/50 dark:border-gray-600/30 ${validationResult.isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
               }`}>
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 {validationResult.isCorrect ? (
                   <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                 ) : (

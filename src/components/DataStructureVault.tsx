@@ -66,8 +66,7 @@ const DataStructureVault = () => {
           Data-Structure Vault 📚
         </h1>
         <p className="text-muted-foreground">
-          Master the 20 most common interview data structures with visual
-          explanations and code examples
+          Master the 20 most common interview data structures
         </p>
       </div>
 

@@ -174,12 +174,12 @@ export class UserAttemptsService {
   ): Promise<UserAttempt | null> {
     // Check if this exact code already exists in accepted submissions
     const existingSubmissions = await this.getAcceptedSubmissions(userId, problemId);
-    const codeAlreadyExists = existingSubmissions.some(submission => 
+
+    const codeAlreadyExists = existingSubmissions.some(submission =>
       submission.code.trim() === code.trim()
     );
 
     if (codeAlreadyExists) {
-      console.log("Code already exists in accepted submissions, skipping duplicate");
       return null;
     }
 

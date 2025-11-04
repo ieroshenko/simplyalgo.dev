@@ -47,7 +47,7 @@ const TabPanel = ({ value, activeTab, children }: TabPanelProps) => (
     className={`h-full ${activeTab === value ? 'block' : 'hidden'}`}
     style={{ height: "100%", overflow: "auto" }}
   >
-    <div className="p-6">
+    <div className="p-6 h-full flex flex-col min-h-0">
       {children}
     </div>
   </div>
