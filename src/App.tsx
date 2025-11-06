@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Problems from "./pages/Problems";
+import SystemDesign from "./pages/SystemDesign";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -77,6 +78,31 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DataStructureRedirect />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system-design"
+              element={
+                <ProtectedRoute>
+                  <SystemDesign />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system-design/:problemId"
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <h1 className="text-2xl font-bold text-foreground mb-4">
+                        System Design Solver
+                      </h1>
+                      <p className="text-muted-foreground">
+                        System Design solver view coming soon...
+                      </p>
+                    </div>
+                  </div>
                 </ProtectedRoute>
               }
             />

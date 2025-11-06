@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
+import { logger } from "@/utils/logger";
 
 
 const ProblemSolverNew = () => {
@@ -179,13 +180,15 @@ const ProblemSolverNew = () => {
     }
   }, []);
 
-  console.log('🔍 ProblemSolverNew: problemId:', problemId);
-  console.log('🔍 ProblemSolverNew: problems count:', problems.length);
-  console.log('🔍 ProblemSolverNew: problems ids:', problems.map(p => p.id));
+  logger.debug('ProblemSolverNew init', {
+    problemId,
+    problemsCount: problems.length,
+    problemIds: problems.map((p) => p.id),
+  });
   
   const problem = problems.find((p) => p.id === problemId);
   
-  console.log('🔍 ProblemSolverNew: found problem:', problem?.title);
+  logger.debug('ProblemSolverNew problem resolved', { problemId, title: problem?.title });
   
   const {
     submissions,
@@ -198,17 +201,18 @@ const ProblemSolverNew = () => {
 
   // Load existing complexity analysis from submissions
   useEffect(() => {
-    console.log('🔍 [ProblemSolverNew] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    logger.debug('[ProblemSolverNew] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
       const results: Record<string, any> = {};
       submissions.forEach(submission => {
-        console.log('📊 [ProblemSolverNew] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        logger.debug('[ProblemSolverNew] Submission analysis presence', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
-          console.log('✅ [ProblemSolverNew] Loading analysis:', submission.complexity_analysis);
+          // Avoid logging full analysis payload to keep logs concise
+          logger.debug('[ProblemSolverNew] Loading analysis for submission', { submissionId: submission.id });
           results[submission.id] = submission.complexity_analysis;
         }
       });
-      console.log('✅ [ProblemSolverNew] Total loaded analysis:', Object.keys(results).length);
+      logger.debug('[ProblemSolverNew] Total loaded analysis', { total: Object.keys(results).length });
       setComplexityResults(results);
     }
   }, [submissions]);
@@ -370,10 +374,9 @@ const ProblemSolverNew = () => {
       }));
 
       // Save to database for persistence
-      console.log('💾 [ProblemSolverNew] Saving analysis for submission:', submissionId);
-      console.log('📝 [ProblemSolverNew] Analysis data:', analysisData);
+      logger.info('[ProblemSolverNew] Saving analysis for submission', { submissionId });
       const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
-      console.log('✅ [ProblemSolverNew] Save result:', saved ? 'Success' : 'Failed');
+      logger.debug('[ProblemSolverNew] Save result', { submissionId, success: !!saved });
 
       if (!saved) {
         console.error('❌ [ProblemSolverNew] Failed to save analysis to database');

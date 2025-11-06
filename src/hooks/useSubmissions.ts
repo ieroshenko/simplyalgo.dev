@@ -1,13 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { UserAttemptsService, UserAttempt } from "@/services/userAttempts";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeCode } from "@/utils/code";
 
-// Normalize code for duplicate detection - removes all whitespace differences
-const normalizeCode = (code: string | null | undefined): string => {
-  if (!code) return "";
-  // Remove all whitespace and normalize to compare code semantically
-  return code.replace(/\s+/g, " ").trim();
-};
+// Use shared normalizeCode from utils
 
 export const useSubmissions = (
   userId: string | undefined,
@@ -94,58 +90,68 @@ export const useSubmissions = (
       `user_attempts_${userId}_${problemId}_${Date.now()}`,
     );
 
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_problem_attempts',
-        },
-        (payload: any) => {
-          const attempt = payload.new as UserAttempt;
+    // Subscribe only to INSERT events for this user. Keep a minimal problemId guard.
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'user_problem_attempts',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload: any) => {
+        const attempt = payload.new as UserAttempt;
+        if (!attempt || attempt.problem_id !== problemId) return;
+        addOrUpdateIfPassed(attempt);
+      },
+    );
 
-          // Filter client-side for our user and problem
-          if (attempt?.user_id !== userId || attempt?.problem_id !== problemId) {
-            return;
-          }
+    // Subscribe only to UPDATE events for this user. Keep a minimal problemId guard.
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'user_problem_attempts',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload: any) => {
+        const attempt = payload.new as UserAttempt;
+        if (!attempt || attempt.problem_id !== problemId) return;
 
-          if (payload.eventType === 'INSERT') {
-            addOrUpdateIfPassed(attempt);
-          } else if (payload.eventType === 'UPDATE') {
-            // For updates, check if this is an existing submission or a new one
-            setSubmissions((prev) => {
-              const idx = prev.findIndex((s) => s.id === attempt.id);
-              if (idx !== -1 && attempt.status === "passed") {
-                // Update existing submission
-                const next = [...prev];
-                next[idx] = attempt;
-                return next;
-              } else if (idx === -1 && attempt.status === "passed") {
-                // New passed submission - add it with duplicate checking
-                const next = [...prev];
-                const norm = normalizeCode(attempt.code);
-                if (norm) {
-                  // Remove duplicates based on normalized code
-                  for (let i = next.length - 1; i >= 0; i--) {
-                    if (normalizeCode(next[i].code) === norm && next[i].id !== attempt.id) {
-                      next.splice(i, 1);
-                    }
-                  }
+        // For updates, check if this is an existing submission or a new one
+        setSubmissions((prev) => {
+          const idx = prev.findIndex((s) => s.id === attempt.id);
+          if (idx !== -1 && attempt.status === "passed") {
+            // Update existing submission
+            const next = [...prev];
+            next[idx] = attempt;
+            return next;
+          } else if (idx === -1 && attempt.status === "passed") {
+            // New passed submission - add it with duplicate checking
+            const next = [...prev];
+            const norm = normalizeCode(attempt.code);
+            if (norm) {
+              // Remove duplicates based on normalized code
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (normalizeCode(next[i].code) === norm && next[i].id !== attempt.id) {
+                  next.splice(i, 1);
                 }
-                next.unshift(attempt);
-                next.sort(
-                  (a, b) =>
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                );
-                return next;
               }
-              return prev;
-            });
+            }
+            next.unshift(attempt);
+            next.sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+            );
+            return next;
           }
-        },
-      )
-      .subscribe((status) => {
+          return prev;
+        });
+      },
+    );
+
+    channel.subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
           console.warn('Supabase realtime channel error for submissions');
         }
