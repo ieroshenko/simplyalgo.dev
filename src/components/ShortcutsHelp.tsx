@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Keyboard } from "lucide-react";
 import { useMemo } from "react";
+import { useLocation } from "react-router-dom";
 
 type ShortcutsHelpProps = {
   className?: string;
@@ -16,6 +17,8 @@ const getIsMac = (): boolean => {
 
 const ShortcutsHelp = ({ className }: ShortcutsHelpProps) => {
   const isMac = useMemo(() => getIsMac(), []);
+  const location = useLocation();
+  const isSystemDesign = location.pathname.includes("/system-design/");
   const CMD = isMac ? "⌘" : "Ctrl";
 
   return (
@@ -34,21 +37,27 @@ const ShortcutsHelp = ({ className }: ShortcutsHelpProps) => {
       <PopoverContent align="end" className="w-72 p-0 overflow-hidden">
         <div className="border-b px-3 py-2 bg-muted/50">
           <div className="text-xs font-medium text-muted-foreground">Shortcuts</div>
-          <div className="text-sm font-semibold">Panels & Testing</div>
+          <div className="text-sm font-semibold">
+            {isSystemDesign ? "Panels" : "Panels & Testing"}
+          </div>
         </div>
         <ul className="p-3 space-y-2 text-sm">
           <li className="flex items-center justify-between">
-            <span className="text-muted-foreground">Toggle Description</span>
+            <span className="text-muted-foreground">
+              {isSystemDesign ? "Toggle Problem Context" : "Toggle Description"}
+            </span>
             <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground text-xs border">
               {CMD}+B
             </kbd>
           </li>
-          <li className="flex items-center justify-between">
-            <span className="text-muted-foreground">Toggle Tests</span>
-            <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground text-xs border">
-              {CMD}+J
-            </kbd>
-          </li>
+          {!isSystemDesign && (
+            <li className="flex items-center justify-between">
+              <span className="text-muted-foreground">Toggle Tests</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground text-xs border">
+                {CMD}+J
+              </kbd>
+            </li>
+          )}
           <li className="flex items-center justify-between">
             <span className="text-muted-foreground">Toggle Chat</span>
             <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground text-xs border">
@@ -57,7 +66,9 @@ const ShortcutsHelp = ({ className }: ShortcutsHelpProps) => {
           </li>
         </ul>
         <div className="px-3 py-2 text-xs text-muted-foreground border-t">
-          Tips: Press Esc to refocus the editor.
+          {isSystemDesign
+            ? "Tips: Use the toolbar to show/hide nodes."
+            : "Tips: Press Esc to refocus the editor."}
         </div>
       </PopoverContent>
     </Popover>

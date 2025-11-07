@@ -307,3 +307,35 @@ export interface SystemDesignSpec {
   expected_topics: string[];
   estimated_time_minutes?: number;
 }
+
+export interface SystemDesignSession {
+  id: string;
+  userId: string;
+  problemId: string;
+  contextThreadId?: string;
+  isCompleted: boolean;
+  score?: number;
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+export interface SystemDesignBoardState {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+export interface DesignEvaluation {
+  score: number;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  improvement_suggestions: string[];
+}
+
+export interface NodePaletteItem {
+  id: string;
+  type: string;
+  label: string;
+  icon: string;
+  color: string;
+}

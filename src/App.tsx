@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Problems from "./pages/Problems";
 import SystemDesign from "./pages/SystemDesign";
+import SystemDesignSolver from "./pages/SystemDesignSolver";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -93,16 +94,7 @@ const App = () => (
               path="/system-design/:problemId"
               element={
                 <ProtectedRoute>
-                  <div className="min-h-screen bg-background flex items-center justify-center">
-                    <div className="text-center">
-                      <h1 className="text-2xl font-bold text-foreground mb-4">
-                        System Design Solver
-                      </h1>
-                      <p className="text-muted-foreground">
-                        System Design solver view coming soon...
-                      </p>
-                    </div>
-                  </div>
+                  <SystemDesignSolver />
                 </ProtectedRoute>
               }
             />

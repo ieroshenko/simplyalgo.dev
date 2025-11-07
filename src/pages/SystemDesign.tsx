@@ -75,41 +75,32 @@ const SystemDesign = () => {
   // Define difficulty options
   const difficulties = ["All", "Easy", "Medium", "Hard"];
 
-  // Function to handle category selection with persistence
-  const handleCategorySelect = (category: string) => {
-    const categoryValue = category === "All" ? undefined : category;
-    setSelectedCategory(categoryValue);
-
-    if (categoryValue) {
-      localStorage.setItem("system-design-selected-category", categoryValue);
+  // Generic filter handler
+  const createFilterHandler = (
+    setter: (value: string | undefined) => void,
+    storageKey: string
+  ) => (value: string) => {
+    const filterValue = value === "All" ? undefined : value;
+    setter(filterValue);
+    if (filterValue) {
+      localStorage.setItem(storageKey, filterValue);
     } else {
-      localStorage.removeItem("system-design-selected-category");
+      localStorage.removeItem(storageKey);
     }
   };
 
-  // Function to handle company selection with persistence
-  const handleCompanySelect = (company: string) => {
-    const companyValue = company === "All" ? undefined : company;
-    setSelectedCompany(companyValue);
-
-    if (companyValue) {
-      localStorage.setItem("system-design-selected-company", companyValue);
-    } else {
-      localStorage.removeItem("system-design-selected-company");
-    }
-  };
-
-  // Function to handle difficulty selection with persistence
-  const handleDifficultySelect = (difficulty: string) => {
-    const difficultyValue = difficulty === "All" ? undefined : difficulty;
-    setSelectedDifficulty(difficultyValue);
-
-    if (difficultyValue) {
-      localStorage.setItem("system-design-selected-difficulty", difficultyValue);
-    } else {
-      localStorage.removeItem("system-design-selected-difficulty");
-    }
-  };
+  const handleCategorySelect = createFilterHandler(
+    setSelectedCategory,
+    "system-design-selected-category"
+  );
+  const handleCompanySelect = createFilterHandler(
+    setSelectedCompany,
+    "system-design-selected-company"
+  );
+  const handleDifficultySelect = createFilterHandler(
+    setSelectedDifficulty,
+    "system-design-selected-difficulty"
+  );
 
   // Validate saved category exists in available categories
   useEffect(() => {
@@ -122,7 +113,7 @@ const SystemDesign = () => {
       setSelectedCategory(undefined);
       localStorage.removeItem("system-design-selected-category");
     }
-  }, [dbCategories, selectedCategory, specsLoading, categories]);
+  }, [dbCategories, selectedCategory, specsLoading]);
 
   // Validate saved company exists in available companies
   useEffect(() => {
@@ -146,7 +137,7 @@ const SystemDesign = () => {
       setSelectedDifficulty(undefined);
       localStorage.removeItem("system-design-selected-difficulty");
     }
-  }, [selectedDifficulty, difficulties]);
+  }, [selectedDifficulty]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -394,4 +385,3 @@ const SystemDesign = () => {
 };
 
 export default SystemDesign;
-

@@ -67,6 +67,7 @@ export const useSystemDesignSpecs = (userId?: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchSpecs = useCallback(async () => {
+    setLoading(true);
     try {
       // Fetch problems that have system_design_specs entries
       // Query from problems table and join with system_design_specs
@@ -171,6 +172,8 @@ export const useSystemDesignSpecs = (userId?: string) => {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
+    } finally {
+      setLoading(false);
     }
   }, [userId]);
 
@@ -186,12 +189,21 @@ export const useSystemDesignSpecs = (userId?: string) => {
 
       // 2) Load system design problems with their category name to compute totals map
       // Query system_design_specs and join with problems to get category info
-      // Using type assertion since system_design_specs might not be in generated types
-      const { data: sdSpecsData } = await (supabase
-        .from("system_design_specs" as never)
-        .select("problem_id, problems!inner(id, categories(name))") as never) as {
+      // Use a minimal typed interface to avoid unsafe 'as never'
+      type SdSpecsSelect = {
         data: SystemDesignSpecsQueryResult[] | null;
       };
+      const { data: sdSpecsData } = (await (supabase as unknown as {
+        from: (
+          table: string,
+        ) => {
+          select: (
+            query: string,
+          ) => Promise<SdSpecsSelect>;
+        };
+      })
+        .from("system_design_specs")
+        .select("problem_id, problems!inner(id, categories(name))")) as SdSpecsSelect;
 
       if (!sdSpecsData) {
         setCategories([]);
@@ -217,12 +229,15 @@ export const useSystemDesignSpecs = (userId?: string) => {
       const solvedByCategory = new Map<string, number>();
       if (userId) {
         // Get system design problem IDs by querying system_design_specs table
-        // Using type assertion since system_design_specs might not be in generated types
-        const { data: sdProblemsData } = await (supabase
-          .from("system_design_specs" as never)
-          .select("problem_id") as never) as {
-          data: SystemDesignSpecsProblemIdResult[] | null;
-        };
+        // Use minimal typed interface to avoid unsafe 'as never'
+        type SdSpecsIdsSelect = { data: SystemDesignSpecsProblemIdResult[] | null };
+        const { data: sdProblemsData } = (await (supabase as unknown as {
+          from: (
+            table: string,
+          ) => { select: (query: string) => Promise<SdSpecsIdsSelect> };
+        })
+          .from("system_design_specs")
+          .select("problem_id")) as SdSpecsIdsSelect;
 
         const sdProblemIds = new Set(
           (sdProblemsData || []).map((p) => p.problem_id),
@@ -340,4 +355,3 @@ export const useSystemDesignSpecs = (userId?: string) => {
     refetch,
   };
 };
-

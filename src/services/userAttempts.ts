@@ -307,7 +307,7 @@ export class UserAttemptsService {
     >;
 
     if (error) {
-      console.error("Error fetching accepted submissions:", error);
+      logger.error('[UserAttemptsService] Error fetching accepted submissions', { userId, problemId, error });
       return [];
     }
 
@@ -351,7 +351,7 @@ export class UserAttemptsService {
       .single()) as SupabaseQueryResult<UserAttempt>;
 
     if (error) {
-      console.error("❌ [UserAttemptsService] Error saving complexity analysis:", error);
+      logger.error('[UserAttemptsService] Failed to save analysis', { submissionId, error });
       return null;
     }
 

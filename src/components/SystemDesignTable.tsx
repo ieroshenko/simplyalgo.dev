@@ -30,7 +30,7 @@ const SystemDesignTable = ({
       case "Easy":
         return "bg-success text-success-foreground";
       case "Medium":
-        return "bg-amber-500 text-white";
+        return "bg-amber-500 text-amber-foreground";
       case "Hard":
         return "bg-destructive text-destructive-foreground";
       default:
@@ -41,9 +41,11 @@ const SystemDesignTable = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "solved":
-        return <Trophy className="w-4 h-4 text-emerald-600 fill-emerald-500" />;
+        return (
+          <Trophy className="w-4 h-4 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400" />
+        );
       case "attempted":
-        return <Zap className="w-4 h-4 text-orange-500" />;
+        return <Zap className="w-4 h-4 text-orange-500 dark:text-orange-400" />;
       default:
         return <Circle className="w-4 h-4 text-muted-foreground" />;
     }
@@ -112,12 +114,12 @@ const SystemDesignTable = ({
                       className="hover:scale-110 transition-transform"
                       onClick={() => onToggleStar?.(spec.id)}
                     >
-                      <Star 
+                      <Star
                         className={`w-4 h-4 transition-colors ${
-                          spec.isStarred 
-                            ? "text-amber-500 fill-amber-500" 
-                            : "text-muted-foreground hover:text-amber-500"
-                        }`} 
+                          spec.isStarred
+                            ? "text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400"
+                            : "text-muted-foreground hover:text-amber-500 dark:hover:text-amber-400"
+                        }`}
                       />
                     </button>
                   </td>
@@ -165,4 +167,3 @@ const SystemDesignTable = ({
 };
 
 export default SystemDesignTable;
-

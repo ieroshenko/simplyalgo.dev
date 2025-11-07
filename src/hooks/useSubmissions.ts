@@ -28,15 +28,8 @@ export const useSubmissions = (
       if (idx !== -1) {
         next[idx] = attempt;
       } else {
-        const norm = normalizeCode(attempt.code);
-        if (norm) {
-          // Remove duplicates with same normalized code
-          for (let i = next.length - 1; i >= 0; i--) {
-            if (normalizeCode(next[i].code) === norm) {
-              next.splice(i, 1);
-            }
-          }
-        }
+        // Centralized duplicate removal by normalized code
+        removeDuplicatesByCode(next, attempt);
         next.unshift(attempt);
       }
       next.sort(
@@ -45,6 +38,23 @@ export const useSubmissions = (
       );
       return next;
     });
+  };
+
+  // Helper: remove submissions that have the same normalized code as newAttempt
+  const removeDuplicatesByCode = (
+    arr: UserAttempt[],
+    newAttempt: UserAttempt,
+  ): UserAttempt[] => {
+    const norm = normalizeCode(newAttempt.code);
+    if (!norm) return arr;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const sameCode = normalizeCode(arr[i].code) === norm;
+      const sameId = arr[i].id === newAttempt.id;
+      if (sameCode && !sameId) {
+        arr.splice(i, 1);
+      }
+    }
+    return arr;
   };
 
   useEffect(() => {
@@ -129,16 +139,7 @@ export const useSubmissions = (
             return next;
           } else if (idx === -1 && attempt.status === "passed") {
             // New passed submission - add it with duplicate checking
-            const next = [...prev];
-            const norm = normalizeCode(attempt.code);
-            if (norm) {
-              // Remove duplicates based on normalized code
-              for (let i = next.length - 1; i >= 0; i--) {
-                if (normalizeCode(next[i].code) === norm && next[i].id !== attempt.id) {
-                  next.splice(i, 1);
-                }
-              }
-            }
+            const next = removeDuplicatesByCode([...prev], attempt);
             next.unshift(attempt);
             next.sort(
               (a, b) =>

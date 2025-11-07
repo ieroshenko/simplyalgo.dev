@@ -379,12 +379,12 @@ const ProblemSolverNew = () => {
       logger.debug('[ProblemSolverNew] Save result', { submissionId, success: !!saved });
 
       if (!saved) {
-        console.error('❌ [ProblemSolverNew] Failed to save analysis to database');
+        logger.error('[ProblemSolverNew] Failed to save analysis to database', { submissionId, analysisData });
       }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {
-      console.error("Complexity analysis error:", error);
+      logger.error('[ProblemSolverNew] Complexity analysis error', { submissionId, error });
       toast.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);
@@ -435,10 +435,10 @@ const ProblemSolverNew = () => {
   };
 
   const handleInsertCodeSnippet = async (snippet: CodeSnippet) => {
-    console.log("🔧 Inserting code snippet:", snippet);
+    logger.info('[ProblemSolverNew] Inserting code snippet', { snippet });
 
     if (!codeEditorRef.current) {
-      console.error("❌ Code editor ref is not available");
+      logger.error('[ProblemSolverNew] Code editor ref is not available');
       toast.error("Code editor not ready");
       return;
     }
@@ -458,7 +458,7 @@ const ProblemSolverNew = () => {
       let insertedAtLine: number | undefined;
       let backendRationale: string | undefined;
       
-      console.log("🚀 Starting AI-powered insertion:", {
+      logger.debug('[ProblemSolverNew] Starting AI-powered insertion', {
         snippetCode: snippet.code,
         currentCodeLength: currentCode.length,
         cursorPosition,
@@ -481,7 +481,7 @@ const ProblemSolverNew = () => {
           },
         });
         
-        console.log("🤖 AI insertion response:", { 
+        logger.debug('[ProblemSolverNew] AI insertion response', { 
           error: !!error, 
           hasData: !!data,
           dataKeys: data ? Object.keys(data) : [],
@@ -497,22 +497,22 @@ const ProblemSolverNew = () => {
               : undefined;
           backendRationale = typeof data.rationale === "string" ? data.rationale : undefined;
           
-          console.log("✅ AI insertion successful:", {
+          logger.info('[ProblemSolverNew] AI insertion successful', {
             insertedAtLine,
             codeLengthChange: newCodeFromBackend.length - currentCode.length,
             rationale: backendRationale || "No rationale provided"
           });
         }
       } catch (e) {
-        console.error("❌ AI insertion failed:", e);
-        console.error("Error details:", {
+        logger.error('[ProblemSolverNew] AI insertion failed', { error: e });
+        logger.debug('[ProblemSolverNew] AI insertion error details', {
           message: (e as Error)?.message,
           stack: (e as Error)?.stack
         });
       }
 
       // Only use AI insertion - no fallback
-      console.log("🤖 AI insertion result:", { 
+      logger.debug('[ProblemSolverNew] AI insertion result', { 
         success: !!newCodeFromBackend, 
         insertedAt: insertedAtLine,
         codeLength: newCodeFromBackend?.length || 0 
@@ -532,7 +532,7 @@ const ProblemSolverNew = () => {
             "The AI suggests replacing a large portion of your code to insert this snippet. Proceed with replacement?",
           );
           if (!ok) {
-            console.warn("User canceled potentially destructive insertion", {
+            logger.warn('[ProblemSolverNew] User canceled potentially destructive insertion', {
               shrinkRatio,
               rationaleText,
             });
@@ -549,7 +549,7 @@ const ProblemSolverNew = () => {
 
       // Only skip if the new code is identical to current code
       if (newCodeFromBackend === currentCode) {
-        console.log("ℹ️ New code is identical to current code - no changes needed.", {
+        logger.info('[ProblemSolverNew] New code identical to current code', {
           currentLength: currentCode.length,
           newLength: newCodeFromBackend.length,
           rationale: backendRationale,
@@ -558,7 +558,7 @@ const ProblemSolverNew = () => {
         return;
       }
 
-      console.log("🔄 Updating editor with new code:", {
+      logger.info('[ProblemSolverNew] Updating editor with new code', {
         oldLength: currentCode.length,
         newLength: newCodeFromBackend.length,
         insertedAtLine,
@@ -569,9 +569,9 @@ const ProblemSolverNew = () => {
       editor.setValue(newCodeFromBackend);
       setCode(newCodeFromBackend);
 
-      console.log("✅ Editor updated successfully");
+      logger.info('[ProblemSolverNew] Editor updated successfully');
     } catch (error) {
-      console.error("❌ Failed to insert code snippet:", error);
+      logger.error('[ProblemSolverNew] Failed to insert code snippet', { error });
       toast.error("Failed to insert code snippet");
     }
   };
