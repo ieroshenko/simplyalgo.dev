@@ -11,6 +11,11 @@ import ShortcutsHelp from "@/components/ShortcutsHelp";
 import { ArrowLeft, Moon, Sun, Star, StarOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +36,6 @@ const SystemDesignSolver = () => {
     loading: sessionLoading,
     error,
     isTyping,
-    startSession,
     updateBoard,
     sendMessage,
     evaluateDesign,
@@ -142,12 +146,6 @@ const SystemDesignSolver = () => {
     }
   }, [evaluation]);
 
-  useEffect(() => {
-    if (!session && !sessionLoading && user && problemId) {
-      startSession();
-    }
-  }, [session, sessionLoading, user, problemId, startSession]);
-
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "Easy":
@@ -200,9 +198,7 @@ const SystemDesignSolver = () => {
               <Badge variant="outline" className="text-muted-foreground">
                 {spec.category}
               </Badge>
-              <Badge variant="secondary" className="text-xs">
-                System Design
-              </Badge>
+              {/* Removed redundant "System Design" label */}
             </div>
           </div>
 
@@ -239,39 +235,51 @@ const SystemDesignSolver = () => {
 
       {/* Main Content - explicit height calculation */}
       <div className="flex-1" style={{ height: "calc(100vh - 81px)" }}>
-        <div className="flex h-full overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left Panel - Problem Context */}
           {showLeftPanel && (
-            <div className="w-80 border-r border-border overflow-y-auto bg-background">
-              <ProblemContextSidebar spec={spec} />
-            </div>
+            <>
+              <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
+                <div className="h-full border-r border-border overflow-y-auto bg-background">
+                  <ProblemContextSidebar spec={spec} />
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+            </>
           )}
 
-          {/* Middle Panel - React Flow Canvas */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <DesignCanvas
-              boardState={boardState}
-              onBoardChange={updateBoard}
-            />
-          </div>
+          {/* Middle Panel - Design Canvas */}
+          <ResizablePanel defaultSize={showLeftPanel && showRightPanel ? 60 : 80}>
+            <div className="h-full overflow-hidden">
+              <DesignCanvas
+                boardState={boardState}
+                onBoardChange={updateBoard}
+              />
+            </div>
+          </ResizablePanel>
 
-                {/* Right Panel - AI Coach Chat */}
-                {showRightPanel && (
-                  <div className="w-96 border-l border-border flex flex-col bg-background">
-                    <DesignCoachChat
-                      messages={messages}
-                      session={session}
-                      loading={sessionLoading}
-                      isTyping={isTyping}
-                      error={error}
-                      onSendMessage={sendMessage}
-                      onClearConversation={clearConversation}
-                      onEvaluate={evaluateDesign}
-                      isEvaluating={isEvaluating}
-                    />
-                  </div>
-                )}
-        </div>
+          {/* Right Panel - AI Coach Chat */}
+          {showRightPanel && (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <div className="h-full border-l border-border flex flex-col bg-background">
+                  <DesignCoachChat
+                    messages={messages}
+                    session={session}
+                    loading={sessionLoading}
+                    isTyping={isTyping}
+                    error={error}
+                    onSendMessage={sendMessage}
+                    onClearConversation={clearConversation}
+                    onEvaluate={evaluateDesign}
+                    isEvaluating={isEvaluating}
+                  />
+                </div>
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
       </div>
 
       {/* Evaluation Modal */}
@@ -286,4 +294,3 @@ const SystemDesignSolver = () => {
 };
 
 export default SystemDesignSolver;
-

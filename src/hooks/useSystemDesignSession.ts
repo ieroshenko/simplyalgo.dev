@@ -19,7 +19,6 @@ interface UseSystemDesignSessionReturn {
   loading: boolean;
   error: string | null;
   isTyping: boolean;
-  startSession: () => Promise<void>;
   updateBoard: (state: SystemDesignBoardState) => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   evaluateDesign: () => Promise<void>;
@@ -51,125 +50,132 @@ export const useSystemDesignSession = ({
   const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastBoardStateRef = useRef<SystemDesignBoardState | null>(null);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const checkExistingSession = async () => {
-      try {
-        const { data: existingSession } = await supabase
-          .from("system_design_sessions")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("problem_id", problemId)
-          .eq("is_completed", false)
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .single();
+  // Initialize session (find existing or create new)
+  const initializeSession = useCallback(async () => {
+    // Don't make request if userId or problemId is empty
+    if (!userId || !problemId) {
+      setLoading(false);
+      return;
+    }
 
-        if (existingSession) {
-          setSession({
-            id: existingSession.id,
-            userId: existingSession.user_id,
-            problemId: existingSession.problem_id,
-            contextThreadId: existingSession.context_thread_id,
-            isCompleted: existingSession.is_completed,
-            score: existingSession.score,
-            startedAt: new Date(existingSession.started_at),
-            completedAt: existingSession.completed_at
-              ? new Date(existingSession.completed_at)
-              : undefined,
-          });
-
-          // Load board state
-          const { data: board } = await supabase
-            .from("system_design_boards")
-            .select("board_state")
-            .eq("session_id", existingSession.id)
-            .single();
-
-          if (board?.board_state) {
-            const state = board.board_state as SystemDesignBoardState;
-            setBoardState(state);
-            lastBoardStateRef.current = state;
-          }
-
-          // Load messages
-          const { data: responses } = await supabase
-            .from("system_design_responses")
-            .select("*")
-            .eq("session_id", existingSession.id)
-            .order("created_at", { ascending: true });
-
-          if (responses) {
-            setMessages(
-              responses.map((r) => ({
-                role: r.message_role as "user" | "assistant",
-                content: r.content,
-                timestamp: new Date(r.created_at),
-              })),
-            );
-          }
-        }
-      } catch (err) {
-        // No existing session, will create new one
-        console.log("No existing session found");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkExistingSession();
-  }, [problemId, userId]);
-
-  const startSession = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: invokeError } = await supabase.functions.invoke(
-        "system-design-chat",
-        {
-          body: {
-            action: "start_design_session",
-            problemId,
-            userId,
-          },
-        },
-      );
+      // Try to find existing session
+      const { data: existingSession } = await supabase
+        .from("system_design_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("problem_id", problemId)
+        .eq("is_completed", false)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .single();
 
-      if (invokeError) throw invokeError;
+      let currentSession: SystemDesignSession;
 
-      const newSession: SystemDesignSession = {
-        id: data.sessionId,
-        userId,
-        problemId,
-        contextThreadId: data.contextThreadId,
-        isCompleted: false,
-        startedAt: new Date(),
-      };
+      if (existingSession) {
+        // Use existing session
+        currentSession = {
+          id: existingSession.id,
+          userId: existingSession.user_id,
+          problemId: existingSession.problem_id,
+          contextThreadId: existingSession.context_thread_id,
+          isCompleted: existingSession.is_completed,
+          score: existingSession.score,
+          startedAt: new Date(existingSession.started_at),
+          completedAt: existingSession.completed_at
+            ? new Date(existingSession.completed_at)
+            : undefined,
+        };
 
-      setSession(newSession);
+        // Load board state
+        const { data: board } = await supabase
+          .from("system_design_boards")
+          .select("board_state")
+          .eq("session_id", existingSession.id)
+          .single();
 
-      if (data.message) {
-        setMessages([
+        if (board?.board_state) {
+          const state = board.board_state as SystemDesignBoardState;
+          setBoardState(state);
+          lastBoardStateRef.current = state;
+        }
+
+        // Load messages
+        const { data: responses } = await supabase
+          .from("system_design_responses")
+          .select("*")
+          .eq("session_id", existingSession.id)
+          .order("created_at", { ascending: true });
+
+        if (responses) {
+          setMessages(
+            responses.map((r) => ({
+              role: r.message_role as "user" | "assistant",
+              content: r.content,
+              timestamp: new Date(r.created_at),
+            })),
+          );
+        }
+
+        setSession(currentSession);
+      } else {
+        // Create new session
+        const { data, error: invokeError } = await supabase.functions.invoke(
+          "system-design-chat",
           {
-            role: "assistant",
-            content: data.message,
-            timestamp: new Date(),
+            body: {
+              action: "start_design_session",
+              problemId,
+              userId,
+            },
           },
-        ]);
-      }
+        );
 
-      // Load initial board state if provided
-      if (data.boardState) {
-        setBoardState(data.boardState);
-        lastBoardStateRef.current = data.boardState;
+        if (invokeError) throw invokeError;
+
+        currentSession = {
+          id: data.sessionId,
+          userId,
+          problemId,
+          contextThreadId: data.contextThreadId,
+          isCompleted: false,
+          startedAt: new Date(),
+        };
+
+        setSession(currentSession);
+
+        // Only set initial message for NEW sessions
+        if (data.message) {
+          setMessages([
+            {
+              role: "assistant",
+              content: data.message,
+              timestamp: new Date(),
+            },
+          ]);
+        }
+
+        // Load initial board state if provided
+        if (data.boardState) {
+          setBoardState(data.boardState);
+          lastBoardStateRef.current = data.boardState;
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start session");
+      console.error("[SystemDesignChat] Error initializing session:", err);
+      setError(err instanceof Error ? err.message : "Failed to initialize session");
     } finally {
       setLoading(false);
     }
   }, [problemId, userId]);
+
+  // Initialize on mount
+  useEffect(() => {
+    initializeSession();
+  }, [initializeSession]);
 
   const updateBoard = useCallback(
     async (state: SystemDesignBoardState) => {
@@ -178,7 +184,7 @@ export const useSystemDesignSession = ({
         return;
       }
 
-      if (!state || !state.nodes || !state.edges) {
+      if (!state || !state.nodes) {
         console.warn("[SystemDesignChat] updateBoard called with invalid state:", state);
         return;
       }
@@ -348,57 +354,20 @@ export const useSystemDesignSession = ({
         .eq("id", session.id);
 
       // Reset local state immediately (so UI updates instantly)
+      setSession(null);
       setMessages([]);
       setBoardState({ nodes: [], edges: [] });
       lastBoardStateRef.current = null;
       setEvaluation(null);
       setError(null);
 
-      // Create new session in background without blocking UI
-      const { data, error: invokeError } = await supabase.functions.invoke(
-        "system-design-chat",
-        {
-          body: {
-            action: "start_design_session",
-            problemId,
-            userId,
-          },
-        },
-      );
-
-      if (invokeError) throw invokeError;
-
-      const newSession: SystemDesignSession = {
-        id: data.sessionId,
-        userId,
-        problemId,
-        contextThreadId: data.contextThreadId,
-        isCompleted: false,
-        startedAt: new Date(),
-      };
-
-      setSession(newSession);
-
-      if (data.message) {
-        setMessages([
-          {
-            role: "assistant",
-            content: data.message,
-            timestamp: new Date(),
-          },
-        ]);
-      }
-
-      // Load initial board state if provided
-      if (data.boardState) {
-        setBoardState(data.boardState);
-        lastBoardStateRef.current = data.boardState;
-      }
+      // Create new session (initializeSession will create a new one since we deleted the old one)
+      await initializeSession();
     } catch (err) {
       console.error("[SystemDesignChat] Error clearing conversation:", err);
       setError(err instanceof Error ? err.message : "Failed to clear conversation");
     }
-  }, [session, problemId, userId]);
+  }, [session, initializeSession]);
 
   const evaluateDesign = useCallback(async () => {
     if (!session || isEvaluating) return;
@@ -470,7 +439,6 @@ export const useSystemDesignSession = ({
     loading,
     error,
     isTyping,
-    startSession,
     updateBoard,
     sendMessage,
     evaluateDesign,

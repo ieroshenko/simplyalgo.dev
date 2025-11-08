@@ -54,10 +54,16 @@ const ProblemTable = ({
 
   const filteredProblems = problems
     .filter((problem) => {
+      // Exclude Data Structure Implementations and System Design (they're in separate sections)
+      if (problem.category === "Data Structure Implementations" ||
+          problem.category === "System Design") {
+        return false;
+      }
+
       const matchesCategory =
         !filteredCategory || problem.category === filteredCategory;
       const matchesCompany =
-        !filteredCompany || 
+        !filteredCompany ||
         (problem.companies && problem.companies.includes(filteredCompany));
       const matchesDifficulty =
         !filteredDifficulty || problem.difficulty === filteredDifficulty;

@@ -80,6 +80,75 @@ SESSION RULES:
 }
 
 /**
+ * Convert board state to human-readable description
+ */
+function describeBoardState(boardState: any): string {
+  if (!boardState || !boardState.nodes || boardState.nodes.length === 0) {
+    return "The canvas is currently empty - no components have been added yet.";
+  }
+
+  const nodes = boardState.nodes || [];
+  const edges = boardState.edges || [];
+
+  // Separate text/annotation nodes from component nodes
+  const textNodes = nodes.filter((n: any) => n.type === "text");
+  const componentNodes = nodes.filter((n: any) => n.type !== "text");
+
+  // Group component nodes by type
+  const nodesByType: Record<string, any[]> = {};
+  componentNodes.forEach((node: any) => {
+    const type = node.type || "unknown";
+    if (!nodesByType[type]) {
+      nodesByType[type] = [];
+    }
+    nodesByType[type].push(node);
+  });
+
+  // Build description
+  let description = `The user has created a diagram with ${nodes.length} component(s) and ${edges.length} connection(s).\n\n`;
+
+  // Describe system components
+  if (componentNodes.length > 0) {
+    description += "SYSTEM COMPONENTS:\n";
+    for (const [type, nodeList] of Object.entries(nodesByType)) {
+      description += `- ${type} (${nodeList.length}): `;
+      const nodeDescriptions = nodeList.map((n: any) => {
+        const label = n.data?.label || "unlabeled";
+        const pos = n.position ? `(at x:${Math.round(n.position.x)}, y:${Math.round(n.position.y)})` : "";
+        return `${label} ${pos}`;
+      });
+      description += nodeDescriptions.join(", ") + "\n";
+    }
+  }
+
+  // Describe standalone text/annotations (notes the user added)
+  if (textNodes.length > 0) {
+    description += "\nTEXT ANNOTATIONS/NOTES:\n";
+    textNodes.forEach((node: any) => {
+      const text = node.data?.label || "[empty text]";
+      const pos = node.position ? `at position (x:${Math.round(node.position.x)}, y:${Math.round(node.position.y)})` : "";
+      description += `- "${text}" ${pos}\n`;
+    });
+  }
+
+  // Describe connections
+  if (edges.length > 0) {
+    description += "\nCONNECTIONS:\n";
+    edges.forEach((edge: any) => {
+      const sourceNode = nodes.find((n: any) => n.id === edge.source);
+      const targetNode = nodes.find((n: any) => n.id === edge.target);
+      const sourceLabel = sourceNode?.data?.label || edge.source;
+      const targetLabel = targetNode?.data?.label || edge.target;
+      description += `- ${sourceLabel} → ${targetLabel}\n`;
+    });
+  } else {
+    description += "\nCONNECTIONS: None yet - components are not connected.\n";
+  }
+
+  return description;
+}
+
+/**
  * Start a new design session or resume existing one
  */
 async function startDesignSession(
@@ -99,25 +168,18 @@ async function startDesignSession(
       .single();
 
     if (existingSession && existingSession.context_thread_id) {
-      // Resume existing session
+      // Resume existing session - don't return a message since frontend loads all messages from DB
       const { data: board } = await supabaseAdmin
         .from("system_design_boards")
         .select("board_state")
         .eq("session_id", existingSession.id)
         .single();
 
-      const { data: messages } = await supabaseAdmin
-        .from("system_design_responses")
-        .select("*")
-        .eq("session_id", existingSession.id)
-        .order("created_at", { ascending: true });
-
       return {
         sessionId: existingSession.id,
         contextThreadId: existingSession.context_thread_id,
-        message: messages && messages.length > 0 
-          ? messages[messages.length - 1].content 
-          : "Welcome back! Let's continue designing your system.",
+        boardState: board?.board_state,
+        // Don't return message - frontend loads all messages from database
       };
     }
 
@@ -313,6 +375,15 @@ async function coachMessage(
       ? session.problems.system_design_specs[0]
       : session.problems.system_design_specs;
 
+    // Get current board state
+    const { data: board } = await supabaseAdmin
+      .from("system_design_boards")
+      .select("board_state")
+      .eq("session_id", sessionId)
+      .single();
+
+    const boardState = board?.board_state || { nodes: [], edges: [] };
+
     // Get chat history
     const { data: messages } = await supabaseAdmin
       .from("system_design_responses")
@@ -323,6 +394,17 @@ async function coachMessage(
     const openai = initializeOpenAI();
     const systemPrompt = generateSystemPrompt(spec);
 
+    // Create board state description
+    const boardDescription = describeBoardState(boardState);
+
+    // Enhanced system prompt with board state
+    const enhancedSystemPrompt = `${systemPrompt}
+
+CURRENT ARCHITECTURE DIAGRAM:
+${boardDescription}
+
+You can see the user's current diagram above. When answering questions, refer to the specific components they've added and guide them based on what's currently on their canvas.`;
+
     const conversationHistory = (messages || []).slice(-10).map((m: any) => ({
       role: m.message_role,
       content: m.content,
@@ -331,7 +413,7 @@ async function coachMessage(
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: enhancedSystemPrompt },
         ...conversationHistory,
         { role: "user", content: message },
       ],

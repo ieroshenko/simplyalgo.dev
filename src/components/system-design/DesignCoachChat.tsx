@@ -193,7 +193,7 @@ const DesignCoachChat = ({
                           }`}
                         >
                           {message.role === "user" ? (
-                            <p className="text-foreground font-medium">{message.content}</p>
+                            <p className="text-sm text-foreground">{message.content}</p>
                           ) : (
                             <div className="prose prose-sm max-w-none text-muted-foreground">
                               <ReactMarkdown
