@@ -65,7 +65,13 @@ const Problems = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  const categories = ["All", ...dbCategories.map((c) => c.name)];
+  // Filter out Data Structure Implementations and System Design categories (shown in separate sections)
+  const categories = ["All", ...dbCategories
+    .filter((c) =>
+      c.name !== "Data Structure Implementations" &&
+      c.name !== "System Design"
+    )
+    .map((c) => c.name)];
   
   // Extract unique companies from problems with memoization
   const companies = useMemo(() => {

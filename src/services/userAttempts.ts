@@ -6,6 +6,8 @@ import {
 } from "@/types/supabase-common";
 import { TestResult } from "@/types";
 import { Json } from "@/integrations/supabase/types";
+import { normalizeCode } from "@/utils/code";
+import { logger } from "@/utils/logger";
 
 export { type UserAttempt };
 
@@ -175,9 +177,11 @@ export class UserAttemptsService {
     // Check if this exact code already exists in accepted submissions
     const existingSubmissions = await this.getAcceptedSubmissions(userId, problemId);
 
-    const codeAlreadyExists = existingSubmissions.some(submission =>
-      submission.code.trim() === code.trim()
-    );
+    const normalizedIncoming = normalizeCode(code);
+    const codeAlreadyExists = existingSubmissions.some((submission) => {
+      const normalizedExisting = normalizeCode(submission?.code as unknown as string);
+      return normalizedExisting === normalizedIncoming;
+    });
 
     if (codeAlreadyExists) {
       return null;
@@ -303,7 +307,7 @@ export class UserAttemptsService {
     >;
 
     if (error) {
-      console.error("Error fetching accepted submissions:", error);
+      logger.error('[UserAttemptsService] Error fetching accepted submissions', { userId, problemId, error });
       return [];
     }
 
@@ -311,8 +315,8 @@ export class UserAttemptsService {
     const uniqueSubmissions: UserAttempt[] = [];
     const seenCodes = new Set<string>();
 
-    (data || []).forEach(submission => {
-      const normalizedCode = submission.code.trim();
+    (data || []).forEach((submission) => {
+      const normalizedCode = normalizeCode(submission?.code as unknown as string);
       if (!seenCodes.has(normalizedCode)) {
         seenCodes.add(normalizedCode);
         uniqueSubmissions.push(submission);
@@ -333,8 +337,8 @@ export class UserAttemptsService {
       analysis: string;
     }
   ): Promise<UserAttempt | null> {
-    console.log('💾 [UserAttemptsService] Saving analysis for submission:', submissionId);
-    console.log('📝 [UserAttemptsService] Analysis:', analysis);
+    logger.info('[UserAttemptsService] Saving analysis for submission', { submissionId });
+    logger.debug('[UserAttemptsService] Analysis payload', { submissionId, analysis });
     
     const { data, error } = (await supabase
       .from("user_problem_attempts")
@@ -347,12 +351,12 @@ export class UserAttemptsService {
       .single()) as SupabaseQueryResult<UserAttempt>;
 
     if (error) {
-      console.error("❌ [UserAttemptsService] Error saving complexity analysis:", error);
+      logger.error('[UserAttemptsService] Failed to save analysis', { submissionId, error });
       return null;
     }
 
-    console.log('✅ [UserAttemptsService] Successfully saved analysis');
-    console.log('📊 [UserAttemptsService] Updated submission:', data);
+    logger.info('[UserAttemptsService] Successfully saved analysis', { submissionId });
+    logger.debug('[UserAttemptsService] Updated submission', { submissionId, submission: data });
     return data;
   }
 }

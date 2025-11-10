@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
+import { logger } from "@/utils/logger";
 
 
 const ProblemSolverNew = () => {
@@ -179,13 +180,15 @@ const ProblemSolverNew = () => {
     }
   }, []);
 
-  console.log('🔍 ProblemSolverNew: problemId:', problemId);
-  console.log('🔍 ProblemSolverNew: problems count:', problems.length);
-  console.log('🔍 ProblemSolverNew: problems ids:', problems.map(p => p.id));
+  logger.debug('ProblemSolverNew init', {
+    problemId,
+    problemsCount: problems.length,
+    problemIds: problems.map((p) => p.id),
+  });
   
   const problem = problems.find((p) => p.id === problemId);
   
-  console.log('🔍 ProblemSolverNew: found problem:', problem?.title);
+  logger.debug('ProblemSolverNew problem resolved', { problemId, title: problem?.title });
   
   const {
     submissions,
@@ -198,17 +201,18 @@ const ProblemSolverNew = () => {
 
   // Load existing complexity analysis from submissions
   useEffect(() => {
-    console.log('🔍 [ProblemSolverNew] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    logger.debug('[ProblemSolverNew] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
       const results: Record<string, any> = {};
       submissions.forEach(submission => {
-        console.log('📊 [ProblemSolverNew] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        logger.debug('[ProblemSolverNew] Submission analysis presence', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
-          console.log('✅ [ProblemSolverNew] Loading analysis:', submission.complexity_analysis);
+          // Avoid logging full analysis payload to keep logs concise
+          logger.debug('[ProblemSolverNew] Loading analysis for submission', { submissionId: submission.id });
           results[submission.id] = submission.complexity_analysis;
         }
       });
-      console.log('✅ [ProblemSolverNew] Total loaded analysis:', Object.keys(results).length);
+      logger.debug('[ProblemSolverNew] Total loaded analysis', { total: Object.keys(results).length });
       setComplexityResults(results);
     }
   }, [submissions]);
@@ -370,18 +374,17 @@ const ProblemSolverNew = () => {
       }));
 
       // Save to database for persistence
-      console.log('💾 [ProblemSolverNew] Saving analysis for submission:', submissionId);
-      console.log('📝 [ProblemSolverNew] Analysis data:', analysisData);
+      logger.info('[ProblemSolverNew] Saving analysis for submission', { submissionId });
       const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
-      console.log('✅ [ProblemSolverNew] Save result:', saved ? 'Success' : 'Failed');
+      logger.debug('[ProblemSolverNew] Save result', { submissionId, success: !!saved });
 
       if (!saved) {
-        console.error('❌ [ProblemSolverNew] Failed to save analysis to database');
+        logger.error('[ProblemSolverNew] Failed to save analysis to database', { submissionId, analysisData });
       }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {
-      console.error("Complexity analysis error:", error);
+      logger.error('[ProblemSolverNew] Complexity analysis error', { submissionId, error });
       toast.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);
@@ -432,10 +435,10 @@ const ProblemSolverNew = () => {
   };
 
   const handleInsertCodeSnippet = async (snippet: CodeSnippet) => {
-    console.log("🔧 Inserting code snippet:", snippet);
+    logger.info('[ProblemSolverNew] Inserting code snippet', { snippet });
 
     if (!codeEditorRef.current) {
-      console.error("❌ Code editor ref is not available");
+      logger.error('[ProblemSolverNew] Code editor ref is not available');
       toast.error("Code editor not ready");
       return;
     }
@@ -455,7 +458,7 @@ const ProblemSolverNew = () => {
       let insertedAtLine: number | undefined;
       let backendRationale: string | undefined;
       
-      console.log("🚀 Starting AI-powered insertion:", {
+      logger.debug('[ProblemSolverNew] Starting AI-powered insertion', {
         snippetCode: snippet.code,
         currentCodeLength: currentCode.length,
         cursorPosition,
@@ -478,7 +481,7 @@ const ProblemSolverNew = () => {
           },
         });
         
-        console.log("🤖 AI insertion response:", { 
+        logger.debug('[ProblemSolverNew] AI insertion response', { 
           error: !!error, 
           hasData: !!data,
           dataKeys: data ? Object.keys(data) : [],
@@ -494,22 +497,22 @@ const ProblemSolverNew = () => {
               : undefined;
           backendRationale = typeof data.rationale === "string" ? data.rationale : undefined;
           
-          console.log("✅ AI insertion successful:", {
+          logger.info('[ProblemSolverNew] AI insertion successful', {
             insertedAtLine,
             codeLengthChange: newCodeFromBackend.length - currentCode.length,
             rationale: backendRationale || "No rationale provided"
           });
         }
       } catch (e) {
-        console.error("❌ AI insertion failed:", e);
-        console.error("Error details:", {
+        logger.error('[ProblemSolverNew] AI insertion failed', { error: e });
+        logger.debug('[ProblemSolverNew] AI insertion error details', {
           message: (e as Error)?.message,
           stack: (e as Error)?.stack
         });
       }
 
       // Only use AI insertion - no fallback
-      console.log("🤖 AI insertion result:", { 
+      logger.debug('[ProblemSolverNew] AI insertion result', { 
         success: !!newCodeFromBackend, 
         insertedAt: insertedAtLine,
         codeLength: newCodeFromBackend?.length || 0 
@@ -529,7 +532,7 @@ const ProblemSolverNew = () => {
             "The AI suggests replacing a large portion of your code to insert this snippet. Proceed with replacement?",
           );
           if (!ok) {
-            console.warn("User canceled potentially destructive insertion", {
+            logger.warn('[ProblemSolverNew] User canceled potentially destructive insertion', {
               shrinkRatio,
               rationaleText,
             });
@@ -546,7 +549,7 @@ const ProblemSolverNew = () => {
 
       // Only skip if the new code is identical to current code
       if (newCodeFromBackend === currentCode) {
-        console.log("ℹ️ New code is identical to current code - no changes needed.", {
+        logger.info('[ProblemSolverNew] New code identical to current code', {
           currentLength: currentCode.length,
           newLength: newCodeFromBackend.length,
           rationale: backendRationale,
@@ -555,7 +558,7 @@ const ProblemSolverNew = () => {
         return;
       }
 
-      console.log("🔄 Updating editor with new code:", {
+      logger.info('[ProblemSolverNew] Updating editor with new code', {
         oldLength: currentCode.length,
         newLength: newCodeFromBackend.length,
         insertedAtLine,
@@ -566,9 +569,9 @@ const ProblemSolverNew = () => {
       editor.setValue(newCodeFromBackend);
       setCode(newCodeFromBackend);
 
-      console.log("✅ Editor updated successfully");
+      logger.info('[ProblemSolverNew] Editor updated successfully');
     } catch (error) {
-      console.error("❌ Failed to insert code snippet:", error);
+      logger.error('[ProblemSolverNew] Failed to insert code snippet', { error });
       toast.error("Failed to insert code snippet");
     }
   };

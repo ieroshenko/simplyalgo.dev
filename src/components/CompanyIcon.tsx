@@ -17,8 +17,25 @@ import {
   SiPaypal,
   SiSpotify,
   SiTiktok, // For ByteDance
+  SiLinkedin,
+  SiZoom,
 } from 'react-icons/si';
-import { Building2, Square } from 'lucide-react';
+import { 
+  Building2, 
+  Square, 
+  MessageCircle,
+  DollarSign,
+  CreditCard,
+  Globe,
+  Database,
+  Server,
+  Cloud,
+  ShoppingBag,
+  Briefcase,
+  TrendingUp,
+  Users,
+  Package,
+} from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
 interface CompanyIconProps {
@@ -59,6 +76,11 @@ const CompanyIcon: React.FC<CompanyIconProps> = ({
         name: 'Meta' 
       },
       'microsoft': { 
+        icon: Square, // Using Square icon as SiMicrosoft might not be available
+        color: '#00A4EF', 
+        name: 'Microsoft' 
+      },
+      'ms': { 
         icon: Square, 
         color: '#00A4EF', 
         name: 'Microsoft' 
@@ -142,10 +164,153 @@ const CompanyIcon: React.FC<CompanyIconProps> = ({
         name: 'TikTok' 
       },
       'zoom': { 
-        icon: Building2, // Using generic building icon for Zoom as it's not in simple-icons
+        icon: SiZoom, 
         color: '#2D8CFF', 
         name: 'Zoom' 
       },
+      'atlassian': { 
+        icon: Briefcase, 
+        color: '#0052CC', 
+        name: 'Atlassian' 
+      },
+      'bloomberg': { 
+        icon: TrendingUp, 
+        color: '#000000',
+        darkColor: '#FFFFFF',
+        name: 'Bloomberg' 
+      },
+      'booking.com': { 
+        icon: Building2, 
+        color: '#003580', 
+        name: 'Booking.com' 
+      },
+      'booking': { 
+        icon: Building2, 
+        color: '#003580', 
+        name: 'Booking.com' 
+      },
+      'canva': { 
+        icon: Package, 
+        color: '#00C4CC', 
+        name: 'Canva' 
+      },
+      'coinbase': { 
+        icon: DollarSign, 
+        color: '#0052FF', 
+        name: 'Coinbase' 
+      },
+      'databricks': { 
+        icon: Database, 
+        color: '#FF3621', 
+        name: 'Databricks' 
+      },
+      'datadog': { 
+        icon: Server, 
+        color: '#632CA6', 
+        name: 'Datadog' 
+      },
+      'doordash': { 
+        icon: ShoppingBag, 
+        color: '#FF3008', 
+        name: 'DoorDash' 
+      },
+      'dropbox': { 
+        icon: Cloud, 
+        color: '#0061FF', 
+        name: 'Dropbox' 
+      },
+      'ebay': { 
+        icon: ShoppingBag, 
+        color: '#E53238', 
+        name: 'eBay' 
+      },
+      'facebook': { 
+        icon: Users, 
+        color: '#1877F2', 
+        name: 'Facebook' 
+      },
+      'flipkart': { 
+        icon: ShoppingBag, 
+        color: '#2874F0', 
+        name: 'Flipkart' 
+      },
+      'linkedin': { 
+        icon: SiLinkedin, 
+        color: '#0077B5', 
+        name: 'LinkedIn' 
+      },
+      'lyft': { 
+        icon: Building2, 
+        color: '#FF00BF', 
+        name: 'Lyft' 
+      },
+      'notion': { 
+        icon: Briefcase, 
+        color: '#000000',
+        darkColor: '#FFFFFF',
+        name: 'Notion' 
+      },
+      'pinterest': { 
+        icon: Globe, 
+        color: '#BD081C', 
+        name: 'Pinterest' 
+      },
+      'revolut': { 
+        icon: CreditCard, 
+        color: '#0075EB', 
+        name: 'Revolut' 
+      },
+      'roblox': { 
+        icon: Package, 
+        color: '#000000',
+        darkColor: '#FFFFFF',
+        name: 'Roblox' 
+      },
+      'square': { 
+        icon: Square, 
+        color: '#3E4348', 
+        name: 'Square' 
+      },
+      'stripe': { 
+        icon: CreditCard, 
+        color: '#635BFF', 
+        name: 'Stripe' 
+      },
+      'twitch': { 
+        icon: Globe, 
+        color: '#9146FF', 
+        name: 'Twitch' 
+      },
+      'twitter': { 
+        icon: MessageCircle, 
+        color: '#1DA1F2', 
+        name: 'Twitter/X' 
+      },
+      'x': { 
+        icon: MessageCircle, 
+        color: '#000000',
+        darkColor: '#FFFFFF',
+        name: 'X (Twitter)' 
+      },
+      'visa': { 
+        icon: CreditCard, 
+        color: '#1A1F71', 
+        name: 'Visa' 
+      },
+      // Aliases for common variations
+      'faang': { 
+        icon: Building2, // FAANG is a group, use generic icon
+        color: '#6B7280',
+        darkColor: '#9CA3AF',
+        name: 'FAANG' 
+      },
+      'capitalone': { 
+        icon: Building2, 
+        color: '#004977', 
+        name: 'Capital One' 
+      },
+      // Handle PayPal capitalization variations (already defined above, but ensure consistency)
+      // Note: 'paypal' is already defined above, this is just for reference
     };
 
     return iconMap[normalizedName] || { 

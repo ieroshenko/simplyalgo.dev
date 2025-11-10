@@ -280,3 +280,62 @@ export interface RequestBody {
 export interface ChatRequestBody extends RequestBody {
   coachingMode?: CoachingMode;
 }
+
+export interface SystemDesignSpec {
+  id: string;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  category: string;
+  status: "solved" | "attempted" | "not-started";
+  isStarred: boolean;
+  companies?: string[];
+  // Fields from system_design_specs table
+  summary: string;
+  functional_requirements: string[];
+  nonfunctional_requirements: string[];
+  assumptions: string[];
+  scale_estimates: Record<string, unknown>;
+  constraints: string[];
+  hints: string[];
+  starter_canvas: Record<string, unknown>;
+  rubric: {
+    axes: string[];
+    weights: Record<string, number>;
+    must_have: string[];
+  };
+  coach_questions: string[];
+  expected_topics: string[];
+  estimated_time_minutes?: number;
+}
+
+export interface SystemDesignSession {
+  id: string;
+  userId: string;
+  problemId: string;
+  contextThreadId?: string;
+  isCompleted: boolean;
+  score?: number;
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+export interface SystemDesignBoardState {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+export interface DesignEvaluation {
+  score: number;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  improvement_suggestions: string[];
+}
+
+export interface NodePaletteItem {
+  id: string;
+  type: string;
+  label: string;
+  icon: string;
+  color: string;
+}

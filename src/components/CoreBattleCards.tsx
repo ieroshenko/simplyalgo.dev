@@ -18,6 +18,15 @@ const CoreBattleCards = () => {
       featureFlag: true,
     },
     {
+      title: "System Design",
+      description: "Practice system design problems and architecture",
+      icon: Share2,
+      color: "bg-primary/10",
+      iconColor: "text-primary",
+      path: "/system-design",
+      featureFlag: true,
+    },
+    {
       title: "Implement Script/API",
       description: "Practice implementing scripts or APIs",
       icon: Webhook,
