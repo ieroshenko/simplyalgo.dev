@@ -328,7 +328,7 @@ export const useChatSession = ({
         console.log('🎯 Coaching mode being sent:', validatedCoachingMode);
 
         // Call AI function with context tracking
-        const { data, error } = await supabase.functions.invoke("ai-chat", {
+        const { data, error } = await supabase.functions.invoke("ai-coach-chat", {
           body: {
             message: content,
             problemDescription,
@@ -449,7 +449,7 @@ export const useChatSession = ({
       setIsTyping(false);
 
       // Call edge function to clear chat (messages + session)
-      const { error, data } = await supabase.functions.invoke("ai-chat", {
+      const { error, data } = await supabase.functions.invoke("ai-coach-chat", {
         body: {
           action: "clear_chat",
           sessionId: session.id,
@@ -519,7 +519,7 @@ export const useChatSession = ({
           });
         }
 
-        const { data, error } = await supabase.functions.invoke("ai-chat", {
+        const { data, error } = await supabase.functions.invoke("ai-coach-chat", {
           body: {
             message: sourceText,
             problemDescription,

@@ -1,3 +1,4 @@
+// @ts-expect-error - Deno URL import
 import OpenAI from "https://esm.sh/openai@4";
 import { ResponsesApiRequest, ResponsesApiResponse, SessionContext, ContextualResponse } from "./types.ts";
 import { logger } from "./utils/logger.ts";
