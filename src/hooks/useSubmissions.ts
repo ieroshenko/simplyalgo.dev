@@ -90,14 +90,18 @@ export const useSubmissions = (
   useEffect(() => {
     if (!userId || !problemId) return;
 
+    console.log('[useSubmissions] 🔌 Setting up realtime subscription', { userId, problemId });
+
     // Cleanup old channel first
     if (channelRef.current) {
+      console.log('[useSubmissions] 🧹 Cleaning up old channel');
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
+    // Use stable channel name (without timestamp) to prevent reconnection loops
     const channel = supabase.channel(
-      `user_attempts_${userId}_${problemId}_${Date.now()}`,
+      `user_attempts_${userId}_${problemId}`,
     );
 
     // Subscribe only to INSERT events for this user. Keep a minimal problemId guard.
@@ -110,8 +114,24 @@ export const useSubmissions = (
         filter: `user_id=eq.${userId}`,
       },
       (payload: any) => {
+        console.log('[useSubmissions] INSERT event received:', payload);
         const attempt = payload.new as UserAttempt;
-        if (!attempt || attempt.problem_id !== problemId) return;
+        if (!attempt) {
+          console.log('[useSubmissions] INSERT: No attempt data');
+          return;
+        }
+        if (attempt.problem_id !== problemId) {
+          console.log('[useSubmissions] INSERT: Wrong problem_id', {
+            received: attempt.problem_id,
+            expected: problemId
+          });
+          return;
+        }
+        console.log('[useSubmissions] INSERT: Adding attempt', {
+          id: attempt.id,
+          status: attempt.status,
+          problemId: attempt.problem_id
+        });
         addOrUpdateIfPassed(attempt);
       },
     );
@@ -153,14 +173,22 @@ export const useSubmissions = (
     );
 
     channel.subscribe((status) => {
+        console.log('[useSubmissions] Channel subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[useSubmissions] ✅ Successfully subscribed to realtime for user:', userId, 'problem:', problemId);
+        }
         if (status === 'CHANNEL_ERROR') {
-          console.warn('Supabase realtime channel error for submissions');
+          console.error('[useSubmissions] ❌ Supabase realtime channel error for submissions');
+        }
+        if (status === 'TIMED_OUT') {
+          console.error('[useSubmissions] ⏱️ Channel subscription timed out');
         }
       });
 
     channelRef.current = channel;
 
     return () => {
+      console.log('[useSubmissions] 🔌 Cleaning up realtime subscription (effect cleanup)', { userId, problemId });
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -194,11 +222,18 @@ export const useSubmissions = (
 
   // Expose an optimistic add helper for immediate UI updates on known success
   const optimisticAdd = (attempt: UserAttempt | null) => {
+    console.log('[useSubmissions] 🚀 Optimistic add called', { 
+      hasAttempt: !!attempt, 
+      attemptId: attempt?.id,
+      status: attempt?.status,
+      problemId: attempt?.problem_id 
+    });
     addOrUpdateIfPassed(attempt || undefined);
   };
 
   // Lightweight polling fallback: use when backend updates may lag or realtime is disabled
   const watchForAcceptance = (timeoutMs = 60_000, intervalMs = 2_000) => {
+    console.log('[useSubmissions] 🔄 Starting watchForAcceptance polling', { timeoutMs, intervalMs, userId, problemId });
     if (!userId || !problemId) return;
     // Reset any prior polling
     if (pollTimerRef.current) {
@@ -216,19 +251,23 @@ export const useSubmissions = (
       }
       try {
         const data = await UserAttemptsService.getAcceptedSubmissions(userId, problemId);
+        console.log('[useSubmissions] 📥 Polling fetch result:', { count: data.length, timeRemaining: pollDeadlineRef.current - Date.now() });
         // If a new item arrived, update and stop polling
         setSubmissions((prev) => {
           const prevIds = new Set(prev.map((p) => p.id));
           const next = [...data];
           const hasNew = next.some((n) => !prevIds.has(n.id));
-          if (hasNew && pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
+          if (hasNew) {
+            console.log('[useSubmissions] ✅ New submission detected via polling! Stopping poll.');
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
           }
           return next;
         });
-      } catch {
-        // ignore transient errors
+      } catch (err) {
+        console.warn('[useSubmissions] ⚠️ Polling fetch error:', err);
       }
     }, intervalMs);
   };

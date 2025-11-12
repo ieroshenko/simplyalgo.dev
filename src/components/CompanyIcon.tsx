@@ -76,12 +76,12 @@ const CompanyIcon: React.FC<CompanyIconProps> = ({
         name: 'Meta' 
       },
       'microsoft': { 
-        icon: Square, // Using Square icon as SiMicrosoft might not be available
+        icon: Building2,
         color: '#00A4EF', 
         name: 'Microsoft' 
       },
       'ms': { 
-        icon: Square, 
+        icon: Building2,
         color: '#00A4EF', 
         name: 'Microsoft' 
       },

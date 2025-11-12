@@ -43,7 +43,8 @@ const CoreBattleCards = () => {
       icon: Code,
       color: "bg-success/20",
       iconColor: "text-primary",
-      featureFlag: false,
+      path: "/technical-interview",
+      featureFlag: "TECHNICAL_INTERVIEW" as const,
     },
     {
       title: "System-Design",
@@ -59,7 +60,8 @@ const CoreBattleCards = () => {
       icon: MessageCircle,
       color: "bg-success/20",
       iconColor: "text-primary",
-      featureFlag: false,
+      path: "/behavioral-interview",
+      featureFlag: "BEHAVIORAL_INTERVIEW" as const,
     },  
     {
       title: "Script/API Follow-up",
@@ -120,7 +122,10 @@ const CoreBattleCards = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         {allInterviews.map((interview) => {
           const Icon = interview.icon;
-          const isEnabled = isFeatureEnabledBooleal(interview.featureFlag);
+          // Check if featureFlag is a string (feature flag name) or boolean
+          const isEnabled = typeof interview.featureFlag === 'string' 
+            ? isFeatureEnabled(interview.featureFlag)
+            : isFeatureEnabledBooleal(interview.featureFlag);
           return (
             <Card
               key={interview.title}
@@ -128,9 +133,8 @@ const CoreBattleCards = () => {
                 isEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-75"
               }`}
               onClick={() => {
-                if (isEnabled) {
-                  // Add navigation logic for interview cards
-                  console.log(`Navigate to ${interview.title}`);
+                if (isEnabled && interview.path) {
+                  navigate(interview.path);
                 }
               }}
             >

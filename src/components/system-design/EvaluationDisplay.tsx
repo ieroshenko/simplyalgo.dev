@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,16 +14,18 @@ interface EvaluationDisplayProps {
 const EvaluationDisplay = ({ evaluation, onClose }: EvaluationDisplayProps) => {
   const isSolved = evaluation.score >= 75;
 
-  // Trigger confetti if solved
-  if (isSolved) {
-    setTimeout(() => {
+  // Trigger confetti when solved state changes
+  useEffect(() => {
+    if (!isSolved) return;
+    const timer = setTimeout(() => {
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
       });
     }, 100);
-  }
+    return () => clearTimeout(timer);
+  }, [isSolved]);
 
   const getScoreColor = (score: number) => {
     if (score >= 75) return "text-emerald-600";
@@ -133,4 +135,3 @@ const EvaluationDisplay = ({ evaluation, onClose }: EvaluationDisplayProps) => {
 };
 
 export default EvaluationDisplay;
-

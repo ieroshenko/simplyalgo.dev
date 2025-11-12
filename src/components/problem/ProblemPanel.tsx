@@ -3,7 +3,6 @@ import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Problem } from "@/types";
 import Notes, { NotesHandle } from "@/components/Notes";
-import { useSubmissions } from "@/hooks/useSubmissions";
 import { useSolutions } from "@/hooks/useSolutions";
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
@@ -25,6 +24,9 @@ interface ProblemPanelProps {
   leftPanelTabs: Array<{ id: string; label: string }>;
   notesRef: React.RefObject<NotesHandle>;
   onFullscreenCode?: (code: string, lang: string, title: string) => void;
+  submissions: any[];
+  submissionsLoading: boolean;
+  submissionsError: string | null;
 }
 
 const ProblemPanel = ({
@@ -36,12 +38,12 @@ const ProblemPanel = ({
   leftPanelTabs,
   notesRef,
   onFullscreenCode,
+  submissions,
+  submissionsLoading: subsLoading,
+  submissionsError: subsError,
 }: ProblemPanelProps) => {
-  const {
-    submissions,
-    loading: subsLoading,
-    error: subsError,
-  } = useSubmissions(userId, problemId);
+  // Submissions are now passed as props from parent (ProblemSolverNew)
+  // This ensures realtime subscription stays active regardless of tab
   const {
     solutions,
     loading: solutionsLoading,
@@ -471,11 +473,11 @@ const ProblemPanel = ({
                     {expandedSubmissionId === s.id && (
                       <div className="px-3 pb-3">
                         <div className="bg-background border rounded">
-                          <div className="flex items-center justify-between px-3 py-2 border-b">
+                          <div className="flex flex-col gap-2 px-3 py-2 border-b sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-muted-foreground">
                               {s.language || "Python"}
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto sm:justify-end">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -486,7 +488,7 @@ const ProblemPanel = ({
                                     `${problem.title} — Submission`,
                                   )
                                 }
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs min-w-0"
                               >
                                 Maximize
                               </Button>
@@ -494,7 +496,7 @@ const ProblemPanel = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleCopy(s.code)}
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs min-w-0"
                               >
                                 Copy
                               </Button>
@@ -503,7 +505,7 @@ const ProblemPanel = ({
                                 size="sm"
                                 onClick={() => handleAnalyzeComplexity(s.code, s.id)}
                                 disabled={analyzingSubmissionId === s.id}
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs min-w-0"
                               >
                                 {analyzingSubmissionId === s.id ? (
                                   "Analyzing..."
@@ -518,7 +520,7 @@ const ProblemPanel = ({
                                 submissionCode={s.code}
                                 submissionId={s.id}
                                 variant="submission"
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs min-w-0 whitespace-normal"
                               />
                             </div>
                           </div>

@@ -113,7 +113,26 @@ export async function startInteractiveCoaching(
           console.log(`🧪 [startInteractiveCoaching] Test summary: ${passedCount}/${totalCount} passed, allPassed=${allPassed}`);
 
           if (allPassed && totalCount > 0) {
-            console.log("✅ [startInteractiveCoaching] All tests passed! Solution is already complete. RETURNING COMPLETION.");
+            console.log("✅ [startInteractiveCoaching] All tests passed! Checking for optimization opportunities...");
+
+            // Check if solution can be optimized
+            let isOptimizable = false;
+            try {
+              const optimizationAnalysis = await analyzeOptimizationWithAI(
+                currentCode,
+                problemDescription
+              );
+              isOptimizable = optimizationAnalysis.isOptimizable || optimizationAnalysis.hasAlternative || false;
+              console.log("🔍 [startInteractiveCoaching] Optimization analysis:", {
+                isOptimizable: optimizationAnalysis.isOptimizable,
+                hasAlternative: optimizationAnalysis.hasAlternative,
+                currentComplexity: optimizationAnalysis.currentComplexity,
+                targetComplexity: optimizationAnalysis.targetComplexity,
+              });
+            } catch (optError) {
+              console.warn("⚠️ [startInteractiveCoaching] Optimization analysis failed:", optError);
+              isOptimizable = false;
+            }
 
             // Return completion message instead of starting coaching
             return {
@@ -125,6 +144,7 @@ export async function startInteractiveCoaching(
               currentStepNumber: 1,
               awaitingSubmission: false,
               isCompleted: true,
+              isOptimizable: isOptimizable, // ← Add optimization flag
               responseId: null,
               contextInitialized: false
             };
@@ -889,12 +909,33 @@ CRITICAL NEXT STEP GENERATION:
               const totalCount = testResults.results?.length || 0;
 
               if (allPassed) {
-                console.log("✅ [validateCoachingSubmission] All tests passed! Marking session as complete.");
+                console.log("✅ [validateCoachingSubmission] All tests passed! Checking for optimization opportunities...");
+
+                // Check if solution can be optimized
+                let isOptimizable = false;
+                try {
+                  const optimizationAnalysis = await analyzeOptimizationWithAI(
+                    currentEditorCode,
+                    problemDescription
+                  );
+                  isOptimizable = optimizationAnalysis.isOptimizable || optimizationAnalysis.hasAlternative || false;
+                  console.log("🔍 [validateCoachingSubmission] Optimization analysis:", {
+                    isOptimizable: optimizationAnalysis.isOptimizable,
+                    hasAlternative: optimizationAnalysis.hasAlternative,
+                    currentComplexity: optimizationAnalysis.currentComplexity,
+                    targetComplexity: optimizationAnalysis.targetComplexity,
+                  });
+                } catch (optError) {
+                  console.warn("⚠️ [validateCoachingSubmission] Optimization analysis failed:", optError);
+                  // Default to false if analysis fails
+                  isOptimizable = false;
+                }
 
                 // Override validation to mark as complete
                 validation.nextAction = "complete_session";
                 validation.feedback = `🎉 Excellent work! Your solution passes all ${totalCount} test cases and meets the complexity requirements. Well done!`;
                 validation.nextStep = {}; // Clear next step
+                validation.isOptimizable = isOptimizable; // Add optimization flag
 
               } else {
                 console.log(`⚠️ [validateCoachingSubmission] Tests failed: ${passedCount}/${totalCount} passed`);

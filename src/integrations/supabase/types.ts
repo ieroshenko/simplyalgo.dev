@@ -108,6 +108,136 @@ export type Database = {
           },
         ]
       }
+      behavioral_interview_feedback: {
+        Row: {
+          areas_for_improvement: string[] | null
+          communication_score: number | null
+          created_at: string | null
+          detailed_feedback: string | null
+          id: string
+          overall_score: number | null
+          problem_solving_score: number | null
+          recommendations: string[] | null
+          session_id: string | null
+          strengths: string[] | null
+          teamwork_score: number | null
+          technical_competence_score: number | null
+        }
+        Insert: {
+          areas_for_improvement?: string[] | null
+          communication_score?: number | null
+          created_at?: string | null
+          detailed_feedback?: string | null
+          id?: string
+          overall_score?: number | null
+          problem_solving_score?: number | null
+          recommendations?: string[] | null
+          session_id?: string | null
+          strengths?: string[] | null
+          teamwork_score?: number | null
+          technical_competence_score?: number | null
+        }
+        Update: {
+          areas_for_improvement?: string[] | null
+          communication_score?: number | null
+          created_at?: string | null
+          detailed_feedback?: string | null
+          id?: string
+          overall_score?: number | null
+          problem_solving_score?: number | null
+          recommendations?: string[] | null
+          session_id?: string | null
+          strengths?: string[] | null
+          teamwork_score?: number | null
+          technical_competence_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavioral_interview_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "behavioral_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavioral_interview_sessions: {
+        Row: {
+          call_id: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          feedback_generated: boolean | null
+          id: string
+          resume_text: string
+          started_at: string | null
+          status: string | null
+          user_id: string | null
+          voice: string
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          feedback_generated?: boolean | null
+          id?: string
+          resume_text: string
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          voice: string
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          feedback_generated?: boolean | null
+          id?: string
+          resume_text?: string
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          voice?: string
+        }
+        Relationships: []
+      }
+      behavioral_interview_transcripts: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          session_id: string | null
+          timestamp: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavioral_interview_transcripts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "behavioral_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           color: string
@@ -310,6 +440,36 @@ export type Database = {
           total_steps?: number
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      data_structure_metadata: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          real_world_uses: Json | null
+          related_problem_ids: Json | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          name: string
+          real_world_uses?: Json | null
+          related_problem_ids?: Json | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          real_world_uses?: Json | null
+          related_problem_ids?: Json | null
+          slug?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -642,6 +802,390 @@ export type Database = {
         }
         Relationships: []
       }
+      system_design_boards: {
+        Row: {
+          board_state: Json
+          id: string
+          session_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          board_state?: Json
+          id?: string
+          session_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          board_state?: Json
+          id?: string
+          session_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_design_boards_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "system_design_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_design_responses: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          message_role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          message_role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          message_role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_design_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "system_design_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_design_sessions: {
+        Row: {
+          completed_at: string | null
+          context_thread_id: string | null
+          id: string
+          is_completed: boolean | null
+          problem_id: string
+          score: number | null
+          started_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          context_thread_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          problem_id: string
+          score?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          context_thread_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          problem_id?: string
+          score?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_design_sessions_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_design_specs: {
+        Row: {
+          assumptions: Json
+          coach_questions: Json
+          constraints: Json
+          created_at: string
+          estimated_time_minutes: number | null
+          expected_topics: Json
+          functional_requirements: Json
+          hints: Json
+          nonfunctional_requirements: Json
+          problem_id: string
+          rubric: Json
+          scale_estimates: Json
+          starter_canvas: Json
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          assumptions?: Json
+          coach_questions?: Json
+          constraints?: Json
+          created_at?: string
+          estimated_time_minutes?: number | null
+          expected_topics?: Json
+          functional_requirements?: Json
+          hints?: Json
+          nonfunctional_requirements?: Json
+          problem_id: string
+          rubric?: Json
+          scale_estimates?: Json
+          starter_canvas?: Json
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          assumptions?: Json
+          coach_questions?: Json
+          constraints?: Json
+          created_at?: string
+          estimated_time_minutes?: number | null
+          expected_topics?: Json
+          functional_requirements?: Json
+          hints?: Json
+          nonfunctional_requirements?: Json
+          problem_id?: string
+          rubric?: Json
+          scale_estimates?: Json
+          starter_canvas?: Json
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_design_specs_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: true
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_interview_code_snapshots: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          session_id: string | null
+          timestamp: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_interview_code_snapshots_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "technical_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_interview_feedback: {
+        Row: {
+          areas_for_improvement: string[] | null
+          code_quality_score: number | null
+          communication_score: number | null
+          created_at: string | null
+          detailed_feedback: string | null
+          id: string
+          interviewer_notes: string | null
+          problem_solving_score: number | null
+          session_id: string | null
+          strengths: string[] | null
+        }
+        Insert: {
+          areas_for_improvement?: string[] | null
+          code_quality_score?: number | null
+          communication_score?: number | null
+          created_at?: string | null
+          detailed_feedback?: string | null
+          id?: string
+          interviewer_notes?: string | null
+          problem_solving_score?: number | null
+          session_id?: string | null
+          strengths?: string[] | null
+        }
+        Update: {
+          areas_for_improvement?: string[] | null
+          code_quality_score?: number | null
+          communication_score?: number | null
+          created_at?: string | null
+          detailed_feedback?: string | null
+          id?: string
+          interviewer_notes?: string | null
+          problem_solving_score?: number | null
+          session_id?: string | null
+          strengths?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_interview_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "technical_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_interview_sessions: {
+        Row: {
+          call_id: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          feedback_generated: boolean | null
+          id: string
+          overall_score: number | null
+          passed: boolean | null
+          problem_id: string
+          started_at: string | null
+          status: string | null
+          user_id: string | null
+          voice: string
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          feedback_generated?: boolean | null
+          id?: string
+          overall_score?: number | null
+          passed?: boolean | null
+          problem_id: string
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          voice: string
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          feedback_generated?: boolean | null
+          id?: string
+          overall_score?: number | null
+          passed?: boolean | null
+          problem_id?: string
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          voice?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_interview_sessions_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_interview_test_results: {
+        Row: {
+          actual: string | null
+          created_at: string | null
+          error: string | null
+          expected: string | null
+          id: string
+          input: string | null
+          passed: boolean | null
+          session_id: string | null
+          test_case_number: number | null
+          timestamp: string | null
+        }
+        Insert: {
+          actual?: string | null
+          created_at?: string | null
+          error?: string | null
+          expected?: string | null
+          id?: string
+          input?: string | null
+          passed?: boolean | null
+          session_id?: string | null
+          test_case_number?: number | null
+          timestamp?: string | null
+        }
+        Update: {
+          actual?: string | null
+          created_at?: string | null
+          error?: string | null
+          expected?: string | null
+          id?: string
+          input?: string | null
+          passed?: boolean | null
+          session_id?: string | null
+          test_case_number?: number | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_interview_test_results_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "technical_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_interview_transcripts: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          session_id: string | null
+          timestamp: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          session_id?: string | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_interview_transcripts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "technical_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       test_cases: {
         Row: {
           created_at: string
@@ -686,9 +1230,52 @@ export type Database = {
           },
         ]
       }
+      trigger_debug_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_first_solve: boolean | null
+          last_activity_date: string | null
+          new_activity_date: string | null
+          new_max_streak: number | null
+          new_streak: number | null
+          old_max_streak: number | null
+          old_streak: number | null
+          problem_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_first_solve?: boolean | null
+          last_activity_date?: string | null
+          new_activity_date?: string | null
+          new_max_streak?: number | null
+          new_streak?: number | null
+          old_max_streak?: number | null
+          old_streak?: number | null
+          problem_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_first_solve?: boolean | null
+          last_activity_date?: string | null
+          new_activity_date?: string | null
+          new_max_streak?: number | null
+          new_streak?: number | null
+          old_max_streak?: number | null
+          old_streak?: number | null
+          problem_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_problem_attempts: {
         Row: {
           code: string | null
+          complexity_analysis: Json | null
           created_at: string
           execution_time: number | null
           id: string
@@ -702,6 +1289,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
+          complexity_analysis?: Json | null
           created_at?: string
           execution_time?: number | null
           id?: string
@@ -715,6 +1303,7 @@ export type Database = {
         }
         Update: {
           code?: string | null
+          complexity_analysis?: Json | null
           created_at?: string
           execution_time?: number | null
           id?: string
@@ -875,12 +1464,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_problems_solved: {
+        Row: {
+          easy_solved: number | null
+          hard_solved: number | null
+          medium_solved: number | null
+          total_attempts: number | null
+          total_solved: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      backfill_json_test_cases: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
+      backfill_json_test_cases: { Args: never; Returns: undefined }
+      calculate_user_streak: {
+        Args: { p_user_id: string }
+        Returns: {
+          current_streak: number
+          max_streak: number
+        }[]
       }
       get_cards_due_for_review: {
         Args: { p_user_id: string }
@@ -897,6 +1500,14 @@ export type Database = {
           solution_title: string
         }[]
       }
+      get_data_structure_related_problems: {
+        Args: { ds_slug: string }
+        Returns: {
+          difficulty: string
+          problem_id: string
+          problem_title: string
+        }[]
+      }
       migrate_test_case_to_json: {
         Args: {
           expected_text: string
@@ -908,6 +1519,8 @@ export type Database = {
           input_json: Json
         }[]
       }
+      recalculate_user_statistics: { Args: never; Returns: undefined }
+      recover_all_streaks: { Args: never; Returns: undefined }
       update_flashcard_schedule: {
         Args: { p_deck_id: string; p_difficulty_rating: number }
         Returns: undefined

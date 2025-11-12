@@ -28,18 +28,18 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
     const checkDimensions = () => {
       if (containerRef.current) {
         const { width, height } = containerRef.current.getBoundingClientRect();
-        console.log('[ExcalidrawCanvas] Checking dimensions:', { width, height });
+        // debug: dimension check removed for production
 
         if (width < MINIMUM_CANVAS_WIDTH || height < MINIMUM_CANVAS_HEIGHT) {
-          console.warn(`[ExcalidrawCanvas] ⚠️ Container too small: ${width}x${height} (minimum: ${MINIMUM_CANVAS_WIDTH}x${MINIMUM_CANVAS_HEIGHT})`);
+          // debug: warning removed for production
           setTooSmall(true);
           setCanRender(false);
         } else if (width > 0 && height > 0) {
-          console.log('[ExcalidrawCanvas] ✅ Valid dimensions, allowing render');
+          // debug: log removed for production
           setTooSmall(false);
           setCanRender(true);
         } else {
-          console.warn('[ExcalidrawCanvas] ❌ Invalid dimensions, blocking render');
+          // debug: warning removed for production
           setCanRender(false);
         }
       }
@@ -114,11 +114,7 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
     [onBoardChange]
   );
 
-  // Log container dimensions right before rendering
-  if (canRender && containerRef.current) {
-    const rect = containerRef.current.getBoundingClientRect();
-    console.log('[ExcalidrawCanvas] 🎨 Rendering Excalidraw with container dimensions:', rect);
-  }
+  // debug: render log removed for production
 
   return (
     <div ref={containerRef} className="h-full w-full" style={{ position: 'relative' }}>

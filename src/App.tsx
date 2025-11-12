@@ -14,6 +14,8 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Survey from "./pages/Survey";
 import FlashcardDeck from "./pages/FlashcardDeck";
+import BehavioralInterview from "./pages/BehavioralInterview";
+import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
@@ -143,6 +145,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <FlashcardDeck />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral-interview"
+              element={
+                <ProtectedRoute>
+                  <BehavioralInterview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technical-interview"
+              element={
+                <ProtectedRoute>
+                  <TechnicalInterview />
                 </ProtectedRoute>
               }
             />
