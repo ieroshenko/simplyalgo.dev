@@ -14,6 +14,11 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Survey from "./pages/Survey";
 import FlashcardDeck from "./pages/FlashcardDeck";
+import Behavioral from "./pages/Behavioral";
+import BehavioralQuestions from "./pages/BehavioralQuestions";
+import BehavioralStories from "./pages/BehavioralStories";
+import BehavioralStoryNew from "./pages/BehavioralStoryNew";
+import BehavioralPractice from "./pages/BehavioralPractice";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
@@ -143,6 +148,46 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <FlashcardDeck />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral"
+              element={
+                <ProtectedRoute>
+                  <Behavioral />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral/questions"
+              element={
+                <ProtectedRoute>
+                  <BehavioralQuestions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral/stories"
+              element={
+                <ProtectedRoute>
+                  <BehavioralStories />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral/stories/new"
+              element={
+                <ProtectedRoute>
+                  <BehavioralStoryNew />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral/practice"
+              element={
+                <ProtectedRoute>
+                  <BehavioralPractice />
                 </ProtectedRoute>
               }
             />

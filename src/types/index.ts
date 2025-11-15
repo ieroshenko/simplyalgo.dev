@@ -339,3 +339,121 @@ export interface NodePaletteItem {
   icon: string;
   color: string;
 }
+
+// Behavioral Interview Types
+export type BehavioralQuestionCategory = 
+  | 'general'
+  | 'technical_leadership'
+  | 'code_review_collaboration'
+  | 'debugging_problem_solving'
+  | 'system_design_architecture'
+  | 'technical_failure_recovery'
+  | 'technical_debt_prioritization'
+  | 'technical_communication'
+  | 'technical_initiative'
+  | 'learning_new_technologies'
+  | 'code_quality_best_practices'
+  | 'scaling_performance';
+
+export type QuestionDifficulty = 'beginner' | 'intermediate' | 'advanced';
+export type SessionType = 'guided' | 'mock' | 'company_specific';
+
+export type EvaluationType = 'star' | 'none' | 'custom';
+
+export interface BehavioralQuestion {
+  id: string;
+  question_text: string;
+  category: BehavioralQuestionCategory[];
+  difficulty: QuestionDifficulty;
+  follow_up_questions?: string[];
+  key_traits?: string[];
+  related_question_ids?: string[];
+  company_associations?: string[];
+  user_id?: string; // NULL for curated questions, user_id for custom questions
+  evaluation_type?: EvaluationType; // 'star', 'none', or 'custom'
+  custom_evaluation_prompt?: string; // Custom prompt when evaluation_type is 'custom' (max 500 words)
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserStory {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string; // Free-form experience description
+  situation?: string; // Optional - can be used for structured STAR if desired
+  task?: string; // Optional
+  action?: string; // Optional
+  result?: string; // Optional
+  tags?: string[];
+  technical_skills?: string[];
+  technologies?: string[];
+  metrics?: string;
+  related_problem_ids?: string[];
+  versatility_score?: number;
+  last_used_at?: string;
+  practice_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PracticeSession {
+  id: string;
+  user_id: string;
+  session_type: SessionType;
+  company_id?: string;
+  started_at: string;
+  completed_at?: string;
+  total_questions: number;
+  average_score?: number;
+}
+
+export interface STARScore {
+  situation: number;
+  task: number;
+  action: number;
+  result: number;
+}
+
+export interface AnswerFeedback {
+  strengths: string[];
+  improvements: string[];
+  specific_examples?: string[];
+  next_steps?: string[];
+}
+
+// Custom metrics for custom evaluation type
+export interface CustomMetrics {
+  [key: string]: number | string; // Flexible structure for custom metrics
+}
+
+export interface PracticeAnswer {
+  id: string;
+  session_id: string;
+  question_id: string;
+  story_id?: string;
+  answer_text: string;
+  answer_audio_url?: string;
+  transcript?: string;
+  time_spent_seconds?: number;
+  star_score?: STARScore; // Optional, only for 'star' evaluation type
+  content_score: number;
+  delivery_score: number;
+  overall_score: number;
+  custom_metrics?: CustomMetrics; // For 'custom' evaluation type
+  feedback: AnswerFeedback;
+  revision_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserBehavioralStats {
+  user_id: string;
+  total_questions_practiced: number;
+  total_stories_created: number;
+  average_overall_score?: number;
+  category_scores: Record<BehavioralQuestionCategory, number>;
+  practice_streak: number;
+  last_practiced_at?: string;
+  updated_at: string;
+}

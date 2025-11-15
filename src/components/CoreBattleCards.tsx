@@ -59,7 +59,8 @@ const CoreBattleCards = () => {
       icon: MessageCircle,
       color: "bg-success/20",
       iconColor: "text-primary",
-      featureFlag: false,
+      featureFlag: true,
+      path: "/behavioral",
     },  
     {
       title: "Script/API Follow-up",
@@ -128,9 +129,8 @@ const CoreBattleCards = () => {
                 isEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-75"
               }`}
               onClick={() => {
-                if (isEnabled) {
-                  // Add navigation logic for interview cards
-                  console.log(`Navigate to ${interview.title}`);
+                if (isEnabled && interview.path) {
+                  navigate(interview.path);
                 }
               }}
             >
