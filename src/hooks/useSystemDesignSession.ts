@@ -51,7 +51,7 @@ export const useSystemDesignSession = ({
   const lastBoardStateRef = useRef<SystemDesignBoardState | null>(null);
 
   // Initialize session (find existing or create new)
-  const initializeSession = useCallback(async () => {
+  const initializeSession = useCallback(async (forceNew = false) => {
     // Don't make request if userId or problemId is empty
     if (!userId || !problemId) {
       setLoading(false);
@@ -62,16 +62,23 @@ export const useSystemDesignSession = ({
       setLoading(true);
       setError(null);
 
-      // Try to find existing session
-      const { data: existingSession } = await supabase
-        .from("system_design_sessions")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("problem_id", problemId)
-        .eq("is_completed", false)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .single();
+      // Try to find existing session (skip if forceNew is true)
+      let existingSession = null;
+      if (!forceNew) {
+        const result = await supabase
+          .from("system_design_sessions")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("problem_id", problemId)
+          .eq("is_completed", false)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .single();
+        existingSession = result.data;
+        console.log("[SystemDesignChat] initializeSession - found existing:", existingSession?.id);
+      } else {
+        console.log("[SystemDesignChat] initializeSession - forceNew=true, creating new session");
+      }
 
       let currentSession: SystemDesignSession;
 
@@ -195,7 +202,6 @@ export const useSystemDesignSession = ({
       });
 
       setBoardState(state);
-      lastBoardStateRef.current = state;
 
       // Clear existing timeout
       if (boardUpdateTimeoutRef.current) {
@@ -219,49 +225,10 @@ export const useSystemDesignSession = ({
         }
       }, 5000);
 
-      // Debounced AI reaction (2-3 seconds after last change)
-      const previousState = lastBoardStateRef.current;
-      if (
-        previousState &&
-        JSON.stringify(previousState) !== JSON.stringify(state)
-      ) {
-        // Clear any existing reaction timeout
-        if (reactionTimeoutRef.current) {
-          clearTimeout(reactionTimeoutRef.current);
-        }
-
-        reactionTimeoutRef.current = setTimeout(async () => {
-          try {
-            console.log("[SystemDesignChat] Requesting AI reaction to board changes (debounced 2.5s)");
-            const { data } = await supabase.functions.invoke(
-              "system-design-chat",
-              {
-                body: {
-                  action: "react_to_board_changes",
-                  sessionId: session.id,
-                  boardState: state,
-                },
-              },
-            );
-
-            console.log("[SystemDesignChat] AI reaction received:", data);
-
-            if (data?.message) {
-              console.log("[SystemDesignChat] Adding AI reaction to messages");
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: data.message,
-                  timestamp: new Date(),
-                },
-              ]);
-            }
-          } catch (err) {
-            console.error("[SystemDesignChat] Failed to get AI reaction:", err);
-          }
-        }, 2500);
-      }
+      // Note: Removed automatic AI reactions to board changes
+      // The coach should only respond when the user explicitly asks a question
+      // Update lastBoardState for tracking purposes
+      lastBoardStateRef.current = state;
     },
     [session],
   );
@@ -330,44 +297,120 @@ export const useSystemDesignSession = ({
   );
 
   const clearConversation = useCallback(async () => {
-    if (!session) return;
+    console.log("[SystemDesignChat] ========== CLEAR CONVERSATION START ==========");
+    console.log("[SystemDesignChat] Current session:", session);
+    
+    if (!session) {
+      console.warn("[SystemDesignChat] No session found, aborting");
+      return;
+    }
+
+    const sessionIdToDelete = session.id;
+    console.log("[SystemDesignChat] Will delete session:", sessionIdToDelete);
 
     try {
-      // Don't set loading to true - keep UI responsive
-      
-      // Delete all responses for this session
-      await supabase
+      // Start typing animation to show we're working on it
+      setIsTyping(true);
+
+      // Small delay to show fade-out animation
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      console.log("[SystemDesignChat] Step 1: Deleting responses...");
+      const { error: responsesError } = await supabase
         .from("system_design_responses")
         .delete()
-        .eq("session_id", session.id);
+        .eq("session_id", sessionIdToDelete);
+      
+      if (responsesError) {
+        console.error("[SystemDesignChat] Responses delete error:", responsesError);
+        throw responsesError;
+      }
+      console.log("[SystemDesignChat] ✓ Responses deleted");
 
-      // Delete board state
-      await supabase
+      console.log("[SystemDesignChat] Step 2: Deleting board state...");
+      const { error: boardError } = await supabase
         .from("system_design_boards")
         .delete()
-        .eq("session_id", session.id);
+        .eq("session_id", sessionIdToDelete);
+      
+      if (boardError) {
+        console.error("[SystemDesignChat] Board delete error:", boardError);
+        throw boardError;
+      }
+      console.log("[SystemDesignChat] ✓ Board deleted");
 
-      // Delete the session itself
-      await supabase
+      console.log("[SystemDesignChat] Step 3: Deleting session...");
+      const { error: sessionError } = await supabase
         .from("system_design_sessions")
         .delete()
-        .eq("id", session.id);
+        .eq("id", sessionIdToDelete);
+      
+      if (sessionError) {
+        console.error("[SystemDesignChat] Session delete error:", sessionError);
+        throw sessionError;
+      }
+      console.log("[SystemDesignChat] ✓ Session deleted");
 
-      // Reset local state immediately (so UI updates instantly)
-      setSession(null);
+      console.log("[SystemDesignChat] Step 4: Resetting local state...");
       setMessages([]);
       setBoardState({ nodes: [], edges: [] });
       lastBoardStateRef.current = null;
       setEvaluation(null);
-      setError(null);
+      setSession(null);
+      console.log("[SystemDesignChat] ✓ Local state reset");
 
-      // Create new session (initializeSession will create a new one since we deleted the old one)
-      await initializeSession();
+      console.log("[SystemDesignChat] Step 5: Creating new session...");
+      const { data: newSessionData, error: createError } = await supabase.functions.invoke(
+        "system-design-chat",
+        {
+          body: {
+            action: "start_design_session",
+            problemId,
+            userId,
+          },
+        },
+      );
+
+      if (createError) {
+        console.error("[SystemDesignChat] Create session error:", createError);
+        throw createError;
+      }
+
+      console.log("[SystemDesignChat] New session data:", newSessionData);
+
+      const newSession: SystemDesignSession = {
+        id: newSessionData.sessionId,
+        userId,
+        problemId,
+        contextThreadId: newSessionData.contextThreadId,
+        isCompleted: false,
+        startedAt: new Date(),
+      };
+
+      console.log("[SystemDesignChat] Step 6: Setting new session...");
+      setSession(newSession);
+
+      if (newSessionData.message) {
+        console.log("[SystemDesignChat] Step 7: Setting initial message...");
+        setMessages([
+          {
+            role: "assistant",
+            content: newSessionData.message,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+      
+      setIsTyping(false);
+
+      console.log("[SystemDesignChat] ========== CLEAR CONVERSATION SUCCESS ==========");
     } catch (err) {
-      console.error("[SystemDesignChat] Error clearing conversation:", err);
+      console.error("[SystemDesignChat] ========== CLEAR CONVERSATION ERROR ==========");
+      console.error("[SystemDesignChat] Error details:", err);
       setError(err instanceof Error ? err.message : "Failed to clear conversation");
+      setIsTyping(false);
     }
-  }, [session, initializeSession]);
+  }, [session, problemId, userId]);
 
   const evaluateDesign = useCallback(async () => {
     if (!session || isEvaluating) return;
@@ -446,4 +489,3 @@ export const useSystemDesignSession = ({
     isEvaluating,
   };
 };
-

@@ -305,7 +305,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       // Check if session started as already completed
       if (data.isCompleted) {
-        console.log("✅ [COACHING] Solution already complete at session start");
+        console.log("✅ [COACHING] Solution already complete at session start", { 
+          isOptimizable: data.isOptimizable 
+        });
 
         // Initialize session state as completed - show the congratulations message in overlay
         setCoachingState(prev => ({
@@ -319,6 +321,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             highlightArea: null,
           } as InteractiveCoachSession,
           isCoachModeActive: true,
+          isOptimizable: data.isOptimizable, // ← Use backend's optimization check
           showInputOverlay: true,
           inputPosition: getPositionBelowLastLine(),
           isWaitingForResponse: false,
@@ -366,34 +369,17 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         if (vErr) throw vErr;
 
         if (validation?.nextAction === 'complete_session' || (validation?.isCorrect && validation?.nextAction === 'insert_and_continue' && validation?.codeToAdd === '')) {
-          // Consider it solved — compute optimization availability then show the overlay with Finish/Optimize
+          // Consider it solved — backend validation now includes optimization check
           applyHighlight(null);
           const pos = getPositionBelowLastLine();
 
-          // Check optimization availability
-          let optimizable = false;
-          try {
-            const { data: opt, error: optErr } = await supabase.functions.invoke('ai-chat', {
-              body: {
-                action: 'start_optimization_coaching',
-                problemId,
-                userId,
-                currentCode,
-                difficulty: 'beginner',
-                problemDescription: problemDescription || `Problem ${problemId}`,
-              },
-            });
-            if (!optErr && opt) {
-              optimizable = opt?.nextAction !== 'complete_optimization';
-            }
-          } catch (e) {
-            // If optimization check fails, silently ignore and default to not showing button
-            console.warn('[COACHING] Optimization check failed', e);
-          }
+          console.log("✅ [COACHING] Solution validated as complete", { 
+            isOptimizable: validation.isOptimizable 
+          });
 
           setCoachingState(prev => ({
             ...prev,
-            isOptimizable: optimizable,
+            isOptimizable: validation.isOptimizable, // ← Use backend's optimization check from validation
             session: prev.session ? { 
               ...prev.session, 
               isCompleted: true, 

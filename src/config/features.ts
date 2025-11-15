@@ -3,6 +3,8 @@ export const FEATURE_FLAGS = {
   MOCK_INTERVIEWS: false,
   DSA_ARENA: true,
   FLASHCARDS: true, // Anki-style spaced repetition flashcards for solved problems
+  BEHAVIORAL_INTERVIEW: false, // AI-powered behavioral interview practice
+  TECHNICAL_INTERVIEW: false, // AI-powered technical mock interview
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;

@@ -43,7 +43,8 @@ const CoreBattleCards = () => {
       icon: Code,
       color: "bg-success/20",
       iconColor: "text-primary",
-      featureFlag: false,
+      path: "/technical-interview",
+      featureFlag: "TECHNICAL_INTERVIEW" as const,
     },
     {
       title: "System-Design",
@@ -121,7 +122,10 @@ const CoreBattleCards = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         {allInterviews.map((interview) => {
           const Icon = interview.icon;
-          const isEnabled = isFeatureEnabledBooleal(interview.featureFlag);
+          // Check if featureFlag is a string (feature flag name) or boolean
+          const isEnabled = typeof interview.featureFlag === 'string' 
+            ? isFeatureEnabled(interview.featureFlag)
+            : isFeatureEnabledBooleal(interview.featureFlag);
           return (
             <Card
               key={interview.title}

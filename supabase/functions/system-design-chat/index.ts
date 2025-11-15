@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import OpenAI from "https://esm.sh/openai@4";
 import { SystemDesignRequest, SystemDesignResponse, DesignEvaluation } from "./types.ts";
+import type { SystemDesignSpec } from "../../../src/types/index.ts";
+import type { SystemDesignBoardState as BoardState } from "../../../src/types/index.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
@@ -25,12 +27,18 @@ let openaiInstance: OpenAI | null = null;
 
 function initializeOpenAI(): OpenAI {
   if (openaiInstance) return openaiInstance;
-  
+
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
     throw new Error("OPENAI_API_KEY environment variable is not set");
   }
-  
+
+  // Log API key info for debugging (first 15 chars only for security)
+  const keyPrefix = openaiKey.substring(0, 15);
+  const keyLength = openaiKey.length;
+  console.log(`[system-design-chat] OpenAI API Key loaded: ${keyPrefix}... (length: ${keyLength})`);
+  console.log(`[system-design-chat] Supabase Project: ${supabaseUrl}`);
+
   openaiInstance = new OpenAI({ apiKey: openaiKey });
   return openaiInstance;
 }
@@ -52,7 +60,7 @@ const corsHeaders = {
 /**
  * Generate system prompt for system design coaching
  */
-function generateSystemPrompt(spec: any): string {
+function generateSystemPrompt(spec: SystemDesignSpec): string {
   return `You are an expert System Design interviewer and mentor.
 Guide the student step-by-step through designing: ${spec.title || 'this system'}
 
@@ -82,7 +90,7 @@ SESSION RULES:
 /**
  * Convert board state to human-readable description
  */
-function describeBoardState(boardState: any): string {
+function describeBoardState(boardState: BoardState): string {
   if (!boardState || !boardState.nodes || boardState.nodes.length === 0) {
     return "The canvas is currently empty - no components have been added yet.";
   }
@@ -581,4 +589,3 @@ serve(async (req) => {
     );
   }
 });
-

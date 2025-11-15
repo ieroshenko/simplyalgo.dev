@@ -19,10 +19,7 @@ import {
   Type,
 } from "lucide-react";
 
-interface NodePaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+// Consolidated NodePaletteProps is defined below with onAddNode
 
 const nodeTypes = [
   // System Design Components
@@ -122,4 +119,3 @@ const NodePalette = ({ isOpen, onClose, onAddNode }: NodePaletteProps) => {
 };
 
 export default NodePalette;
-

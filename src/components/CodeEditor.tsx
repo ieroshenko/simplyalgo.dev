@@ -24,9 +24,10 @@ interface CodeEditorProps {
   problemId: string;
   onCodeChange: (code: string) => void;
   onRun: () => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   isRunning: boolean;
   editorRef?: React.MutableRefObject<any>;
+  hideSubmit?: boolean;
   // Coach Mode props
   onStartCoaching?: () => void;
   onStopCoaching?: () => void;
@@ -42,6 +43,7 @@ const CodeEditor = ({
   onSubmit,
   isRunning,
   editorRef: externalEditorRef,
+  hideSubmit = false,
   onStartCoaching,
   onStopCoaching,
   isCoachModeActive = false,
@@ -218,16 +220,18 @@ const CodeEditor = ({
             </Button>
           )}
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRun}
-            disabled={isRunning}
-            className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-          >
-            <Zap className="w-4 h-4 mr-1" />
-            {isRunning ? "Running..." : "Submit"}
-          </Button>
+          {!hideSubmit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRun}
+              disabled={isRunning}
+              className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+            >
+              <Zap className="w-4 h-4 mr-1" />
+              {isRunning ? "Running..." : "Submit"}
+            </Button>
+          )}
           {/* <Button 
             size="sm" 
             onClick={onSubmit}

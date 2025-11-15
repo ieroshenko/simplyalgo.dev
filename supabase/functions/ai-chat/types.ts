@@ -174,6 +174,7 @@ export interface CoachingValidation {
     expectedCodeType: "variable" | "loop" | "condition" | "expression" | "return" | "any";
     hint: string;
   };
+  isOptimizable?: boolean; // Flag to indicate if solution can be further optimized
 }
 
 export interface CoachingStep {

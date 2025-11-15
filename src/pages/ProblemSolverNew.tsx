@@ -755,6 +755,9 @@ const ProblemSolverNew = () => {
                   leftPanelTabs={leftPanelTabs}
                   notesRef={notesRef}
                   onFullscreenCode={openFullscreen}
+                  submissions={submissions}
+                  submissionsLoading={subsLoading}
+                  submissionsError={subsError}
                 />
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -1048,7 +1051,31 @@ const ProblemSolverNew = () => {
                 coachingState.inputPosition = pos as { x: number; y: number } | null;
               }}
               onStartOptimization={(type) => startOptimization(type)} // Pass the type parameter
-              onFinishCoaching={stopCoaching}
+              onFinishCoaching={async () => {
+                // When coaching completes successfully, save as submission
+                if (user?.id && problem?.id && code) {
+                  console.log('[ProblemSolverNew] Coaching completed - saving submission');
+                  try {
+                    const saved = await UserAttemptsService.markProblemSolved(
+                      user.id,
+                      problem.id,
+                      code,
+                    );
+                    if (saved) {
+                      optimisticAdd(saved);
+                    }
+                    watchForAcceptance(30_000, 2_000);
+                    await handleProblemSolved(
+                      problem.difficulty as "Easy" | "Medium" | "Hard",
+                    );
+                    toast.success("Solution saved to submissions! 🎉");
+                  } catch (error) {
+                    console.error('[ProblemSolverNew] Failed to save coaching completion:', error);
+                    toast.error("Failed to save submission");
+                  }
+                }
+                stopCoaching();
+              }}
               isOptimizable={coachingState.isOptimizable || coachingState.lastValidation?.isOptimizable}
               hasAlternative={coachingState.lastValidation?.hasAlternative} // New prop
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}

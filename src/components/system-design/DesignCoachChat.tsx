@@ -7,6 +7,8 @@ import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { prism as prismLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/hooks/useTheme";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 interface DesignCoachChatProps {
@@ -37,6 +39,9 @@ const DesignCoachChat = ({
   isEvaluating,
 }: DesignCoachChatProps) => {
   const [input, setInput] = useState("");
+  const [isClearing, setIsClearing] = useState(false);
+  const { isDark } = useTheme();
+  const syntaxTheme = isDark ? vscDarkPlus : prismLight;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Speech-to-text functionality
@@ -132,10 +137,20 @@ const DesignCoachChat = ({
         <div className="flex items-center gap-4">
           {session && messages.length > 0 && (
             <Button
+              type="button"
               variant="ghost"
               size="sm"
-              onClick={onClearConversation}
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("[DesignCoachChat] Delete clicked, calling clearConversation");
+                setIsClearing(true);
+                await onClearConversation();
+                // isClearing will be reset when new messages appear
+                setTimeout(() => setIsClearing(false), 500);
+              }}
               className="text-muted-foreground hover:text-destructive"
+              disabled={isClearing}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -174,7 +189,14 @@ const DesignCoachChat = ({
               )}
               <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message, idx) => (
-                  <div key={idx} className="mb-6 min-w-0">
+                  <div 
+                    key={idx} 
+                    className={`mb-6 min-w-0 transition-all duration-300 ${
+                      isClearing 
+                        ? "opacity-0 translate-y-2" 
+                        : "opacity-100 translate-y-0 animate-in fade-in slide-in-from-bottom-2 duration-500"
+                    }`}
+                  >
                     <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                       {/* Avatar for assistant (left side) */}
                       {message.role === "assistant" && (
@@ -204,7 +226,7 @@ const DesignCoachChat = ({
                                   if (!inline) {
                                     return (
                                       <SyntaxHighlighter
-                                        style={vscDarkPlus}
+                                        style={syntaxTheme}
                                         language={lang}
                                         PreTag="div"
                                         className="rounded-md !mt-2 !mb-2"
@@ -316,12 +338,12 @@ const DesignCoachChat = ({
                 type="button"
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
                   isListening
-                    ? "text-red-500 animate-pulse"
+                    ? "text-red-500 dark:text-red-400 animate-pulse"
                     : isProcessing
-                      ? "text-blue-500"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "text-blue-500 dark:text-blue-400"
+                      : "text-neutral-500 dark:text-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200"
                 }`}
                 title={
                   isListening

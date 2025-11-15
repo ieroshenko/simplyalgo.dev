@@ -185,6 +185,9 @@ export interface CoachingValidationResult {
     hint: string;
     highlightArea?: CoachHighlightArea;
   };
+  
+  // Optimization availability flag
+  isOptimizable?: boolean; // Flag to indicate if solution can be further optimized
 }
 
 export interface OptimizationStep {

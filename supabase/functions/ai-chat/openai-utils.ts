@@ -21,12 +21,18 @@ let openaiInstance: OpenAI | null = null;
  */
 export function initializeOpenAI(): OpenAI {
   if (openaiInstance) return openaiInstance;
-  
+
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
     throw new Error("OPENAI_API_KEY environment variable is not set");
   }
-  
+
+  // Log API key info for debugging (first 15 chars only for security)
+  const keyPrefix = openaiKey.substring(0, 15);
+  const keyLength = openaiKey.length;
+  logger.info(`OpenAI API Key loaded: ${keyPrefix}... (length: ${keyLength})`);
+  logger.info(`Using model: ${configuredModel} (${modelSource})`);
+
   openaiInstance = new OpenAI({ apiKey: openaiKey });
   return openaiInstance;
 }

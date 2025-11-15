@@ -19,6 +19,8 @@ import BehavioralQuestions from "./pages/BehavioralQuestions";
 import BehavioralStories from "./pages/BehavioralStories";
 import BehavioralStoryNew from "./pages/BehavioralStoryNew";
 import BehavioralPractice from "./pages/BehavioralPractice";
+import BehavioralInterview from "./pages/BehavioralInterview";
+import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
@@ -156,6 +158,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Behavioral />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral-interview"
+              element={
+                <ProtectedRoute>
+                  <BehavioralInterview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technical-interview"
+              element={
+                <ProtectedRoute>
+                  <TechnicalInterview />
                 </ProtectedRoute>
               }
             />
