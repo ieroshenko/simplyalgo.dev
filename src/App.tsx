@@ -20,6 +20,7 @@ import BehavioralStories from "./pages/BehavioralStories";
 import BehavioralStoryNew from "./pages/BehavioralStoryNew";
 import BehavioralPractice from "./pages/BehavioralPractice";
 import BehavioralInterview from "./pages/BehavioralInterview";
+import BehavioralMockInterview from "./pages/BehavioralMockInterview";
 import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
@@ -206,6 +207,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BehavioralPractice />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/behavioral/mock-interview"
+              element={
+                <ProtectedRoute>
+                  <BehavioralMockInterview />
                 </ProtectedRoute>
               }
             />

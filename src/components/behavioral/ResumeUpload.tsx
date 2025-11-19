@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ResumeUploadProps {
   onResumeExtracted: (text: string) => void;
@@ -60,20 +61,34 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
       const formData = new FormData();
       formData.append("file", file);
 
-      // Call Express backend via Vite proxy
-      const response = await fetch("/api/upload-resume", {
-        method: "POST",
-        body: formData,
-      });
+      // Get Supabase URL and anon key from environment variables
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error("Missing Supabase configuration. Please check your environment variables.");
+      }
+
+      // Call Supabase edge function directly with fetch (for FormData support)
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/upload-resume`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: "Failed to parse resume" }));
         throw new Error(errorData.error || "Failed to parse resume");
       }
 
       const data = await response.json();
 
-      if (!data.text) {
+      if (!data?.text) {
         throw new Error("No text extracted from resume");
       }
 

@@ -104,6 +104,7 @@ export const usePracticeAnswers = () => {
         .from("practice_answers")
         .select("question_id, overall_score")
         .in("session_id", sessionIds)
+        .not("question_id", "is", null)
         .not("overall_score", "is", null)
         .order("created_at", { ascending: false });
 
@@ -163,6 +164,7 @@ export const usePracticeAnswers = () => {
         .from("practice_answers")
         .select("question_id, overall_score")
         .in("session_id", sessionIds)
+        .not("question_id", "is", null)
         .not("overall_score", "is", null);
 
       if (answersError) throw answersError;

@@ -661,6 +661,98 @@ export type Database = {
           },
         ]
       }
+      mock_interview_answers: {
+        Row: {
+          answer_text: string
+          content_score: number | null
+          created_at: string | null
+          delivery_score: number | null
+          feedback: Json | null
+          id: string
+          mock_interview_id: string
+          overall_score: number | null
+          question_category: string[] | null
+          question_difficulty: string | null
+          question_text: string
+          star_score: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          answer_text: string
+          content_score?: number | null
+          created_at?: string | null
+          delivery_score?: number | null
+          feedback?: Json | null
+          id?: string
+          mock_interview_id: string
+          overall_score?: number | null
+          question_category?: string[] | null
+          question_difficulty?: string | null
+          question_text: string
+          star_score?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          answer_text?: string
+          content_score?: number | null
+          created_at?: string | null
+          delivery_score?: number | null
+          feedback?: Json | null
+          id?: string
+          mock_interview_id?: string
+          overall_score?: number | null
+          question_category?: string[] | null
+          question_difficulty?: string | null
+          question_text?: string
+          star_score?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_answers_mock_interview_id_fkey"
+            columns: ["mock_interview_id"]
+            isOneToOne: false
+            referencedRelation: "mock_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mock_interviews: {
+        Row: {
+          company: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          resume_text: string
+          role: string
+          started_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          resume_text: string
+          role: string
+          started_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          resume_text?: string
+          role?: string
+          started_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           content: string | null
@@ -706,7 +798,7 @@ export type Database = {
           feedback: Json | null
           id: string
           overall_score: number | null
-          question_id: string
+          question_id: string | null
           revision_count: number | null
           session_id: string
           star_score: Json | null
@@ -724,7 +816,7 @@ export type Database = {
           feedback?: Json | null
           id?: string
           overall_score?: number | null
-          question_id: string
+          question_id?: string | null
           revision_count?: number | null
           session_id: string
           star_score?: Json | null
@@ -742,7 +834,7 @@ export type Database = {
           feedback?: Json | null
           id?: string
           overall_score?: number | null
-          question_id?: string
+          question_id?: string | null
           revision_count?: number | null
           session_id?: string
           star_score?: Json | null
@@ -1027,6 +1119,8 @@ export type Database = {
         Row: {
           completed_at: string | null
           context_thread_id: string | null
+          draft_board_state: Json | null
+          evaluation_feedback: string | null
           id: string
           is_completed: boolean | null
           problem_id: string
@@ -1038,6 +1132,8 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           context_thread_id?: string | null
+          draft_board_state?: Json | null
+          evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null
           problem_id: string
@@ -1049,6 +1145,8 @@ export type Database = {
         Update: {
           completed_at?: string | null
           context_thread_id?: string | null
+          draft_board_state?: Json | null
+          evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null
           problem_id?: string

@@ -9,10 +9,6 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      '/api/upload-resume': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-      },
       '/api/ephemeral-token': {
         target: 'http://localhost:3002',
         changeOrigin: true,

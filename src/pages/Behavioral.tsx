@@ -10,9 +10,9 @@ import { useUserStories } from "@/hooks/useUserStories";
 import {
   BookOpen,
   FileText,
-  MessageSquare,
   TrendingUp,
   ArrowRight,
+  Users,
 } from "lucide-react";
 
 const Behavioral = () => {
@@ -88,11 +88,11 @@ const Behavioral = () => {
       color: "text-green-500",
     },
     {
-      title: "Practice",
-      description: "Practice answering questions with AI-powered feedback",
-      icon: MessageSquare,
-      path: "/behavioral/practice",
-      color: "text-purple-500",
+      title: "Mock Interview",
+      description: "Upload your resume and get personalized interview questions",
+      icon: Users,
+      path: "/behavioral/mock-interview",
+      color: "text-orange-500",
     },
   ];
 
