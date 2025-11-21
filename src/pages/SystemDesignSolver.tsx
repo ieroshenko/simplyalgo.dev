@@ -3,14 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSystemDesignSession } from "@/hooks/useSystemDesignSession";
 import { useSystemDesignSpecs } from "@/hooks/useSystemDesignSpecs";
+import { useSystemDesignSubmissions } from "@/hooks/useSystemDesignSubmissions";
 import DesignCanvas from "@/components/system-design/DesignCanvas";
 import ProblemContextSidebar from "@/components/system-design/ProblemContextSidebar";
 import DesignCoachChat from "@/components/system-design/DesignCoachChat";
+import SystemDesignSubmissions from "@/components/system-design/SystemDesignSubmissions";
 import EvaluationDisplay from "@/components/system-design/EvaluationDisplay";
+import SubmissionPreviewModal from "@/components/system-design/SubmissionPreviewModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
-import { ArrowLeft, Moon, Sun, Star, StarOff } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Star, StarOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -19,6 +24,8 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { SystemDesignBoardState } from "@/types";
+import type { SystemDesignSubmission } from "@/hooks/useSystemDesignSubmissions";
 
 const SystemDesignSolver = () => {
   const { problemId } = useParams<{ problemId: string }>();
@@ -33,20 +40,43 @@ const SystemDesignSolver = () => {
     boardState,
     messages,
     evaluation,
+    completeness,
     loading: sessionLoading,
     error,
     isTyping,
+    hasDraft,
     updateBoard,
     sendMessage,
     evaluateDesign,
     clearConversation,
+    saveDraft,
+    restoreDraft,
     isEvaluating,
   } = useSystemDesignSession({
     problemId: problemId || "",
     userId: user?.id || "",
   });
 
+  const {
+    submissions,
+    loading: submissionsLoading,
+    error: submissionsError,
+  } = useSystemDesignSubmissions(user?.id, problemId);
+
   const [showEvaluation, setShowEvaluation] = useState(false);
+  const [previewSubmission, setPreviewSubmission] = useState<SystemDesignSubmission | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
     const saved = localStorage.getItem("system-design-showLeftPanel");
     return saved !== null ? JSON.parse(saved) : true;
@@ -71,6 +101,56 @@ const SystemDesignSolver = () => {
 
   const toggleTheme = () => {
     setTheme(isDark ? "light" : "dark");
+  };
+
+  const handleClearDiagram = () => {
+    const hasNodes = boardState.nodes && boardState.nodes.length > 0;
+
+    if (hasNodes) {
+      setConfirmDialog({
+        isOpen: true,
+        title: "Clear Diagram?",
+        message: "Are you sure you want to start a new attempt? This will clear your current diagram and cannot be undone.",
+        onConfirm: async () => {
+          setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+          await clearConversation();
+          toast.success("Started new attempt");
+        },
+      });
+    } else {
+      // No nodes, just clear without confirmation
+      clearConversation();
+      toast.success("Started new attempt");
+    }
+  };
+
+  const handleViewSubmission = async (submission: SystemDesignSubmission) => {
+    // Auto-save current work as draft before viewing
+    const hasCurrentWork = boardState.nodes && boardState.nodes.length > 0;
+
+    if (hasCurrentWork) {
+      await saveDraft();
+      toast.success("Current work saved as draft");
+    }
+
+    // Open preview modal
+    setPreviewSubmission(submission);
+    setShowPreviewModal(true);
+  };
+
+  const handleRestoreDraft = () => {
+    if (!hasDraft) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Restore Draft?",
+      message: "This will replace your current work with the previously saved draft. Continue?",
+      onConfirm: async () => {
+        setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+        await restoreDraft();
+        toast.success("Draft restored successfully");
+      },
+    });
   };
 
   const handleToggleStar = async () => {
@@ -203,6 +283,30 @@ const SystemDesignSolver = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            {hasDraft && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRestoreDraft}
+                className="text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950"
+                title="Restore previously saved draft"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Restore Draft</span>
+                <span className="sm:hidden">Draft</span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearDiagram}
+              className="text-muted-foreground hover:text-foreground"
+              title="Clear diagram and start fresh"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Clear Diagram</span>
+              <span className="sm:hidden">Clear</span>
+            </Button>
             <ShortcutsHelp />
             <Button
               variant="ghost"
@@ -236,12 +340,34 @@ const SystemDesignSolver = () => {
       {/* Main Content - explicit height calculation */}
       <div className="flex-1" style={{ height: "calc(100vh - 81px)" }}>
         <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* Left Panel - Problem Context */}
+          {/* Left Panel - Problem Context & Submissions */}
           {showLeftPanel && (
             <>
               <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
-                <div className="h-full border-r border-border overflow-y-auto bg-background">
-                  <ProblemContextSidebar spec={spec} />
+                <div className="h-full border-r border-border bg-background">
+                  <Tabs defaultValue="description" className="h-full flex flex-col">
+                    <TabsList className="w-full justify-start rounded-none border-b border-border bg-muted/50">
+                      <TabsTrigger value="description" className="flex-1">
+                        Description
+                      </TabsTrigger>
+                      <TabsTrigger value="submissions" className="flex-1">
+                        Submissions
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="description" className="flex-1 m-0 overflow-auto">
+                      <ProblemContextSidebar spec={spec} />
+                    </TabsContent>
+
+                    <TabsContent value="submissions" className="flex-1 m-0 overflow-auto">
+                      <SystemDesignSubmissions
+                        submissions={submissions}
+                        loading={submissionsLoading}
+                        error={submissionsError}
+                        onViewDiagram={handleViewSubmission}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -270,6 +396,7 @@ const SystemDesignSolver = () => {
                     loading={sessionLoading}
                     isTyping={isTyping}
                     error={error}
+                    completeness={completeness}
                     onSendMessage={sendMessage}
                     onClearConversation={clearConversation}
                     onEvaluate={evaluateDesign}
@@ -289,6 +416,28 @@ const SystemDesignSolver = () => {
           onClose={() => setShowEvaluation(false)}
         />
       )}
+
+      {/* Submission Preview Modal */}
+      <SubmissionPreviewModal
+        submission={previewSubmission}
+        isOpen={showPreviewModal}
+        onClose={() => {
+          setShowPreviewModal(false);
+          setPreviewSubmission(null);
+        }}
+      />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant="destructive"
+        confirmLabel="Continue"
+        cancelLabel="Cancel"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+      />
     </div>
   );
 };

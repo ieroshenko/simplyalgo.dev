@@ -10,6 +10,8 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { prism as prismLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { Badge } from "@/components/ui/badge";
+import type { CompletenessAnalysis } from "@/types";
 
 interface DesignCoachChatProps {
   messages: Array<{
@@ -21,6 +23,7 @@ interface DesignCoachChatProps {
   loading: boolean;
   isTyping: boolean;
   error: string | null;
+  completeness: CompletenessAnalysis | null;
   onSendMessage: (message: string) => void;
   onClearConversation: () => void;
   onEvaluate: () => void;
@@ -33,6 +36,7 @@ const DesignCoachChat = ({
   loading,
   isTyping,
   error,
+  completeness,
   onSendMessage,
   onClearConversation,
   onEvaluate,
@@ -206,9 +210,9 @@ const DesignCoachChat = ({
                       )}
 
                       {/* Message Content */}
-                      <div className="max-w-[80%] min-w-0">
-                        <div 
-                          className={`rounded-lg p-3 ${
+                      <div className="max-w-[80%] min-w-0 overflow-hidden">
+                        <div
+                          className={`rounded-lg p-3 break-words ${
                             message.role === "user"
                               ? "border border-primary/60 bg-card text-foreground"
                               : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15"
@@ -217,7 +221,7 @@ const DesignCoachChat = ({
                           {message.role === "user" ? (
                             <p className="text-sm text-foreground">{message.content}</p>
                           ) : (
-                            <div className="prose prose-sm max-w-none text-muted-foreground">
+                            <div className={`prose prose-sm max-w-none overflow-x-hidden ${isDark ? "prose-invert" : ""}`} style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
                               <ReactMarkdown
                                 components={{
                                 code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
@@ -225,26 +229,29 @@ const DesignCoachChat = ({
                                   const lang = match?.[1] || "python";
                                   if (!inline) {
                                     return (
-                                      <SyntaxHighlighter
-                                        style={syntaxTheme}
-                                        language={lang}
-                                        PreTag="div"
-                                        className="rounded-md !mt-2 !mb-2"
-                                        customStyle={{
-                                          whiteSpace: "pre",
-                                          overflowX: "auto"
-                                        }}
-                                      >
-                                        {String(children).replace(/\n$/, "")}
-                                      </SyntaxHighlighter>
+                                      <div className="overflow-x-auto max-w-full">
+                                        <SyntaxHighlighter
+                                          style={syntaxTheme}
+                                          language={lang}
+                                          PreTag="div"
+                                          className="rounded-md !mt-2 !mb-2"
+                                          customStyle={{
+                                            whiteSpace: "pre",
+                                            overflowX: "auto",
+                                            maxWidth: "100%"
+                                          }}
+                                        >
+                                          {String(children).replace(/\n$/, "")}
+                                        </SyntaxHighlighter>
+                                      </div>
                                     );
                                   }
                                   return (
-                                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono break-words">{children}</code>
                                   );
                                 },
                                 p: ({ children }) => (
-                                  <p>{children}</p>
+                                  <p className="break-words">{children}</p>
                                 ),
                                 ul: ({ children }) => (
                                   <ul className="list-disc list-outside pl-5 mb-2">
@@ -391,13 +398,35 @@ const DesignCoachChat = ({
           </div>
         )}
 
+        {/* Completeness Badge */}
+        {completeness && completeness.confidence >= 50 && (
+          <div className="mt-2 flex justify-center">
+            <Badge
+              variant={completeness.isComplete && completeness.confidence >= 70 ? "default" : "secondary"}
+              className={
+                completeness.isComplete && completeness.confidence >= 70
+                  ? "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30"
+                  : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+              }
+            >
+              {completeness.isComplete && completeness.confidence >= 70
+                ? "✓ Ready to Evaluate"
+                : "Almost There"}
+            </Badge>
+          </div>
+        )}
+
         {/* Evaluate Design Button */}
-        <div className="mt-2">
+        <div className="mt-2 relative">
           <Button
             onClick={onEvaluate}
             disabled={isEvaluating || messages.length === 0}
-            className="w-full"
-            variant="outline"
+            className={`w-full ${
+              completeness?.isComplete && completeness.confidence >= 70
+                ? "animate-pulse bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg shadow-green-500/50"
+                : ""
+            }`}
+            variant={completeness?.isComplete && completeness.confidence >= 70 ? "default" : "outline"}
           >
             {isEvaluating ? (
               <>
@@ -406,6 +435,7 @@ const DesignCoachChat = ({
               </>
             ) : (
               <>
+                {completeness?.isComplete && completeness.confidence >= 70 ? "✓ " : ""}
                 Evaluate Design
               </>
             )}

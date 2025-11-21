@@ -62,6 +62,12 @@ for i in {1..60}; do
 done
 curl -fsS "http://localhost:${API_PORT}/health" >/dev/null || { echo -e "${RED}❌ API failed to start${NC}"; exit 1; }
 
+# Install Resume Parser Server dependencies
+echo -e "${YELLOW}📦 Installing Resume Parser deps...${NC}"
+pushd "server" >/dev/null
+npm install --no-audit --no-fund --silent
+popd >/dev/null
+
 # Start Resume Parser Server
 echo -e "${YELLOW}🚀 Starting Resume Parser server on :${RESUME_SERVER_PORT}...${NC}"
 node server/index.js &

@@ -1,43 +1,42 @@
 import { Button } from "@/components/ui/button";
 import {
-  Monitor,
-  Server,
-  Loader,
-  Database,
-  Zap,
-  MessageSquare,
-  Globe,
-  Gauge,
-  Shield,
-  Webhook,
-  HardDrive,
-  Clock,
-  Network,
   Square,
   Circle,
   Diamond,
   Type,
 } from "lucide-react";
+import {
+  TbDeviceDesktop,
+  TbServer,
+  TbRouteAltLeft,
+  TbDatabase,
+  TbDatabaseImport,
+  TbList,
+  TbWorld,
+  TbDeviceFloppy,
+  TbClockPlay,
+  TbNetwork,
+} from "react-icons/tb";
 
 // Consolidated NodePaletteProps is defined below with onAddNode
 
 const nodeTypes = [
   // System Design Components
-  { id: "client", label: "Client", icon: Monitor, color: "bg-blue-500" },
-  { id: "api", label: "API/Backend", icon: Server, color: "bg-green-500" },
+  { id: "client", label: "Client", icon: TbDeviceDesktop, color: "bg-blue-500" },
+  { id: "api", label: "Server", icon: TbServer, color: "bg-green-500" },
   {
     id: "loadbalancer",
     label: "Load Balancer",
-    icon: Loader,
+    icon: TbRouteAltLeft,
     color: "bg-cyan-500",
   },
-  { id: "database", label: "Database", icon: Database, color: "bg-purple-500" },
-  { id: "cache", label: "Cache", icon: Zap, color: "bg-orange-500" },
-  { id: "queue", label: "Queue", icon: MessageSquare, color: "bg-pink-500" },
-  { id: "cdn", label: "CDN", icon: Globe, color: "bg-indigo-500" },
-  { id: "storage", label: "Storage", icon: HardDrive, color: "bg-gray-500" },
-  { id: "worker", label: "Cron/Worker", icon: Clock, color: "bg-slate-500" },
-  { id: "gateway", label: "DNS/Gateway", icon: Network, color: "bg-violet-500" },
+  { id: "database", label: "Database", icon: TbDatabase, color: "bg-purple-500" },
+  { id: "cache", label: "Cache", icon: TbDatabaseImport, color: "bg-orange-500" },
+  { id: "queue", label: "Queue", icon: TbList, color: "bg-pink-500" },
+  { id: "cdn", label: "CDN", icon: TbWorld, color: "bg-indigo-500" },
+  { id: "storage", label: "Storage", icon: TbDeviceFloppy, color: "bg-gray-500" },
+  { id: "worker", label: "Cron/Worker", icon: TbClockPlay, color: "bg-slate-500" },
+  { id: "gateway", label: "DNS/Gateway", icon: TbNetwork, color: "bg-violet-500" },
 
   // Basic Shapes (Excalidraw-like)
   { id: "rectangle", label: "Rectangle", icon: Square, color: "bg-gray-700" },

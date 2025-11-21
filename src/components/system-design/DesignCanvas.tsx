@@ -18,26 +18,29 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
 import {
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Puzzle,
-  Monitor,
-  Server,
-  Loader,
-  Database,
-  Zap,
-  MessageSquare,
-  Globe,
-  HardDrive,
-  Clock,
-  Network,
-  MousePointer2,
-  Eraser,
-  Trash2,
-} from "lucide-react";
+  TbDeviceDesktop,
+  TbServer,
+  TbRouteAltLeft,
+  TbDatabase,
+  TbDatabaseImport,
+  TbList,
+  TbWorld,
+  TbDeviceFloppy,
+  TbClockPlay,
+  TbNetwork,
+  TbZoomIn,
+  TbZoomOut,
+  TbMaximize,
+  TbPuzzle,
+  TbPointer,
+  TbEraser,
+  TbTrash,
+} from "react-icons/tb";
 import NodePalette from "./NodePalette";
 import TextEditModal from "./TextEditModal";
+import { RoughIcon } from "./RoughIcon";
+import { RoughShape } from "./RoughShapes";
+import { RoughEdge } from "./RoughEdge";
 import type { SystemDesignBoardState } from "@/types";
 
 interface DesignCanvasProps {
@@ -45,18 +48,36 @@ interface DesignCanvasProps {
   onBoardChange: (state: SystemDesignBoardState) => void;
 }
 
-// Icon mapping
+// Icon mapping with Tabler icons
 const iconMap: Record<string, any> = {
-  client: Monitor,
-  api: Server,
-  loadbalancer: Loader,
-  database: Database,
-  cache: Zap,
-  queue: MessageSquare,
-  cdn: Globe,
-  storage: HardDrive,
-  worker: Clock,
-  gateway: Network,
+  client: TbDeviceDesktop,
+  api: TbServer,
+  loadbalancer: TbRouteAltLeft,
+  database: TbDatabase,
+  cache: TbDatabaseImport,
+  queue: TbList,
+  cdn: TbWorld,
+  storage: TbDeviceFloppy,
+  worker: TbClockPlay,
+  gateway: TbNetwork,
+};
+
+// Default labels for node types
+const nodeLabelMap: Record<string, string> = {
+  client: "Client",
+  api: "Server",
+  loadbalancer: "Load Balancer",
+  database: "Database",
+  cache: "Cache",
+  queue: "Queue",
+  cdn: "CDN",
+  storage: "Storage",
+  worker: "Cron/Worker",
+  gateway: "DNS/Gateway",
+  rectangle: "Rectangle",
+  circle: "Circle",
+  diamond: "Diamond",
+  text: "Text",
 };
 
 // Resizable wrapper with handles
@@ -159,7 +180,7 @@ const ResizableNode = ({
   );
 };
 
-// Simple CSS-based hand-drawn node
+// Hand-drawn node using RoughShape and RoughIcon
 const HandDrawnNode = ({
   children,
   color,
@@ -175,116 +196,26 @@ const HandDrawnNode = ({
   icon?: any;
   selected: boolean;
 }) => {
-  const baseClasses = "relative flex items-center gap-2 px-4 py-3 transition-all h-full w-full";
-  const borderClasses = `border-2 shadow-md hover:shadow-lg`;
-
-  if (shape === "diamond") {
-    return (
-      <div className="relative h-full w-full flex items-center justify-center">
-        <ResizableNode selected={selected} color={color}>
-          <div
-            className={`${baseClasses} ${borderClasses} justify-center`}
-            style={{
-              borderColor: color,
-              backgroundColor: bgColor,
-              clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
-              boxShadow: `3px 3px 0px ${color}40`,
-            }}
-          >
-            <div className="flex flex-col items-center gap-1">
-              {Icon && <Icon className="w-5 h-5" style={{ color }} />}
-              <div className="font-semibold text-xs text-center whitespace-nowrap" style={{ color }}>
-                {children}
-              </div>
-            </div>
-          </div>
-        </ResizableNode>
-      </div>
-    );
-  }
-
-  if (shape === "circle") {
-    return (
-      <div className="relative h-full w-full flex items-center justify-center">
-        <ResizableNode selected={selected} color={color}>
-          <div
-            className={`${baseClasses} ${borderClasses} justify-center`}
-            style={{
-              borderColor: color,
-              backgroundColor: bgColor,
-              borderRadius: "50%",
-              borderStyle: "dashed",
-            }}
-          >
-            <div className="flex flex-col items-center gap-1">
-              {Icon && <Icon className="w-5 h-5" style={{ color }} />}
-              <div className="font-semibold text-xs text-center" style={{ color }}>
-                {children}
-              </div>
-            </div>
-          </div>
-        </ResizableNode>
-      </div>
-    );
-  }
-
-  if (shape === "cylinder") {
-    return (
-      <div className="relative h-full w-full">
-        <ResizableNode selected={selected} color={color}>
-          <div
-            className={`${baseClasses} ${borderClasses} justify-center`}
-            style={{
-              borderColor: color,
-              backgroundColor: bgColor,
-              borderRadius: "20px / 40px",
-              position: "relative",
-              boxShadow: `3px 3px 0px ${color}40`,
-            }}
-          >
-            <div className="flex flex-col items-center gap-1">
-              {Icon && <Icon className="w-5 h-5" style={{ color }} />}
-              <div className="font-semibold text-xs text-center" style={{ color }}>
-                {children}
-              </div>
-            </div>
-            {/* Horizontal line to simulate cylinder look */}
-            <div
-              style={{
-                position: "absolute",
-                top: "25%",
-                left: 0,
-                right: 0,
-                height: "2px",
-                backgroundColor: color,
-                opacity: 0.3,
-              }}
-            />
-          </div>
-        </ResizableNode>
-      </div>
-    );
-  }
-
-  // Default rectangle with hand-drawn style
   return (
     <div className="relative h-full w-full">
       <ResizableNode selected={selected} color={color}>
-        <div
-          className={`${baseClasses} ${borderClasses}`}
-          style={{
-            borderColor: color,
-            backgroundColor: bgColor,
-            borderRadius: "8px",
-            borderStyle: "solid",
-            boxShadow: `3px 3px 0px ${color}40`,
-          }}
+        <RoughShape
+          width={180}
+          height={80}
+          color={color}
+          bgColor={bgColor}
+          shape={shape as "rectangle" | "circle" | "diamond" | "cylinder"}
+          roughness={1.5}
+          bowing={0.8}
+          strokeWidth={2}
         >
-          {Icon && <Icon className="w-5 h-5" style={{ color }} />}
-          <div className="font-semibold" style={{ color }}>
-            {children}
+          <div className="flex items-center gap-2">
+            {Icon && <RoughIcon Icon={Icon} size={20} color={color} roughness={1.8} bowing={1.0} />}
+            <div className="font-semibold text-sm" style={{ color }}>
+              {children}
+            </div>
           </div>
-        </div>
+        </RoughShape>
       </ResizableNode>
     </div>
   );
@@ -336,9 +267,26 @@ const nodeTypes: NodeTypes = {
   ),
 };
 
+// Edge types with RoughEdge
+const edgeTypes = {
+  rough: RoughEdge,
+};
+
+// Normalize incoming edges so they always use the rough edge renderer and consistent styling
+const ensureRoughEdges = (edgeList: Edge[] = []) =>
+  edgeList.map((edge) => ({
+    ...edge,
+    type: edge.type || "rough",
+    markerEnd: edge.markerEnd || { type: MarkerType.ArrowClosed },
+    style: {
+      stroke: edge.style?.stroke || "#6366f1",
+      strokeWidth: edge.style?.strokeWidth ?? 3,
+    },
+  }));
+
 const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(boardState.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(boardState.edges || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(ensureRoughEdges(boardState.edges || []));
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [selectedTool, setSelectedTool] = useState<"select" | "eraser">("select");
   const [editModal, setEditModal] = useState<{ isOpen: boolean; nodeId: string; initialValue: string }>({
@@ -366,7 +314,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
 
     if (nodesChanged || edgesChanged) {
       setNodes(boardState.nodes || []);
-      setEdges(boardState.edges || []);
+      setEdges(ensureRoughEdges(boardState.edges || []));
       prevBoardStateRef.current = boardState;
     }
   }, [boardState, setNodes, setEdges]);
@@ -399,7 +347,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
             ...params,
             markerEnd: { type: MarkerType.ArrowClosed },
             style: { stroke: "#6366f1", strokeWidth: 3 },
-            type: "smoothstep",
+            type: "rough",
             animated: false,
           },
           eds
@@ -480,7 +428,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
         id: `${type}-${Date.now()}`,
         type: type === "default" ? undefined : type,
         position,
-        data: { label: type.charAt(0).toUpperCase() + type.slice(1) },
+        data: { label: nodeLabelMap[type] || type.charAt(0).toUpperCase() + type.slice(1) },
         style: { width: 180, height: 80 }, // Default size
       };
 
@@ -504,7 +452,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
         id: `${nodeType}-${Date.now()}`,
         type: nodeType === "default" ? undefined : nodeType,
         position: { x: centerX - 90, y: centerY - 40 },
-        data: { label: nodeType.charAt(0).toUpperCase() + nodeType.slice(1) },
+        data: { label: nodeLabelMap[nodeType] || nodeType.charAt(0).toUpperCase() + nodeType.slice(1) },
         style: { width: 180, height: 80 },
       };
 
@@ -534,7 +482,28 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
     [editModal.nodeId, setNodes]
   );
 
-  // Eraser mode - click to delete
+  // Eraser mode - hover to delete
+  const onNodeMouseEnter = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (selectedTool === "eraser") {
+        setNodes((nds) => nds.filter((n) => n.id !== node.id));
+        // Also delete connected edges
+        setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id));
+      }
+    },
+    [selectedTool, setNodes, setEdges]
+  );
+
+  const onEdgeMouseEnter = useCallback(
+    (_event: React.MouseEvent, edge: Edge) => {
+      if (selectedTool === "eraser") {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+      }
+    },
+    [selectedTool, setEdges]
+  );
+
+  // Keep click handlers for backwards compatibility
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
       if (selectedTool === "eraser") {
@@ -549,12 +518,34 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
 
   const onEdgeClick = useCallback(
     (event: React.MouseEvent, edge: Edge) => {
+      event.preventDefault();
       if (selectedTool === "eraser") {
-        event.preventDefault();
         setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        return;
+      }
+
+      const multi = event.metaKey || event.ctrlKey || event.shiftKey;
+
+      setEdges((eds) =>
+        eds.map((e) => {
+          if (multi) {
+            if (e.id === edge.id) {
+              return { ...e, selected: !e.selected };
+            }
+            return e;
+          }
+
+          // Single select: clear others
+          return { ...e, selected: e.id === edge.id };
+        })
+      );
+
+      if (!multi) {
+        // Clear node selection when focusing an edge
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
       }
     },
-    [selectedTool, setEdges]
+    [selectedTool, setEdges, setNodes]
   );
 
   // Clear canvas
@@ -593,7 +584,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                   onClick={() => setSelectedTool("select")}
                   title="Select Tool (V)"
                 >
-                  <MousePointer2 className="w-4 h-4" />
+                  <TbPointer className="w-4 h-4" />
                 </Button>
                 <Button
                   variant={selectedTool === "eraser" ? "default" : "ghost"}
@@ -601,7 +592,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                   onClick={() => setSelectedTool("eraser")}
                   title="Eraser (E) - Click items to delete"
                 >
-                  <Eraser className="w-4 h-4" />
+                  <TbEraser className="w-4 h-4" />
                 </Button>
               </div>
 
@@ -612,7 +603,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                 onClick={() => reactFlowInstance?.zoomIn()}
                 title="Zoom In"
               >
-                <ZoomIn className="w-4 h-4" />
+                <TbZoomIn className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -620,7 +611,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                 onClick={() => reactFlowInstance?.zoomOut()}
                 title="Zoom Out"
               >
-                <ZoomOut className="w-4 h-4" />
+                <TbZoomOut className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -628,7 +619,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                 onClick={() => reactFlowInstance?.fitView()}
                 title="Fit View"
               >
-                <Maximize2 className="w-4 h-4" />
+                <TbMaximize className="w-4 h-4" />
               </Button>
 
               {/* Clear Canvas */}
@@ -639,13 +630,13 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                 title="Clear Canvas"
                 className="text-destructive hover:text-destructive"
               >
-                <Trash2 className="w-4 h-4" />
+                <TbTrash className="w-4 h-4" />
               </Button>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="text-xs text-muted-foreground">
-                {selectedTool === "eraser" ? "Eraser Mode: Click to delete" : "Drag from colored dots to connect"}
+                {selectedTool === "eraser" ? "Eraser Mode: Hover to delete" : "Drag from colored dots to connect"}
               </div>
               <Button
                 variant="outline"
@@ -653,14 +644,17 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
                 onClick={() => setIsPaletteOpen(!isPaletteOpen)}
                 title="Show Shapes"
               >
-                <Puzzle className="w-4 h-4 mr-2" />
+                <TbPuzzle className="w-4 h-4 mr-2" />
                 Shapes
               </Button>
             </div>
           </div>
 
           {/* React Flow Canvas */}
-          <div ref={reactFlowWrapper} className="flex-1">
+          <div
+            ref={reactFlowWrapper}
+            className={`flex-1 ${selectedTool === "eraser" ? "eraser-mode" : ""}`}
+          >
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -672,25 +666,33 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
               onNodeDoubleClick={onNodeDoubleClick}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onEdgeMouseEnter={onEdgeMouseEnter}
               onMoveEnd={onMoveEnd}
               onNodesChange={onNodesChange}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               fitView
               snapToGrid
               snapGrid={[15, 15]}
               deleteKeyCode={selectedTool === "select" ? ["Backspace", "Delete"] : []}
+              // Enable edge selection/hit testing
+              edgesUpdatable={true}
+              edgesSelectable={true}
               defaultViewport={panZoom}
               minZoom={0.1}
               maxZoom={2}
               connectionLineStyle={{ stroke: "#6366f1", strokeWidth: 3 }}
               defaultEdgeOptions={{
-                type: "smoothstep",
+                type: "rough",
                 markerEnd: { type: MarkerType.ArrowClosed },
                 style: { stroke: "#6366f1", strokeWidth: 3 },
+                interactionWidth: 24,
               }}
-              selectionOnDrag={selectedTool === "select"}
               panOnDrag={selectedTool === "select" ? [1, 2] : true}
               selectNodesOnDrag={selectedTool === "select"}
+              elementsSelectable={selectedTool === "select"}
+              selectionOnDrag={selectedTool === "select"}
             >
               <Background variant="dots" gap={15} size={1} />
               <Controls />

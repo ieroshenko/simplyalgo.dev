@@ -91,16 +91,16 @@ export interface ChatMessage {
   sessionId?: string;
   codeSnippets?: CodeSnippet[];
   diagram?:
-    | {
-        engine: "mermaid";
-        code: string; // raw mermaid DSL
-        title?: string;
-      }
-    | {
-        engine: "reactflow";
-        graph: FlowGraph;
-        title?: string;
-      };
+  | {
+    engine: "mermaid";
+    code: string; // raw mermaid DSL
+    title?: string;
+  }
+  | {
+    engine: "reactflow";
+    graph: FlowGraph;
+    title?: string;
+  };
   suggestDiagram?: boolean;
 }
 
@@ -163,21 +163,21 @@ export interface CoachingValidationResult {
   feedback: string;
   nextAction: 'insert_and_continue' | 'retry' | 'hint' | 'complete_session';
   codeToAdd?: string; // Corrected code to insert when student's code is wrong
-  
+
   // Analysis details
   codeAnalysis?: {
     syntax: 'valid' | 'invalid';
     logic: 'correct' | 'incorrect' | 'partial';
     efficiency: 'optimal' | 'acceptable' | 'inefficient';
   };
-  
+
   // For successful submissions
   codeInsertion?: {
     insertAt: 'cursor' | 'function_body' | 'after_line' | 'before_return';
     targetLine?: number;
     indentationLevel?: number;
   };
-  
+
   // Next step generation
   nextStep?: {
     question: string;
@@ -185,7 +185,7 @@ export interface CoachingValidationResult {
     hint: string;
     highlightArea?: CoachHighlightArea;
   };
-  
+
   // Optimization availability flag
   isOptimizable?: boolean; // Flag to indicate if solution can be further optimized
 }
@@ -335,6 +335,14 @@ export interface DesignEvaluation {
   improvement_suggestions: string[];
 }
 
+export interface CompletenessAnalysis {
+  isComplete: boolean;
+  confidence: number;
+  missingComponents: string[];
+  missingTopics: string[];
+  reasoning: string;
+}
+
 export interface NodePaletteItem {
   id: string;
   type: string;
@@ -344,7 +352,7 @@ export interface NodePaletteItem {
 }
 
 // Behavioral Interview Types
-export type BehavioralQuestionCategory = 
+export type BehavioralQuestionCategory =
   | 'general'
   | 'technical_leadership'
   | 'code_review_collaboration'

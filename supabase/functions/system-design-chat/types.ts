@@ -41,11 +41,34 @@ export interface DesignEvaluation {
   improvement_suggestions: string[];
 }
 
+export interface CompletenessAnalysis {
+  isComplete: boolean;
+  confidence: number;
+  missingComponents: string[];
+  missingTopics: string[];
+  reasoning: string;
+}
+
 export interface SystemDesignResponse {
   sessionId?: string;
   message?: string;
   contextThreadId?: string;
+  boardState?: {
+    nodes: Array<{
+      id: string;
+      type?: string;
+      data: { label: string; note?: string };
+      position: { x: number; y: number };
+    }>;
+    edges: Array<{
+      id: string;
+      source: string;
+      target: string;
+      label?: string;
+    }>;
+  };
   evaluation?: DesignEvaluation;
+  completeness?: CompletenessAnalysis;
   error?: string;
 }
 

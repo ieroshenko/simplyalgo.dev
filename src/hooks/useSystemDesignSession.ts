@@ -4,6 +4,7 @@ import type {
   SystemDesignSession,
   SystemDesignBoardState,
   DesignEvaluation,
+  CompletenessAnalysis,
 } from "@/types";
 
 interface UseSystemDesignSessionProps {
@@ -16,13 +17,17 @@ interface UseSystemDesignSessionReturn {
   boardState: SystemDesignBoardState;
   messages: Array<{ role: "user" | "assistant"; content: string; timestamp: Date }>;
   evaluation: DesignEvaluation | null;
+  completeness: CompletenessAnalysis | null;
   loading: boolean;
   error: string | null;
   isTyping: boolean;
+  hasDraft: boolean;
   updateBoard: (state: SystemDesignBoardState) => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   evaluateDesign: () => Promise<void>;
   clearConversation: () => Promise<void>;
+  saveDraft: () => Promise<void>;
+  restoreDraft: () => Promise<void>;
   isEvaluating: boolean;
 }
 
@@ -39,10 +44,12 @@ export const useSystemDesignSession = ({
     Array<{ role: "user" | "assistant"; content: string; timestamp: Date }>
   >([]);
   const [evaluation, setEvaluation] = useState<DesignEvaluation | null>(null);
+  const [completeness, setCompleteness] = useState<CompletenessAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
   // Debounce refs
   const boardUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -208,10 +215,10 @@ export const useSystemDesignSession = ({
         clearTimeout(boardUpdateTimeoutRef.current);
       }
 
-      // Debounced save to database (every 5 seconds)
+      // Debounced save to database and AI reaction (every 3 seconds)
       boardUpdateTimeoutRef.current = setTimeout(async () => {
         try {
-          console.log("[SystemDesignChat] Saving board state to database (debounced 5s)");
+          console.log("[SystemDesignChat] Saving board state to database (debounced 3s)");
           await supabase.functions.invoke("system-design-chat", {
             body: {
               action: "update_board_state",
@@ -220,14 +227,74 @@ export const useSystemDesignSession = ({
             },
           });
           console.log("[SystemDesignChat] Board state saved successfully");
-        } catch (err) {
-          console.error("[SystemDesignChat] Failed to save board state:", err);
-        }
-      }, 5000);
 
-      // Note: Removed automatic AI reactions to board changes
-      // The coach should only respond when the user explicitly asks a question
-      // Update lastBoardState for tracking purposes
+          // Check if board changed significantly before triggering AI reaction
+          // Detect changes in: node count, edge count, or node labels
+          let hasSignificantChange = false;
+
+          if (!lastBoardStateRef.current) {
+            hasSignificantChange = true;
+          } else {
+            const nodeCountChanged = state.nodes.length !== lastBoardStateRef.current.nodes.length;
+            const edgeCountChanged = state.edges.length !== lastBoardStateRef.current.edges.length;
+
+            // Check if any node labels changed
+            const labelChanged = state.nodes.some((node, index) => {
+              const prevNode = lastBoardStateRef.current!.nodes.find(n => n.id === node.id);
+              return prevNode && prevNode.data?.label !== node.data?.label;
+            });
+
+            hasSignificantChange = nodeCountChanged || edgeCountChanged || labelChanged;
+          }
+
+          if (hasSignificantChange && state.nodes.length > 0) {
+            console.log("[SystemDesignChat] Board changed significantly, triggering AI reaction");
+            setLoading(true);
+
+            const { data, error } = await supabase.functions.invoke("system-design-chat", {
+              body: {
+                action: "react_to_board_changes",
+                sessionId: session.id,
+                boardState: state,
+              },
+            });
+
+            if (error) {
+              console.error("[SystemDesignChat] AI reaction failed:", error);
+            } else if (data?.message) {
+              console.log("[SystemDesignChat] AI reacted to board changes");
+
+              // Reload messages to show the new AI reaction
+              const { data: responses } = await supabase
+                .from("system_design_responses")
+                .select("*")
+                .eq("session_id", session.id)
+                .order("created_at", { ascending: true });
+
+              if (responses) {
+                setMessages(
+                  responses.map((r) => ({
+                    role: r.message_role as "user" | "assistant",
+                    content: r.content,
+                    timestamp: new Date(r.created_at),
+                  })),
+                );
+              }
+
+              // Update completeness if provided
+              if (data.completeness) {
+                setCompleteness(data.completeness);
+              }
+            }
+
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error("[SystemDesignChat] Failed to save board state or get AI reaction:", err);
+          setLoading(false);
+        }
+      }, 3000); // 3 seconds debounce
+
       lastBoardStateRef.current = state;
     },
     [session],
@@ -238,6 +305,13 @@ export const useSystemDesignSession = ({
       if (!session || !message.trim()) {
         console.log("[SystemDesignChat] sendMessage called but no session or empty message");
         return;
+      }
+
+      // Cancel pending board update auto-reaction when user sends a message
+      if (boardUpdateTimeoutRef.current) {
+        console.log("[SystemDesignChat] Canceling pending auto-reaction - user sent message");
+        clearTimeout(boardUpdateTimeoutRef.current);
+        boardUpdateTimeoutRef.current = null;
       }
 
       console.log("[SystemDesignChat] Sending message:", {
@@ -284,6 +358,12 @@ export const useSystemDesignSession = ({
         } else {
           console.warn("[SystemDesignChat] No message in response data:", data);
         }
+
+        // Update completeness state if provided
+        if (data?.completeness) {
+          console.log("[SystemDesignChat] Updating completeness state:", data.completeness);
+          setCompleteness(data.completeness);
+        }
       } catch (err) {
         console.error("[SystemDesignChat] Error sending message:", err);
         setError(err instanceof Error ? err.message : "Failed to send message");
@@ -299,7 +379,7 @@ export const useSystemDesignSession = ({
   const clearConversation = useCallback(async () => {
     console.log("[SystemDesignChat] ========== CLEAR CONVERSATION START ==========");
     console.log("[SystemDesignChat] Current session:", session);
-    
+
     if (!session) {
       console.warn("[SystemDesignChat] No session found, aborting");
       return;
@@ -320,7 +400,7 @@ export const useSystemDesignSession = ({
         .from("system_design_responses")
         .delete()
         .eq("session_id", sessionIdToDelete);
-      
+
       if (responsesError) {
         console.error("[SystemDesignChat] Responses delete error:", responsesError);
         throw responsesError;
@@ -332,7 +412,7 @@ export const useSystemDesignSession = ({
         .from("system_design_boards")
         .delete()
         .eq("session_id", sessionIdToDelete);
-      
+
       if (boardError) {
         console.error("[SystemDesignChat] Board delete error:", boardError);
         throw boardError;
@@ -344,7 +424,7 @@ export const useSystemDesignSession = ({
         .from("system_design_sessions")
         .delete()
         .eq("id", sessionIdToDelete);
-      
+
       if (sessionError) {
         console.error("[SystemDesignChat] Session delete error:", sessionError);
         throw sessionError;
@@ -356,6 +436,7 @@ export const useSystemDesignSession = ({
       setBoardState({ nodes: [], edges: [] });
       lastBoardStateRef.current = null;
       setEvaluation(null);
+      setCompleteness(null);
       setSession(null);
       console.log("[SystemDesignChat] ✓ Local state reset");
 
@@ -400,7 +481,7 @@ export const useSystemDesignSession = ({
           },
         ]);
       }
-      
+
       setIsTyping(false);
 
       console.log("[SystemDesignChat] ========== CLEAR CONVERSATION SUCCESS ==========");
@@ -443,11 +524,11 @@ export const useSystemDesignSession = ({
           setSession((prev) =>
             prev
               ? {
-                  ...prev,
-                  isCompleted: true,
-                  score: data.evaluation.score,
-                  completedAt: new Date(),
-                }
+                ...prev,
+                isCompleted: true,
+                score: data.evaluation.score,
+                completedAt: new Date(),
+              }
               : null,
           );
         }
@@ -458,6 +539,92 @@ export const useSystemDesignSession = ({
       }
     }, 500); // 500ms debounce for evaluation button
   }, [session, boardState, isEvaluating]);
+
+  const saveDraft = useCallback(async () => {
+    if (!session) {
+      console.log("[SystemDesignChat] saveDraft: No session, skipping");
+      return;
+    }
+
+    // Only save if there's actual work (nodes on the board)
+    if (!boardState.nodes || boardState.nodes.length === 0) {
+      console.log("[SystemDesignChat] saveDraft: No nodes, skipping");
+      return;
+    }
+
+    try {
+      console.log("[SystemDesignChat] Saving current work as draft...");
+      const { error: updateError } = await supabase
+        .from("system_design_sessions")
+        .update({ draft_board_state: boardState })
+        .eq("id", session.id);
+
+      if (updateError) throw updateError;
+
+      setHasDraft(true);
+      console.log("[SystemDesignChat] ✓ Draft saved successfully");
+    } catch (err) {
+      console.error("[SystemDesignChat] Failed to save draft:", err);
+      setError(err instanceof Error ? err.message : "Failed to save draft");
+    }
+  }, [session, boardState]);
+
+  const restoreDraft = useCallback(async () => {
+    if (!session) {
+      console.log("[SystemDesignChat] restoreDraft: No session, skipping");
+      return;
+    }
+
+    try {
+      console.log("[SystemDesignChat] Restoring draft...");
+      const { data, error: fetchError } = await supabase
+        .from("system_design_sessions")
+        .select("draft_board_state")
+        .eq("id", session.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (data?.draft_board_state) {
+        const draftState = data.draft_board_state as SystemDesignBoardState;
+        setBoardState(draftState);
+        lastBoardStateRef.current = draftState;
+
+        // Clear the draft after restoring
+        await supabase
+          .from("system_design_sessions")
+          .update({ draft_board_state: null })
+          .eq("id", session.id);
+
+        setHasDraft(false);
+        console.log("[SystemDesignChat] ✓ Draft restored successfully");
+      } else {
+        console.log("[SystemDesignChat] No draft found to restore");
+      }
+    } catch (err) {
+      console.error("[SystemDesignChat] Failed to restore draft:", err);
+      setError(err instanceof Error ? err.message : "Failed to restore draft");
+    }
+  }, [session]);
+
+  // Check if session has a draft on load
+  useEffect(() => {
+    if (!session) return;
+
+    const checkDraft = async () => {
+      const { data } = await supabase
+        .from("system_design_sessions")
+        .select("draft_board_state")
+        .eq("id", session.id)
+        .single();
+
+      if (data?.draft_board_state) {
+        setHasDraft(true);
+      }
+    };
+
+    checkDraft();
+  }, [session]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -479,13 +646,17 @@ export const useSystemDesignSession = ({
     boardState,
     messages,
     evaluation,
+    completeness,
     loading,
     error,
     isTyping,
+    hasDraft,
     updateBoard,
     sendMessage,
     evaluateDesign,
     clearConversation,
+    saveDraft,
+    restoreDraft,
     isEvaluating,
   };
 };
