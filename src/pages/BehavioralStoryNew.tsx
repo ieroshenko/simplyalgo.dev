@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useUserStories } from "@/hooks/useUserStories";
-import { ArrowLeft, X, Loader2 } from "lucide-react";
+import { ArrowLeft, X, Loader2, Mic, MicOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 const BehavioralStoryNew = () => {
   const navigate = useNavigate();
@@ -33,6 +34,60 @@ const BehavioralStoryNew = () => {
   const [techInput, setTechInput] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Speech-to-text functionality for title field
+  const {
+    isListening: isListeningTitle,
+    hasNativeSupport: hasNativeSupportTitle,
+    isProcessing: isProcessingTitle,
+    startListening: startListeningTitle,
+    stopListening: stopListeningTitle,
+    error: speechErrorTitle,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setTitle((prev) => prev + (prev ? ' ' : '') + transcript);
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  // Speech-to-text functionality for description field
+  const {
+    isListening: isListeningDescription,
+    hasNativeSupport: hasNativeSupportDescription,
+    isProcessing: isProcessingDescription,
+    startListening: startListeningDescription,
+    stopListening: stopListeningDescription,
+    error: speechErrorDescription,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setDescription((prev) => prev + (prev ? ' ' : '') + transcript);
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  const toggleMicrophoneTitle = async () => {
+    if (!hasNativeSupportTitle) return;
+
+    if (isListeningTitle) {
+      stopListeningTitle();
+    } else {
+      await startListeningTitle();
+    }
+  };
+
+  const toggleMicrophoneDescription = async () => {
+    if (!hasNativeSupportDescription) return;
+
+    if (isListeningDescription) {
+      stopListeningDescription();
+    } else {
+      await startListeningDescription();
+    }
+  };
 
   const availableCategories = [
     "technical_leadership",
@@ -181,12 +236,58 @@ const BehavioralStoryNew = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Input
-                  placeholder="e.g., Optimized Database Queries, Built Payment System, Led Team Migration"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    placeholder={
+                      isListeningTitle
+                        ? "🎤 Listening... Speak the title."
+                        : isProcessingTitle
+                          ? "🔄 Processing audio..."
+                          : "e.g., Optimized Database Queries, Built Payment System, Led Team Migration"
+                    }
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className={hasNativeSupportTitle ? "pr-10" : ""}
+                    required
+                  />
+                  {hasNativeSupportTitle && (
+                    <button
+                      type="button"
+                      onClick={toggleMicrophoneTitle}
+                      disabled={isSubmitting}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                        isListeningTitle
+                          ? "text-red-500 animate-pulse"
+                          : isProcessingTitle
+                            ? "text-blue-500"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      }`}
+                      title={
+                        isListeningTitle
+                          ? "Stop listening"
+                          : isProcessingTitle
+                            ? "Processing..."
+                            : "Start voice input"
+                      }
+                    >
+                      {isListeningTitle ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : isProcessingTitle ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                  {speechErrorTitle && (
+                    <div
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-red-500 opacity-80"
+                      title={speechErrorTitle}
+                    >
+                      ⚠️
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -199,13 +300,58 @@ const BehavioralStoryNew = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Textarea
-                  placeholder="Example: I optimized our production database that was experiencing 5-second query times. I analyzed slow query logs, identified missing indexes, and implemented them during off-peak hours. This reduced query times from 5 seconds to 50ms, cutting user complaints by 90% and improving page load times by 40%."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[200px]"
-                  required
-                />
+                <div className="relative">
+                  <Textarea
+                    placeholder={
+                      isListeningDescription
+                        ? "🎤 Listening... Speak your description."
+                        : isProcessingDescription
+                          ? "🔄 Processing audio..."
+                          : "Example: I optimized our production database that was experiencing 5-second query times. I analyzed slow query logs, identified missing indexes, and implemented them during off-peak hours. This reduced query times from 5 seconds to 50ms, cutting user complaints by 90% and improving page load times by 40%."
+                    }
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className={`min-h-[200px] ${hasNativeSupportDescription ? "pr-10" : ""}`}
+                    required
+                  />
+                  {hasNativeSupportDescription && (
+                    <button
+                      type="button"
+                      onClick={toggleMicrophoneDescription}
+                      disabled={isSubmitting}
+                      className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                        isListeningDescription
+                          ? "text-red-500 animate-pulse"
+                          : isProcessingDescription
+                            ? "text-blue-500"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      }`}
+                      title={
+                        isListeningDescription
+                          ? "Stop listening"
+                          : isProcessingDescription
+                            ? "Processing..."
+                            : "Start voice input"
+                      }
+                    >
+                      {isListeningDescription ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : isProcessingDescription ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                  {speechErrorDescription && (
+                    <div
+                      className="absolute right-10 top-2 text-xs text-red-500 opacity-80"
+                      title={speechErrorDescription}
+                    >
+                      ⚠️
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Tip: Include context, your specific actions, and any measurable results. You can reference this when answering behavioral questions.
                 </p>

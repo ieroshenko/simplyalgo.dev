@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { useUserStories } from "@/hooks/useUserStories";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, Mic, MicOff } from "lucide-react";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { UserStory } from "@/types";
 
 const BehavioralStories = () => {
@@ -44,6 +45,60 @@ const BehavioralStories = () => {
   const [tagInput, setTagInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
   const [techInput, setTechInput] = useState("");
+
+  // Speech-to-text functionality for edit title field
+  const {
+    isListening: isListeningTitle,
+    hasNativeSupport: hasNativeSupportTitle,
+    isProcessing: isProcessingTitle,
+    startListening: startListeningTitle,
+    stopListening: stopListeningTitle,
+    error: speechErrorTitle,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setEditTitle((prev) => prev + (prev ? ' ' : '') + transcript);
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  // Speech-to-text functionality for edit description field
+  const {
+    isListening: isListeningDescription,
+    hasNativeSupport: hasNativeSupportDescription,
+    isProcessing: isProcessingDescription,
+    startListening: startListeningDescription,
+    stopListening: stopListeningDescription,
+    error: speechErrorDescription,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setEditDescription((prev) => prev + (prev ? ' ' : '') + transcript);
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  const toggleMicrophoneTitle = async () => {
+    if (!hasNativeSupportTitle) return;
+
+    if (isListeningTitle) {
+      stopListeningTitle();
+    } else {
+      await startListeningTitle();
+    }
+  };
+
+  const toggleMicrophoneDescription = async () => {
+    if (!hasNativeSupportDescription) return;
+
+    if (isListeningDescription) {
+      stopListeningDescription();
+    } else {
+      await startListeningDescription();
+    }
+  };
 
   const availableCategories = [
     "technical_leadership",
@@ -308,26 +363,117 @@ const BehavioralStories = () => {
                 {/* Title */}
                 <div className="space-y-2">
                   <Label htmlFor="edit-title">Title *</Label>
-                  <Input
-                    id="edit-title"
-                    placeholder="e.g., Optimized Database Queries, Built Payment System"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="edit-title"
+                      placeholder={
+                        isListeningTitle
+                          ? "🎤 Listening... Speak the title."
+                          : isProcessingTitle
+                            ? "🔄 Processing audio..."
+                            : "e.g., Optimized Database Queries, Built Payment System"
+                      }
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className={hasNativeSupportTitle ? "pr-10" : ""}
+                      required
+                    />
+                    {hasNativeSupportTitle && (
+                      <button
+                        type="button"
+                        onClick={toggleMicrophoneTitle}
+                        disabled={isSubmitting}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                          isListeningTitle
+                            ? "text-red-500 animate-pulse"
+                            : isProcessingTitle
+                              ? "text-blue-500"
+                              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                        title={
+                          isListeningTitle
+                            ? "Stop listening"
+                            : isProcessingTitle
+                              ? "Processing..."
+                              : "Start voice input"
+                        }
+                      >
+                        {isListeningTitle ? (
+                          <MicOff className="w-4 h-4" />
+                        ) : isProcessingTitle ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                    {speechErrorTitle && (
+                      <div
+                        className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-red-500 opacity-80"
+                        title={speechErrorTitle}
+                      >
+                        ⚠️
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Main Description */}
                 <div className="space-y-2">
                   <Label htmlFor="edit-description">What did you do? *</Label>
-                  <Textarea
-                    id="edit-description"
-                    placeholder="Describe your experience, project, or achievement..."
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="min-h-[200px]"
-                    required
-                  />
+                  <div className="relative">
+                    <Textarea
+                      id="edit-description"
+                      placeholder={
+                        isListeningDescription
+                          ? "🎤 Listening... Speak your description."
+                          : isProcessingDescription
+                            ? "🔄 Processing audio..."
+                            : "Describe your experience, project, or achievement..."
+                      }
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className={`min-h-[200px] ${hasNativeSupportDescription ? "pr-10" : ""}`}
+                      required
+                    />
+                    {hasNativeSupportDescription && (
+                      <button
+                        type="button"
+                        onClick={toggleMicrophoneDescription}
+                        disabled={isSubmitting}
+                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                          isListeningDescription
+                            ? "text-red-500 animate-pulse"
+                            : isProcessingDescription
+                              ? "text-blue-500"
+                              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                        title={
+                          isListeningDescription
+                            ? "Stop listening"
+                            : isProcessingDescription
+                              ? "Processing..."
+                              : "Start voice input"
+                        }
+                      >
+                        {isListeningDescription ? (
+                          <MicOff className="w-4 h-4" />
+                        ) : isProcessingDescription ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                    {speechErrorDescription && (
+                      <div
+                        className="absolute right-10 top-2 text-xs text-red-500 opacity-80"
+                        title={speechErrorDescription}
+                      >
+                        ⚠️
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Optional STAR Structure */}

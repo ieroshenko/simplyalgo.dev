@@ -30,8 +30,9 @@ import { useCustomQuestions } from "@/hooks/useCustomQuestions";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Send, Loader2, Copy, Check, Edit } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Copy, Check, Edit, Mic, MicOff } from "lucide-react";
 import { FeedbackViews } from "@/components/behavioral/FeedbackViews";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { BehavioralQuestion, STARScore, CustomMetrics, AnswerFeedback, PracticeAnswer, BehavioralQuestionCategory, QuestionDifficulty, EvaluationType } from "@/types";
 
 const BehavioralPractice = () => {
@@ -68,6 +69,7 @@ const BehavioralPractice = () => {
     feedback: AnswerFeedback;
   } | null>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const lastLoadedQuestionIdRef = useRef<string | null>(null);
   
   // Edit dialog state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -76,6 +78,33 @@ const BehavioralPractice = () => {
   const [editDifficulty, setEditDifficulty] = useState<QuestionDifficulty>("intermediate");
   const [editEvaluationType, setEditEvaluationType] = useState<EvaluationType>("star");
   const [editCustomPrompt, setEditCustomPrompt] = useState("");
+
+  // Speech-to-text functionality for answer field
+  const {
+    isListening,
+    hasNativeSupport,
+    isProcessing,
+    startListening,
+    stopListening,
+    error: speechError,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setAnswer((prev) => prev + (prev ? ' ' : '') + transcript);
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  const toggleMicrophone = async () => {
+    if (!hasNativeSupport) return;
+
+    if (isListening) {
+      stopListening();
+    } else {
+      await startListening();
+    }
+  };
 
   // Load question if questionId is provided
   useEffect(() => {
@@ -115,33 +144,42 @@ const BehavioralPractice = () => {
   }, [selectedQuestion, currentSession, user, createSession]);
 
   // Load last answer when question is selected
+  // Only load if it's a different question to avoid overwriting unsaved changes
   useEffect(() => {
     const loadLastAnswer = async () => {
       if (selectedQuestion && user) {
-        const last = await getLastAnswer(selectedQuestion.id);
-        setLastAnswer(last);
-        if (last) {
-          setAnswer(last.answer_text);
-          if (last.story_id) {
-            setSelectedStory(last.story_id);
-          }
-          // Load previous feedback if it exists
-          if (last.overall_score > 0) {
-            setFeedback({
-              star_score: last.star_score,
-              content_score: last.content_score,
-              delivery_score: last.delivery_score,
-              overall_score: last.overall_score,
-              custom_metrics: last.custom_metrics,
-              feedback: last.feedback,
-            });
+        const isDifferentQuestion = lastLoadedQuestionIdRef.current !== selectedQuestion.id;
+        
+        // Only load from DB if it's a different question (preserve unsaved changes when switching tabs)
+        if (isDifferentQuestion) {
+          const last = await getLastAnswer(selectedQuestion.id);
+          setLastAnswer(last);
+          lastLoadedQuestionIdRef.current = selectedQuestion.id;
+          
+          if (last) {
+            setAnswer(last.answer_text);
+            if (last.story_id) {
+              setSelectedStory(last.story_id);
+            }
+            // Load previous feedback if it exists
+            if (last.overall_score > 0) {
+              setFeedback({
+                star_score: last.star_score,
+                content_score: last.content_score,
+                delivery_score: last.delivery_score,
+                overall_score: last.overall_score,
+                custom_metrics: last.custom_metrics,
+                feedback: last.feedback,
+              });
+            } else {
+              setFeedback(null);
+            }
           } else {
+            // Only clear if it's a different question (don't clear if user has unsaved changes)
+            setAnswer("");
+            setSelectedStory(null);
             setFeedback(null);
           }
-        } else {
-          setAnswer("");
-          setSelectedStory(null);
-          setFeedback(null);
         }
       }
     };
@@ -683,18 +721,61 @@ const BehavioralPractice = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder={
-                      (selectedQuestion.evaluation_type || 'star') === 'star'
-                        ? "Type your answer here... Remember to use the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
-                        : selectedQuestion.evaluation_type === 'custom'
-                        ? "Type your answer here... Make sure to address all aspects mentioned in the custom evaluation criteria below."
-                        : "Type your answer here... Focus on providing a clear, detailed response with specific examples and outcomes."
-                    }
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    className="min-h-[300px]"
-                  />
+                  <div className="relative">
+                    <Textarea
+                      placeholder={
+                        isListening
+                          ? "🎤 Listening... Speak your answer."
+                          : isProcessing
+                            ? "🔄 Processing audio..."
+                            : (selectedQuestion.evaluation_type || 'star') === 'star'
+                            ? "Type your answer here... Remember to use the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
+                            : selectedQuestion.evaluation_type === 'custom'
+                            ? "Type your answer here... Make sure to address all aspects mentioned in the custom evaluation criteria below."
+                            : "Type your answer here... Focus on providing a clear, detailed response with specific examples and outcomes."
+                      }
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      className={`min-h-[300px] ${hasNativeSupport ? "pr-10" : ""}`}
+                    />
+                    {hasNativeSupport && (
+                      <button
+                        type="button"
+                        onClick={toggleMicrophone}
+                        disabled={isSubmitting}
+                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                          isListening
+                            ? "text-red-500 animate-pulse"
+                            : isProcessing
+                              ? "text-blue-500"
+                              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                        title={
+                          isListening
+                            ? "Stop listening"
+                            : isProcessing
+                              ? "Processing..."
+                              : "Start voice input"
+                        }
+                      >
+                        {isListening ? (
+                          <MicOff className="w-4 h-4" />
+                        ) : isProcessing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                    {speechError && (
+                      <div
+                        className="absolute right-10 top-2 text-xs text-red-500 opacity-80"
+                        title={speechError}
+                      >
+                        ⚠️
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Custom Evaluation Criteria */}
                   {selectedQuestion.evaluation_type === 'custom' && selectedQuestion.custom_evaluation_prompt && (

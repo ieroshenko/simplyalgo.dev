@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Send, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Send, Loader2, CheckCircle2, Mic, MicOff } from "lucide-react";
 import ResumeUpload from "@/components/behavioral/ResumeUpload";
 import { FeedbackViews } from "@/components/behavioral/FeedbackViews";
 import { Badge } from "@/components/ui/badge";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 interface GeneratedQuestion {
   question_text: string;
@@ -53,6 +54,39 @@ const BehavioralMockInterview = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+
+  // Speech-to-text functionality for answer field
+  const {
+    isListening,
+    hasNativeSupport,
+    isProcessing,
+    startListening,
+    stopListening,
+    error: speechError,
+  } = useSpeechToText({
+    onResult: (transcript) => {
+      setState(prev => ({
+        ...prev,
+        answers: {
+          ...prev.answers,
+          [prev.currentQuestionIndex]: (prev.answers[prev.currentQuestionIndex] || '') + (prev.answers[prev.currentQuestionIndex] ? ' ' : '') + transcript,
+        },
+      }));
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+    },
+  });
+
+  const toggleMicrophone = async () => {
+    if (!hasNativeSupport) return;
+
+    if (isListening) {
+      stopListening();
+    } else {
+      await startListening();
+    }
+  };
 
   // Load resume from localStorage if available
   useEffect(() => {
@@ -403,18 +437,63 @@ const BehavioralMockInterview = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="answer">Your Answer</Label>
-                      <Textarea
-                        id="answer"
-                        placeholder="Type your answer here. Use the STAR method (Situation, Task, Action, Result) to structure your response."
-                        value={currentAnswer}
-                        onChange={(e) =>
-                          setState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [prev.currentQuestionIndex]: e.target.value },
-                          }))
-                        }
-                        className="min-h-[300px]"
-                      />
+                      <div className="relative">
+                        <Textarea
+                          id="answer"
+                          placeholder={
+                            isListening
+                              ? "🎤 Listening... Speak your answer."
+                              : isProcessing
+                                ? "🔄 Processing audio..."
+                                : "Type your answer here. Use the STAR method (Situation, Task, Action, Result) to structure your response."
+                          }
+                          value={currentAnswer}
+                          onChange={(e) =>
+                            setState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [prev.currentQuestionIndex]: e.target.value },
+                            }))
+                          }
+                          className={`min-h-[300px] ${hasNativeSupport ? "pr-10" : ""}`}
+                        />
+                        {hasNativeSupport && (
+                          <button
+                            type="button"
+                            onClick={toggleMicrophone}
+                            disabled={isSubmittingAnswer}
+                            className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                              isListening
+                                ? "text-red-500 animate-pulse"
+                                : isProcessing
+                                  ? "text-blue-500"
+                                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            }`}
+                            title={
+                              isListening
+                                ? "Stop listening"
+                                : isProcessing
+                                  ? "Processing..."
+                                  : "Start voice input"
+                            }
+                          >
+                            {isListening ? (
+                              <MicOff className="w-4 h-4" />
+                            ) : isProcessing ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Mic className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        {speechError && (
+                          <div
+                            className="absolute right-10 top-2 text-xs text-red-500 opacity-80"
+                            title={speechError}
+                          >
+                            ⚠️
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex gap-2">
