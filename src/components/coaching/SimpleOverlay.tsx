@@ -15,29 +15,31 @@ import confetti from 'canvas-confetti';
 import { OverlayPositionManager, type OverlayPosition, type EditorBounds } from '../../services/overlayPositionManager';
 import { EditorBoundsCalculator, type MonacoEditor } from '../../services/editorBoundsCalculator';
 
-// Blurred hint component with click-to-reveal
-const BlurredHintComponent: React.FC<{ hint: string }> = ({ hint }) => {
+// Blurred section component with click-to-reveal
+const BlurredSection: React.FC<{ content: string; label?: string; icon?: React.ReactNode; className?: string }> = ({ content, label = "Hint", icon = "💡", className }) => {
   const [isRevealed, setIsRevealed] = useState(false);
 
   return (
     <div
-      className="relative cursor-pointer text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md border-l-4 border-blue-200 dark:border-blue-600"
-      onClick={() => setIsRevealed(!isRevealed)}
+      className={`relative cursor-pointer text-xs text-muted-foreground p-2 rounded-md border-l-4 ${className || "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-600"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsRevealed(!isRevealed);
+      }}
     >
       <div className="flex items-center gap-2">
         {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
         <span className="text-xs font-medium">
-          {isRevealed ? 'Hide Hint' : 'Click to reveal hint'}
+          {isRevealed ? `Hide ${label}` : `Click to reveal ${label}`}
         </span>
       </div>
-      {isRevealed && (
-        <div className="mt-2 text-foreground">
-          💡 {hint}
+      {isRevealed ? (
+        <div className="mt-2 text-foreground whitespace-pre-wrap">
+          <span className="mr-1">{icon}</span>{content}
         </div>
-      )}
-      {!isRevealed && (
+      ) : (
         <div className="mt-2 select-none filter blur-sm text-muted-foreground text-xs">
-          This hint will help guide you to the solution...
+          This {label.toLowerCase()} will help guide you to the solution...
         </div>
       )}
     </div>
@@ -317,8 +319,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     if (isSessionCompleted) return false;
     // Never show questions during validation
     if (isValidating) return false;
-    // Never show questions if validation shows problem is solved
-    if (validationResult?.isCorrect && validationResult?.nextAction === 'complete_session') return false;
+    // Never show questions if validation shows problem is solved or if there's a next step
+    if (validationResult?.isCorrect && (validationResult.nextAction === 'complete_session' || validationResult.nextStep?.question || validationResult.nextStep?.hint)) return false;
     // Never show questions if lastValidation indicates completion
     if (validationResult?.nextAction === 'complete_session') return false;
     // Show question only if we have one and session is active
@@ -858,7 +860,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                 {question}
               </div>
               {hint && !validationResult && (
-                <BlurredHintComponent hint={hint} />
+                <BlurredSection content={hint} />
               )}
             </div>
           )}
@@ -907,23 +909,50 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                     {validationResult.feedback}
                   </div>
                   {(() => {
-                    const q = (validationResult.nextStep?.question || "").trim();
+                    const qRaw = (validationResult.nextStep?.question || "").trim();
                     const h = (validationResult.nextStep?.hint || "").trim();
                     // Only show next step if answer was CORRECT and not session completed
-                    return Boolean(q || h) && validationResult.isCorrect && !isSessionCompleted;
+                    return Boolean(qRaw || h) && validationResult.isCorrect && !isSessionCompleted;
                   })() && (
                       <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
                         <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
                           Next Step:
                         </div>
-                        {validationResult.nextStep?.question?.trim() && (
-                          <div className="text-sm text-blue-700 dark:text-blue-300">
-                            {validationResult.nextStep?.question}
-                          </div>
-                        )}
+                        {(() => {
+                           const qRaw = (validationResult.nextStep?.question || "").trim();
+                           // Split question if it contains explicit solution/answer marker
+                           const match = qRaw.match(/(?:Solution|Answer):\s*([\s\S]*)/i);
+                           const q = match && match.index !== undefined ? qRaw.substring(0, match.index).trim() : qRaw;
+                           const sol = match ? match[1].trim() : null;
+                           
+                           return (
+                             <>
+                               {q && (
+                                 <div className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap mb-2">
+                                   {q}
+                                 </div>
+                               )}
+                               
+                               {sol && (
+                                 <div className="mt-2">
+                                   <BlurredSection 
+                                     content={sol} 
+                                     label="Solution" 
+                                     icon="✅" 
+                                     className="bg-white/50 dark:bg-black/20 border-blue-300 dark:border-blue-500"
+                                   />
+                                 </div>
+                               )}
+                             </>
+                           );
+                        })()}
+                        
                         {validationResult.nextStep?.hint?.trim() && (
-                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 italic">
-                            💡 {validationResult.nextStep.hint}
+                          <div className="mt-2">
+                            <BlurredSection 
+                              content={validationResult.nextStep.hint} 
+                              className="bg-white/50 dark:bg-black/20 border-blue-300 dark:border-blue-500"
+                            />
                           </div>
                         )}
                         {/* Optimization button intentionally hidden inside Next Step.

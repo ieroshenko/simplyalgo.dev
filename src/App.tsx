@@ -25,6 +25,7 @@ import BehavioralMockInterview from "./pages/BehavioralMockInterview";
 import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/AdminDashboard";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -225,6 +226,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BehavioralMockInterview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />
