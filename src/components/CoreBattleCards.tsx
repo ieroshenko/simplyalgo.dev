@@ -24,7 +24,7 @@ const CoreBattleCards = () => {
       color: "bg-primary/10",
       iconColor: "text-primary",
       path: "/system-design",
-      featureFlag: true,
+      featureFlag: false, // Disabled for launch
     },
     {
       title: "Implement Script/API",

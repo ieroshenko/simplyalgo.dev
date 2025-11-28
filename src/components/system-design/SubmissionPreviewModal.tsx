@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -114,34 +114,21 @@ const createNodeType = (color: string, bgColor: string, icon?: any, shape?: stri
   );
 };
 
-const nodeTypes: NodeTypes = {
-  client: createNodeType("#2563eb", "#dbeafe", iconMap.client),
-  api: createNodeType("#059669", "#d1fae5", iconMap.api),
-  database: createNodeType("#7c3aed", "#ede9fe", iconMap.database, "cylinder"),
-  cache: createNodeType("#ea580c", "#fed7aa", iconMap.cache),
-  loadbalancer: createNodeType("#0891b2", "#cffafe", iconMap.loadbalancer, "diamond"),
-  queue: createNodeType("#db2777", "#fce7f3", iconMap.queue),
-  cdn: createNodeType("#4f46e5", "#e0e7ff", iconMap.cdn),
-  storage: createNodeType("#475569", "#e2e8f0", iconMap.storage, "cylinder"),
-  worker: createNodeType("#1e293b", "#f1f5f9", iconMap.worker),
-  gateway: createNodeType("#7c3aed", "#f3e8ff", iconMap.gateway, "diamond"),
-  rectangle: createNodeType("#1f2937", "#f9fafb"),
-  circle: createNodeType("#1f2937", "#f9fafb", undefined, "circle"),
-  diamond: createNodeType("#1f2937", "#f9fafb", undefined, "diamond"),
-  text: ({ data }: { data: any }) => (
-    <div className="relative px-2 py-1 bg-transparent">
-      <div className="font-medium text-foreground whitespace-pre-wrap">{data.label || "Text"}</div>
-      <Handle id="text-right-source" type="source" position={Position.Right} style={{ opacity: 0 }} />
-      <Handle id="text-bottom-source" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-      <Handle id="text-left-source" type="source" position={Position.Left} style={{ opacity: 0 }} />
-      <Handle id="text-top-source" type="source" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle id="text-right-target" type="target" position={Position.Right} style={{ opacity: 0 }} />
-      <Handle id="text-bottom-target" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
-      <Handle id="text-left-target" type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <Handle id="text-top-target" type="target" position={Position.Top} style={{ opacity: 0 }} />
-    </div>
-  ),
-};
+const getNodeColors = (isDark: boolean) => ({
+  client: { color: isDark ? "#bfdbfe" : "#2563eb", bgColor: isDark ? "#1d4ed8" : "#dbeafe" },
+  api: { color: isDark ? "#bbf7d0" : "#059669", bgColor: isDark ? "#166534" : "#d1fae5" },
+  database: { color: isDark ? "#e9d5ff" : "#7c3aed", bgColor: isDark ? "#5b21b6" : "#ede9fe" },
+  cache: { color: isDark ? "#fed7aa" : "#ea580c", bgColor: isDark ? "#9a3412" : "#fed7aa" },
+  loadbalancer: { color: isDark ? "#a5f3fc" : "#0891b2", bgColor: isDark ? "#155e75" : "#cffafe" },
+  queue: { color: isDark ? "#fbcfe8" : "#db2777", bgColor: isDark ? "#9d174d" : "#fce7f3" },
+  cdn: { color: isDark ? "#c7d2fe" : "#4f46e5", bgColor: isDark ? "#312e81" : "#e0e7ff" },
+  storage: { color: isDark ? "#cbd5e1" : "#475569", bgColor: isDark ? "#0f172a" : "#e2e8f0" },
+  worker: { color: isDark ? "#e2e8f0" : "#1e293b", bgColor: isDark ? "#0b1120" : "#f1f5f9" },
+  gateway: { color: isDark ? "#e9d5ff" : "#7c3aed", bgColor: isDark ? "#4c1d95" : "#f3e8ff" },
+  rectangle: { color: isDark ? "#e5e7eb" : "#1f2937", bgColor: isDark ? "#0f172a" : "#f9fafb" },
+  circle: { color: isDark ? "#e5e7eb" : "#1f2937", bgColor: isDark ? "#0f172a" : "#f9fafb" },
+  diamond: { color: isDark ? "#e5e7eb" : "#1f2937", bgColor: isDark ? "#0f172a" : "#f9fafb" },
+});
 
 const edgeTypes = {
   rough: RoughEdge,
@@ -152,6 +139,69 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const nodeColors = useMemo(() => getNodeColors(isDark), [isDark]);
+
+  const nodeTypes: NodeTypes = useMemo(
+    () => ({
+      client: createNodeType(nodeColors.client.color, nodeColors.client.bgColor, iconMap.client),
+      api: createNodeType(nodeColors.api.color, nodeColors.api.bgColor, iconMap.api),
+      database: createNodeType(
+        nodeColors.database.color,
+        nodeColors.database.bgColor,
+        iconMap.database,
+        "cylinder",
+      ),
+      cache: createNodeType(nodeColors.cache.color, nodeColors.cache.bgColor, iconMap.cache),
+      loadbalancer: createNodeType(
+        nodeColors.loadbalancer.color,
+        nodeColors.loadbalancer.bgColor,
+        iconMap.loadbalancer,
+        "diamond",
+      ),
+      queue: createNodeType(nodeColors.queue.color, nodeColors.queue.bgColor, iconMap.queue),
+      cdn: createNodeType(nodeColors.cdn.color, nodeColors.cdn.bgColor, iconMap.cdn),
+      storage: createNodeType(
+        nodeColors.storage.color,
+        nodeColors.storage.bgColor,
+        iconMap.storage,
+        "cylinder",
+      ),
+      worker: createNodeType(nodeColors.worker.color, nodeColors.worker.bgColor, iconMap.worker),
+      gateway: createNodeType(
+        nodeColors.gateway.color,
+        nodeColors.gateway.bgColor,
+        iconMap.gateway,
+        "diamond",
+      ),
+      rectangle: createNodeType(nodeColors.rectangle.color, nodeColors.rectangle.bgColor),
+      circle: createNodeType(
+        nodeColors.circle.color,
+        nodeColors.circle.bgColor,
+        undefined,
+        "circle",
+      ),
+      diamond: createNodeType(
+        nodeColors.diamond.color,
+        nodeColors.diamond.bgColor,
+        undefined,
+        "diamond",
+      ),
+      text: ({ data }: { data: any }) => (
+        <div className="relative px-2 py-1 bg-transparent">
+          <div className="font-medium text-foreground whitespace-pre-wrap">{data.label || "Text"}</div>
+          <Handle id="text-right-source" type="source" position={Position.Right} style={{ opacity: 0 }} />
+          <Handle id="text-bottom-source" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+          <Handle id="text-left-source" type="source" position={Position.Left} style={{ opacity: 0 }} />
+          <Handle id="text-top-source" type="source" position={Position.Top} style={{ opacity: 0 }} />
+          <Handle id="text-right-target" type="target" position={Position.Right} style={{ opacity: 0 }} />
+          <Handle id="text-bottom-target" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
+          <Handle id="text-left-target" type="target" position={Position.Left} style={{ opacity: 0 }} />
+          <Handle id="text-top-target" type="target" position={Position.Top} style={{ opacity: 0 }} />
+        </div>
+      ),
+    }),
+    [nodeColors],
+  );
 
   // Load submission board state when modal opens
   useEffect(() => {
@@ -306,11 +356,16 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
                 defaultEdgeOptions={{
                   type: "rough",
                   markerEnd: { type: MarkerType.ArrowClosed },
-                  style: { stroke: "#6366f1", strokeWidth: 3 },
+                  style: { stroke: isDark ? "#818cf8" : "#6366f1", strokeWidth: 3 },
                   animated: false,
                 }}
               >
-                <Background variant="dots" gap={15} size={1} color="#94a3b8" />
+                <Background
+                  variant="dots"
+                  gap={15}
+                  size={1}
+                  color="hsl(var(--muted-foreground))"
+                />
                 <Controls showInteractive={false} />
                 <MiniMap nodeStrokeWidth={3} zoomable pannable />
               </ReactFlow>

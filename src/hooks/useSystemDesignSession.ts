@@ -27,7 +27,7 @@ interface UseSystemDesignSessionReturn {
   evaluateDesign: () => Promise<void>;
   clearConversation: () => Promise<void>;
   saveDraft: () => Promise<void>;
-  restoreDraft: () => Promise<void>;
+  restoreDraft: () => Promise<boolean>;
   isEvaluating: boolean;
 }
 
@@ -37,8 +37,9 @@ export const useSystemDesignSession = ({
 }: UseSystemDesignSessionProps): UseSystemDesignSessionReturn => {
   const [session, setSession] = useState<SystemDesignSession | null>(null);
   const [boardState, setBoardState] = useState<SystemDesignBoardState>({
-    nodes: [],
-    edges: [],
+    elements: [],
+    appState: {},
+    files: {},
   });
   const [messages, setMessages] = useState<
     Array<{ role: "user" | "assistant"; content: string; timestamp: Date }>
@@ -50,6 +51,7 @@ export const useSystemDesignSession = ({
   const [isTyping, setIsTyping] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [lastSavedDraftHash, setLastSavedDraftHash] = useState<string | null>(null);
 
   // Debounce refs
   const boardUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -198,14 +200,15 @@ export const useSystemDesignSession = ({
         return;
       }
 
-      if (!state || !state.nodes) {
+      if (!state) {
         console.warn("[SystemDesignChat] updateBoard called with invalid state:", state);
         return;
       }
 
       console.log("[SystemDesignChat] Board state updated:", {
-        nodeCount: state.nodes.length,
-        edgeCount: state.edges.length,
+        elementCount: state.elements?.length || 0,
+        nodeCount: state.nodes?.length || 0,
+        edgeCount: state.edges?.length || 0,
       });
 
       setBoardState(state);
@@ -235,19 +238,28 @@ export const useSystemDesignSession = ({
           if (!lastBoardStateRef.current) {
             hasSignificantChange = true;
           } else {
-            const nodeCountChanged = state.nodes.length !== lastBoardStateRef.current.nodes.length;
-            const edgeCountChanged = state.edges.length !== lastBoardStateRef.current.edges.length;
+            // Check for Excalidraw elements
+            if (state.elements) {
+              const elementCountChanged = state.elements.length !== (lastBoardStateRef.current.elements?.length || 0);
+              hasSignificantChange = elementCountChanged;
+            }
+            // Check for ReactFlow nodes/edges (backwards compatibility)
+            else if (state.nodes) {
+              const nodeCountChanged = state.nodes.length !== (lastBoardStateRef.current.nodes?.length || 0);
+              const edgeCountChanged = (state.edges?.length || 0) !== (lastBoardStateRef.current.edges?.length || 0);
 
-            // Check if any node labels changed
-            const labelChanged = state.nodes.some((node, index) => {
-              const prevNode = lastBoardStateRef.current!.nodes.find(n => n.id === node.id);
-              return prevNode && prevNode.data?.label !== node.data?.label;
-            });
+              // Check if any node labels changed
+              const labelChanged = state.nodes.some((node, index) => {
+                const prevNode = lastBoardStateRef.current!.nodes?.find(n => n.id === node.id);
+                return prevNode && prevNode.data?.label !== node.data?.label;
+              });
 
-            hasSignificantChange = nodeCountChanged || edgeCountChanged || labelChanged;
+              hasSignificantChange = nodeCountChanged || edgeCountChanged || labelChanged;
+            }
           }
 
-          if (hasSignificantChange && state.nodes.length > 0) {
+          const hasContent = (state.elements && state.elements.length > 0) || (state.nodes && state.nodes.length > 0);
+          if (hasSignificantChange && hasContent) {
             console.log("[SystemDesignChat] Board changed significantly, triggering AI reaction");
             setLoading(true);
 
@@ -433,7 +445,7 @@ export const useSystemDesignSession = ({
 
       console.log("[SystemDesignChat] Step 4: Resetting local state...");
       setMessages([]);
-      setBoardState({ nodes: [], edges: [] });
+      setBoardState({ elements: [], appState: {}, files: {} });
       lastBoardStateRef.current = null;
       setEvaluation(null);
       setCompleteness(null);
@@ -546,22 +558,26 @@ export const useSystemDesignSession = ({
       return;
     }
 
-    // Only save if there's actual work (nodes on the board)
-    if (!boardState.nodes || boardState.nodes.length === 0) {
-      console.log("[SystemDesignChat] saveDraft: No nodes, skipping");
+    // Only save if there's actual work (elements or nodes on the board)
+    const hasContent = (boardState.elements && boardState.elements.length > 0) ||
+                       (boardState.nodes && boardState.nodes.length > 0);
+    if (!hasContent) {
+      console.log("[SystemDesignChat] saveDraft: No elements/nodes, skipping");
       return;
     }
 
     try {
+      const draftHash = JSON.stringify(boardState ?? {});
       console.log("[SystemDesignChat] Saving current work as draft...");
       const { error: updateError } = await supabase
         .from("system_design_sessions")
-        .update({ draft_board_state: boardState })
+        .update({ draft_board_state: boardState, draft_hash: draftHash })
         .eq("id", session.id);
 
       if (updateError) throw updateError;
 
       setHasDraft(true);
+      setLastSavedDraftHash(draftHash);
       console.log("[SystemDesignChat] ✓ Draft saved successfully");
     } catch (err) {
       console.error("[SystemDesignChat] Failed to save draft:", err);
@@ -569,17 +585,19 @@ export const useSystemDesignSession = ({
     }
   }, [session, boardState]);
 
-  const restoreDraft = useCallback(async () => {
+  const restoreDraft = useCallback(async (): Promise<boolean> => {
     if (!session) {
       console.log("[SystemDesignChat] restoreDraft: No session, skipping");
-      return;
+      return false;
     }
+
+    const backupState = lastBoardStateRef.current ?? boardState;
 
     try {
       console.log("[SystemDesignChat] Restoring draft...");
       const { data, error: fetchError } = await supabase
         .from("system_design_sessions")
-        .select("draft_board_state")
+        .select("draft_board_state, draft_hash")
         .eq("id", session.id)
         .single();
 
@@ -587,44 +605,86 @@ export const useSystemDesignSession = ({
 
       if (data?.draft_board_state) {
         const draftState = data.draft_board_state as SystemDesignBoardState;
+        console.log("[SystemDesignChat] Captured backup of current board state before restore", {
+          hasElements: !!backupState?.elements?.length,
+          hasNodes: !!backupState?.nodes?.length,
+        });
         setBoardState(draftState);
         lastBoardStateRef.current = draftState;
+        setLastSavedDraftHash(data.draft_hash ?? null);
 
         // Clear the draft after restoring
         await supabase
           .from("system_design_sessions")
-          .update({ draft_board_state: null })
+          .update({ draft_board_state: null, draft_hash: null })
           .eq("id", session.id);
 
         setHasDraft(false);
         console.log("[SystemDesignChat] ✓ Draft restored successfully");
+        return true;
       } else {
         console.log("[SystemDesignChat] No draft found to restore");
+        return false;
       }
     } catch (err) {
       console.error("[SystemDesignChat] Failed to restore draft:", err);
       setError(err instanceof Error ? err.message : "Failed to restore draft");
+      return false;
     }
-  }, [session]);
+  }, [session, boardState]);
 
   // Check if session has a draft on load
   useEffect(() => {
     if (!session) return;
+    let mounted = true;
+    const sessionId = session.id;
 
     const checkDraft = async () => {
-      const { data } = await supabase
-        .from("system_design_sessions")
-        .select("draft_board_state")
-        .eq("id", session.id)
-        .single();
+      try {
+        const { data, error: fetchError } = await supabase
+          .from("system_design_sessions")
+          .select("draft_board_state, draft_hash")
+          .eq("id", sessionId)
+          .single();
 
-      if (data?.draft_board_state) {
-        setHasDraft(true);
+        if (fetchError) {
+          console.error("[SystemDesignChat] Failed to check draft:", fetchError);
+          if (mounted) {
+            setError(fetchError.message || "Failed to check draft");
+          }
+          return;
+        }
+
+        if (!mounted) return;
+
+        if (data?.draft_board_state) {
+          setHasDraft(true);
+          setLastSavedDraftHash(data.draft_hash ?? JSON.stringify(data.draft_board_state));
+        }
+      } catch (err) {
+        console.error("[SystemDesignChat] Failed to check draft:", err);
+        if (mounted) {
+          setError(err instanceof Error ? err.message : "Failed to check draft");
+        }
       }
     };
 
     checkDraft();
+
+    return () => {
+      mounted = false;
+    };
   }, [session]);
+
+  // Clear draft badge when current board differs from last saved draft
+  useEffect(() => {
+    if (!hasDraft || !lastSavedDraftHash) return;
+
+    const currentHash = JSON.stringify(boardState ?? {});
+    if (currentHash !== lastSavedDraftHash) {
+      setHasDraft(false);
+    }
+  }, [boardState, hasDraft, lastSavedDraftHash]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {

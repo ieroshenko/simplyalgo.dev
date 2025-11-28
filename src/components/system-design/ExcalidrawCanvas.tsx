@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Excalidraw, MainMenu, WelcomeScreen } from "@excalidraw/excalidraw";
 import type { ExcalidrawElement, AppState, BinaryFiles } from "@excalidraw/excalidraw/types/types";
 import type { SystemDesignBoardState } from "@/types";
@@ -11,6 +11,78 @@ interface ExcalidrawCanvasProps {
 
 const MINIMUM_CANVAS_WIDTH = 400;
 const MINIMUM_CANVAS_HEIGHT = 300;
+const MAX_SAFE_SCROLL = 10000;
+const MAX_SCENE_DIMENSION = 20000; // Keep scene smaller than browser canvas limits
+const MAX_COORDINATE = MAX_SCENE_DIMENSION / 2;
+
+// Guard against corrupted board/app state values that can blow up the Excalidraw canvas.
+const clampNumber = (value: any, fallback: number, limit: number) => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return fallback;
+  if (Math.abs(numericValue) > limit) return Math.sign(numericValue) * limit;
+  return numericValue;
+};
+
+const sanitizeElements = (elements?: readonly ExcalidrawElement[]) => {
+  if (!Array.isArray(elements)) return [];
+  const validElements = elements.filter((el) => {
+    const coords = [el.x, el.y, el.width, el.height];
+    return coords.every((val) => Number.isFinite(val) && Math.abs(val) <= MAX_COORDINATE);
+  });
+
+  if (validElements.length === 0) return [];
+
+  // If the overall bounding box is still huge, reset to empty to prevent canvas explosion.
+  const bounds = validElements.reduce(
+    (acc, el) => ({
+      minX: Math.min(acc.minX, el.x),
+      minY: Math.min(acc.minY, el.y),
+      maxX: Math.max(acc.maxX, el.x + (el.width || 0)),
+      maxY: Math.max(acc.maxY, el.y + (el.height || 0)),
+    }),
+    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+  );
+
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  if (width > MAX_SCENE_DIMENSION || height > MAX_SCENE_DIMENSION) {
+    console.warn("[ExcalidrawCanvas] Scene bounding box too large, clearing elements to avoid DOMException.", {
+      width,
+      height,
+      elementCount: validElements.length,
+    });
+    return [];
+  }
+
+  return validElements;
+};
+
+const sanitizeAppState = (appState: any, backgroundColor: string) => {
+  const zoomValue = clampNumber(appState?.zoom?.value ?? appState?.zoom, 1, 4);
+  const scrollX = clampNumber(appState?.scrollX, 0, MAX_SAFE_SCROLL);
+  const scrollY = clampNumber(appState?.scrollY, 0, MAX_SAFE_SCROLL);
+
+  return {
+    viewBackgroundColor: typeof appState?.viewBackgroundColor === "string" ? appState.viewBackgroundColor : backgroundColor,
+    zoom: { value: zoomValue as AppState["zoom"]["value"] },
+    scrollX,
+    scrollY,
+    currentItemStrokeColor: appState?.currentItemStrokeColor,
+    currentItemBackgroundColor: appState?.currentItemBackgroundColor,
+    currentItemFillStyle: appState?.currentItemFillStyle,
+    currentItemStrokeWidth: appState?.currentItemStrokeWidth,
+    currentItemRoughness: appState?.currentItemRoughness,
+    currentItemOpacity: appState?.currentItemOpacity,
+  };
+};
+
+const sanitizeBoardState = (state: SystemDesignBoardState, backgroundColor: string): SystemDesignBoardState => ({
+  elements: sanitizeElements(state.elements as readonly ExcalidrawElement[]),
+  appState: sanitizeAppState(state.appState, backgroundColor),
+  files: (state.files && typeof state.files === "object") ? state.files : {},
+  nodes: Array.isArray(state.nodes) ? state.nodes : undefined,
+  edges: Array.isArray(state.edges) ? state.edges : undefined,
+});
 
 const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) => {
   const { isDark } = useTheme();
@@ -19,6 +91,17 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
   const [tooSmall, setTooSmall] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const changeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const themeBackground = useMemo(() => {
+    if (typeof window === "undefined") {
+      return isDark ? "hsl(222 47% 11%)" : "hsl(0 0% 100%)";
+    }
+    const cssValue = getComputedStyle(document.documentElement).getPropertyValue("--background").trim();
+    return cssValue ? `hsl(${cssValue})` : isDark ? "hsl(222 47% 11%)" : "hsl(0 0% 100%)";
+  }, [isDark]);
+  const safeBoardState = useMemo(
+    () => sanitizeBoardState(boardState, themeBackground),
+    [boardState, themeBackground],
+  );
 
   // Wait for container to have valid dimensions before rendering Excalidraw
   useEffect(() => {
@@ -67,19 +150,20 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
 
   // Initialize Excalidraw with saved board state
   useEffect(() => {
-    if (excalidrawAPI && boardState.elements) {
+    if (excalidrawAPI && safeBoardState.elements && Array.isArray(safeBoardState.elements)) {
       // Only update if elements actually changed (prevent infinite loops)
       const currentElements = excalidrawAPI.getSceneElements();
-      const elementsChanged = JSON.stringify(currentElements) !== JSON.stringify(boardState.elements);
+      const elementsChanged = JSON.stringify(currentElements) !== JSON.stringify(safeBoardState.elements);
 
-      if (elementsChanged && boardState.elements.length > 0) {
+      if (elementsChanged && safeBoardState.elements.length > 0) {
         excalidrawAPI.updateScene({
-          elements: boardState.elements,
-          appState: boardState.appState || {},
+          elements: safeBoardState.elements,
+          appState: safeBoardState.appState || {},
+          files: safeBoardState.files || {},
         });
       }
     }
-  }, [boardState, excalidrawAPI]);
+  }, [safeBoardState, excalidrawAPI]);
 
   // Handle changes from Excalidraw
   const handleChange = useCallback(
@@ -104,14 +188,19 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
           currentItemOpacity: appState.currentItemOpacity,
         };
 
-        onBoardChange({
-          elements: elements as any[],
-          appState: essentialAppState,
-          files: files as any,
-        });
+        const sanitizedState = sanitizeBoardState(
+          {
+            elements: elements as any[],
+            appState: essentialAppState,
+            files: files as any,
+          },
+          themeBackground,
+        );
+
+        onBoardChange(sanitizedState);
       }, 500); // Debounce for 500ms
     },
-    [onBoardChange]
+    [onBoardChange, themeBackground]
   );
 
   // debug: render log removed for production
@@ -141,14 +230,11 @@ const ExcalidrawCanvas = ({ boardState, onBoardChange }: ExcalidrawCanvasProps) 
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           onChange={handleChange}
           initialData={{
-            elements: boardState.elements || [],
-            files: boardState.files || {},
+            elements: safeBoardState.elements || [],
+            files: safeBoardState.files || {},
             appState: {
-              zoom: { value: 1 },
-              scrollX: 0,
-              scrollY: 0,
-              viewBackgroundColor: isDark ? "#1e1e1e" : "#ffffff",
-              ...boardState.appState,  // Preserve any saved viewport state
+              viewBackgroundColor: themeBackground,
+              ...safeBoardState.appState,  // Preserve any saved viewport state
             },
           }}
           theme={isDark ? "dark" : "light"}

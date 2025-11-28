@@ -126,29 +126,15 @@ export const RoughShape = ({
   }, [width, height, color, bgColor, shape, roughness, bowing, strokeWidth]);
 
   return (
-    <div style={{ position: "relative", width, height }}>
+    <div className="relative" style={{ width, height }}>
       <svg
         ref={svgRef}
         width={width}
         height={height}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          pointerEvents: "none",
-        }}
+        className="absolute top-0 left-0 pointer-events-none"
       />
       <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "12px 16px",
-        }}
+        className="relative z-10 w-full h-full flex items-center justify-center px-4 py-3"
       >
         {children}
       </div>

@@ -12,7 +12,7 @@ import EvaluationDisplay from "@/components/system-design/EvaluationDisplay";
 import SubmissionPreviewModal from "@/components/system-design/SubmissionPreviewModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
-import { ArrowLeft, Moon, Sun, Star, StarOff, RotateCcw } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Star, StarOff, RotateCcw, Paintbrush } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -147,8 +147,12 @@ const SystemDesignSolver = () => {
       message: "This will replace your current work with the previously saved draft. Continue?",
       onConfirm: async () => {
         setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
-        await restoreDraft();
-        toast.success("Draft restored successfully");
+        const restored = await restoreDraft();
+        if (restored) {
+          toast.success("Draft restored successfully");
+        } else {
+          toast.error("No draft available to restore");
+        }
       },
     });
   };
@@ -306,6 +310,17 @@ const SystemDesignSolver = () => {
               <RotateCcw className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Clear Diagram</span>
               <span className="sm:hidden">Clear</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/excalidraw-design")}
+              className="text-primary hover:text-primary-foreground hover:bg-primary border-primary"
+              title="Open Excalidraw Canvas"
+            >
+              <Paintbrush className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Excalidraw</span>
+              <span className="sm:hidden">Draw</span>
             </Button>
             <ShortcutsHelp />
             <Button

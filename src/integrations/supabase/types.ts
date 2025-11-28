@@ -1120,6 +1120,7 @@ export type Database = {
           completed_at: string | null
           context_thread_id: string | null
           draft_board_state: Json | null
+          draft_hash: string | null
           evaluation_feedback: string | null
           id: string
           is_completed: boolean | null
@@ -1133,6 +1134,7 @@ export type Database = {
           completed_at?: string | null
           context_thread_id?: string | null
           draft_board_state?: Json | null
+          draft_hash?: string | null
           evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null
@@ -1146,6 +1148,7 @@ export type Database = {
           completed_at?: string | null
           context_thread_id?: string | null
           draft_board_state?: Json | null
+          draft_hash?: string | null
           evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null

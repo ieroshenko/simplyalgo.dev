@@ -323,8 +323,13 @@ export interface SystemDesignSession {
 }
 
 export interface SystemDesignBoardState {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
+  // Excalidraw format (new default)
+  elements?: any[];
+  appState?: any;
+  files?: any;
+  // ReactFlow format (legacy, kept for backwards compatibility)
+  nodes?: FlowNode[];
+  edges?: FlowEdge[];
 }
 
 export interface DesignEvaluation {

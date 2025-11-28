@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -11,7 +10,6 @@ import {
 } from "@/components/ui/select";
 import Sidebar from "@/components/Sidebar";
 import ProblemTable from "@/components/ProblemTable";
-import DataStructureVault from "@/components/DataStructureVault";
 import CompanyIcon from "@/components/CompanyIcon";
 import { useState, useEffect, useMemo } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -278,14 +276,8 @@ const Problems = () => {
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="problems" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="problems">Problems</TabsTrigger>
-            <TabsTrigger value="data-structures">Data Structures</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="problems" className="space-y-6">
+        {/* Main Content - Data Structures tab hidden for launch */}
+        <div className="space-y-6">
             {/* Filters */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">
@@ -429,12 +421,7 @@ const Problems = () => {
                 onToggleStar={toggleStar}
               />
             </div>
-          </TabsContent>
-
-          <TabsContent value="data-structures">
-            <DataStructureVault />
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </div>
   );

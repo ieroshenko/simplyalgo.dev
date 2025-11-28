@@ -482,45 +482,38 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
     [editModal.nodeId, setNodes]
   );
 
-  // Eraser mode - hover to delete
-  const onNodeMouseEnter = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (selectedTool === "eraser") {
-        setNodes((nds) => nds.filter((n) => n.id !== node.id));
-        // Also delete connected edges
-        setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id));
-      }
+  // Centralized delete helpers (can be extended to push undo operations)
+  const deleteNodeWithEdges = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
     },
-    [selectedTool, setNodes, setEdges]
+    [setNodes, setEdges]
   );
 
-  const onEdgeMouseEnter = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      if (selectedTool === "eraser") {
-        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-      }
+  const deleteEdgeById = useCallback(
+    (edgeId: string) => {
+      setEdges((eds) => eds.filter((e) => e.id !== edgeId));
     },
-    [selectedTool, setEdges]
+    [setEdges]
   );
 
-  // Keep click handlers for backwards compatibility
+  // Keep click handlers for eraser mode (explicit action vs accidental hover)
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
       if (selectedTool === "eraser") {
         event.preventDefault();
-        setNodes((nds) => nds.filter((n) => n.id !== node.id));
-        // Also delete connected edges
-        setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id));
+        deleteNodeWithEdges(node.id);
       }
     },
-    [selectedTool, setNodes, setEdges]
+    [selectedTool, deleteNodeWithEdges]
   );
 
   const onEdgeClick = useCallback(
     (event: React.MouseEvent, edge: Edge) => {
       event.preventDefault();
       if (selectedTool === "eraser") {
-        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        deleteEdgeById(edge.id);
         return;
       }
 
@@ -545,7 +538,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
         setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
       }
     },
-    [selectedTool, setEdges, setNodes]
+    [selectedTool, deleteEdgeById, setNodes]
   );
 
   // Clear canvas
@@ -666,8 +659,6 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
               onNodeDoubleClick={onNodeDoubleClick}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
-              onNodeMouseEnter={onNodeMouseEnter}
-              onEdgeMouseEnter={onEdgeMouseEnter}
               onMoveEnd={onMoveEnd}
               onNodesChange={onNodesChange}
               nodeTypes={nodeTypes}

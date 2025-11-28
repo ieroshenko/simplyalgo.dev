@@ -34,8 +34,9 @@ export const RoughEdge = ({
   const arrowTipX = targetX - nodeEdgeOffset * Math.cos(angle);
   const arrowTipY = targetY - nodeEdgeOffset * Math.sin(angle);
 
-  // Colors based on selection state
-  const strokeColor = selected ? "#22c55e" : (style.stroke as string || "#6366f1");
+  // Colors based on selection state (theme-aware)
+  const strokeColor =
+    selected ? "hsl(var(--success))" : (style.stroke as string || "hsl(var(--primary))");
   const strokeWidth = selected ? 5 : ((style.strokeWidth as number) || 3);
 
   useEffect(() => {

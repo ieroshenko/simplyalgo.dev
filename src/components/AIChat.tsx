@@ -228,39 +228,128 @@ const AIChat = ({
     return () => clearTimeout(timeoutId);
   }, [messages, isTyping]);
 
-  // Extract trailing single-line "Hint: ..." outside of code fences
+  // Extract hints, solutions, and hints for next step sections
   const splitContentAndHint = (
     content: string,
-  ): { body: string; hint?: string } => {
+  ): { body: string; hint?: string; hintsForNextStep?: string; solution?: string } => {
     const lines = content.split("\n");
     let inCode = false;
     let hint: string | undefined;
+    let hintsForNextStep: string | undefined;
+    let solution: string | undefined;
     const bodyLines: string[] = [];
-    
+
+    let captureMode: 'none' | 'hintsForNextStep' | 'solution' = 'none';
+    const capturedHintsLines: string[] = [];
+    const capturedSolutionLines: string[] = [];
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
-      
+
       // Track code fence state
       if (trimmed.startsWith("```") && (trimmed === "```" || /^```\w+/.test(trimmed))) {
         inCode = !inCode;
-        bodyLines.push(line);
-        continue;
+
+        // If we're capturing, add to capture buffer
+        if (captureMode === 'hintsForNextStep') {
+          capturedHintsLines.push(line);
+          continue;
+        } else if (captureMode === 'solution') {
+          capturedSolutionLines.push(line);
+          continue;
+        } else {
+          bodyLines.push(line);
+          continue;
+        }
       }
-      
-      // Look for hint pattern when not in code
+
+      // Look for special sections when not in code
       if (!inCode) {
+        // Single-line hint pattern
         const hintMatch = trimmed.match(/^Hint\s*:\s*(.+)$/i);
         if (hintMatch) {
           hint = hintMatch[1];
           continue; // Don't add this line to body
         }
+
+        // Match various hint patterns:
+        // - "Hints for Next Step:"
+        // - "Hint:"
+        // - "Hints:"
+        // - "Next Step Hint:"
+        // - "Think about:"
+        if (trimmed.match(/^Hints?\s+for\s+(the\s+)?Next\s+Step\s*:?$/i) ||
+            trimmed.match(/^Hints?\s*:$/i) ||
+            trimmed.match(/^Next\s+Step\s+Hints?\s*:?$/i) ||
+            trimmed.match(/^Think\s+about\s*:?$/i)) {
+          // Finalize previous capture before switching
+          if (captureMode === 'hintsForNextStep' && capturedHintsLines.length > 0) {
+            hintsForNextStep = capturedHintsLines.join("\n").trim();
+            capturedHintsLines.length = 0;
+          } else if (captureMode === 'solution' && capturedSolutionLines.length > 0) {
+            solution = capturedSolutionLines.join("\n").trim();
+            capturedSolutionLines.length = 0;
+          }
+          captureMode = 'hintsForNextStep';
+          continue;
+        }
+
+        // "Solution:" or "Complete Solution:" section
+        if (trimmed.match(/^(Complete\s+)?Solution\s*:?$/i)) {
+          // Finalize previous capture before switching
+          if (captureMode === 'hintsForNextStep' && capturedHintsLines.length > 0) {
+            hintsForNextStep = capturedHintsLines.join("\n").trim();
+            capturedHintsLines.length = 0;
+          } else if (captureMode === 'solution' && capturedSolutionLines.length > 0) {
+            solution = capturedSolutionLines.join("\n").trim();
+            capturedSolutionLines.length = 0;
+          }
+          captureMode = 'solution';
+          continue;
+        }
+
+        // Check if we hit a new major section (stop capturing)
+        // Look for patterns like "Question:", "Approach:", etc. but not numbered lists
+        if (captureMode !== 'none' && trimmed.match(/^[A-Z][a-z]*(\s+[A-Z][a-z]*)*\s*:$/) && !trimmed.match(/^\d+\./)) {
+          // New section detected, stop capturing current mode
+          if (captureMode === 'hintsForNextStep') {
+            hintsForNextStep = capturedHintsLines.join("\n").trim();
+            capturedHintsLines.length = 0;
+          } else if (captureMode === 'solution') {
+            solution = capturedSolutionLines.join("\n").trim();
+            capturedSolutionLines.length = 0;
+          }
+          captureMode = 'none';
+          bodyLines.push(line);
+          continue;
+        }
       }
-      
-      bodyLines.push(line);
+
+      // Add lines to appropriate buffer
+      if (captureMode === 'hintsForNextStep') {
+        capturedHintsLines.push(line);
+      } else if (captureMode === 'solution') {
+        capturedSolutionLines.push(line);
+      } else {
+        bodyLines.push(line);
+      }
     }
-    
-    return { body: bodyLines.join("\n").trim(), hint };
+
+    // Capture any remaining content
+    if (captureMode === 'hintsForNextStep' && capturedHintsLines.length > 0) {
+      hintsForNextStep = capturedHintsLines.join("\n").trim();
+    }
+    if (captureMode === 'solution' && capturedSolutionLines.length > 0) {
+      solution = capturedSolutionLines.join("\n").trim();
+    }
+
+    return {
+      body: bodyLines.join("\n").trim(),
+      hint,
+      hintsForNextStep,
+      solution
+    };
   };
 
   const BlurredHint: React.FC<{ text: string }> = ({ text }) => {
@@ -302,6 +391,108 @@ const AIChat = ({
         ) : (
           <div className="mt-2 select-none filter blur-sm text-muted-foreground text-xs">
             This hint will help guide you to the solution...
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const BlurredSection: React.FC<{ title: string; content: string; icon?: string; color?: string }> = ({
+    title,
+    content,
+    icon = "💡",
+    color = "amber"
+  }) => {
+    const [isRevealed, setIsRevealed] = useState(false);
+
+    const colorClasses = {
+      amber: {
+        bg: "bg-amber-50 dark:bg-amber-950/30",
+        border: "border-amber-200 dark:border-amber-600",
+        text: "text-amber-700 dark:text-amber-400"
+      },
+      green: {
+        bg: "bg-green-50 dark:bg-green-950/30",
+        border: "border-green-200 dark:border-green-600",
+        text: "text-green-700 dark:text-green-400"
+      },
+      blue: {
+        bg: "bg-blue-50 dark:bg-blue-950/30",
+        border: "border-blue-200 dark:border-blue-600",
+        text: "text-blue-700 dark:text-blue-400"
+      }
+    };
+
+    const colors = colorClasses[color as keyof typeof colorClasses] || colorClasses.amber;
+
+    return (
+      <div
+        className={`mt-3 cursor-pointer text-xs text-muted-foreground p-3 ${colors.bg} rounded-md border-l-4 ${colors.border}`}
+        onClick={() => setIsRevealed((v) => !v)}
+        role="button"
+        aria-label={isRevealed ? `Hide ${title}` : `Click to reveal ${title}`}
+      >
+        <div className="flex items-center gap-2">
+          {isRevealed ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-4 h-4"
+            >
+              <path d="M3.53 2.47a.75.75 0 1 0-1.06 1.06l2.026 2.026C2.835 6.73 1.651 8.164.88 9.53a1.77 1.77 0 0 0 0 1.94C2.51 14.503 6.04 18 12 18c2.095 0 3.898-.437 5.393-1.152l3.077 3.077a.75.75 0 1 0 1.06-1.06L3.53 2.47ZM12 16.5c-5.18 0-8.317-3.1-9.72-5.53a.27.27 0 0 1 0-.29c.64-1.08 1.63-2.32 2.996-3.37l2.022 2.022A4.5 4.5 0 0 0 12 16.5Z" />
+              <path d="M7.94 8.5 9.4 9.96A3 3 0 0 0 14.04 14.6l1.46 1.46A4.5 4.5 0 0 1 7.94 8.5Z" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-4 h-4"
+            >
+              <path d="M12 6c-5.96 0-9.49 3.497-11.12 6.53a1.77 1.77 0 0 0 0 1.94C2.51 17.503 6.04 21 12 21s9.49-3.497 11.12-6.53a1.77 1.77 0 0 0 0-1.94C21.49 9.497 17.96 6 12 6Zm0 12c-4.69 0-7.67-2.804-9.28-5.47A.27.27 0 0 1 2.7 12c1.61-2.666 4.59-5.47 9.3-5.47 4.69 0 7.67 2.804 9.28 5.47a.27.27 0 0 1 0 .53C19.67 15.196 16.69 18 12 18Zm0-9a4 4 0 1 0 .001 8.001A4 4 0 0 0 12 9Z" />
+            </svg>
+          )}
+          <span className={`text-sm font-semibold ${colors.text}`}>
+            {icon} {title}
+          </span>
+          <span className="ml-auto text-xs opacity-60">
+            {isRevealed ? "Click to hide" : "Click to reveal"}
+          </span>
+        </div>
+        {isRevealed ? (
+          <div className="mt-3 text-foreground prose prose-sm max-w-none">
+            <ReactMarkdown
+              components={{
+                code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
+                  const match = /language-(\w+)/.exec(className || "");
+                  const lang = match?.[1] || "python";
+                  if (!inline) {
+                    return (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={lang}
+                        PreTag="div"
+                        className="rounded-md !mt-2 !mb-2"
+                      >
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
+                    );
+                  }
+                  return (
+                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                  );
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <div className="mt-2 select-none filter blur-sm text-muted-foreground text-xs">
+            {title === "Solution"
+              ? "Complete solution code and explanation..."
+              : "Strategic hints to guide your next steps..."}
           </div>
         )}
       </div>
@@ -470,7 +661,7 @@ const AIChat = ({
                             <p className="text-foreground font-medium mb-2">{message.content}</p>
                           ) : (
                             (() => {
-                              const { body, hint } = splitContentAndHint(
+                              const { body, hint, hintsForNextStep, solution } = splitContentAndHint(
                                 message.content,
                               );
                               return (
@@ -519,6 +710,22 @@ const AIChat = ({
                                     {body}
                                   </ReactMarkdown>
                                   {hint && <BlurredHint text={hint} />}
+                                  {hintsForNextStep && (
+                                    <BlurredSection
+                                      title="Hints for Next Step"
+                                      content={hintsForNextStep}
+                                      icon="💡"
+                                      color="amber"
+                                    />
+                                  )}
+                                  {solution && (
+                                    <BlurredSection
+                                      title="Solution"
+                                      content={solution}
+                                      icon="✅"
+                                      color="green"
+                                    />
+                                  )}
                                 </div>
                               );
                             })()
