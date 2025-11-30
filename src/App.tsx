@@ -27,6 +27,7 @@ import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
+import { AdminRoute } from "./components/route/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -232,9 +233,9 @@ const App = () => (
             <Route
               path="/admin"
               element={
-                <ProtectedRoute>
+                <AdminRoute>
                   <AdminDashboard />
-                </ProtectedRoute>
+                </AdminRoute>
               }
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

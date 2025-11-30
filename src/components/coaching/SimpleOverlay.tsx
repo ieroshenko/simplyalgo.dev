@@ -1116,7 +1116,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   }}
                   disabled={isInserting}
                   size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 >
                   {isInserting ? (
                     <>
@@ -1125,7 +1125,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
+                      <Sparkles className="w-4 h-4 mr-2" />
                       Use Correct Code
                     </>
                   )}

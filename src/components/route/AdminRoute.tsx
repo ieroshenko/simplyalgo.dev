@@ -1,0 +1,35 @@
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+
+interface AdminRouteProps {
+  children: React.ReactNode;
+}
+
+// Whitelist of admin emails
+const ADMIN_EMAILS = [
+  "tazigrigolia@gmail.com",
+  "ivaneroshenko@gmail.com"  // Likely correction
+];
+
+export const AdminRoute = ({ children }: AdminRouteProps) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
+    console.warn(`Unauthorized access attempt to /admin by ${user.email}`);
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};

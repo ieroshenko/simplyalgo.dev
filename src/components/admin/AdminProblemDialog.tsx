@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, Save } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 
-interface Problem {
+export interface Problem {
   id: string;
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
@@ -36,6 +38,7 @@ interface Problem {
   hints: string[];
   recommended_time_complexity: string;
   recommended_space_complexity: string;
+  created_at?: string;
 }
 
 interface TestCase {
@@ -67,20 +70,21 @@ interface Category {
 }
 
 interface AdminProblemDialogProps {
-  problemId: string | null;
+  problem: Problem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
+  onSaved: (savedProblem?: Problem) => void;
   categories: Category[];
 }
 
 export function AdminProblemDialog({
-  problemId,
+  problem,
   open,
   onOpenChange,
   onSaved,
   categories,
 }: AdminProblemDialogProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -100,6 +104,8 @@ export function AdminProblemDialog({
     recommended_space_complexity: "",
   });
 
+  const [initialSignature, setInitialSignature] = useState("");
+
   const [jsonState, setJsonState] = useState({
     companies: "[]",
     examples: "[]",
@@ -112,9 +118,18 @@ export function AdminProblemDialog({
 
   useEffect(() => {
     if (open) {
-      if (problemId) {
-        loadProblem();
+      if (problem) {
+        setFormData(problem);
+        setInitialSignature(problem.function_signature);
+        setJsonState({
+          companies: JSON.stringify(problem.companies || [], null, 2),
+          examples: JSON.stringify(problem.examples || [], null, 2),
+          constraints: JSON.stringify(problem.constraints || [], null, 2),
+          hints: JSON.stringify(problem.hints || [], null, 2),
+        });
+        loadRelatedData(problem.id);
       } else {
+        // Reset for new problem
         setFormData({
           id: "",
           title: "",
@@ -129,6 +144,7 @@ export function AdminProblemDialog({
           recommended_time_complexity: "",
           recommended_space_complexity: "",
         });
+        setInitialSignature("");
         setJsonState({
           companies: "[]",
           examples: "[]",
@@ -140,20 +156,11 @@ export function AdminProblemDialog({
         setActiveTab("details");
       }
     }
-  }, [open, problemId]);
+  }, [open, problem]);
 
-  const loadProblem = async () => {
-    if (!problemId) return;
+  const loadRelatedData = async (problemId: string) => {
     setLoading(true);
     try {
-      const { data: problem, error: problemError } = await supabase
-        .from("problems")
-        .select("*")
-        .eq("id", problemId)
-        .single();
-
-      if (problemError) throw problemError;
-
       const { data: tcs, error: tcError } = await supabase
         .from("test_cases")
         .select("*")
@@ -169,22 +176,14 @@ export function AdminProblemDialog({
 
       if (solError) throw solError;
 
-      setFormData(problem as any);
-      setJsonState({
-        companies: JSON.stringify(problem.companies || [], null, 2),
-        examples: JSON.stringify(problem.examples || [], null, 2),
-        constraints: JSON.stringify(problem.constraints || [], null, 2),
-        hints: JSON.stringify(problem.hints || [], null, 2),
-      });
       setTestCases(tcs as any || []);
       setSolutions(sols as any || []);
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error loading problem",
+        title: "Error loading related data",
         description: error.message,
       });
-      onOpenChange(false);
     } finally {
       setLoading(false);
     }
@@ -205,25 +204,78 @@ export function AdminProblemDialog({
         constraints,
         hints,
       };
+      
+      console.log("AdminProblemDialog: Saving payload:", problemData);
 
-      if (problemId) {
-        const { error } = await supabase
+      if (problem) {
+        // Verify permission by ensuring data is returned
+        const { data: updatedProblem, error } = await supabase
           .from("problems")
           .update(problemData)
-          .eq("id", problemId);
+          .eq("id", problem.id)
+          .select()
+          .single();
+          
         if (error) throw error;
-        toast({ title: "Problem updated" });
+
+        if (formData.function_signature !== initialSignature) {
+          console.log("AdminProblemDialog: Signature changed", {
+            old: initialSignature,
+            new: formData.function_signature,
+            problemId: problem.id
+          });
+          
+          // Clear pending drafts if signature changed
+          const { error: deleteError, count } = await supabase
+            .from("user_problem_attempts")
+            .delete({ count: 'exact' })
+            .eq("problem_id", problem.id)
+            .eq("status", "pending");
+          
+          if (deleteError) {
+            console.error("AdminProblemDialog: Failed to delete drafts", deleteError);
+          } else {
+            console.log("AdminProblemDialog: Drafts deleted", { count });
+          }
+
+          if (user?.id) {
+             const { error: insertError } = await supabase.from("user_problem_attempts").insert({
+                user_id: user.id,
+                problem_id: problem.id,
+                code: formData.function_signature,
+                status: "pending",
+                updated_at: new Date().toISOString()
+             });
+             
+             if (insertError) {
+                 console.error("AdminProblemDialog: Failed to insert new draft", insertError);
+                 toast({ variant: "destructive", title: "Problem updated but failed to reset editor" });
+             } else {
+                 console.log("AdminProblemDialog: Inserted new draft with updated signature");
+                 toast({ title: "Problem updated & editor reset" });
+             }
+          } else {
+             toast({ title: "Problem updated (Sign in to reset editor)" });
+          }
+        } else {
+          console.log("AdminProblemDialog: Signature unchanged");
+          toast({ title: "Problem updated" });
+        }
+        
+        onSaved(updatedProblem as Problem);
+        
       } else {
-        const { error } = await supabase.from("problems").insert([problemData]);
+        const { data: insertedProblem, error } = await supabase.from("problems").insert([problemData]).select().single();
         if (error) throw error;
         toast({ title: "Problem created" });
+        onSaved(insertedProblem as Problem);
       }
-      onSaved();
     } catch (error: any) {
+      console.error("AdminProblemDialog: Save error", error);
       toast({
         variant: "destructive",
         title: "Error saving problem",
-        description: error.message,
+        description: error.message || "Failed to save. Check permissions.",
       });
     } finally {
       setLoading(false);
@@ -272,7 +324,10 @@ export function AdminProblemDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{problemId ? "Edit Problem" : "New Problem"}</DialogTitle>
+          <DialogTitle>{problem ? "Edit Problem" : "New Problem"}</DialogTitle>
+          <DialogDescription>
+            {problem ? "Edit the details of the existing problem." : "Add a new problem to the database."}
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs
@@ -282,10 +337,10 @@ export function AdminProblemDialog({
         >
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="testcases" disabled={!problemId}>
+            <TabsTrigger value="testcases" disabled={!problem}>
               Test Cases
             </TabsTrigger>
-            <TabsTrigger value="solutions" disabled={!problemId}>
+            <TabsTrigger value="solutions" disabled={!problem}>
               Solutions
             </TabsTrigger>
           </TabsList>
@@ -300,7 +355,7 @@ export function AdminProblemDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, id: e.target.value })
                     }
-                    disabled={!!problemId}
+                    disabled={!!problem}
                   />
                 </div>
                 <div className="space-y-2">
