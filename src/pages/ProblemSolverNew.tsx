@@ -58,7 +58,7 @@ import {
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import { logger } from "@/utils/logger";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import { CodeDiffDialog } from "@/components/CodeDiffDialog";
 
 
 const ProblemSolverNew = () => {
@@ -281,6 +281,7 @@ const ProblemSolverNew = () => {
   // Replacement Confirmation State
   const [showReplacementDialog, setShowReplacementDialog] = useState(false);
   const [pendingReplacementCode, setPendingReplacementCode] = useState<string | null>(null);
+  const [currentCodeForDiff, setCurrentCodeForDiff] = useState("");
 
   const handleConfirmReplacement = () => {
     if (!pendingReplacementCode || !codeEditorRef.current) return;
@@ -569,6 +570,7 @@ const ProblemSolverNew = () => {
           );
         if (looksDestructive && (snippet.insertionType || "smart") !== "replace") {
           setPendingReplacementCode(newCodeFromBackend);
+          setCurrentCodeForDiff(currentCode);
           setShowReplacementDialog(true);
           return;
         }
@@ -1144,15 +1146,13 @@ const ProblemSolverNew = () => {
         />
       )}
 
-      <ConfirmDialog
+      <CodeDiffDialog
         isOpen={showReplacementDialog}
-        title="Replace Code?"
-        message="The AI suggests replacing a large portion of your code to insert this snippet. This will overwrite your current changes. Proceed with replacement?"
-        confirmLabel="Replace Code"
-        cancelLabel="Cancel"
-        variant="destructive"
-        onConfirm={handleConfirmReplacement}
-        onCancel={handleCancelReplacement}
+        onOpenChange={setShowReplacementDialog}
+        originalCode={currentCodeForDiff}
+        modifiedCode={pendingReplacementCode || ""}
+        onAccept={handleConfirmReplacement}
+        onReject={handleCancelReplacement}
       />
     </div>
   );

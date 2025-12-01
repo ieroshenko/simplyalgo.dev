@@ -290,14 +290,34 @@ export function AdminProblemDialog({
 
   const handleSaveTestCase = async (tc: TestCase) => {
     try {
+      // When updating text fields, clear JSON fields to force backend to use legacy parsing
+      // This ensures the backend sees the changes immediately without needing complex JSON parsing on client
       const { error } = await supabase
         .from("test_cases")
-        .update({ input: tc.input, expected_output: tc.expected_output })
+        .update({ 
+            input: tc.input, 
+            expected_output: tc.expected_output,
+            input_json: null,
+            expected_json: null
+        })
         .eq("id", tc.id);
+        
       if (error) throw error;
       toast({ title: "Test case updated" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error updating test case", description: error.message });
+    }
+  };
+
+  const handleDeleteTestCase = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this test case?")) return;
+    try {
+      const { error } = await supabase.from("test_cases").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Test case deleted" });
+      if (problem) loadRelatedData(problem.id);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error deleting test case", description: error.message });
     }
   };
 
@@ -317,6 +337,18 @@ export function AdminProblemDialog({
       toast({ title: "Solution updated" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error updating solution", description: error.message });
+    }
+  };
+
+  const handleDeleteSolution = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this solution?")) return;
+    try {
+      const { error } = await supabase.from("problem_solutions").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Solution deleted" });
+      if (problem) loadRelatedData(problem.id);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error deleting solution", description: error.message });
     }
   };
 
@@ -484,8 +516,11 @@ export function AdminProblemDialog({
             <TabsContent value="testcases" className="space-y-4 mt-0">
               {testCases.map((tc, idx) => (
                 <Card key={tc.id || idx}>
-                  <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm">Test Case {idx + 1}</CardTitle>
+                  <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-sm font-medium">Test Case {idx + 1}</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTestCase(tc.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -519,7 +554,7 @@ export function AdminProblemDialog({
             <TabsContent value="solutions" className="space-y-4 mt-0">
               {solutions.map((sol, idx) => (
                 <Card key={sol.id || idx}>
-                  <CardHeader className="p-4 pb-2">
+                  <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
                     <div className="space-y-1">
                         <Label className="text-xs">Title</Label>
                         <Input 
@@ -528,6 +563,9 @@ export function AdminProblemDialog({
                             className="h-8"
                         />
                     </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteSolution(sol.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-4 pt-0">
                     <Label className="text-xs">Code ({sol.language})</Label>
