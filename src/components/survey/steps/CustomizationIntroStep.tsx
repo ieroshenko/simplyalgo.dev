@@ -1,5 +1,6 @@
 import React from 'react';
 import { SurveyStepProps } from '@/types/survey';
+import letsMakeSimplyalgoFitImage from '@/assets/survey/lets-make-simplyalgo-fit.png';
 
 export const CustomizationIntroStep: React.FC<SurveyStepProps> = (props) => {
   const { onAnswer } = props;
@@ -8,7 +9,7 @@ export const CustomizationIntroStep: React.FC<SurveyStepProps> = (props) => {
     <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8">
       <div className="flex justify-center mb-8">
         <img 
-          src="/src/assets/survey/lets-make-simplyalgo-fit.png"
+          src={letsMakeSimplyalgoFitImage}
           alt="Let's make SimplyAlgo fit you"
           className="w-full max-w-sm rounded-lg"
         />

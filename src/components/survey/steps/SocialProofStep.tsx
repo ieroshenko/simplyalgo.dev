@@ -1,25 +1,28 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { SurveyStepProps, Review } from '@/types/survey';
+import jakePhoto from '@/assets/survey/user_reviews/jake.png';
+import priyaPhoto from '@/assets/survey/user_reviews/priya.png';
+import ashwinPhoto from '@/assets/survey/user_reviews/ashwin.png';
 
 export const SocialProofStep: React.FC<SurveyStepProps> = (props) => {
   const { onAnswer } = props;
 
   const reviews: Review[] = [
     {
-      photo: "/src/assets/survey/user_reviews/jake.png",
+      photo: jakePhoto,
       name: "Jake Sullivan",
       stars: 5,
       text: "I landed a job at Datadog within a month. The approach I learned here, which is breaking problems into smaller parts and tackling one at a time, made a night-and-day difference for me."
     },
     {
-      photo: "/src/assets/survey/user_reviews/priya.png",
+      photo: priyaPhoto,
       name: "Priya Reddy",
       stars: 5,
       text: "I hated grinding leetcode - feeling like I have to solve challenges everyday to build muscle memory and memorize solutions/templates so I don't forget anything. First principles applied towards interview problems is so much better, I'm confident now that I can solve pretty much any unfamiliar problem."
     },
     {
-      photo: "/src/assets/survey/user_reviews/ashwin.png",
+      photo: ashwinPhoto,
       name: "Ashwin K.",
       stars: 5,
       text: "Got an offer from FAANG company. Getting interviewer-style feedback was tremendous - just knowing how much I'm ready for interview helped build my confidence tremendously going into the actual interviews."

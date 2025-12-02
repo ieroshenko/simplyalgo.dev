@@ -1,5 +1,6 @@
 import React from 'react';
 import { SurveyStepProps } from '@/types/survey';
+import longTermResultsImage from '@/assets/survey/simply-algo-creates-long-term-results.png';
 
 export const LongTermResultsStep: React.FC<SurveyStepProps> = (props) => {
   const { onAnswer } = props;
@@ -14,7 +15,7 @@ export const LongTermResultsStep: React.FC<SurveyStepProps> = (props) => {
       
       <div className="flex justify-center mb-8">
         <img 
-          src="/src/assets/survey/simply-algo-creates-long-term-results.png"
+          src={longTermResultsImage}
           alt="Simplyalgo creates long-term results"
           className="w-full max-w-md rounded-lg"
         />

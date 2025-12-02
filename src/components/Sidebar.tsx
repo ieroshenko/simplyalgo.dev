@@ -55,7 +55,7 @@ const Sidebar = () => {
       <div className="pt-7 pb-7 pl-5 border-b border-border">
         <div className="flex items-center space-x-3">
           <img
-            src="/src/assets/simplyalgo-logo.png"
+            src="/simplyalgo-logo.png"
             alt="SimplyAlgo Logo"
             className="w-8 h-8 rounded-lg object-contain"
           />

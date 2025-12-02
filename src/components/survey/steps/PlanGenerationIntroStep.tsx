@@ -1,5 +1,6 @@
 import React from 'react';
 import { SurveyStepProps } from '@/types/survey';
+import timeToGeneratePlanImage from '@/assets/survey/time-to-generate-custom-plan.png';
 
 export const PlanGenerationIntroStep: React.FC<SurveyStepProps> = (props) => {
   const { onAnswer } = props;
@@ -8,7 +9,7 @@ export const PlanGenerationIntroStep: React.FC<SurveyStepProps> = (props) => {
     <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8">
       <div className="flex justify-center mb-8">
         <img 
-          src="/src/assets/survey/time-to-generate-custom-plan.png"
+          src={timeToGeneratePlanImage}
           alt="Time to generate your custom plan"
           className="w-full max-w-sm rounded-lg"
         />
