@@ -6,31 +6,62 @@ import { logger } from "./utils/logger.ts";
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
 
+// LLM Provider Configuration
+const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
+
 // Model configuration
-export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5-mini").trim();
-export const modelSource = Deno.env.get("OPENAI_MODEL")
-  ? "OPENAI_MODEL env set"
-  : "defaulted to gpt-5-mini (no OPENAI_MODEL)";
-export const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
+export const configuredModel = (useOpenRouter ? openrouterModel : openaiModel).trim();
+export const modelSource = useOpenRouter
+  ? `OpenRouter: ${openrouterModel}`
+  : (Deno.env.get("OPENAI_MODEL") ? "OPENAI_MODEL env set" : "defaulted to gpt-5-mini");
+
+// Only use Responses API for OpenAI's gpt-5/o3 models, NOT for OpenRouter
+export const useResponsesApi = !useOpenRouter && /^(gpt-5|o3)/i.test(configuredModel);
 
 // OpenAI client instance
 let openaiInstance: OpenAI | null = null;
 
 /**
  * Initialize OpenAI client with API key validation
+ * Supports both OpenRouter (preferred) and OpenAI (fallback)
  */
 export function initializeOpenAI(): OpenAI {
   if (openaiInstance) return openaiInstance;
 
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!openaiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+  // Try OpenRouter first
+  if (useOpenRouter) {
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (openrouterKey) {
+      const siteUrl = Deno.env.get("OPENROUTER_SITE_URL") || "https://simplyalgo.dev";
+      const appName = Deno.env.get("OPENROUTER_APP_NAME") || "SimplyAlgo";
+
+      logger.info(`Using OpenRouter: model=${configuredModel} | site=${siteUrl}`);
+
+      openaiInstance = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
+        },
+      });
+      return openaiInstance;
+    }
   }
 
-  // Log API key info for debugging (first 15 chars only for security)
+  // Fallback to OpenAI
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) {
+    throw new Error(useOpenRouter
+      ? "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set"
+      : "OPENAI_API_KEY environment variable is not set");
+  }
+
   const keyPrefix = openaiKey.substring(0, 15);
   const keyLength = openaiKey.length;
-  logger.info(`OpenAI API Key loaded: ${keyPrefix}... (length: ${keyLength})`);
+  logger.info(`Using OpenAI (fallback): API Key: ${keyPrefix}... (length: ${keyLength})`);
   logger.info(`Using model: ${configuredModel} (${modelSource})`);
 
   openaiInstance = new OpenAI({ apiKey: openaiKey });
@@ -82,7 +113,7 @@ export function extractResponsesText(response: ResponsesApiResponse): string {
   const direct =
     typeof response?.output_text === "string" ? response.output_text : "";
   if (direct) return direct;
-  
+
   // 2) Traverse output[].content[] for output_text/text
   const output = Array.isArray(response?.output) ? response.output : [];
   let text = "";
@@ -94,8 +125,8 @@ export function extractResponsesText(response: ResponsesApiResponse): string {
         ?.text as unknown;
       const nestedValue =
         textField &&
-        typeof textField === "object" &&
-        "value" in (textField as Record<string, unknown>)
+          typeof textField === "object" &&
+          "value" in (textField as Record<string, unknown>)
           ? (textField as { value?: string }).value
           : undefined;
       if (type === "output_text" && typeof nestedValue === "string") {
@@ -107,7 +138,7 @@ export function extractResponsesText(response: ResponsesApiResponse): string {
     }
   }
   if (text) return text;
-  
+
   // 3) Fallback to chat-like choices
   const choices = Array.isArray(response?.choices) ? response.choices : [];
   return choices?.[0]?.message?.content || "";
@@ -126,7 +157,7 @@ export async function llmText(
 ): Promise<string> {
   const openai = getOpenAI();
   const model = configuredModel;
-  
+
   if (useResponsesApi) {
     // Try configured Responses model first, then gpt-5-mini, then fall back to Chat API
     const responseModels = [model, "gpt-5-mini"].filter(
@@ -162,12 +193,12 @@ export async function llmText(
       `[ai-chat] All Responses API attempts failed; falling back to Chat Completions.`,
     );
   }
-  
+
   const chatModel = useResponsesApi ? "gpt-5-mini" : model;
   console.log(
     `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? "yes" : "no"})`,
   );
-  
+
   const chatRequestParams: any = {
     model: chatModel,
     messages: [{ role: "user", content: prompt }],
@@ -176,12 +207,12 @@ export async function llmText(
       ? ({ type: opts.responseFormat } as { type: "json_object" })
       : undefined,
   };
-  
+
   // Only add temperature for non-GPT-5 models
   if (!chatModel.startsWith("gpt-5")) {
     chatRequestParams.temperature = opts.temperature ?? 0.7;
   }
-  
+
   const chat = await openai.chat.completions.create(chatRequestParams as unknown as { choices: Array<{ message?: { content?: string } }> });
   return chat.choices[0]?.message?.content || "";
 }
@@ -213,13 +244,13 @@ export async function createInitialContext(
 ): Promise<{ content: string; responseId: string }> {
   const openai = getOpenAI();
   const model = configuredModel;
-  
+
   if (useResponsesApi) {
     // Try Responses API with store: true for context preservation
     const responseModels = [model, "gpt-5-mini"].filter(
       (v, i, a) => a.indexOf(v) === i,
     );
-    
+
     for (const respModel of responseModels) {
       try {
         console.log(`[ai-chat] Creating initial context with model=${respModel}`);
@@ -230,19 +261,19 @@ export async function createInitialContext(
           }),
           store: true, // Enable context storage
         };
-        
+
         const response = await openai.responses.create(
           req as unknown as ResponsesApiResponse,
         );
-        
+
         const content = extractResponsesText(response);
         const responseId = (response as unknown as { id?: string }).id || '';
-        
+
         if (content.trim().length > 0 && responseId) {
           console.log(`[ai-chat] Initial context created with response_id=${responseId}`);
           return { content, responseId };
         }
-        
+
         console.warn(
           `[ai-chat] Initial context creation failed for model=${respModel}; trying next option...`,
         );
@@ -255,12 +286,12 @@ export async function createInitialContext(
         continue;
       }
     }
-    
+
     console.warn(
       `[ai-chat] All initial context attempts failed; falling back to Chat Completions.`,
     );
   }
-  
+
   // Fallback to Chat Completions (no context storage)
   const content = await llmText(prompt, opts);
   return { content, responseId: '' };
@@ -280,12 +311,12 @@ export async function continueWithContext(
 ): Promise<{ content: string; responseId: string }> {
   const openai = getOpenAI();
   const model = configuredModel;
-  
+
   if (useResponsesApi && previousResponseId) {
     const responseModels = [model, "gpt-5-mini"].filter(
       (v, i, a) => a.indexOf(v) === i,
     );
-    
+
     for (const respModel of responseModels) {
       try {
         console.log(`[ai-chat] Continuing with context response_id=${previousResponseId}, model=${respModel}`);
@@ -297,19 +328,19 @@ export async function continueWithContext(
           previous_response_id: previousResponseId, // Continue from previous context
           store: true, // Continue storing context
         };
-        
+
         const response = await openai.responses.create(
           req as unknown as ResponsesApiResponse,
         );
-        
+
         const content = extractResponsesText(response);
         const responseId = (response as unknown as { id?: string }).id || previousResponseId;
-        
+
         if (content.trim().length > 0) {
           console.log(`[ai-chat] Context continuation successful with response_id=${responseId}`);
           return { content, responseId };
         }
-        
+
         console.warn(
           `[ai-chat] Context continuation failed for model=${respModel}; trying next option...`,
         );
@@ -322,12 +353,12 @@ export async function continueWithContext(
         continue;
       }
     }
-    
+
     console.warn(
       `[ai-chat] All context continuation attempts failed; falling back to full context.`,
     );
   }
-  
+
   // Fallback: if no previous context or continuation failed, create new context
   console.log(`[ai-chat] Creating new context due to continuation failure or missing response_id`);
   return await createInitialContext(prompt, opts);
@@ -369,18 +400,18 @@ export function getOrCreateSessionContext(
   coachingMode?: string,
 ): SessionContext {
   // Include coaching mode in cache key for chat contexts to prevent mode mixing
-  const cacheKey = contextType === 'chat' && coachingMode 
-    ? `${sessionId}_${coachingMode}` 
+  const cacheKey = contextType === 'chat' && coachingMode
+    ? `${sessionId}_${coachingMode}`
     : sessionId;
-  
+
   const existing = sessionContextCache.get(cacheKey);
-  
+
   if (existing && existing.contextType === contextType) {
     // Update last used timestamp
     existing.lastUsedAt = new Date().toISOString();
     return existing;
   }
-  
+
   // Create new session context
   const context: SessionContext = {
     sessionId,
@@ -391,10 +422,10 @@ export function getOrCreateSessionContext(
     createdAt: new Date().toISOString(),
     lastUsedAt: new Date().toISOString(),
   };
-  
+
   sessionContextCache.set(cacheKey, context);
   console.log(`[session-context] Created new context for ${contextType} session: ${cacheKey}`);
-  
+
   return context;
 }
 
@@ -410,13 +441,13 @@ export function updateSessionContext(
   // Use same cache key logic as getOrCreateSessionContext
   const cacheKey = coachingMode ? `${sessionId}_${coachingMode}` : sessionId;
   const context = sessionContextCache.get(cacheKey);
-  
+
   if (context) {
     context.responseId = responseId;
     context.isInitialized = true;
     context.lastCodeState = codeState;
     context.lastUsedAt = new Date().toISOString();
-    
+
     console.log(`[session-context] Updated context ${sessionId} with response_id: ${responseId}`);
   } else {
     console.warn(`[session-context] Attempted to update non-existent context: ${sessionId}`);
@@ -432,22 +463,22 @@ export function hasSignificantCodeChange(
   threshold: number = 0.3, // 30% change threshold
 ): boolean {
   if (!oldCode || !newCode) return true;
-  
+
   const oldLines = oldCode.trim().split('\n').filter(line => line.trim() !== '');
   const newLines = newCode.trim().split('\n').filter(line => line.trim() !== '');
-  
+
   // Simple diff based on line count and content
   const lineDiff = Math.abs(oldLines.length - newLines.length);
   const maxLines = Math.max(oldLines.length, newLines.length);
-  
+
   if (maxLines === 0) return false;
-  
+
   // Check if change ratio exceeds threshold
   const changeRatio = lineDiff / maxLines;
   const hasSignificantChange = changeRatio > threshold;
-  
+
   console.log(`[code-diff] Change ratio: ${changeRatio.toFixed(3)}, significant: ${hasSignificantChange}`);
-  
+
   return hasSignificantChange;
 }
 
@@ -468,17 +499,17 @@ export async function llmWithSessionContext(
   } = {},
 ): Promise<ContextualResponse> {
   const sessionContext = getOrCreateSessionContext(sessionId, contextType, currentCode, opts.coachingMode);
-  
+
   // Determine if we need a new context
-  const needsNewContext = 
+  const needsNewContext =
     opts.forceNewContext ||
     !sessionContext.isInitialized ||
     !sessionContext.responseId ||
     hasSignificantCodeChange(sessionContext.lastCodeState, currentCode);
-  
+
   let result: { content: string; responseId: string };
   let tokensSaved = 0;
-  
+
   if (needsNewContext) {
     console.log(`[session-context] Creating new context for ${contextType} session: ${sessionId}`);
     result = await createInitialContext(prompt, opts);
@@ -487,11 +518,11 @@ export async function llmWithSessionContext(
     console.log(`[session-context] Continuing with existing context for ${contextType} session: ${sessionId}`);
     result = await continueWithContext(prompt, sessionContext.responseId!, opts);
     updateSessionContext(sessionId, result.responseId, currentCode, opts.coachingMode);
-    
+
     // Estimate tokens saved (rough calculation)
     tokensSaved = Math.floor(prompt.length * 0.6); // Assuming 60% reduction
   }
-  
+
   return {
     content: result.content,
     responseId: result.responseId,
@@ -527,7 +558,7 @@ export async function llmJsonFast(
   opts?: { maxTokens?: number },
 ): Promise<string> {
   const openai = getOpenAI();
-  
+
   // Prefer Responses API for gpt-5-mini, fall back to Chat Completions with gpt-5-mini
   try {
     console.log(
@@ -576,8 +607,8 @@ export async function llmJsonFast(
             ?.text as unknown;
           const nestedValue =
             textField &&
-            typeof textField === "object" &&
-            "value" in (textField as Record<string, unknown>)
+              typeof textField === "object" &&
+              "value" in (textField as Record<string, unknown>)
               ? (textField as { value?: string }).value
               : undefined;
           if (type === "output_text" && typeof nestedValue === "string") {

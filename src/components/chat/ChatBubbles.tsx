@@ -44,14 +44,14 @@ const ChatBubbles = ({
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-  
+
   // Diagram state
   type ActiveDiagram =
     | { engine: "mermaid"; code: string }
     | { engine: "reactflow"; graph: FlowGraph };
   const [isDiagramOpen, setIsDiagramOpen] = useState(false);
   const [activeDiagram, setActiveDiagram] = useState<ActiveDiagram | null>(null);
-  
+
   // Canvas state
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
@@ -156,15 +156,15 @@ const ChatBubbles = ({
     // If code contains semicolons and no newlines, it's likely malformed
     if (code.includes(';') && !code.includes('\n')) {
       console.log('Fixing malformed Python code:', code);
-      
+
       // Split by semicolons and join with proper newlines
       const statements = code.split(';').map(s => s.trim()).filter(s => s.length > 0);
       const fixed = statements.join('\n');
-      
+
       console.log('Fixed Python code:', fixed);
       return fixed;
     }
-    
+
     return code;
   };
 
@@ -176,18 +176,18 @@ const ChatBubbles = ({
     let inCode = false;
     let hint: string | undefined;
     const bodyLines: string[] = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
-      
+
       // Track code fence state
       if (trimmed.startsWith("```") && (trimmed === "```" || /^```\w+/.test(trimmed))) {
         inCode = !inCode;
         bodyLines.push(line);
         continue;
       }
-      
+
       // Look for hint pattern when not in code
       if (!inCode) {
         const hintMatch = trimmed.match(/^Hint\s*:\s*(.+)$/i);
@@ -196,10 +196,10 @@ const ChatBubbles = ({
           continue; // Don't add this line to body
         }
       }
-      
+
       bodyLines.push(line);
     }
-    
+
     return { body: bodyLines.join("\n").trim(), hint };
   };
 
@@ -263,7 +263,7 @@ const ChatBubbles = ({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {session && messages.length > 0 && (
             <Button
@@ -310,11 +310,10 @@ const ChatBubbles = ({
                     {/* Message Bubble */}
                     <div className="max-w-[80%] min-w-0">
                       <div
-                        className={`rounded-lg p-3 ${
-                          message.role === "user"
+                        className={`rounded-lg p-3 ${message.role === "user"
                             ? "border border-primary/60 bg-card text-foreground"
                             : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
-                        }`}
+                          }`}
                       >
                         <div className={`prose prose-sm max-w-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
                           {message.role === "user" ? (
@@ -326,20 +325,22 @@ const ChatBubbles = ({
                                 <div>
                                   <ReactMarkdown
                                     components={{
-                                      code({ inline, className, children }) {
+                                      code({ className, children }) {
                                         const match = /language-(\w+)/.exec(className || "");
                                         const lang = match?.[1] || "python";
-                                        
+                                        // Strictly require a language match to treat as a block
+                                        const isBlock = !!match;
+
                                         // Debug logging for code snippets
                                         console.log('Code snippet detected:', {
-                                          inline,
+                                          isBlock,
                                           className,
                                           lang,
                                           children: String(children),
                                           childrenLength: String(children).length
                                         });
-                                        
-                                        if (!inline) {
+
+                                        if (isBlock) {
                                           return (
                                             <div className="relative group">
                                               <SyntaxHighlighter
@@ -366,7 +367,7 @@ const ChatBubbles = ({
                                                       hasNewlines: codeToInsert.includes('\n'),
                                                       hasSemicolons: codeToInsert.includes(';')
                                                     });
-                                                    
+
                                                     const snippet: CodeSnippet = {
                                                       id: `direct-${Date.now()}`,
                                                       code: codeToInsert,
@@ -414,8 +415,8 @@ const ChatBubbles = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag: {
@@ -424,9 +425,9 @@ const ChatBubbles = ({
                             } | null =
                               attached && attached.engine === "mermaid"
                                 ? (attached as {
-                                    engine: "mermaid";
-                                    code: string;
-                                  })
+                                  engine: "mermaid";
+                                  code: string;
+                                })
                                 : null;
                             return diag ? (
                               <div className="mt-3">
@@ -464,8 +465,8 @@ const ChatBubbles = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag: {
@@ -474,9 +475,9 @@ const ChatBubbles = ({
                             } | null =
                               attached && attached.engine === "reactflow"
                                 ? (attached as {
-                                    engine: "reactflow";
-                                    graph: FlowGraph;
-                                  })
+                                  engine: "reactflow";
+                                  graph: FlowGraph;
+                                })
                                 : null;
                             return diag ? (
                               <div className="mt-3">
@@ -524,7 +525,7 @@ const ChatBubbles = ({
                             </div>
                           </div>
                         )}
-                        
+
                         {/* Timestamp */}
                         <div className="text-xs text-muted-foreground mt-2">
                           {formatTime(message.timestamp)}
@@ -541,7 +542,7 @@ const ChatBubbles = ({
                   </div>
                 </div>
               ))}
-              
+
               {isTyping && (
                 <div className="mb-6">
                   <div className="flex gap-3 justify-start">
@@ -587,9 +588,8 @@ const ChatBubbles = ({
                     : "Ask your AI coach anything..."
               }
               disabled={loading || isTyping}
-              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                hasNativeSupport ? "pr-10" : "pr-3"
-              }`}
+              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${hasNativeSupport ? "pr-10" : "pr-3"
+                }`}
               minRows={1}
               maxRows={6}
             />
@@ -598,13 +598,12 @@ const ChatBubbles = ({
                 type="button"
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${
-                  isListening
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${isListening
                     ? "text-red-500 animate-pulse"
                     : isProcessing
                       ? "text-blue-500"
                       : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
                 title={
                   isListening
                     ? "Stop listening"

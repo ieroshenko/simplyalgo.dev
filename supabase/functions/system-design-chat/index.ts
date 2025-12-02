@@ -22,40 +22,72 @@ const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : supabase;
 
-// Model configuration (matching ai-chat)
-export const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5-mini").trim();
-export const modelSource = Deno.env.get("OPENAI_MODEL")
-  ? "OPENAI_MODEL env set"
-  : "defaulted to gpt-5-mini (no OPENAI_MODEL)";
+// LLM Provider Configuration
+// Supports both OpenRouter (preferred) and OpenAI (fallback)
+const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
-// OpenAI client instance
-let openaiInstance: OpenAI | null = null;
+export const configuredModel = useOpenRouter ? openrouterModel : openaiModel;
+export const modelSource = useOpenRouter
+  ? `OpenRouter: ${openrouterModel}`
+  : `OpenAI: ${openaiModel}`;
 
-function initializeOpenAI(): OpenAI {
-  if (openaiInstance) return openaiInstance;
+// LLM client instance (OpenRouter or OpenAI)
+let llmClient: OpenAI | null = null;
 
+function initializeLLMClient(): OpenAI {
+  if (llmClient) return llmClient;
+
+  // Try OpenRouter first
+  if (useOpenRouter) {
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (openrouterKey) {
+      const siteUrl = Deno.env.get("OPENROUTER_SITE_URL") || "https://simplyalgo.dev";
+      const appName = Deno.env.get("OPENROUTER_APP_NAME") || "SimplyAlgo";
+
+      console.log(`[system-design-chat] Using OpenRouter`);
+      console.log(`[system-design-chat] Model: ${configuredModel}`);
+      console.log(`[system-design-chat] Site: ${siteUrl}`);
+
+      llmClient = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
+        },
+      });
+      return llmClient;
+    }
+  }
+
+  // Fallback to OpenAI
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    throw new Error("Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set");
   }
 
-  // Log API key info for debugging (first 15 chars only for security)
   const keyPrefix = openaiKey.substring(0, 15);
   const keyLength = openaiKey.length;
-  console.log(`[system-design-chat] OpenAI API Key loaded: ${keyPrefix}... (length: ${keyLength})`);
-  console.log(`[system-design-chat] Using model: ${configuredModel} (${modelSource})`);
-  console.log(`[system-design-chat] Supabase Project: ${supabaseUrl}`);
+  console.log(`[system-design-chat] Using OpenAI (fallback)`);
+  console.log(`[system-design-chat] API Key: ${keyPrefix}... (length: ${keyLength})`);
+  console.log(`[system-design-chat] Model: ${configuredModel}`);
 
-  openaiInstance = new OpenAI({ apiKey: openaiKey });
-  return openaiInstance;
+  llmClient = new OpenAI({ apiKey: openaiKey });
+  return llmClient;
 }
 
-function getOpenAI(): OpenAI {
-  if (!openaiInstance) {
-    throw new Error("OpenAI client not initialized");
+function getLLMClient(): OpenAI {
+  if (!llmClient) {
+    throw new Error("LLM client not initialized");
   }
-  return openaiInstance;
+  return llmClient;
 }
+
+// Backward compatibility aliases
+const initializeOpenAI = initializeLLMClient;
+const getOpenAI = getLLMClient;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -193,17 +225,17 @@ function analyzeCompleteness(
   const difficulty = spec.difficulty || "Medium";
   const mustHave = (spec.rubric?.must_have || []).map((m: string) => (m || "").toLowerCase());
   const expectedTopics = (spec.expected_topics || []).map((t: string) => (t || "").toLowerCase());
-  
+
   // Extract component types and labels from nodes
   const componentTypes = new Set<string>();
   const componentLabels = new Set<string>();
   const textContent: string[] = [];
-  
+
   nodes.forEach((node: any) => {
     const type = (node.type || "").toLowerCase();
     const label = (node.data?.label || "").toLowerCase();
     const note = (node.data?.note || "").toLowerCase();
-    
+
     if (type && type !== "text") {
       componentTypes.add(type);
     }
@@ -215,51 +247,51 @@ function analyzeCompleteness(
       textContent.push(note);
     }
   });
-  
+
   // Extract chat content
   const chatContent = chatHistory
     .filter((m) => m.role === "user")
     .map((m) => (m.content || "").toLowerCase())
     .join(" ");
-  
+
   const allTextContent = [...textContent, chatContent].join(" ");
-  
+
   // Core components that should exist in most designs
   const coreComponents = ["api", "backend", "database", "db", "cache", "load balancer", "lb"];
   const advancedComponents = ["cdn", "queue", "metrics", "logging", "auth", "storage", "worker", "cron"];
-  
+
   // Check for must_have components
   const foundMustHave = mustHave.filter((m) => {
-    return componentLabels.has(m) || 
-           componentTypes.has(m) ||
-           Array.from(componentLabels).some((l) => l.includes(m)) ||
-           Array.from(componentTypes).some((t) => t.includes(m));
+    return componentLabels.has(m) ||
+      componentTypes.has(m) ||
+      Array.from(componentLabels).some((l) => l.includes(m)) ||
+      Array.from(componentTypes).some((t) => t.includes(m));
   });
-  
+
   const missingComponents = mustHave.filter((m) => !foundMustHave.includes(m));
-  
+
   // Check for expected topics coverage
   const foundTopics = expectedTopics.filter((topic) => {
     return allTextContent.includes(topic) ||
-           componentLabels.has(topic) ||
-           Array.from(componentLabels).some((l) => l.includes(topic));
+      componentLabels.has(topic) ||
+      Array.from(componentLabels).some((l) => l.includes(topic));
   });
-  
+
   const missingTopics = expectedTopics.filter((t) => !foundTopics.includes(t));
-  
+
   // Scoring logic
   let componentScore = 0;
   let connectionScore = 0;
   let topicScore = 0;
-  
+
   // Component Score (0-50 points)
   if (difficulty === "Hard") {
     // Strict: All must_have must be present
     const mustHaveRatio = mustHave.length > 0 ? foundMustHave.length / mustHave.length : 1;
     componentScore = mustHaveRatio * 40;
-    
+
     // Bonus for advanced components
-    const advancedCount = advancedComponents.filter((c) => 
+    const advancedCount = advancedComponents.filter((c) =>
       componentTypes.has(c) || Array.from(componentLabels).some((l) => l.includes(c))
     ).length;
     componentScore += Math.min(advancedCount * 2, 10);
@@ -269,29 +301,29 @@ function analyzeCompleteness(
       componentTypes.has(c) || Array.from(componentLabels).some((l) => l.includes(c))
     ).length;
     componentScore = (coreCount / coreComponents.length) * 20;
-    
+
     const mustHaveRatio = mustHave.length > 0 ? foundMustHave.length / mustHave.length : 1;
     componentScore += mustHaveRatio * 20;
-    
+
     // Bonus for having multiple components
     if (componentTypes.size >= 3) {
       componentScore += 10;
     }
   }
-  
+
   // Connection Score (0-20 points)
   const connectionRatio = nodes.length > 0 ? edges.length / nodes.length : 0;
   connectionScore = Math.min(connectionRatio * 20, 20);
   if (edges.length >= 3) {
     connectionScore = Math.max(connectionScore, 15);
   }
-  
+
   // Topic Coverage Score (0-30 points)
   if (difficulty === "Hard") {
     // Strict: All topics must be covered
     const topicRatio = expectedTopics.length > 0 ? foundTopics.length / expectedTopics.length : 1;
     topicScore = topicRatio * 25;
-    
+
     // Bonus for discussing advanced concepts
     const advancedKeywords = ["scalability", "reliability", "availability", "consistency", "partitioning", "replication"];
     const advancedMentions = advancedKeywords.filter((k) => allTextContent.includes(k)).length;
@@ -300,16 +332,16 @@ function analyzeCompleteness(
     // Moderate: Main topics discussed
     const topicRatio = expectedTopics.length > 0 ? foundTopics.length / expectedTopics.length : 1;
     topicScore = topicRatio * 15;
-    
+
     // Bonus for discussing key concepts
     const keyKeywords = ["scalability", "cache", "database", "api", "load", "balance"];
     const keyMentions = keyKeywords.filter((k) => allTextContent.includes(k)).length;
     topicScore += Math.min(keyMentions * 2, 15);
   }
-  
+
   const totalConfidence = Math.round(componentScore + connectionScore + topicScore);
   const isComplete = totalConfidence >= 70;
-  
+
   // Generate reasoning
   let reasoning = "";
   if (isComplete) {
@@ -325,11 +357,11 @@ function analyzeCompleteness(
     if (edges.length < 2) {
       issues.push("Need more connections between components");
     }
-    reasoning = issues.length > 0 
+    reasoning = issues.length > 0
       ? `Design needs improvement: ${issues.join("; ")}`
       : `Design is ${totalConfidence}% complete. Continue adding components and discussing architecture.`;
   }
-  
+
   return {
     isComplete,
     confidence: totalConfidence,
@@ -348,7 +380,7 @@ async function startDesignSession(
 ): Promise<SystemDesignResponse> {
   try {
     console.log(`[startDesignSession] Entry: problemId=${problemId}, userId=${userId}`);
-    
+
     // Check for existing incomplete session
     const { data: existingSession, error: existingSessionError } = await supabaseAdmin
       .from("system_design_sessions")
@@ -367,18 +399,18 @@ async function startDesignSession(
 
     if (existingSession && existingSession.context_thread_id) {
       console.log(`[startDesignSession] Resuming existing session: sessionId=${existingSession.id}`);
-      
+
       // Check if there are any messages - if not, create a new session instead
       const { data: messages, error: messagesError } = await supabaseAdmin
         .from("system_design_responses")
         .select("id")
         .eq("session_id", existingSession.id)
         .limit(1);
-      
+
       if (messagesError) {
         console.error(`[startDesignSession] Error checking messages:`, messagesError);
       }
-      
+
       // If no messages exist, treat this as a new session and generate initial message
       if (!messages || messages.length === 0) {
         console.log(`[startDesignSession] Existing session has no messages, creating new session instead`);
@@ -447,7 +479,7 @@ async function startDesignSession(
     // Generate initial AI message
     const openai = initializeOpenAI();
     const systemPrompt = generateSystemPrompt(spec);
-    
+
     const initialPrompt = `${systemPrompt}
 
 Generate a welcoming first message that:
@@ -475,7 +507,7 @@ Keep it warm, professional, and engaging. Format it clearly with the two questio
     console.log(`[startDesignSession] Generating initial message: model=${configuredModel}, promptLength=${initialPrompt.length}, maxTokens=${completionParams.max_completion_tokens}`);
 
     let response = await openai.chat.completions.create(completionParams);
-    
+
     console.log(`[startDesignSession] OpenAI completion result:`, {
       choices: response.choices?.length || 0,
       contentLength: response.choices[0]?.message?.content?.length || 0,
@@ -483,13 +515,13 @@ Keep it warm, professional, and engaging. Format it clearly with the two questio
       usage: response.usage,
       model: response.model,
     });
-    
+
     const promptTokens = response.usage?.prompt_tokens || 0;
     const completionTokens = response.usage?.completion_tokens || 0;
     const finishReason = response.choices[0]?.finish_reason;
     console.log(`[startDesignSession] Initial message generated: promptTokens=${promptTokens}, completionTokens=${completionTokens}, finishReason=${finishReason}`);
 
-    const firstMessage = response.choices[0]?.message?.content || 
+    const firstMessage = response.choices[0]?.message?.content ||
       `Welcome to our system design session! Today, we'll be tackling the challenge of designing ${problem.title}.
 
 ${spec.summary || 'Let\'s work through this system design problem together.'}
@@ -638,11 +670,11 @@ Keep it conversational and brief—1-2 sentences max.`;
 
     const reaction = response.choices[0]?.message?.content || "";
     const finishReason = response.choices[0]?.finish_reason;
-    
+
     if (finishReason === "length") {
       console.warn(`[reactToBoardChanges] Response was truncated due to max_tokens limit.`);
     }
-    
+
     if (!reaction || reaction.trim().length === 0) {
       console.warn(`[reactToBoardChanges] Empty reaction received (finish_reason: ${finishReason}), skipping`);
     }
@@ -663,7 +695,7 @@ Keep it conversational and brief—1-2 sentences max.`;
     // Append completeness suggestion if design becomes complete
     let finalReaction = reaction;
     if (completeness.isComplete && completeness.confidence >= 70) {
-      finalReaction = reaction 
+      finalReaction = reaction
         ? `${reaction}\n\n💡 I notice your design is looking more complete. Consider evaluating when ready!`
         : "💡 I notice your design is looking more complete. Consider evaluating when ready!";
     }
@@ -698,10 +730,10 @@ async function coachMessage(
 ): Promise<SystemDesignResponse> {
   const startTime = Date.now();
   const timestamp = new Date().toISOString();
-  
+
   try {
     console.log(`[coachMessage] Entry: sessionId=${sessionId}, messageLength=${message.length}, messagePreview="${message.substring(0, 100)}", timestamp=${timestamp}`);
-    
+
     // Save user message
     const { error: insertError } = await supabaseAdmin
       .from("system_design_responses")
@@ -710,7 +742,7 @@ async function coachMessage(
         message_role: "user",
         content: message,
       });
-    
+
     if (insertError) {
       console.error(`[coachMessage] Error saving user message:`, insertError);
       throw insertError;
@@ -728,18 +760,18 @@ async function coachMessage(
       console.error(`[coachMessage] Error fetching session:`, sessionError);
       throw sessionError;
     }
-    
+
     if (!session) {
       console.error(`[coachMessage] Session not found: sessionId=${sessionId}`);
       throw new Error("Session not found");
     }
-    
+
     console.log(`[coachMessage] Session fetched: sessionId=${sessionId}, problemId=${session.problem_id}, userId=${session.user_id}`);
 
     const spec = Array.isArray(session.problems.system_design_specs)
       ? session.problems.system_design_specs[0]
       : session.problems.system_design_specs;
-    
+
     console.log(`[coachMessage] Spec loaded: title="${spec?.title || 'N/A'}", hasFunctionalReqs=${!!spec?.functional_requirements?.length}`);
 
     // Get current board state
@@ -770,7 +802,7 @@ async function coachMessage(
       console.error(`[coachMessage] Error fetching chat history:`, messagesError);
       throw messagesError;
     }
-    
+
     const totalMessages = messages?.length || 0;
     const userMessages = (messages || []).filter((m: any) => m.message_role === "user").length;
     const assistantMessages = (messages || []).filter((m: any) => m.message_role === "assistant").length;
@@ -925,7 +957,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
     const systemPromptLength = enhancedSystemPrompt.length;
     const conversationHistoryLength = conversationHistory.length;
     const totalMessagesCount = completionParams.messages.length;
-    
+
     console.log(`[coachMessage] Before OpenAI call: model=${configuredModel}, systemPromptLength=${systemPromptLength}, conversationHistoryLength=${conversationHistoryLength}, totalMessages=${totalMessagesCount}, maxTokens=${completionParams.max_completion_tokens}, hasTemperature=${!!completionParams.temperature}`);
 
     let response = await openai.chat.completions.create(completionParams);
@@ -946,7 +978,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
     const promptTokens = response.usage?.prompt_tokens || 0;
     const completionTokens = response.usage?.completion_tokens || 0;
     const totalTokens = response.usage?.total_tokens || 0;
-    
+
     console.log(`[coachMessage] After OpenAI call: responseLength=${responseLength}, promptTokens=${promptTokens}, completionTokens=${completionTokens}, totalTokens=${totalTokens}, finishReason=${finishReason}, responsePreview="${aiResponse.substring(0, 100)}"`);
 
     // Check finish reason - if it's "length", the response was truncated
@@ -998,7 +1030,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
     // Analyze completeness (only after initial phase)
     let completeness;
     let finalResponse = aiResponse;
-    
+
     if (!isInitialPhase) {
       completeness = analyzeCompleteness(
         boardState as BoardState,
@@ -1022,7 +1054,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
     }
 
     console.log(`[coachMessage] Before saving assistant response: responseLength=${finalResponse.length}, completeness=${completeness?.isComplete ? 'complete' : 'incomplete'}, confidence=${completeness?.confidence || 0}`);
-    
+
     const { error: saveError } = await supabaseAdmin
       .from("system_design_responses")
       .insert({
@@ -1035,7 +1067,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
       console.error(`[coachMessage] Error saving assistant response:`, saveError);
       throw saveError;
     }
-    
+
     console.log(`[coachMessage] Assistant response saved successfully`);
 
     // Ensure message is always present
@@ -1046,15 +1078,15 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
 
     const elapsedTime = Date.now() - startTime;
     console.log(`[coachMessage] Returning result: sessionId=${sessionId}, messageLength=${finalResponse.length}, elapsedTime=${elapsedTime}ms, hasCompleteness=${!!completeness}`);
-    
+
     const result: SystemDesignResponse = {
       sessionId,
       message: finalResponse,
       completeness,
     };
-    
+
     console.log(`[coachMessage] Result object keys: ${Object.keys(result).join(', ')}, message present: ${!!result.message}`);
-    
+
     return result;
   } catch (error) {
     const elapsedTime = Date.now() - startTime;
@@ -1079,7 +1111,7 @@ async function evaluateFinalDesign(
 ): Promise<SystemDesignResponse> {
   try {
     console.log(`[evaluateFinalDesign] Entry: sessionId=${sessionId}`);
-    
+
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("system_design_sessions")
       .select("*, problems(*, system_design_specs(*))")
@@ -1146,16 +1178,16 @@ Be thorough but fair. Consider scalability, reliability, availability, and the r
 
     const evaluationText = response.choices[0]?.message?.content || "{}";
     const finishReason = response.choices[0]?.finish_reason;
-    
+
     if (finishReason === "length") {
       console.warn(`[evaluateFinalDesign] Response was truncated due to max_tokens limit. Consider increasing max_completion_tokens.`);
     }
-    
+
     if (!evaluationText || evaluationText.trim() === "{}") {
       console.error(`[evaluateFinalDesign] Empty or invalid evaluation received (finish_reason: ${finishReason})`);
       throw new Error(`Failed to generate evaluation (finish_reason: ${finishReason}). Please try again.`);
     }
-    
+
     const evaluation: DesignEvaluation = JSON.parse(evaluationText);
 
     // Generate detailed feedback text for submissions
@@ -1236,12 +1268,12 @@ serve(async (req) => {
 
   try {
     initializeOpenAI();
-    
+
     const body: SystemDesignRequest = await req.json();
     const { action } = body;
 
     console.log(`[system-design-chat] Received request: action=${action}, timestamp=${new Date().toISOString()}`);
-    
+
     if (action === "coach_message") {
       console.log(`[system-design-chat] coach_message request: sessionId=${body.sessionId}, messageLength=${body.message?.length || 0}, messagePreview=${body.message?.substring(0, 100) || 'N/A'}`);
     }
@@ -1289,7 +1321,7 @@ serve(async (req) => {
     }
 
     console.log(`[system-design-chat] Request completed successfully: action=${action}, resultKeys=${Object.keys(result || {}).join(',')}`);
-    
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

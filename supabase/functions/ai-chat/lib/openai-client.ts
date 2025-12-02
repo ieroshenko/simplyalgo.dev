@@ -1,4 +1,5 @@
 // OpenAI client setup and API interaction utilities
+// Now supports both OpenRouter (preferred) and OpenAI (fallback)
 
 import OpenAI from "https://esm.sh/openai@4";
 import type { ResponsesApiRequest, ResponsesApiResponse } from "./utils/types.ts";
@@ -9,29 +10,63 @@ declare const Deno: { env: { get(name: string): string | undefined } };
 // Global OpenAI client instance
 let openai: OpenAI;
 
-// Model selection via env var; default to gpt-5-mini if not set
-const configuredModel = (Deno.env.get("OPENAI_MODEL") || "gpt-5-mini").trim();
-const modelSource = Deno.env.get("OPENAI_MODEL")
-  ? "OPENAI_MODEL env set"
-  : "defaulted to gpt-5-mini (no OPENAI_MODEL)";
-const useResponsesApi = /^(gpt-5|o3)/i.test(configuredModel);
+// LLM Provider Configuration
+const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
+
+// Model selection via env var; default to appropriate model based on provider
+const configuredModel = (useOpenRouter ? openrouterModel : openaiModel).trim();
+const modelSource = useOpenRouter
+  ? `OpenRouter: ${openrouterModel}`
+  : (Deno.env.get("OPENAI_MODEL") ? "OPENAI_MODEL env set" : "defaulted to gpt-5-mini");
+
+// Only use Responses API for OpenAI's gpt-5/o3 models, NOT for OpenRouter
+const useResponsesApi = !useOpenRouter && /^(gpt-5|o3)/i.test(configuredModel);
 
 /**
  * Initialize OpenAI client with API key validation
+ * Supports both OpenRouter (preferred) and OpenAI (fallback)
  */
 export function initializeOpenAI(): { success: boolean; error?: string } {
+  // Try OpenRouter first
+  if (useOpenRouter) {
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (openrouterKey) {
+      const siteUrl = Deno.env.get("OPENROUTER_SITE_URL") || "https://simplyalgo.dev";
+      const appName = Deno.env.get("OPENROUTER_APP_NAME") || "SimplyAlgo";
+
+      openai = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
+        },
+      });
+
+      console.log(
+        `[ai-chat] Using OpenRouter: model=${configuredModel} | site=${siteUrl}`
+      );
+
+      return { success: true };
+    }
+  }
+
+  // Fallback to OpenAI
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
     return {
       success: false,
-      error: "OPENAI_API_KEY environment variable is not set",
+      error: useOpenRouter
+        ? "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set"
+        : "OPENAI_API_KEY environment variable is not set",
     };
   }
 
   openai = new OpenAI({ apiKey: openaiKey });
   console.log(
-    `[ai-chat] Model selection: model=${configuredModel} | api=${
-      useResponsesApi ? "Responses" : "Chat"
+    `[ai-chat] Using OpenAI (fallback): model=${configuredModel} | api=${useResponsesApi ? "Responses" : "Chat"
     } | source=${modelSource}`
   );
 
@@ -77,7 +112,7 @@ function extractResponsesText(response: ResponsesApiResponse): string {
   // 1) Direct output_text
   const direct = typeof response?.output_text === "string" ? response.output_text : "";
   if (direct) return direct;
-  
+
   // 2) Traverse output[].content[] for output_text/text
   const output = Array.isArray(response?.output) ? response.output : [];
   let text = "";
@@ -88,8 +123,8 @@ function extractResponsesText(response: ResponsesApiResponse): string {
       const textField = (c as { text?: { value?: string } | string })?.text as unknown;
       const nestedValue =
         textField &&
-        typeof textField === "object" &&
-        "value" in (textField as Record<string, unknown>)
+          typeof textField === "object" &&
+          "value" in (textField as Record<string, unknown>)
           ? (textField as { value?: string }).value
           : undefined;
       if (type === "output_text" && typeof nestedValue === "string") {
@@ -101,7 +136,7 @@ function extractResponsesText(response: ResponsesApiResponse): string {
     }
   }
   if (text) return text;
-  
+
   // 3) Fallback to chat-like choices
   const choices = Array.isArray(response?.choices) ? response.choices : [];
   return choices?.[0]?.message?.content || "";
@@ -139,8 +174,7 @@ export async function llmText(
       } catch (e) {
         const err = e as unknown as { name?: string; message?: string };
         console.warn(
-          `[ai-chat] Responses API failed for model=${respModel}. ${err?.name || ""}: ${
-            err?.message || ""
+          `[ai-chat] Responses API failed for model=${respModel}. ${err?.name || ""}: ${err?.message || ""
           }`
         );
         continue;
@@ -148,11 +182,10 @@ export async function llmText(
     }
     console.warn(`[ai-chat] All Responses API attempts failed; falling back to Chat Completions.`);
   }
-  
+
   const chatModel = useResponsesApi ? "gpt-5-mini" : model;
   console.log(
-    `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${
-      useResponsesApi ? "yes" : "no"
+    `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? "yes" : "no"
     })`
   );
   const chatRequestParams: any = {
@@ -235,8 +268,8 @@ export async function llmJsonFast(
           const textField = (c as { text?: { value?: string } | string })?.text as unknown;
           const nestedValue =
             textField &&
-            typeof textField === "object" &&
-            "value" in (textField as Record<string, unknown>)
+              typeof textField === "object" &&
+              "value" in (textField as Record<string, unknown>)
               ? (textField as { value?: string }).value
               : undefined;
           if (type === "output_text" && typeof nestedValue === "string") {

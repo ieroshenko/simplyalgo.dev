@@ -61,15 +61,20 @@ const Auth = () => {
       setLoading(true);
       setError("");
 
+      const redirectTo = `${window.location.origin}/dashboard`;
+      console.log("[Auth] Starting GitHub OAuth flow");
+      console.log("[Auth] Redirect URL:", redirectTo);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo,
         },
       });
 
       if (error) throw error;
     } catch (error) {
+      console.error("[Auth] GitHub Sign-In Error:", error);
       const message = error instanceof Error ? error.message : "Failed to sign in with GitHub";
       setError(message);
     } finally {

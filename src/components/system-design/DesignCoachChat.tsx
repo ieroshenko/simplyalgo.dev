@@ -96,7 +96,7 @@ const DesignCoachChat = ({
     const scrollToBottom = () => {
       if (scrollAreaRef.current) {
         // Try multiple selectors for the scrollable element
-        const scrollElement = 
+        const scrollElement =
           scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]") ||
           scrollAreaRef.current.querySelector("[data-radix-scroll-area-content]") ||
           scrollAreaRef.current;
@@ -137,7 +137,7 @@ const DesignCoachChat = ({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {session && messages.length > 0 && (
             <Button
@@ -164,8 +164,8 @@ const DesignCoachChat = ({
 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-hidden min-w-0">
-        <ScrollArea 
-          className="h-full min-h-[200px] p-4 min-w-0" 
+        <ScrollArea
+          className="h-full min-h-[200px] p-4 min-w-0"
           ref={scrollAreaRef}
           style={{ minWidth: 0 }}
         >
@@ -193,13 +193,12 @@ const DesignCoachChat = ({
               )}
               <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`mb-6 min-w-0 transition-all duration-300 ${
-                      isClearing 
-                        ? "opacity-0 translate-y-2" 
-                        : "opacity-100 translate-y-0 animate-in fade-in slide-in-from-bottom-2 duration-500"
-                    }`}
+                  <div
+                    key={idx}
+                    className={`mb-6 min-w-0 transition-all duration-300 ${isClearing
+                      ? "opacity-0 translate-y-2"
+                      : "opacity-100 translate-y-0 animate-in fade-in slide-in-from-bottom-2 duration-500"
+                      }`}
                   >
                     <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                       {/* Avatar for assistant (left side) */}
@@ -212,11 +211,10 @@ const DesignCoachChat = ({
                       {/* Message Content */}
                       <div className="max-w-[80%] min-w-0 overflow-hidden">
                         <div
-                          className={`rounded-lg p-3 break-words ${
-                            message.role === "user"
-                              ? "border border-primary/60 bg-card text-foreground"
-                              : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15"
-                          }`}
+                          className={`rounded-lg p-3 break-words ${message.role === "user"
+                            ? "border border-primary/60 bg-card text-foreground"
+                            : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15"
+                            }`}
                         >
                           {message.role === "user" ? (
                             <p className="text-sm text-foreground">{message.content}</p>
@@ -224,54 +222,57 @@ const DesignCoachChat = ({
                             <div className={`prose prose-sm max-w-none overflow-x-hidden ${isDark ? "prose-invert" : ""}`} style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
                               <ReactMarkdown
                                 components={{
-                                code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
-                                  const match = /language-(\w+)/.exec(className || "");
-                                  const lang = match?.[1] || "python";
-                                  if (!inline) {
+                                  code({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                    const match = /language-(\w+)/.exec(className || "");
+                                    const lang = match?.[1] || "python";
+                                    // Strictly require a language match to treat as a block
+                                    const isBlock = !!match;
+
+                                    if (isBlock) {
+                                      return (
+                                        <div className="overflow-x-auto max-w-full">
+                                          <SyntaxHighlighter
+                                            style={syntaxTheme}
+                                            language={lang}
+                                            PreTag="div"
+                                            className="rounded-md !mt-2 !mb-2"
+                                            customStyle={{
+                                              whiteSpace: "pre",
+                                              overflowX: "auto",
+                                              maxWidth: "100%"
+                                            }}
+                                          >
+                                            {String(children).replace(/\n$/, "")}
+                                          </SyntaxHighlighter>
+                                        </div>
+                                      );
+                                    }
                                     return (
-                                      <div className="overflow-x-auto max-w-full">
-                                        <SyntaxHighlighter
-                                          style={syntaxTheme}
-                                          language={lang}
-                                          PreTag="div"
-                                          className="rounded-md !mt-2 !mb-2"
-                                          customStyle={{
-                                            whiteSpace: "pre",
-                                            overflowX: "auto",
-                                            maxWidth: "100%"
-                                          }}
-                                        >
-                                          {String(children).replace(/\n$/, "")}
-                                        </SyntaxHighlighter>
-                                      </div>
+                                      <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono break-words" {...props}>{children}</code>
                                     );
-                                  }
-                                  return (
-                                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono break-words">{children}</code>
-                                  );
-                                },
-                                p: ({ children }) => (
-                                  <p className="break-words">{children}</p>
-                                ),
-                                ul: ({ children }) => (
-                                  <ul className="list-disc list-outside pl-5 mb-2">
-                                    {children}
-                                  </ul>
-                                ),
-                                ol: ({ children }) => (
-                                  <ol className="list-decimal list-outside pl-5 mb-2">
-                                    {children}
-                                  </ol>
-                                ),
-                                li: ({
-                                  children,
-                                }: {
-                                  children?: React.ReactNode;
-                                }) => <li className="mb-1">{children}</li>,
-                              }}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
+                                  },
+                                  p: ({ children }) => (
+                                    <p className="break-words">{children}</p>
+                                  ),
+                                  ul: ({ children }) => (
+                                    <ul className="list-disc list-outside pl-5 mb-2">
+                                      {children}
+                                    </ul>
+                                  ),
+                                  ol: ({ children }) => (
+                                    <ol className="list-decimal list-outside pl-5 mb-2">
+                                      {children}
+                                    </ol>
+                                  ),
+                                  li: ({
+                                    children,
+                                  }: {
+                                    children?: React.ReactNode;
+                                  }) => <li className="mb-1">{children}</li>,
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
                             </div>
                           )}
                         </div>
@@ -316,10 +317,10 @@ const DesignCoachChat = ({
             </div>
           )}
         </ScrollArea>
-      </div>
+      </div >
 
       {/* Message Input */}
-      <div className="flex-shrink-0 p-4 border-t border-border">
+      < div className="flex-shrink-0 p-4 border-t border-border" >
         <div className="flex gap-3 items-center">
           <div className="relative flex-1">
             <TextareaAutosize
@@ -334,9 +335,8 @@ const DesignCoachChat = ({
                     : "Ask your AI coach anything..."
               }
               disabled={loading || isTyping}
-              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                hasNativeSupport ? "pr-10" : "pr-3"
-              }`}
+              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${hasNativeSupport ? "pr-10" : "pr-3"
+                }`}
               minRows={1}
               maxRows={6}
             />
@@ -345,13 +345,12 @@ const DesignCoachChat = ({
                 type="button"
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  isListening
-                    ? "text-red-500 dark:text-red-400 animate-pulse"
-                    : isProcessing
-                      ? "text-blue-500 dark:text-blue-400"
-                      : "text-neutral-500 dark:text-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200"
-                }`}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${isListening
+                  ? "text-red-500 dark:text-red-400 animate-pulse"
+                  : isProcessing
+                    ? "text-blue-500 dark:text-blue-400"
+                    : "text-neutral-500 dark:text-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200"
+                  }`}
                 title={
                   isListening
                     ? "Stop listening"
@@ -392,40 +391,43 @@ const DesignCoachChat = ({
           </Button>
         </div>
 
-        {error && (
-          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded p-2 mt-2">
-            {error}
-          </div>
-        )}
+        {
+          error && (
+            <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded p-2 mt-2">
+              {error}
+            </div>
+          )
+        }
 
         {/* Completeness Badge */}
-        {completeness && completeness.confidence >= 50 && (
-          <div className="mt-2 flex justify-center">
-            <Badge
-              variant={completeness.isComplete && completeness.confidence >= 70 ? "default" : "secondary"}
-              className={
-                completeness.isComplete && completeness.confidence >= 70
-                  ? "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30"
-                  : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
-              }
-            >
-              {completeness.isComplete && completeness.confidence >= 70
-                ? "✓ Ready to Evaluate"
-                : "Almost There"}
-            </Badge>
-          </div>
-        )}
+        {
+          completeness && completeness.confidence >= 50 && (
+            <div className="mt-2 flex justify-center">
+              <Badge
+                variant={completeness.isComplete && completeness.confidence >= 70 ? "default" : "secondary"}
+                className={
+                  completeness.isComplete && completeness.confidence >= 70
+                    ? "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30"
+                    : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                }
+              >
+                {completeness.isComplete && completeness.confidence >= 70
+                  ? "✓ Ready to Evaluate"
+                  : "Almost There"}
+              </Badge>
+            </div>
+          )
+        }
 
         {/* Evaluate Design Button */}
         <div className="mt-2 relative">
           <Button
             onClick={onEvaluate}
             disabled={isEvaluating || messages.length === 0}
-            className={`w-full ${
-              completeness?.isComplete && completeness.confidence >= 70
-                ? "animate-pulse bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg shadow-green-500/50"
-                : ""
-            }`}
+            className={`w-full ${completeness?.isComplete && completeness.confidence >= 70
+              ? "animate-pulse bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg shadow-green-500/50"
+              : ""
+              }`}
             variant={completeness?.isComplete && completeness.confidence >= 70 ? "default" : "outline"}
           >
             {isEvaluating ? (
@@ -441,8 +443,8 @@ const DesignCoachChat = ({
             )}
           </Button>
         </div>
-      </div>
-    </Card>
+      </div >
+    </Card >
   );
 };
 

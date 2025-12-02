@@ -62,13 +62,13 @@ const AIChat = ({
   // Canvas state
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [canvasTitle, setCanvasTitle] = useState("Interactive Component");
-  
+
   // Coaching mode state
   // Single coaching mode: Socratic (toggle removed)
   const coachingMode: CoachingMode = 'socratic';
-  
 
-  
+
+
   const {
     session,
     messages,
@@ -201,11 +201,11 @@ const AIChat = ({
     const scrollToBottom = () => {
       if (scrollAreaRef.current) {
         // Try multiple selectors for the scrollable element
-        const scrollElement = 
+        const scrollElement =
           scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]") ||
           scrollAreaRef.current.querySelector("[data-radix-scroll-area-content]") ||
           scrollAreaRef.current;
-        
+
         console.log('Attempting to scroll:', {
           scrollAreaRef: !!scrollAreaRef.current,
           scrollElement: !!scrollElement,
@@ -280,9 +280,9 @@ const AIChat = ({
         // - "Next Step Hint:"
         // - "Think about:"
         if (trimmed.match(/^Hints?\s+for\s+(the\s+)?Next\s+Step\s*:?$/i) ||
-            trimmed.match(/^Hints?\s*:$/i) ||
-            trimmed.match(/^Next\s+Step\s+Hints?\s*:?$/i) ||
-            trimmed.match(/^Think\s+about\s*:?$/i)) {
+          trimmed.match(/^Hints?\s*:$/i) ||
+          trimmed.match(/^Next\s+Step\s+Hints?\s*:?$/i) ||
+          trimmed.match(/^Think\s+about\s*:?$/i)) {
           // Finalize previous capture before switching
           if (captureMode === 'hintsForNextStep' && capturedHintsLines.length > 0) {
             hintsForNextStep = capturedHintsLines.join("\n").trim();
@@ -587,7 +587,7 @@ const AIChat = ({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {session && messages.length > 0 && (
             <Button
@@ -604,8 +604,8 @@ const AIChat = ({
 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-hidden min-w-0">
-        <ScrollArea 
-          className="h-full min-h-[200px] p-4 min-w-0" 
+        <ScrollArea
+          className="h-full min-h-[200px] p-4 min-w-0"
           ref={scrollAreaRef}
           style={{ minWidth: 0 }}
         >
@@ -634,7 +634,7 @@ const AIChat = ({
               <div className={messages.length === 0 ? "" : "flex-1 space-y-4"}>
                 {messages.map((message) => (
                   <div key={message.id} className="mb-6 min-w-0">
-                    <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`} style={{backgroundColor: message.role === "user" ? "rgba(255,0,0,0.1)" : "rgba(0,255,0,0.1)"}}>
+                    <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`} style={{ backgroundColor: message.role === "user" ? "rgba(255,0,0,0.1)" : "rgba(0,255,0,0.1)" }}>
                       {/* Avatar for assistant (left side) */}
                       {message.role === "assistant" && (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
@@ -644,12 +644,11 @@ const AIChat = ({
 
                       {/* Message Content */}
                       <div className="max-w-[80%] min-w-0">
-                        <div 
-                          className={`prose prose-sm max-w-none text-muted-foreground rounded-lg p-3 ${
-                            message.role === "user"
-                              ? "border border-primary/60 bg-card text-foreground"
-                              : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15 pl-4"
-                          }`}
+                        <div
+                          className={`prose prose-sm max-w-none text-muted-foreground rounded-lg p-3 ${message.role === "user"
+                            ? "border border-primary/60 bg-card text-foreground"
+                            : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15 pl-4"
+                            }`}
                           onMouseEnter={() => {
                             if (message.role === 'assistant') setHoveredMessageId(message.id);
                           }}
@@ -667,46 +666,50 @@ const AIChat = ({
                               return (
                                 <div>
                                   <ReactMarkdown
-                                  components={{
-                                  code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
-                                    const match = /language-(\w+)/.exec(className || "");
-                                    const lang = match?.[1] || "python";
-                                    if (!inline) {
-                                      // Determine visibility from message hover flag
-                                      const hovered = hoveredMessageId === message.id;
-                                      return (
-                                        <CodeBlockWithInsert
-                                          code={String(children)}
-                                          lang={lang}
-                                          onInsert={onInsertCodeSnippet}
-                                          showOverride={hovered}
-                                        />
-                                      );
-                                    }
-                                    return (
-                                      <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
-                                    );
-                                  },
-                                  p: ({ children }) => (
-                                    <p>{children}</p>
-                                  ),
-                                  ul: ({ children }) => (
-                                    <ul className="list-disc list-outside pl-5 mb-2">
-                                      {children}
-                                    </ul>
-                                  ),
-                                  ol: ({ children }) => (
-                                    <ol className="list-decimal list-outside pl-5 mb-2">
-                                      {children}
-                                    </ol>
-                                  ),
-                                  li: ({
-                                    children,
-                                  }: {
-                                    children?: React.ReactNode;
-                                  }) => <li className="mb-1">{children}</li>,
-                                }}
-                              >
+                                    components={{
+                                      code({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        const match = /language-(\w+)/.exec(className || "");
+                                        const lang = match?.[1] || "python";
+                                        // Strictly require a language match to treat as a block with "Add" button
+                                        // This ensures inline code (which has no language class) is always rendered inline
+                                        const isBlock = !!match;
+
+                                        if (isBlock) {
+                                          // Determine visibility from message hover flag
+                                          const hovered = hoveredMessageId === message.id;
+                                          return (
+                                            <CodeBlockWithInsert
+                                              code={String(children)}
+                                              lang={lang}
+                                              onInsert={onInsertCodeSnippet}
+                                              showOverride={hovered}
+                                            />
+                                          );
+                                        }
+                                        return (
+                                          <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                                        );
+                                      },
+                                      p: ({ children }) => (
+                                        <p>{children}</p>
+                                      ),
+                                      ul: ({ children }) => (
+                                        <ul className="list-disc list-outside pl-5 mb-2">
+                                          {children}
+                                        </ul>
+                                      ),
+                                      ol: ({ children }) => (
+                                        <ol className="list-decimal list-outside pl-5 mb-2">
+                                          {children}
+                                        </ol>
+                                      ),
+                                      li: ({
+                                        children,
+                                      }: {
+                                        children?: React.ReactNode;
+                                      }) => <li className="mb-1">{children}</li>,
+                                    }}
+                                  >
                                     {body}
                                   </ReactMarkdown>
                                   {hint && <BlurredHint text={hint} />}
@@ -738,8 +741,8 @@ const AIChat = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag: {
@@ -748,9 +751,9 @@ const AIChat = ({
                             } | null =
                               attached && attached.engine === "mermaid"
                                 ? (attached as {
-                                    engine: "mermaid";
-                                    code: string;
-                                  })
+                                  engine: "mermaid";
+                                  code: string;
+                                })
                                 : null;
                             if (!diag) return null;
                             return (
@@ -790,8 +793,8 @@ const AIChat = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag: {
@@ -800,9 +803,9 @@ const AIChat = ({
                             } | null =
                               attached && attached.engine === "reactflow"
                                 ? (attached as {
-                                    engine: "reactflow";
-                                    graph: FlowGraph;
-                                  })
+                                  engine: "reactflow";
+                                  graph: FlowGraph;
+                                })
                                 : null;
                             if (!diag) return null;
                             return (
@@ -888,20 +891,20 @@ const AIChat = ({
                                   </div>
 
                                   <div className="bg-slate-900 rounded-md p-3 mb-3">
-                                  <SyntaxHighlighter
-                                    language={snippet.language}
-                                    style={vscDarkPlus}
-                                    customStyle={{
-                                      margin: 0,
-                                      padding: 0,
-                                      background: "transparent",
-                                      fontSize: "0.8rem",
-                                      whiteSpace: "pre",
-                                      overflowX: "auto"
-                                    }}
-                                  >
-                                    {snippet.code}
-                                  </SyntaxHighlighter>
+                                    <SyntaxHighlighter
+                                      language={snippet.language}
+                                      style={vscDarkPlus}
+                                      customStyle={{
+                                        margin: 0,
+                                        padding: 0,
+                                        background: "transparent",
+                                        fontSize: "0.8rem",
+                                        whiteSpace: "pre",
+                                        overflowX: "auto"
+                                      }}
+                                    >
+                                      {snippet.code}
+                                    </SyntaxHighlighter>
                                   </div>
 
                                   {snippet.insertionHint?.description && (
@@ -972,9 +975,8 @@ const AIChat = ({
                     : "Ask your AI coach anything..."
               }
               disabled={loading || isTyping}
-              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                hasNativeSupport ? "pr-10" : "pr-3"
-              }`}
+              className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${hasNativeSupport ? "pr-10" : "pr-3"
+                }`}
               minRows={1}
               maxRows={6}
             />
@@ -983,13 +985,12 @@ const AIChat = ({
                 type="button"
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${
-                  isListening
-                    ? "text-red-500 animate-pulse"
-                    : isProcessing
-                      ? "text-blue-500"
-                      : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${isListening
+                  ? "text-red-500 animate-pulse"
+                  : isProcessing
+                    ? "text-blue-500"
+                    : "text-gray-500 hover:text-gray-700"
+                  }`}
                 title={
                   isListening
                     ? "Stop listening"
