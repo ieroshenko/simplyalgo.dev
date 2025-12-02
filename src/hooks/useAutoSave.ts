@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -18,6 +18,7 @@ export const useAutoSave = (
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   const saveCode = useCallback(
     async (code: string) => {
@@ -48,20 +49,30 @@ export const useAutoSave = (
   );
 
   const debouncedSave = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (code: string) => {
-        // Don't try to save if user is not available yet
-        if (!user?.id) {
-          return;
-        }
-        setHasUnsavedChanges(true);
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => saveCode(code), debounceMs);
-      };
-    })(),
+    (code: string) => {
+      // Don't try to save if user is not available yet
+      if (!user?.id) {
+        return;
+      }
+      setHasUnsavedChanges(true);
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => saveCode(code), debounceMs);
+    },
     [saveCode, debounceMs, user?.id],
   );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const loadLatestCode = useCallback(async (): Promise<string | null> => {
     if (!user?.id || !problemId) {

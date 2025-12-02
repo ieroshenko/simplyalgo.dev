@@ -19,17 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Pencil, Trash2, Search } from "lucide-react";
-import { AdminProblemDialog } from "@/components/admin/AdminProblemDialog";
-
-interface Problem {
-  id: string;
-  title: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  category_id: string;
-  description: string;
-  function_signature: string;
-  created_at: string;
-}
+import { AdminProblemDialog, type Problem } from "@/components/admin/AdminProblemDialog";
 
 interface Category {
   id: string;
@@ -71,7 +61,10 @@ const AdminDashboard = () => {
 
       if (categoriesError) throw categoriesError;
 
-      setProblems(problemsData || []);
+      // Cast to Problem[] to match the expected interface with JSON fields
+      const typedProblems = (problemsData as unknown as Problem[]) || [];
+      console.log("AdminDashboard: Fetched problems", typedProblems);
+      setProblems(typedProblems);
       setCategories(categoriesData || []);
     } catch (error: any) {
       toast({
@@ -100,6 +93,8 @@ const AdminDashboard = () => {
     const matchesDifficulty = selectedDifficulty === "all" || problem.difficulty === selectedDifficulty;
     return matchesSearch && matchesCategory && matchesDifficulty;
   });
+
+  const selectedProblem = problems.find(p => p.id === selectedProblemId) || null;
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -192,7 +187,7 @@ const AdminDashboard = () => {
                         "Unknown"}
                     </TableCell>
                     <TableCell>
-                      {new Date(problem.created_at).toLocaleDateString()}
+                      {problem.created_at ? new Date(problem.created_at).toLocaleDateString() : 'N/A'}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => handleEditProblem(problem.id)}>
@@ -210,10 +205,20 @@ const AdminDashboard = () => {
       <AdminProblemDialog 
         open={isDialogOpen} 
         onOpenChange={setIsDialogOpen}
-        problemId={selectedProblemId}
-        onSaved={() => {
+        problem={selectedProblem}
+        onSaved={(savedProblem) => {
+            if (savedProblem) {
+                setProblems(prev => {
+                    const exists = prev.find(p => p.id === savedProblem.id);
+                    if (exists) {
+                        return prev.map(p => p.id === savedProblem.id ? savedProblem : p);
+                    }
+                    return [savedProblem, ...prev];
+                });
+            } else {
+                fetchData();
+            }
             setIsDialogOpen(false);
-            fetchData();
         }}
         categories={categories}
       />

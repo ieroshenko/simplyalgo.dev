@@ -58,6 +58,7 @@ import {
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import { logger } from "@/utils/logger";
+import { CodeDiffDialog } from "@/components/CodeDiffDialog";
 
 
 const ProblemSolverNew = () => {
@@ -275,6 +276,46 @@ const ProblemSolverNew = () => {
     setFullscreenLang((lang || "python").toLowerCase());
     setFullscreenTitle(title);
     setFullscreenOpen(true);
+  };
+
+  // Replacement Confirmation State
+  const [showReplacementDialog, setShowReplacementDialog] = useState(false);
+  const [pendingReplacementCode, setPendingReplacementCode] = useState<string | null>(null);
+  const [currentCodeForDiff, setCurrentCodeForDiff] = useState("");
+
+  const handleConfirmReplacement = () => {
+    if (!pendingReplacementCode || !codeEditorRef.current) return;
+    
+    const currentCode = codeEditorRef.current.getValue();
+    const newCodeFromBackend = pendingReplacementCode;
+
+    if (newCodeFromBackend === currentCode) {
+      logger.info('[ProblemSolverNew] New code identical to current code', {
+        currentLength: currentCode.length,
+        newLength: newCodeFromBackend.length,
+      });
+      toast.success("Code is already correct — no changes made.");
+    } else {
+      logger.info('[ProblemSolverNew] Updating editor with new code', {
+        oldLength: currentCode.length,
+        newLength: newCodeFromBackend.length,
+        codePreview: newCodeFromBackend.substring(0, 300) + "..."
+      });
+
+      codeEditorRef.current.setValue(newCodeFromBackend);
+      setCode(newCodeFromBackend);
+
+      logger.info('[ProblemSolverNew] Editor updated successfully');
+    }
+    
+    setShowReplacementDialog(false);
+    setPendingReplacementCode(null);
+  };
+
+  const handleCancelReplacement = () => {
+    setShowReplacementDialog(false);
+    setPendingReplacementCode(null);
+    toast.error("Insertion canceled. No changes applied.");
   };
 
   if (loading) {
@@ -528,17 +569,10 @@ const ProblemSolverNew = () => {
             rationaleText,
           );
         if (looksDestructive && (snippet.insertionType || "smart") !== "replace") {
-          const ok = window.confirm(
-            "The AI suggests replacing a large portion of your code to insert this snippet. Proceed with replacement?",
-          );
-          if (!ok) {
-            logger.warn('[ProblemSolverNew] User canceled potentially destructive insertion', {
-              shrinkRatio,
-              rationaleText,
-            });
-            toast.error("Insertion canceled. No changes applied.");
-            newCodeFromBackend = null;
-          }
+          setPendingReplacementCode(newCodeFromBackend);
+          setCurrentCodeForDiff(currentCode);
+          setShowReplacementDialog(true);
+          return;
         }
       }
 
@@ -1111,6 +1145,15 @@ const ProblemSolverNew = () => {
           showConfetti={coachingState.feedback.showConfetti}
         />
       )}
+
+      <CodeDiffDialog
+        isOpen={showReplacementDialog}
+        onOpenChange={setShowReplacementDialog}
+        originalCode={currentCodeForDiff}
+        modifiedCode={pendingReplacementCode || ""}
+        onAccept={handleConfirmReplacement}
+        onReject={handleCancelReplacement}
+      />
     </div>
   );
 };

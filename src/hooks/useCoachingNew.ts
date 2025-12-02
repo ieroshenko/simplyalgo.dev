@@ -804,7 +804,10 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
   const insertCorrectCode = useCallback(async () => {
     if (!coachingState.lastValidation?.codeToAdd) return;
 
-    const codeToInsert = coachingState.lastValidation.codeToAdd;
+    // Strip markdown code fences if present (e.g. ```python ... ```)
+    const rawCode = coachingState.lastValidation.codeToAdd;
+    const codeToInsert = rawCode.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
+
     try {
       const editor = editorRef.current;
       const before = editor?.getValue() || "";
