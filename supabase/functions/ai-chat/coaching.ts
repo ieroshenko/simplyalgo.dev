@@ -1,3 +1,4 @@
+// @ts-expect-error - Deno URL import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { llmText, llmJson, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
 import { CoachingSession, CoachingValidation, CoachingStep, ContextualResponse } from "./types.ts";
@@ -83,12 +84,9 @@ export async function startInteractiveCoaching(
         .single();
 
       if (problem && problem.test_cases && problem.test_cases.length > 0) {
-        // Call code executor API
-        const codeExecutorUrl = Deno.env.get("CODE_EXECUTOR_URL") || "http://localhost:3001";
-        const testResponse = await fetch(`${codeExecutorUrl}/execute`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        // Call code executor edge function
+        const { data: testResults, error: testError } = await supabase.functions.invoke('code-executor-api', {
+          body: {
             code: currentCode,
             language: "python",
             problemId: problemId,
@@ -96,13 +94,12 @@ export async function startInteractiveCoaching(
               input: tc.input_json,
               expected: tc.expected_json,
             })),
-          }),
+          },
         });
 
-        console.log("🧪 [startInteractiveCoaching] Test response status:", testResponse.status);
-
-        if (testResponse.ok) {
-          const testResults = await testResponse.json();
+        if (testError) {
+          console.error(`❌ [startInteractiveCoaching] Test execution failed:`, testError);
+        } else if (testResults) {
           console.log("🧪 [startInteractiveCoaching] Test results:", JSON.stringify(testResults));
 
           // Check if all tests passed
@@ -151,10 +148,6 @@ export async function startInteractiveCoaching(
           } else {
             console.log(`⚠️ [startInteractiveCoaching] Tests failed: ${passedCount}/${totalCount} passed - will provide coaching`);
           }
-        } else {
-          console.error(`❌ [startInteractiveCoaching] Test execution failed with status: ${testResponse.status}`);
-          const errorText = await testResponse.text();
-          console.error(`❌ [startInteractiveCoaching] Error response: ${errorText}`);
         }
       }
     } catch (testError) {
@@ -883,12 +876,9 @@ CRITICAL NEXT STEP GENERATION:
             .single();
 
           if (problem && problem.test_cases && problem.test_cases.length > 0) {
-            // Call code executor API
-            const codeExecutorUrl = Deno.env.get("CODE_EXECUTOR_URL") || "http://localhost:3001";
-            const testResponse = await fetch(`${codeExecutorUrl}/execute`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
+            // Call code executor edge function
+            const { data: testResults, error: testError } = await supabase.functions.invoke('code-executor-api', {
+              body: {
                 code: currentEditorCode,
                 language: "python",
                 problemId: problemId,
@@ -896,11 +886,13 @@ CRITICAL NEXT STEP GENERATION:
                   input: tc.input_json,
                   expected: tc.expected_json,
                 })),
-              }),
+              },
             });
 
-            if (testResponse.ok) {
-              const testResults = await testResponse.json();
+            if (testError) {
+              console.error("⚠️ [validateCoachingSubmission] Test execution failed:", testError);
+              // Continue with AI validation if test execution fails
+            } else if (testResults) {
               console.log("🧪 [validateCoachingSubmission] Test results:", testResults);
 
               // Check if all tests passed

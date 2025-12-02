@@ -1,4 +1,5 @@
 import { TestCase, TestResult } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface RunCodePayload {
   language: string;
@@ -12,13 +13,9 @@ export interface RunCodeResponse {
 }
 
 export class TestRunnerService {
-  // Code Executor API endpoint - using localhost for development
-  private static CODE_EXECUTOR_API_URL =
-    import.meta.env.VITE_CODE_EXECUTOR_URL || "http://localhost:3001";
-
   static async runCode(payload: RunCodePayload): Promise<RunCodeResponse> {
     console.log(
-      `🚀 Calling Code Executor API: ${this.CODE_EXECUTOR_API_URL}/execute`,
+      `🚀 Calling Code Executor Edge Function`,
     );
 
     try {
@@ -35,24 +32,22 @@ export class TestRunnerService {
 
       console.log("📤 Request payload:", requestBody);
 
-      const response = await fetch(`${this.CODE_EXECUTOR_API_URL}/execute`, {
-        method: "POST",
+      // Get session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Call Supabase edge function
+      const { data, error } = await supabase.functions.invoke('code-executor-api', {
+        body: requestBody,
         headers: {
-          "Content-Type": "application/json",
+          Authorization: session ? `Bearer ${session.access_token}` : '',
         },
-        body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+      if (error) {
         throw new Error(
-          `Code Executor API error: ${response.status} - ${errorData.error || errorData.message}`,
+          `Code Executor API error: ${error.message || 'Unknown error'}`,
         );
       }
-
-      const data = await response.json();
 
       if (!data || !data.results) {
         throw new Error("Invalid response from Code Executor API");
@@ -64,7 +59,7 @@ export class TestRunnerService {
       console.log(`📊 Results: ${data.results.length} test cases processed`);
 
       return { results: data.results };
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Code Executor API execution failed:", error);
 
       // Return error results instead of fallback
@@ -74,7 +69,7 @@ export class TestRunnerService {
         expected: testCase.expected,
         actual: "",
         stdout: "",
-        stderr: `API Error: ${error.message}`,
+        stderr: `API Error: ${error.message || 'Unknown error'}`,
         time: "0ms",
       }));
 
