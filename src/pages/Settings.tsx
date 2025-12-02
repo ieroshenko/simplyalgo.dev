@@ -11,10 +11,26 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Sidebar from "@/components/Sidebar";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { useTheme } from "@/hooks/useTheme";
-import { Monitor, Moon, Sun, Palette, User, Bell, Shield } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { Monitor, Moon, Sun, Palette, User, Bell, Shield, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 const Settings = () => {
   const { theme, setTheme } = useTheme();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success("Successfully logged out");
+      navigate("/");
+    } catch (error) {
+      toast.error("Failed to log out");
+      console.error("Logout error:", error);
+    }
+  };
 
   const themeOptions = [
     {
@@ -111,9 +127,22 @@ const Settings = () => {
                 Manage your account settings and preferences
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">
-                Account settings will be available in a future update.
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground mb-2">Session</h3>
+                  <Button
+                    variant="destructive"
+                    onClick={handleLogout}
+                    className="w-full sm:w-auto"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Log Out
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Sign out of your account on this device
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

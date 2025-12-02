@@ -107,25 +107,30 @@ const Sidebar = () => {
               Category Progress
             </h3>
             <div className="space-y-3">
-              {categories.map((category) => {
-                const percentage = (category.solved / category.total) * 100;
+              {categories
+                .filter((category) =>
+                  category.name !== "Data Structure Implementations" &&
+                  category.name !== "System Design"
+                )
+                .map((category) => {
+                  const percentage = (category.solved / category.total) * 100;
 
-                return (
-                  <div key={category.name} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-foreground">
-                          {category.name}
+                  return (
+                    <div key={category.name} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-foreground">
+                            {category.name}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {category.solved}/{category.total}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {category.solved}/{category.total}
-                      </span>
+                      <Progress value={percentage} className="h-2" />
                     </div>
-                    <Progress value={percentage} className="h-2" />
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </Card>
         </div>
