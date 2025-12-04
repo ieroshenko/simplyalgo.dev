@@ -313,9 +313,11 @@ CRITICAL:
 
 Be encouraging and guide them step by step with specific, actionable advice focused on the algorithm.`;
 
+
   // Use context-aware AI call to create initial coaching context
-  let stepData;
+  let stepData: any;
   let contextualResponse: ContextualResponse;
+
 
   try {
     logger.coaching("Creating initial coaching context", { sessionId, action: "create_context" });
@@ -327,7 +329,7 @@ Be encouraging and guide them step by step with specific, actionable advice focu
       'coaching',
       currentCode,
       {
-        maxTokens: 800,
+        maxTokens: 10000, // Increased from 800 to prevent truncation
         temperature: 0.7,
         responseFormat: "json_object"
       }
@@ -343,7 +345,7 @@ Be encouraging and guide them step by step with specific, actionable advice focu
 
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
-        .replace(/^```(?:json)?\n?/m, "")
+        .replace(/^```(?:json)?\\n?/m, "")
         .replace(/```$/m, "")
         .trim();
     }
@@ -355,13 +357,42 @@ Be encouraging and guide them step by step with specific, actionable advice focu
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
 
-    stepData = JSON.parse(cleanContent);
-    logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData.question, hasHighlightArea: !!stepData.highlightArea, isCompleted: !!stepData.isCompleted });
+    // Check if response looks truncated (incomplete JSON)
+    if (!cleanContent.endsWith("}") && !cleanContent.endsWith("]")) {
+      logger.error("Response appears truncated", undefined, {
+        sessionId,
+        action: "start_interactive_coaching",
+        responseLength: cleanContent.length,
+        lastChars: cleanContent.slice(-100)
+      });
+      throw new Error("AI_RESPONSE_TRUNCATED: The AI response was incomplete. Please try again.");
+    }
+
+    try {
+      stepData = JSON.parse(cleanContent);
+      logger.debug("JSON parsed successfully", { sessionId, stepDataKeys: Object.keys(stepData || {}) });
+    } catch (parseError: any) {
+      logger.error("JSON parse error", parseError, {
+        sessionId,
+        action: "start_interactive_coaching",
+        errorMessage: parseError.message,
+        contentPreview: cleanContent.substring(0, 500)
+      });
+      throw new Error(`AI_INVALID_JSON: Failed to parse AI response. ${parseError.message}`);
+    }
+
+    logger.debug("Step data parsed successfully", { sessionId, hasQuestion: !!stepData?.question, hasHighlightArea: !!stepData?.highlightArea, isCompleted: !!stepData?.isCompleted });
+
+    // Validate stepData exists and has required structure
+    if (!stepData || typeof stepData !== 'object') {
+      logger.error("Invalid stepData structure", undefined, { sessionId, stepData: JSON.stringify(stepData), action: "validate_step_data" });
+      throw new Error("AI returned invalid data structure");
+    }
 
     // Validate required fields (highlightArea can be null if session is already completed)
     if (!stepData.question) {
       logger.error("Missing required fields in step data", undefined, { sessionId, stepData, action: "validate_step_data" });
-      throw new Error("Invalid coaching step data");
+      throw new Error("Invalid coaching step data: missing question");
     }
 
     // If not completed, highlightArea is required
@@ -782,7 +813,7 @@ CRITICAL NEXT STEP GENERATION:
       'coaching',
       currentEditorCode,
       {
-        maxTokens: 1500,
+        maxTokens: 10000,
         responseFormat: "json_object"
       }
     );
@@ -795,27 +826,42 @@ CRITICAL NEXT STEP GENERATION:
     const rawContent = contextualResponse.content;
     let cleanContent = rawContent.trim();
 
-    console.log("🎯 [validateCoachingSubmission] Raw AI response:", rawContent);
+    console.log("🎯 [validateCoachingSubmission] Raw AI response:", rawContent.substring(0, 200) + (rawContent.length > 200 ? "..." : ""));
 
     if (cleanContent.startsWith("```")) {
       cleanContent = cleanContent
-        .replace(/^```(?:json)?\n?/m, "")
+        .replace(/^```(?:json)?\\n?/m, "")
         .replace(/```$/m, "")
         .trim();
     }
 
-    console.log("🎯 [validateCoachingSubmission] Cleaned response:", cleanContent);
+    console.log("🎯 [validateCoachingSubmission] Cleaned response:", cleanContent.substring(0, 200) + (cleanContent.length > 200 ? "..." : ""));
 
     if (!cleanContent || cleanContent === "{}") {
       console.error("🚨 [validateCoachingSubmission] Empty or invalid response from AI");
-      console.error("🚨 [validateCoachingSubmission] Raw response was:", JSON.stringify(rawContent));
+      console.error("🚨 [validateCoachingSubmission] Raw response length:", rawContent.length);
       console.error("🚨 [validateCoachingSubmission] Context response ID:", contextualResponse.responseId);
       console.error("🚨 [validateCoachingSubmission] Is new context:", contextualResponse.isNewContext);
 
       throw new Error("AI_SERVICE_UNAVAILABLE: The AI coaching service is temporarily unavailable. We're working on a fix.");
     }
 
-    const validation = JSON.parse(cleanContent);
+    // Check if response looks truncated (incomplete JSON)
+    if (!cleanContent.endsWith("}") && !cleanContent.endsWith("]")) {
+      console.error("🚨 [validateCoachingSubmission] Response appears truncated!");
+      console.error("🚨 [validateCoachingSubmission] Response length:", cleanContent.length);
+      console.error("🚨 [validateCoachingSubmission] Last 100 chars:", cleanContent.slice(-100));
+      throw new Error("AI_RESPONSE_TRUNCATED: The AI response was incomplete. This usually means maxTokens is too low. Please try again.");
+    }
+
+    let validation;
+    try {
+      validation = JSON.parse(cleanContent);
+    } catch (parseError: any) {
+      console.error("🚨 [validateCoachingSubmission] JSON parse error:", parseError.message);
+      console.error("🚨 [validateCoachingSubmission] Failed to parse:", cleanContent.substring(0, 500));
+      throw new Error(`AI_INVALID_JSON: Failed to parse AI response. ${parseError.message}`);
+    }
 
     // Add optimization detect flag to inform UI about Learn Optimization button visibility
     try {

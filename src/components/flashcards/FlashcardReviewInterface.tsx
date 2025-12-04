@@ -502,60 +502,84 @@ export const FlashcardReviewInterface = ({
             </div>
           </div>
 
-          {/* Questions Panel */}
+          {/* Practice Code Panel */}
           <div className="w-1/2 flex flex-col">
             {!showRatingOptions ? (
               <>
-                {/* Current Question */}
-                <div className="flex-1 p-6">
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <div className="text-sm text-muted-foreground mb-2">
-                        Question {(currentSession?.currentQuestionIndex || 0) + 1} of {REVIEW_QUESTIONS.length}
-                      </div>
-                      <h3 className="text-xl font-semibold mb-2">
-                        {currentQuestion?.question}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {currentQuestion?.description}
-                      </p>
-                    </div>
+                {/* Code Practice Area */}
+                <div className="flex-1 p-6 flex flex-col">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Try to Recall Your Solution</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Write out your solution or pseudocode below. Click "Show Solution" when ready to compare.
+                    </p>
+                  </div>
 
-                    {/* <div className="bg-muted/20 rounded-lg p-6 text-center">
-                      <p className="text-lg font-medium mb-2">Think it through</p>
-                      <p className="text-sm text-muted-foreground">
-                        Take your time to recall the answer. You can check your solution code if needed.
-                      </p>
-                    </div> */}
+                  {/* Editable Code Editor */}
+                  <div className="flex-1 min-h-0">
+                    {currentProblemData?.function_signature ? (
+                      <div className="h-full rounded overflow-hidden border">
+                        <Editor
+                          key={`practice-${currentCard?.problem_id}-${currentCardIndex}`}
+                          height="100%"
+                          language="python"
+                          theme={editorTheme}
+                          defaultValue={currentProblemData.function_signature}
+                          loading={<div className="flex items-center justify-center h-full">Loading editor...</div>}
+                          options={{
+                            minimap: { enabled: false },
+                            lineNumbers: 'on',
+                            folding: false,
+                            wordWrap: 'on',
+                            scrollBeyondLastLine: false,
+                            renderWhitespace: 'none',
+                            fontSize: 13,
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            readOnly: false, // Allow editing
+                            tabSize: 4,
+                            insertSpaces: true,
+                          }}
+                          onMount={(editor, monaco) => {
+                            defineCustomThemes(monaco);
+                            setIsEditorReady(true);
+                            // Focus the editor
+                            editor.focus();
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center border rounded bg-muted/20">
+                        <div className="text-center">
+                          <Code className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm text-muted-foreground">
+                            Loading problem signature...
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Next Question Button */}
+                {/* Bottom Action Bar */}
                 <div className="p-6 border-t">
                   <div className="flex justify-between items-center">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        // Skip to next card without rating (no penalty to spaced repetition)
-                        console.log('Skip button clicked, moving from', currentCardIndex, 'to', currentCardIndex + 1);
                         setCurrentSession(null);
                         setShowRatingOptions(false);
                         setShowSolution(false);
                         setCurrentProblemData(null);
                         setCurrentCardIndex(prev => prev + 1);
-                        // The useEffect will trigger startNewCard when currentCardIndex changes
                       }}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       Skip Card
                     </Button>
 
-                    <Button onClick={nextQuestion}>
-                      {(currentSession?.currentQuestionIndex || 0) < REVIEW_QUESTIONS.length - 1
-                        ? "Next Question"
-                        : "Rate My Memory"
-                      }
+                    <Button onClick={() => setShowRatingOptions(true)}>
+                      Rate My Memory
                     </Button>
                   </div>
                 </div>

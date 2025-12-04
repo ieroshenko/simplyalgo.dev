@@ -12,7 +12,7 @@ let openai: OpenAI;
 
 // LLM Provider Configuration
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
-const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash-preview-09-2025";
 const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
 // Model selection via env var; default to appropriate model based on provider
