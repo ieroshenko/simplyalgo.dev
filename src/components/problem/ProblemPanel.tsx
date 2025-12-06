@@ -55,7 +55,7 @@ const ProblemPanel = ({
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
   const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
   const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
-  
+
   // Select syntax highlighting theme based on current color scheme
   const syntaxTheme = isDark ? vscDarkPlus : vs;
 
@@ -235,7 +235,7 @@ const ProblemPanel = ({
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Problem Description
             </h2>
-            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground">
+            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground prose-code:bg-transparent prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-img:rounded-lg prose-img:border prose-img:border-border prose-strong:text-foreground prose-strong:font-semibold prose-headings:text-foreground">
               <ReactMarkdown
                 components={{
                   code({ inline, className, children }: any) {
@@ -256,6 +256,23 @@ const ProblemPanel = ({
                       </SyntaxHighlighter>
                     ) : (
                       <code className={className}>{children}</code>
+                    );
+                  },
+                  // Enhanced image rendering with responsive sizing and dark mode support
+                  img({ src, alt }: any) {
+                    return (
+                      <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
+                        <img
+                          src={src}
+                          alt={alt || "Problem illustration"}
+                          className="max-w-full h-auto rounded shadow-sm mx-auto"
+                          style={{
+                            maxHeight: "400px",
+                            objectFit: "contain",
+                          }}
+                          loading="lazy"
+                        />
+                      </div>
                     );
                   },
                 }}

@@ -176,6 +176,7 @@ async function fetchTestCasesFromDB(problemId: string) {
         input: inputParams,
         expected: expectedOutput,
         isExample: tc.is_example,
+        functionSignature: problem.function_signature, // Add function signature for main function detection
       };
     });
 
@@ -545,6 +546,7 @@ def listnode_to_array(head):
   if (isClassBasedProblem) {
     functionName = "class_based";
   } else {
+    // Extract all function names from user code
     const allFunctionMatches = [...userCode.matchAll(/def\s+(\w+)\s*\(/g)];
     const validFunctions = allFunctionMatches
       .map((match) => match[1])
@@ -554,7 +556,30 @@ def listnode_to_array(head):
       throw new Error("No function definition found in Python code");
     }
 
-    functionName = validFunctions[0];
+    // Try to determine the main function from the problem's function signature
+    // This helps distinguish between main functions and helper functions
+    let mainFunctionName: string | null = null;
+
+    // Check if we have a function signature from the problem (passed via testCases metadata or problemId lookup)
+    // The function signature should be in the format: "def functionName(params): ..."
+    if (testCases.length > 0 && testCases[0].functionSignature) {
+      const sigMatch = testCases[0].functionSignature.match(/def\s+(\w+)\s*\(/);
+      if (sigMatch) {
+        mainFunctionName = sigMatch[1];
+      }
+    }
+
+    // If we found a main function name from the signature, use it if it exists in the user's code
+    if (mainFunctionName && validFunctions.includes(mainFunctionName)) {
+      functionName = mainFunctionName;
+      console.log(`Using main function from signature: ${functionName}`);
+    } else {
+      // Fallback: Use the first function (legacy behavior)
+      functionName = validFunctions[0];
+      if (validFunctions.length > 1) {
+        console.warn(`Multiple functions found: ${validFunctions.join(", ")}. Using first function: ${functionName}. Consider adding function signature to problem definition.`);
+      }
+    }
   }
 
   // Extract function signature

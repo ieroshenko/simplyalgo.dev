@@ -158,22 +158,24 @@ export async function startInteractiveCoaching(
 
   // Analyze current code to determine an insertion line inside the active function
   const codeLines = (currentCode || '').split('\n');
-  const computeNextLineNumber = () => {
-    if (!codeLines.length) return 2;
+  const computeNextLineNumberAndFunction = () => {
+    if (!codeLines.length) return { lineNumber: 2, functionName: null, functionStartLine: null };
     // Find last function definition and its indent
     let defLine = -1;
     let defIndent = 0;
+    let functionName = null;
     for (let i = codeLines.length - 1; i >= 0; i--) {
       const line = codeLines[i];
-      const m = line.match(/^(\s*)def\s+\w+\s*\(/);
+      const m = line.match(/^(\s*)def\s+(\w+)\s*\(/);
       if (m) {
         defLine = i;
         defIndent = m[1]?.length || 0;
+        functionName = m[2]; // Extract function name
         break;
       }
     }
     // If no def found, append after last line
-    if (defLine === -1) return Math.max(2, codeLines.length + 1);
+    if (defLine === -1) return { lineNumber: Math.max(2, codeLines.length + 1), functionName: null, functionStartLine: null };
     // Find first line with greater indent -> function body start
     let bodyStart = defLine + 1;
     while (bodyStart < codeLines.length) {
@@ -181,7 +183,7 @@ export async function startInteractiveCoaching(
       if (indent > defIndent) break;
       bodyStart++;
     }
-    if (bodyStart >= codeLines.length) return defLine + 2;
+    if (bodyStart >= codeLines.length) return { lineNumber: defLine + 2, functionName, functionStartLine: defLine + 1 };
     // Prefer first blank line in body; else choose last body line + 1
     let firstBlankInBody = -1;
     let lastBodyLine = bodyStart;
@@ -192,9 +194,9 @@ export async function startInteractiveCoaching(
       if (firstBlankInBody === -1 && codeLines[i].trim() === '') firstBlankInBody = i;
     }
     const target = firstBlankInBody !== -1 ? firstBlankInBody + 1 : lastBodyLine + 2;
-    return Math.max(2, target);
+    return { lineNumber: Math.max(2, target), functionName, functionStartLine: defLine + 1 };
   };
-  const nextLineNumber = computeNextLineNumber();
+  const { lineNumber: nextLineNumber, functionName: targetFunctionName, functionStartLine: targetFunctionStartLine } = computeNextLineNumberAndFunction();
 
   // Create comprehensive initial context with ALL coaching rules and context
   const initialContextPrompt = `You are an expert coding coach for a DSA-style platform with Judge0 execution environment.
@@ -240,8 +242,14 @@ ALGORITHM-FOCUSED COACHING APPROACH:
 - If they have data structures initialized, guide to the next algorithmic step
 - Focus on core logic: iteration patterns, bit manipulation, counting, etc.
 - Ask about algorithmic approach, not code formatting or imports
-- Reference line ${nextLineNumber} for where they should add algorithm code, and mention existing symbol names (e.g., variables) when applicable
+${targetFunctionName
+      ? `- You are currently coaching the '${targetFunctionName}' function which starts at line ${targetFunctionStartLine}
+- Reference line ${nextLineNumber} (inside the '${targetFunctionName}' function) for where they should add algorithm code`
+      : `- Reference line ${nextLineNumber} for where they should add algorithm code`}
+- When mentioning line numbers, ALWAYS verify which function that line belongs to by checking the code
+- CRITICAL: If you mention a function name with a line number, ensure the line number is actually inside that function
 - Be specific about algorithmic steps, not boilerplate code
+
 
 CRITICAL: CHECK IF SOLUTION IS ALREADY COMPLETE
 Before asking any questions, analyze if the student's code already solves the problem:
@@ -251,6 +259,15 @@ Before asking any questions, analyze if the student's code already solves the pr
 4. If NO → Identify what's missing and ask about that specific piece
 
 DO NOT start coaching if the solution is already functionally complete. Instead, acknowledge their solution and mark session as complete.
+
+CRITICAL LINE-TO-FUNCTION VERIFICATION:
+Before generating your question, if you mention a specific function name with a line number:
+1. Look at the CURRENT STUDENT CODE STATE above
+2. Count the line numbers (starting from 1)
+3. Verify which function that line number actually belongs to
+4. ONLY mention the function name if the line number is actually inside that function
+5. Example: If line 6 contains "def decode(...)", then line 6 is the START of the decode function, not inside the encode function
+6. If you're unsure which function a line belongs to, just reference the line number without mentioning a function name
 
 Now analyze this student's current code and generate the FIRST coaching step.
 
@@ -525,6 +542,15 @@ TONE & HINT POLICY:
 - Do NOT include unsolicited praise (e.g., "Great start", "You're on track"). Keep tone concise and neutral.
 - The hint must NOT answer the question. Avoid naming the exact operator/algorithm unless it already appears in CURRENT CODE.
 - Provide at most one short hint (<= 120 characters). No code in hint.
+
+CRITICAL LINE-TO-FUNCTION VERIFICATION:
+Before generating your question, if you mention a specific function name with a line number:
+1. Look at the CURRENT STUDENT CODE STATE above
+2. Count the line numbers (starting from 1)
+3. Verify which function that line number actually belongs to
+4. ONLY mention the function name if the line number is actually inside that function
+5. Example: If line 6 contains "def decode(...)", then line 6 is the START of the decode function, not inside the encode function
+6. If you're unsure which function a line belongs to, just reference the line number without mentioning a function name
 
 FOR HIGHLIGHTING: Use EXACT line numbers from their algorithm code (ignore function signature lines)
 
