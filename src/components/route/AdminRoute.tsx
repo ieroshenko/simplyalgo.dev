@@ -8,7 +8,7 @@ interface AdminRouteProps {
 // Whitelist of admin emails
 const ADMIN_EMAILS = [
   "tazigrigolia@gmail.com",
-  "ivaneroshenko@gmail.com"  // Likely correction
+  "ivaneroshenko@gmail.com"
 ];
 
 export const AdminRoute = ({ children }: AdminRouteProps) => {
