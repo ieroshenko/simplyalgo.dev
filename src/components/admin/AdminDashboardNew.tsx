@@ -16,9 +16,11 @@ import {
     Search,
     UserMinus,
     Gift,
-    CreditCard
+    CreditCard,
+    ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface UserStats {
     id: string;
@@ -39,6 +41,7 @@ interface OpenRouterUsage {
 }
 
 export function AdminDashboardNew() {
+    const navigate = useNavigate();
     const [users, setUsers] = useState<UserStats[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -342,7 +345,16 @@ export function AdminDashboardNew() {
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={() => navigate("/dashboard")}
+                        variant="outline"
+                        size="icon"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+                </div>
                 <Button onClick={fetchDashboardData} variant="outline">
                     <Activity className="h-4 w-4 mr-2" />
                     Refresh Data
