@@ -1215,7 +1215,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                         }, 2000);
                       }
                     } catch (err) {
-                      console.error('Failed to copy:', err);
+                      logger.error('[SimpleOverlay] Failed to copy', { error: err });
                     }
                   }}
                   size="sm"

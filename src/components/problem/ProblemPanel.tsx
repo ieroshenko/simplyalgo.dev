@@ -17,6 +17,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import "katex/dist/katex.min.css";
+import { logger } from "@/utils/logger";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -64,17 +65,18 @@ const ProblemPanel = ({
 
   // Load existing complexity analysis from submissions
   React.useEffect(() => {
-    console.log('🔍 [ProblemPanel] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    logger.debug('[ProblemPanel] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
       const results: Record<string, any> = {};
       submissions.forEach(submission => {
-        console.log('📊 [ProblemPanel] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        logger.debug('[ProblemPanel] Processing submission for analysis', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
-          console.log('✅ [ProblemPanel] Loading analysis:', submission.complexity_analysis);
+          logger.debug('📊 [ProblemPanel] Submission has analysis', { id: submission.id });
+          logger.debug('[ProblemPanel] Loading analysis data', { analysis: submission.complexity_analysis });
           results[submission.id] = submission.complexity_analysis;
         }
       });
-      console.log('✅ [ProblemPanel] Total loaded analysis:', Object.keys(results).length);
+      logger.debug('✅ [ProblemPanel] Total loaded analysis', { count: Object.keys(results).length });
       setComplexityResults(results);
     }
   }, [submissions]);
@@ -155,19 +157,19 @@ const ProblemPanel = ({
       }));
 
       // Save to database for persistence
-      console.log('💾 [ProblemPanel] Saving analysis for submission:', submissionId);
-      console.log('📝 [ProblemPanel] Analysis data:', analysisData);
+      logger.info('[ProblemPanel] Saving analysis for submission', { submissionId });
+      logger.debug('[ProblemPanel] Analysis data', analysisData);
       const { UserAttemptsService } = await import("@/services/userAttempts");
       const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
-      console.log('✅ [ProblemPanel] Save result:', saved ? 'Success' : 'Failed');
+      logger.info('[ProblemPanel] Save result', { success: saved });
 
       if (!saved) {
-        console.error('❌ [ProblemPanel] Failed to save analysis to database');
+        logger.error('[ProblemPanel] Failed to save analysis to database');
       }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {
-      console.error("Complexity analysis error:", error);
+      logger.error("[ProblemPanel] Complexity analysis error", { error });
       toast.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);

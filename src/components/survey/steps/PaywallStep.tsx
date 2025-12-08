@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { useTrialEligibility } from '@/hooks/useTrialEligibility';
+import { logger } from '@/utils/logger';
 
 interface PaywallStepProps extends SurveyStepProps {
   onPaymentSuccess?: () => void;
@@ -14,7 +15,7 @@ interface PaywallStepProps extends SurveyStepProps {
 
 // Initialize Stripe
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-console.log('Stripe publishable key:', stripePublishableKey ? 'Loaded' : 'Missing');
+logger.info('[PaywallStep] Stripe publishable key status', { status: stripePublishableKey ? 'Loaded' : 'Missing' });
 const stripePromise = loadStripe(stripePublishableKey!);
 
 export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
@@ -53,7 +54,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
     setIsLoading(true);
     
     try {
-      console.log('Creating checkout session for plan:', selectedPlan);
+      logger.info('[PaywallStep] Creating checkout session', { plan: selectedPlan });
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -61,7 +62,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
         throw new Error('No active session');
       }
 
-      console.log('User session found:', session.user?.email);
+      logger.debug('[PaywallStep] User session found', { email: session.user?.email });
 
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: {
@@ -73,26 +74,26 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
         },
       });
 
-      console.log('Stripe checkout response:', { data, error });
+      logger.debug('[PaywallStep] Stripe checkout response', { data, error });
 
       if (error) {
         throw error;
       }
 
       if (data?.clientSecret) {
-        console.log('Client secret received, showing checkout');
+        logger.info('[PaywallStep] Client secret received, showing checkout');
         setClientSecret(data.clientSecret);
         setShowCheckout(true);
         setCheckoutError(null);
       } else if (data?.url) {
         // Fallback to redirect-based checkout
-        console.log('Redirecting to Stripe checkout');
+        logger.info('[PaywallStep] Redirecting to Stripe checkout');
         window.location.href = data.url;
       } else {
         throw new Error('No client secret or URL received');
       }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
+    } catch (error: any) {
+      logger.error('[PaywallStep] Error creating checkout session', { error });
       
       // Check if user already has an active subscription
       if (error.message && error.message.includes('already has an active subscription')) {
@@ -142,7 +143,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
                 options={{ 
                   clientSecret,
                   onComplete: () => {
-                    console.log('Payment completed successfully');
+                    logger.info('[PaywallStep] Payment completed successfully');
                     handlePaymentSuccess();
                   }
                 }}

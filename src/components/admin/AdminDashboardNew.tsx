@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/utils/logger";
 
 interface UserStats {
     id: string;
@@ -64,7 +65,7 @@ export function AdminDashboardNew() {
                 fetchOverviewStats()
             ]);
         } catch (error) {
-            console.error("Error fetching dashboard data:", error);
+            logger.error("[AdminDashboard] Error fetching dashboard data", { error });
             toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
@@ -172,7 +173,7 @@ export function AdminDashboardNew() {
             const data = await response.json();
 
             if (data.error) {
-                console.warn("OpenRouter usage error:", data.error);
+                logger.warn("[AdminDashboard] OpenRouter usage error", { error: data.error });
             }
 
             setOpenRouterStats({
@@ -181,7 +182,7 @@ export function AdminDashboardNew() {
                 credits_used: data.credits_used || 0,
             });
         } catch (error) {
-            console.error("Error fetching OpenRouter usage:", error);
+            logger.error("[AdminDashboard] Error fetching OpenRouter usage", { error });
             setOpenRouterStats({
                 credits_remaining: 0,
                 credits_total: 0,
@@ -322,7 +323,7 @@ export function AdminDashboardNew() {
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
-            console.error("Error granting premium:", error);
+            logger.error("[AdminDashboard] Error granting premium", { error });
             toast.error("Failed to grant premium access");
         }
     };
@@ -340,7 +341,7 @@ export function AdminDashboardNew() {
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
-            console.error("Error revoking premium:", error);
+            logger.error("[AdminDashboard] Error revoking premium", { error });
             toast.error("Failed to revoke premium access");
         }
     };
@@ -363,7 +364,7 @@ export function AdminDashboardNew() {
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
-            console.error("Error deleting user:", error);
+            logger.error("[AdminDashboard] Error deleting user", { error });
             toast.error("Failed to delete user");
         }
     };
@@ -668,3 +669,4 @@ export function AdminDashboardNew() {
         </div>
     );
 }
+

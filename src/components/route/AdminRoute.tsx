@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
   }
 
   if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
-    console.warn(`Unauthorized access attempt to /admin by ${user.email}`);
+    logger.warn('[AdminRoute] Unauthorized access attempt', { email: user.email, path: '/admin' });
     return <Navigate to="/dashboard" replace />;
   }
 

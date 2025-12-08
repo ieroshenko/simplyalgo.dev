@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 import type { UserBehavioralStats } from "@/types";
 
 export const useBehavioralStats = () => {
@@ -69,7 +70,7 @@ export const useBehavioralStats = () => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch stats");
-      console.error("Error fetching behavioral stats:", err);
+      logger.error("[useBehavioralStats] Error fetching behavioral stats", { error: err });
     } finally {
       setLoading(false);
     }

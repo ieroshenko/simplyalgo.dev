@@ -16,6 +16,7 @@ import { useAutoSave } from "@/hooks/useAutoSave";
 import { useEditorTheme, EditorTheme } from "@/hooks/useEditorTheme";
 import EditorSettings from "@/components/EditorSettings";
 import { toast } from "sonner";
+import { logger } from "@/utils/logger";
 import "@/styles/monaco-theme.css";
 import "@/styles/code-highlight.css";
 
@@ -82,10 +83,10 @@ const CodeEditor = ({
             editorRef.current,
             vimStatusbarRef.current,
           );
-          console.log("Vim mode initialized successfully");
+          logger.info("[CodeEditor] Vim mode initialized successfully");
         }
       } catch (error) {
-        console.warn("Vim mode not available:", error);
+        logger.warn("[CodeEditor] Vim mode not available", { error });
         toast.error("Failed to load Vim mode");
         setVimMode(false);
         localStorage.setItem("editor-vim-mode", "false");

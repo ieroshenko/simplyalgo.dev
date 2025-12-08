@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { CreditCard, Calendar, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { logger } from '@/utils/logger';
 
 interface StripeSubscriptionDetails {
   current_period_end: number;
@@ -54,13 +55,13 @@ export const SubscriptionManagement: React.FC = () => {
       });
 
       if (error) {
-        console.error('Error fetching subscription details:', error);
+        logger.error('[SubscriptionManagement] Error fetching subscription details', { error });
         return;
       }
 
       setStripeDetails(data);
     } catch (err) {
-      console.error('Error fetching subscription details:', err);
+      logger.error('[SubscriptionManagement] Error fetching subscription details', { error: err });
     } finally {
       setIsLoadingDetails(false);
     }
@@ -118,7 +119,7 @@ export const SubscriptionManagement: React.FC = () => {
       });
 
       if (error) {
-        console.error('Function error:', error);
+        logger.error('[SubscriptionManagement] Function error', { error });
         if (error.message?.includes('No active subscription found')) {
           setError('No active subscription found. Please contact support if you believe this is an error.');
         } else if (error.message?.includes('Customer portal not configured')) {
@@ -135,7 +136,7 @@ export const SubscriptionManagement: React.FC = () => {
         setError('Failed to get customer portal URL. Please try again.');
       }
     } catch (err: any) {
-      console.error('Error creating customer portal session:', err);
+      logger.error('[SubscriptionManagement] Error creating customer portal session', { error: err });
       if (err.message?.includes('No active subscription found')) {
         setError('No active subscription found. Please contact support if you believe this is an error.');
       } else if (err.message?.includes('Customer portal not configured')) {
@@ -170,7 +171,7 @@ export const SubscriptionManagement: React.FC = () => {
       // Refresh subscription details to show updated cancellation info
       await fetchStripeSubscriptionDetails();
     } catch (err) {
-      console.error('Error cancelling subscription:', err);
+      logger.error('[SubscriptionManagement] Error cancelling subscription', { error: err });
       setError('Failed to cancel subscription. Please try again or contact support.');
     } finally {
       setIsLoadingAction(false);

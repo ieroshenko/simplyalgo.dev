@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { CanvasContainer } from "@/components/canvas";
 import { hasInteractiveDemo } from "@/components/visualizations/registry";
+import { logger } from "@/utils/logger";
 import type { ChatMessage, Problem } from "@/types";
 
 interface CanvasRendererProps {
@@ -35,17 +36,14 @@ export const CanvasRenderer = ({ message, problem }: CanvasRendererProps) => {
 
   const handleGenerateComponent = async (messageContent: string) => {
     if (!problem) {
-      console.error("No problem context available for visualization");
+      logger.error("[CanvasRenderer] No problem context available for visualization");
       return;
     }
 
     // Open the canvas modal with the problem-specific interactive demo
     setCanvasTitle(`${problem.title} - Interactive Demo`);
     setIsCanvasOpen(true);
-    console.debug(
-      "[InteractiveDemo] Opening visualization for:",
-      problem.title,
-    );
+    logger.debug("[CanvasRenderer] Opening visualization for", { title: problem.title });
   };
 
   return (

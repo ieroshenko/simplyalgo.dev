@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { logger } from "@/utils/logger";
 import {
   Send,
   Bot,
@@ -94,7 +95,7 @@ const ChatBubbles = ({
       });
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error("[ChatBubbles] Speech recognition error", { error });
     },
   });
 
@@ -158,13 +159,13 @@ const ChatBubbles = ({
   const fixPythonCode = (code: string): string => {
     // If code contains semicolons and no newlines, it's likely malformed
     if (code.includes(';') && !code.includes('\n')) {
-      console.log('Fixing malformed Python code:', code);
+      logger.debug('[ChatBubbles] Fixing malformed Python code:', { code });
 
       // Split by semicolons and join with proper newlines
       const statements = code.split(';').map(s => s.trim()).filter(s => s.length > 0);
       const fixed = statements.join('\n');
 
-      console.log('Fixed Python code:', fixed);
+      logger.debug('[ChatBubbles] Fixed Python code:', { fixed });
       return fixed;
     }
 
@@ -314,8 +315,8 @@ const ChatBubbles = ({
                     <div className="max-w-[80%] min-w-0">
                       <div
                         className={`rounded-lg p-3 ${message.role === "user"
-                            ? "border border-primary/60 bg-card text-foreground"
-                            : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
+                          ? "border border-primary/60 bg-card text-foreground"
+                          : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
                           }`}
                       >
                         <div className={`prose prose-sm max-w-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
@@ -344,13 +345,7 @@ const ChatBubbles = ({
                                         const isBlock = !!match;
 
                                         // Debug logging for code snippets
-                                        console.log('Code snippet detected:', {
-                                          isBlock,
-                                          className,
-                                          lang,
-                                          children: String(children),
-                                          childrenLength: String(children).length
-                                        });
+                                        logger.debug('Code snippet detected:', { children, lang, isBlock });
 
                                         if (isBlock) {
                                           return (
@@ -372,7 +367,7 @@ const ChatBubbles = ({
                                                   onClick={() => {
                                                     const rawCode = String(children).replace(/\n$/, "");
                                                     const codeToInsert = fixPythonCode(rawCode);
-                                                    console.log('Inserting code snippet:', {
+                                                    logger.debug('Inserting code snippet:', {
                                                       originalChildren: String(children),
                                                       rawCode,
                                                       fixedCode: codeToInsert,
@@ -611,10 +606,10 @@ const ChatBubbles = ({
                 onClick={toggleMicrophone}
                 disabled={loading || isTyping}
                 className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded ${isListening
-                    ? "text-red-500 animate-pulse"
-                    : isProcessing
-                      ? "text-blue-500"
-                      : "text-gray-500 hover:text-gray-700"
+                  ? "text-red-500 animate-pulse"
+                  : isProcessing
+                    ? "text-blue-500"
+                    : "text-gray-500 hover:text-gray-700"
                   }`}
                 title={
                   isListening
