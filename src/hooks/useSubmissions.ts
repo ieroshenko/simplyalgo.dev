@@ -166,18 +166,18 @@ export const useSubmissions = (
       },
     );
 
-    channel.subscribe((status) => {
-        logger.debug("Channel subscription status", { component: "useSubmissions", status });
-        if (status === 'SUBSCRIBED') {
-          logger.debug("Successfully subscribed to realtime", { component: "useSubmissions", userId, problemId });
-        }
-        if (status === 'CHANNEL_ERROR') {
-          logger.error("Supabase realtime channel error for submissions", null, { component: "useSubmissions" });
-        }
-        if (status === 'TIMED_OUT') {
-          logger.error("Channel subscription timed out", null, { component: "useSubmissions" });
-        }
-      });
+    channel.subscribe((status, err) => {
+      logger.debug("Channel subscription status", { component: "useSubmissions", status });
+      if (status === 'SUBSCRIBED') {
+        logger.debug("Successfully subscribed to realtime", { component: "useSubmissions", userId, problemId });
+      }
+      if (status === 'CHANNEL_ERROR') {
+        logger.error("Supabase realtime channel error for submissions", { error: err, status }, { component: "useSubmissions" });
+      }
+      if (status === 'TIMED_OUT') {
+        logger.error("Channel subscription timed out", { error: err, status }, { component: "useSubmissions" });
+      }
+    });
 
     channelRef.current = channel;
 

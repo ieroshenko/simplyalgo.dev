@@ -103,14 +103,14 @@ export class EditorBoundsCalculator {
    */
   getEditorBounds(): EditorBounds | null {
     if (!this.editor) {
-      logger.warn('[EditorBoundsCalculator] No editor initialized');
+      logger.debug('[EditorBoundsCalculator] No editor initialized');
       return this.lastKnownBounds;
     }
 
     try {
       const domNode = this.editor.getDomNode();
       if (!domNode) {
-        logger.warn('[EditorBoundsCalculator] Editor DOM node not available');
+        logger.debug('[EditorBoundsCalculator] Editor DOM node not available');
         return this.lastKnownBounds;
       }
 

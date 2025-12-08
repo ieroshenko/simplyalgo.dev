@@ -466,7 +466,16 @@ export async function insertSnippetSmart(
   problemDescription: string,
   cursorPosition?: { line: number; column: number },
   contextHint?: string,
-): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
+): Promise<{
+  newCode: string;
+  insertedAtLine?: number;
+  rationale?: string;
+  mergeError?: {
+    reason: string;
+    type: string;
+    usedFallback: boolean;
+  }
+}> {
 
   const mergePrompt = `You are a smart code merging assistant. Your job is to intelligently merge the current code with the new snippet while PRESERVING as much of the existing code as possible.
 
@@ -524,7 +533,17 @@ Return JSON:
     };
 
   } catch (error) {
-    console.error("[ai-chat] Smart merge failed:", error);
+    // Capture detailed error information for logging and user feedback
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+
+    console.error("[ai-chat] Smart merge failed:", {
+      error: errorMessage,
+      errorName,
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      codeLength: code?.length || 0,
+      snippetLength: snippet?.code?.length || 0,
+    });
 
     // Fallback: Try to intelligently insert the snippet instead of replacing everything
     // Find a reasonable insertion point (after variable declarations, before return)
@@ -570,7 +589,12 @@ Return JSON:
     return {
       newCode: newLines.join('\n'),
       insertedAtLine: insertionLine,
-      rationale: "Fallback: Inserted snippet at intelligent location (before return or after last variable)"
+      rationale: `Fallback: Inserted snippet at intelligent location (before return or after last variable)`,
+      mergeError: {
+        reason: errorMessage,
+        type: errorName,
+        usedFallback: true
+      }
     };
   }
 }

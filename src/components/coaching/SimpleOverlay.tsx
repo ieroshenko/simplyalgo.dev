@@ -870,6 +870,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                     strong({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
                       return <strong {...props}>{children}</strong>;
                     },
+                    code({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                      // For inline code (no className), render as italics with better dark mode support
+                      const match = /language-(\w+)/.exec(className || "");
+                      if (!match) {
+                        return <em className="text-blue-600 dark:text-blue-400 font-medium" {...props}>{children}</em>;
+                      }
+                      // For code blocks with language, you could add syntax highlighting if needed
+                      return <code className={className} {...props}>{children}</code>;
+                    },
                   }}
                 >
                   {question}
@@ -935,38 +944,38 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                           Next Step:
                         </div>
                         {(() => {
-                           const qRaw = (validationResult.nextStep?.question || "").trim();
-                           // Split question if it contains explicit solution/answer marker
-                           const match = qRaw.match(/(?:Solution|Answer):\s*([\s\S]*)/i);
-                           const q = match && match.index !== undefined ? qRaw.substring(0, match.index).trim() : qRaw;
-                           const sol = match ? match[1].trim() : null;
-                           
-                           return (
-                             <>
-                               {q && (
-                                 <div className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap mb-2">
-                                   {q}
-                                 </div>
-                               )}
-                               
-                               {sol && (
-                                 <div className="mt-2">
-                                   <BlurredSection 
-                                     content={sol} 
-                                     label="Solution" 
-                                     icon="✅" 
-                                     className="bg-white/50 dark:bg-black/20 border-blue-300 dark:border-blue-500"
-                                   />
-                                 </div>
-                               )}
-                             </>
-                           );
+                          const qRaw = (validationResult.nextStep?.question || "").trim();
+                          // Split question if it contains explicit solution/answer marker
+                          const match = qRaw.match(/(?:Solution|Answer):\s*([\s\S]*)/i);
+                          const q = match && match.index !== undefined ? qRaw.substring(0, match.index).trim() : qRaw;
+                          const sol = match ? match[1].trim() : null;
+
+                          return (
+                            <>
+                              {q && (
+                                <div className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap mb-2">
+                                  {q}
+                                </div>
+                              )}
+
+                              {sol && (
+                                <div className="mt-2">
+                                  <BlurredSection
+                                    content={sol}
+                                    label="Solution"
+                                    icon="✅"
+                                    className="bg-white/50 dark:bg-black/20 border-blue-300 dark:border-blue-500"
+                                  />
+                                </div>
+                              )}
+                            </>
+                          );
                         })()}
-                        
+
                         {validationResult.nextStep?.hint?.trim() && (
                           <div className="mt-2">
-                            <BlurredSection 
-                              content={validationResult.nextStep.hint} 
+                            <BlurredSection
+                              content={validationResult.nextStep.hint}
                               className="bg-white/50 dark:bg-black/20 border-blue-300 dark:border-blue-500"
                             />
                           </div>
@@ -1120,35 +1129,133 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                   </>
                 )}
               </Button>
-              {validationResult?.codeToAdd && onInsertCorrectCode && (
-                <Button
-                  onClick={async () => {
-                    try {
-                      setIsInserting(true);
-                      await onInsertCorrectCode();
-                    } finally {
-                      setIsInserting(false);
-                    }
-                  }}
-                  disabled={isInserting}
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                >
-                  {isInserting ? (
-                    <>
-                      <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
-                      Applying fix...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Use Correct Code
-                    </>
+              {validationResult?.codeToAdd && (
+                <>
+                  <Button
+                    onClick={async () => {
+                      // Show the correct code dialog
+                      const dialog = document.getElementById('correct-code-dialog') as HTMLDialogElement;
+                      if (dialog) {
+                        dialog.showModal();
+                      }
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Code
+                  </Button>
+                  {onInsertCorrectCode && (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          setIsInserting(true);
+                          await onInsertCorrectCode();
+                        } finally {
+                          setIsInserting(false);
+                        }
+                      }}
+                      disabled={isInserting}
+                      size="sm"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                    >
+                      {isInserting ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                          Applying fix...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Apply Code
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </>
               )}
             </div>
           )}
+
+          {/* Correct Code Dialog */}
+          <dialog
+            id="correct-code-dialog"
+            className="backdrop:bg-black/50 bg-card text-card-foreground rounded-lg p-0 border border-border shadow-2xl max-w-2xl w-full"
+          >
+            <div className="flex flex-col max-h-[80vh]">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h3 className="text-lg font-semibold">Correct Code</h3>
+                <button
+                  onClick={() => {
+                    const dialog = document.getElementById('correct-code-dialog') as HTMLDialogElement;
+                    dialog?.close();
+                  }}
+                  className="p-1 hover:bg-accent rounded-md transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <div className="bg-muted rounded-md p-4 font-mono text-sm overflow-x-auto">
+                  <pre>{validationResult?.codeToAdd}</pre>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(validationResult?.codeToAdd || '');
+                      // Show a brief success message
+                      const btn = document.getElementById('copy-code-btn');
+                      if (btn) {
+                        btn.textContent = 'Copied!';
+                        setTimeout(() => {
+                          btn.textContent = 'Copy';
+                        }, 2000);
+                      }
+                    } catch (err) {
+                      console.error('Failed to copy:', err);
+                    }
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  <span id="copy-code-btn">Copy</span>
+                </Button>
+                {onInsertCorrectCode && (
+                  <Button
+                    onClick={async () => {
+                      try {
+                        setIsInserting(true);
+                        await onInsertCorrectCode();
+                        const dialog = document.getElementById('correct-code-dialog') as HTMLDialogElement;
+                        dialog?.close();
+                      } finally {
+                        setIsInserting(false);
+                      }
+                    }}
+                    disabled={isInserting}
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    {isInserting ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                        Applying...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Apply Code
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </dialog>
+
 
           {(overlayState === 'initial' || overlayState === 'validating') && (
             <Button

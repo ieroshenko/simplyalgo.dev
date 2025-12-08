@@ -404,9 +404,9 @@ const ChatBubbles = ({
                                           );
                                         }
                                         return (
-                                          <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">
+                                          <em className="text-blue-600 dark:text-blue-400 font-medium">
                                             {children}
-                                          </code>
+                                          </em>
                                         );
                                       },
                                       p: ({ children }) => <p>{children}</p>,

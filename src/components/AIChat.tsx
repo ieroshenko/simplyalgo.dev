@@ -483,7 +483,7 @@ const AIChat = ({
                     );
                   }
                   return (
-                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                    <em className="text-blue-600 dark:text-blue-400 font-medium">{children}</em>
                   );
                 },
               }}
@@ -706,7 +706,7 @@ const AIChat = ({
                                           );
                                         }
                                         return (
-                                          <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                                          <em className="text-blue-600 dark:text-blue-400 font-medium" {...props}>{children}</em>
                                         );
                                       },
                                       p: ({ children }) => (

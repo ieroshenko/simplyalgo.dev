@@ -52,6 +52,21 @@ class Logger {
     return false;
   }
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      // Log initialization status
+      const env = this.isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION';
+      const nrStatus = window.newrelic ? 'AVAILABLE' : 'NOT AVAILABLE';
+
+      // Use console directly to bypass our own filtering logic for this init message
+      console.log(`[Logger] Initialized in ${env} mode. New Relic: ${nrStatus}`);
+
+      if (!this.isDevelopment && !window.newrelic) {
+        console.warn('[Logger] Production mode detected but New Relic is not available!');
+      }
+    }
+  }
+
   // Expose environment status for debugging
   get isProduction(): boolean {
     return !this.isDevelopment;

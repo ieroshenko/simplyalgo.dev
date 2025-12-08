@@ -202,15 +202,63 @@ export function AdminDashboardNew() {
             .select("*", { count: "exact", head: true })
             .in("status", ["active", "trialing"]);
 
-        // Get active users by checking user_statistics
+        // Get active users by checking actual activity from multiple tables
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStart = today.toISOString();
 
-        const { count: activeCount } = await supabase
-            .from("user_statistics")
-            .select("*", { count: "exact", head: true })
-            .gte("last_activity_date", todayStr);
+        // Get users with activity today from various sources
+        const [
+            { data: chatUsers },
+            { data: coachingUsers },
+            { data: attemptsUsers },
+            { data: behavioralUsers },
+            { data: technicalUsers },
+            { data: systemDesignUsers }
+        ] = await Promise.all([
+            // AI chat sessions today
+            supabase
+                .from("ai_chat_sessions")
+                .select("user_id")
+                .gte("created_at", todayStart),
+            // Coaching sessions today
+            supabase
+                .from("coaching_sessions")
+                .select("user_id")
+                .gte("created_at", todayStart),
+            // Problem attempts today
+            supabase
+                .from("user_problem_attempts")
+                .select("user_id")
+                .gte("created_at", todayStart),
+            // Behavioral interview sessions today
+            supabase
+                .from("behavioral_interview_sessions")
+                .select("user_id")
+                .gte("created_at", todayStart),
+            // Technical interview sessions today
+            supabase
+                .from("technical_interview_sessions")
+                .select("user_id")
+                .gte("created_at", todayStart),
+            // System design sessions today
+            supabase
+                .from("system_design_sessions")
+                .select("user_id")
+                .gte("created_at", todayStart)
+        ]);
+
+        // Combine all user IDs and get unique count
+        const allUserIds = new Set([
+            ...(chatUsers?.map(u => u.user_id) || []),
+            ...(coachingUsers?.map(u => u.user_id) || []),
+            ...(attemptsUsers?.map(u => u.user_id) || []),
+            ...(behavioralUsers?.map(u => u.user_id) || []),
+            ...(technicalUsers?.map(u => u.user_id) || []),
+            ...(systemDesignUsers?.map(u => u.user_id) || [])
+        ]);
+
+        const activeCount = allUserIds.size;
 
         setTotalUsers(totalCount || 0);
         setPremiumUsers(premiumCount || 0);
