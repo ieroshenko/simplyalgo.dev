@@ -11,6 +11,7 @@ import { useUserStories } from "@/hooks/useUserStories";
 import { ArrowLeft, X, Loader2, Mic, MicOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { logger } from "@/utils/logger";
 
 const BehavioralStoryNew = () => {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ const BehavioralStoryNew = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [technicalSkills, setTechnicalSkills] = useState<string[]>([]);
   const [technologies, setTechnologies] = useState<string[]>([]);
-  
+
   // Input states for adding new tags/skills/technologies
   const [tagInput, setTagInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
@@ -48,7 +49,7 @@ const BehavioralStoryNew = () => {
       setTitle((prev) => prev + (prev ? ' ' : '') + transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralStoryNew] Speech recognition error (title)', { error });
     },
   });
 
@@ -65,7 +66,7 @@ const BehavioralStoryNew = () => {
       setDescription((prev) => prev + (prev ? ' ' : '') + transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralStoryNew] Speech recognition error (description)', { error });
     },
   });
 
@@ -255,13 +256,12 @@ const BehavioralStoryNew = () => {
                       type="button"
                       onClick={toggleMicrophoneTitle}
                       disabled={isSubmitting}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                        isListeningTitle
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListeningTitle
                           ? "text-red-500 animate-pulse"
                           : isProcessingTitle
                             ? "text-blue-500"
                             : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
+                        }`}
                       title={
                         isListeningTitle
                           ? "Stop listening"
@@ -319,13 +319,12 @@ const BehavioralStoryNew = () => {
                       type="button"
                       onClick={toggleMicrophoneDescription}
                       disabled={isSubmitting}
-                      className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                        isListeningDescription
+                      className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListeningDescription
                           ? "text-red-500 animate-pulse"
                           : isProcessingDescription
                             ? "text-blue-500"
                             : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
+                        }`}
                       title={
                         isListeningDescription
                           ? "Stop listening"

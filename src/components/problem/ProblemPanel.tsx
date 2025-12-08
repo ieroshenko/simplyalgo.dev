@@ -10,10 +10,13 @@ import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
+import "katex/dist/katex.min.css";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -237,6 +240,8 @@ const ProblemPanel = ({
             </h2>
             <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground prose-code:bg-transparent prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-img:rounded-lg prose-img:border prose-img:border-border prose-strong:text-foreground prose-strong:font-semibold prose-headings:text-foreground">
               <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   code({ inline, className, children }: any) {
                     const match = /language-(\w+)/.exec(className || "");

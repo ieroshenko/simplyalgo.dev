@@ -15,6 +15,7 @@ import {
   NotesData,
   SupabaseQueryResult,
 } from "@/types/supabase-common";
+import { logger } from "@/utils/logger";
 
 interface NotesProps {
   problemId: string;
@@ -50,7 +51,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
       const cached = localStorage.getItem(getCacheKey());
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
-      console.warn("Failed to load notes from cache:", error);
+      logger.warn('[Notes] Failed to load from cache', { error });
       return null;
     }
   }, [getCacheKey]);
@@ -59,7 +60,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     try {
       localStorage.setItem(getCacheKey(), JSON.stringify(notes));
     } catch (error) {
-      console.warn("Failed to save notes to cache:", error);
+      logger.warn('[Notes] Failed to save to cache', { error });
     }
   }, [getCacheKey]);
 
@@ -72,16 +73,16 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
       setContent(cached.content);
       setLastSaved(new Date(cached.lastSaved));
       setHasUnsavedChanges(false);
-      console.log("📝 Loaded notes from cache");
+      logger.debug('[Notes] Loaded from cache', { problemId });
     }
 
     // 2. Check if we need to sync from server
-    const shouldSync = !cached || 
+    const shouldSync = !cached ||
       (Date.now() - cached.timestamp > 5 * 60 * 1000) || // 5 minutes old
       cached.version === 0; // First time or corrupted cache
 
     if (!shouldSync) {
-      console.log("📝 Using cached notes, skipping server sync");
+      logger.debug('[Notes] Using cached notes, skipping server sync', { problemId });
       return;
     }
 
@@ -122,9 +123,9 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
             version: (cached?.version || 0) + 1
           });
 
-          console.log("📝 Synced newer notes from server");
+          logger.debug('[Notes] Synced from server', { problemId });
         } else {
-          console.log("📝 Cache is up-to-date, no sync needed");
+          logger.debug('[Notes] Cache is up-to-date', { problemId });
         }
       } else if (!cached) {
         // No server data and no cache - initialize empty
@@ -135,14 +136,14 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
           version: 1
         };
         saveToCache(emptyNotes);
-        console.log("📝 No notes found, initialized empty");
+        logger.debug('[Notes] Initialized empty notes', { problemId });
       }
     } catch (error) {
-      console.error("Error syncing notes:", error);
+      logger.error('[Notes] Error syncing notes', { error, problemId });
       if (!cached) {
         toast.error("Failed to load notes");
       } else {
-        console.log("📝 Using cached notes due to sync error");
+        logger.debug('[Notes] Using cached notes due to sync error', { problemId });
       }
     } finally {
       setIsLoading(false);
@@ -192,11 +193,11 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
 
         setLastSaved(now);
         setHasUnsavedChanges(false);
-        console.log("Notes saved successfully");
+        logger.debug('[Notes] Saved successfully', { problemId });
       } catch (error) {
-        console.error("Error saving notes:", error);
+        logger.error('[Notes] Error saving notes', { error, problemId });
         toast.error("Failed to save notes");
-        
+
         // Revert optimistic update on error
         const revertedCache = loadFromCache();
         if (revertedCache && revertedCache.content !== noteContent) {
@@ -224,7 +225,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     if (newContent.length <= maxCharacters) {
       setContent(newContent);
       setHasUnsavedChanges(true);
-      
+
       // Update local cache immediately for persistence across tab switches
       const cached = loadFromCache();
       saveToCache({
@@ -233,7 +234,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
         timestamp: Date.now(),
         version: (cached?.version || 0) + 1
       });
-      
+
       debouncedSave(newContent);
     }
   };

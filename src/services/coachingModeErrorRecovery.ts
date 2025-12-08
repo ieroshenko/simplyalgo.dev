@@ -4,6 +4,7 @@
  */
 
 import { CoachingMode } from '@/types';
+import { logger } from '@/utils/logger';
 
 export interface CoachingModeError extends Error {
   code: 'INVALID_MODE' | 'STORAGE_ERROR' | 'TOGGLE_FAILURE' | 'VALIDATION_ERROR' | 'UNKNOWN';
@@ -25,7 +26,7 @@ export function createCoachingModeError(
   error.code = code;
   error.originalMode = originalMode;
   error.attemptedMode = attemptedMode;
-  
+
   // Determine recovery action based on error type
   switch (code) {
     case 'INVALID_MODE':
@@ -41,7 +42,7 @@ export function createCoachingModeError(
     default:
       error.recoveryAction = 'FALLBACK_TO_COMPREHENSIVE';
   }
-  
+
   return error;
 }
 
@@ -57,12 +58,12 @@ export function validateCoachingModeWithRecovery(
     if (mode == null) {
       return { mode: currentMode };
     }
-    
+
     // Handle string validation
     if (typeof mode === 'string' && ['socratic', 'comprehensive'].includes(mode)) {
       return { mode: mode as CoachingMode };
     }
-    
+
     // Invalid mode - create error and fallback
     const error = createCoachingModeError(
       `Invalid coaching mode: ${mode}. Using fallback.`,
@@ -70,9 +71,9 @@ export function validateCoachingModeWithRecovery(
       currentMode,
       mode as CoachingMode
     );
-    
+
     return { mode: 'socratic', error };
-    
+
   } catch (validationError) {
     const error = createCoachingModeError(
       `Validation error: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`,
@@ -80,9 +81,9 @@ export function validateCoachingModeWithRecovery(
       currentMode,
       mode as CoachingMode
     );
-    
+
     return { mode: 'socratic', error };
-}
+  }
 }
 
 /**
@@ -94,30 +95,30 @@ export function handleCoachingModeError(
   onRetry?: () => void,
   onMaintain?: () => void
 ): CoachingMode {
-  console.error('Coaching mode error:', error);
-  
+  logger.error('[CoachingMode] Error occurred', { error });
+
   switch (error.recoveryAction) {
     case 'FALLBACK_TO_COMPREHENSIVE':
       if (onFallback) {
         onFallback('socratic');
       }
       return 'socratic';
-      
+
     case 'RETRY':
       if (onRetry) {
         onRetry();
       }
       return error.originalMode || 'socratic';
-      
+
     case 'MAINTAIN_CURRENT':
       if (onMaintain) {
         onMaintain();
       }
       return error.originalMode || 'socratic';
-      
+
     default:
       return 'socratic';
-}
+  }
 }
 
 /**
@@ -135,28 +136,28 @@ export function getCoachingModeErrorMessage(error: CoachingModeError): {
         description: `The requested mode is not supported. Switched to Socratic mode.`,
         action: 'Try switching modes again'
       };
-      
+
     case 'STORAGE_ERROR':
       return {
         title: 'Settings Save Failed',
         description: 'Your mode preference could not be saved, but the mode switch was successful.',
         action: 'Your selection will work for this session'
       };
-      
+
     case 'TOGGLE_FAILURE':
       return {
         title: 'Mode Switch Failed',
         description: `Could not switch to ${error.attemptedMode === 'socratic' ? 'Socratic' : 'Comprehensive'} mode.`,
         action: 'Please try again'
       };
-      
+
     case 'VALIDATION_ERROR':
       return {
         title: 'Mode Validation Error',
         description: 'There was an issue validating the coaching mode. Using Socratic mode.',
         action: 'Try refreshing the page if issues persist'
       };
-      
+
     default:
       return {
         title: 'Coaching Mode Error',
@@ -183,9 +184,9 @@ export function logCoachingModeError(error: CoachingModeError, context?: Record<
     timestamp: new Date().toISOString(),
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
   };
-  
-  console.error('[CoachingMode Error]', logData);
-  
+
+  logger.error('[CoachingMode] Error details', logData);
+
   // In a production environment, you might want to send this to an error tracking service
   // Example: errorTrackingService.captureException(error, logData);
 }

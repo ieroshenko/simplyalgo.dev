@@ -48,6 +48,7 @@ import CoachProgress from "@/components/coaching/CoachProgress";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
+import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import {
   Dialog,
@@ -57,7 +58,6 @@ import {
 } from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
-import { logger } from "@/utils/logger";
 import { CodeDiffDialog } from "@/components/CodeDiffDialog";
 
 
@@ -915,8 +915,8 @@ const ProblemSolverNew = () => {
                             {testResults[activeTestCase] && (
                               <div
                                 className={`p-4 rounded-lg border-2 ${testResults[activeTestCase].passed
-                                    ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
-                                    : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                                  ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                                  : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
                                   }`}
                               >
                                 <div className="flex items-center justify-between mb-4">
@@ -931,8 +931,8 @@ const ProblemSolverNew = () => {
                                     </span>
                                     <Badge
                                       className={`text-xs font-semibold px-3 py-1 ${testResults[activeTestCase].passed
-                                          ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
-                                          : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
+                                        ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                                        : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
                                         }`}
                                     >
                                       {testResults[activeTestCase].passed ? "✅ PASSED" : "❌ FAILED"}
@@ -972,8 +972,8 @@ const ProblemSolverNew = () => {
                                       </div>
                                       <pre
                                         className={`text-sm font-mono whitespace-pre overflow-x-auto ${testResults[activeTestCase].passed
-                                            ? "text-green-700 dark:text-green-300"
-                                            : "text-red-700 dark:text-red-300"
+                                          ? "text-green-700 dark:text-green-300"
+                                          : "text-red-700 dark:text-red-300"
                                           }`}
                                       >
                                         {renderValue(testResults[activeTestCase].actual) ||
@@ -1076,13 +1076,13 @@ const ProblemSolverNew = () => {
                 // Get code from the highlighted area in the main editor
                 const editor = codeEditorRef.current;
                 if (!editor) {
-                  console.error("Editor not available for code validation");
+                  logger.error('[ProblemSolverNew] Editor not available for code validation');
                   return;
                 }
 
                 // Get the current code from the editor
                 const currentCode = editor.getValue();
-                console.log("Validating code from editor:", currentCode);
+                logger.debug('[ProblemSolverNew] Validating code from editor', { codeLength: currentCode.length });
 
                 // Submit the current editor code for validation with optional explanation
                 submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
@@ -1110,7 +1110,7 @@ const ProblemSolverNew = () => {
               onFinishCoaching={async () => {
                 // When coaching completes successfully, save as submission
                 if (user?.id && problem?.id && code) {
-                  console.log('[ProblemSolverNew] Coaching completed - saving submission');
+                  logger.debug('[ProblemSolverNew] Coaching completed - saving submission');
                   try {
                     const saved = await UserAttemptsService.markProblemSolved(
                       user.id,
@@ -1126,7 +1126,7 @@ const ProblemSolverNew = () => {
                     );
                     toast.success("Solution saved to submissions! 🎉");
                   } catch (error) {
-                    console.error('[ProblemSolverNew] Failed to save coaching completion:', error);
+                    logger.error('[ProblemSolverNew] Failed to save coaching completion', { error });
                     toast.error("Failed to save submission");
                   }
                 }
@@ -1136,7 +1136,7 @@ const ProblemSolverNew = () => {
               hasAlternative={coachingState.lastValidation?.hasAlternative} // New prop
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
-                console.log("Exiting coach mode due to AI service error");
+                logger.debug('[ProblemSolverNew] Exiting coach mode due to AI service error');
                 stopCoaching();
               }}
               highlightedLine={coachingState.session.highlightArea?.startLine}

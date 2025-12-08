@@ -3,6 +3,7 @@ import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 interface ResumeUploadProps {
   onResumeExtracted: (text: string) => void;
@@ -49,7 +50,7 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
       onResumeExtracted(text);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to extract text from file");
-      console.error(err);
+      logger.error('[ResumeUpload] Error extracting text', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +95,7 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
 
       return data.text;
     } catch (err) {
-      console.error("Error parsing resume:", err);
+      logger.error('[ResumeUpload] Error parsing resume', { error: err });
       throw err;
     }
   };
@@ -128,11 +129,10 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
       {!fileName ? (
         <Card
           onClick={handleClick}
-          className={`border-2 border-dashed p-8 text-center transition-all ${
-            disabled
+          className={`border-2 border-dashed p-8 text-center transition-all ${disabled
               ? "opacity-50 cursor-not-allowed"
               : "cursor-pointer hover:border-primary hover:bg-accent"
-          }`}
+            }`}
         >
           <div className="flex flex-col items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">

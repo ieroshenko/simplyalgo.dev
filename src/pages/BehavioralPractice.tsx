@@ -34,6 +34,7 @@ import { ArrowLeft, Send, Loader2, Copy, Check, Edit, Mic, MicOff } from "lucide
 import { FeedbackViews } from "@/components/behavioral/FeedbackViews";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { BehavioralQuestion, STARScore, CustomMetrics, AnswerFeedback, PracticeAnswer, BehavioralQuestionCategory, QuestionDifficulty, EvaluationType } from "@/types";
+import { logger } from "@/utils/logger";
 
 const BehavioralPractice = () => {
   const navigate = useNavigate();
@@ -70,7 +71,7 @@ const BehavioralPractice = () => {
   } | null>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const lastLoadedQuestionIdRef = useRef<string | null>(null);
-  
+
   // Edit dialog state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editQuestionText, setEditQuestionText] = useState("");
@@ -92,7 +93,7 @@ const BehavioralPractice = () => {
       setAnswer((prev) => prev + (prev ? ' ' : '') + transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralPractice] Speech recognition error', { error });
     },
   });
 
@@ -149,13 +150,13 @@ const BehavioralPractice = () => {
     const loadLastAnswer = async () => {
       if (selectedQuestion && user) {
         const isDifferentQuestion = lastLoadedQuestionIdRef.current !== selectedQuestion.id;
-        
+
         // Only load from DB if it's a different question (preserve unsaved changes when switching tabs)
         if (isDifferentQuestion) {
           const last = await getLastAnswer(selectedQuestion.id);
           setLastAnswer(last);
           lastLoadedQuestionIdRef.current = selectedQuestion.id;
-          
+
           if (last) {
             setAnswer(last.answer_text);
             if (last.story_id) {
@@ -263,7 +264,7 @@ const BehavioralPractice = () => {
         }
       }
     } catch (err) {
-      console.error("Error submitting answer:", err);
+      logger.error('[BehavioralPractice] Error submitting answer', { error: err });
       alert("Failed to get feedback. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -423,28 +424,28 @@ const BehavioralPractice = () => {
                   {questions.slice(0, 5).map((q) => {
                     const score = questionScores[q.id];
                     return (
-                    <Button
-                      key={q.id}
-                      variant="outline"
-                      className="w-full justify-start text-left h-auto py-3"
-                      onClick={() => setSelectedQuestion(q)}
-                    >
+                      <Button
+                        key={q.id}
+                        variant="outline"
+                        className="w-full justify-start text-left h-auto py-3"
+                        onClick={() => setSelectedQuestion(q)}
+                      >
                         <div className="flex-1">
-                        <div className="font-medium">{q.question_text}</div>
+                          <div className="font-medium">{q.question_text}</div>
                           <div className="flex gap-2 mt-1 items-center">
-                          {q.category.map((cat) => (
-                            <Badge key={cat} variant="secondary" className="text-xs">
-                              {cat.replace(/_/g, " ")}
-                            </Badge>
-                          ))}
+                            {q.category.map((cat) => (
+                              <Badge key={cat} variant="secondary" className="text-xs">
+                                {cat.replace(/_/g, " ")}
+                              </Badge>
+                            ))}
                             {score !== undefined && (
                               <Badge variant="default" className="text-xs">
                                 Score: {score}%
                               </Badge>
                             )}
+                          </div>
                         </div>
-                      </div>
-                    </Button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -507,185 +508,185 @@ const BehavioralPractice = () => {
                   </DialogHeader>
                   <div className="space-y-2 mt-4">
                     {stories.map((story) => {
-                        const isSelected = selectedStory === story.id;
-                        const isExpanded = isSelected;
-                        
-                        // Build the story content for copying (only content, no metadata)
-                        // If STAR format exists, use that; otherwise use description
-                        const hasSTARFormat = story.situation && story.task && story.action && story.result;
-                        const contentParts = [];
-                        
-                        if (hasSTARFormat) {
-                          contentParts.push(
-                            `Situation: ${story.situation}`,
-                            `Task: ${story.task}`,
-                            `Action: ${story.action}`,
-                            `Result: ${story.result}`
-                          );
-                        } else if (story.description) {
-                          contentParts.push(story.description);
-                        }
-                        
-                        // Include metrics if it exists (as it's part of the content)
-                        if (story.metrics) {
-                          contentParts.push(`Metrics: ${story.metrics}`);
-                        }
-                        
-                        const storyContent = contentParts.join("\n\n");
+                      const isSelected = selectedStory === story.id;
+                      const isExpanded = isSelected;
 
-                        const handleCopy = async () => {
-                          try {
-                            await navigator.clipboard.writeText(storyContent);
-                            setCopiedStoryId(story.id);
-                            setTimeout(() => setCopiedStoryId(null), 2000);
-                          } catch (err) {
-                            console.error("Failed to copy:", err);
-                          }
-                        };
+                      // Build the story content for copying (only content, no metadata)
+                      // If STAR format exists, use that; otherwise use description
+                      const hasSTARFormat = story.situation && story.task && story.action && story.result;
+                      const contentParts = [];
 
-                        return (
-                          <div key={story.id} className="border rounded-lg overflow-hidden">
-                            <Button
-                              variant={isSelected ? "default" : "outline"}
-                              className="w-full justify-start text-left h-auto py-2 rounded-b-none"
-                              onClick={() =>
-                                setSelectedStory(isSelected ? null : story.id)
-                              }
-                            >
-                              <div className="flex-1">
-                            <div className="font-medium">{story.title}</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {story.description
-                                ? story.description.substring(0, 100) + "..."
-                                : story.situation
-                                  ? story.situation.substring(0, 100) + "..."
-                                  : "No description"}
+                      if (hasSTARFormat) {
+                        contentParts.push(
+                          `Situation: ${story.situation}`,
+                          `Task: ${story.task}`,
+                          `Action: ${story.action}`,
+                          `Result: ${story.result}`
+                        );
+                      } else if (story.description) {
+                        contentParts.push(story.description);
+                      }
+
+                      // Include metrics if it exists (as it's part of the content)
+                      if (story.metrics) {
+                        contentParts.push(`Metrics: ${story.metrics}`);
+                      }
+
+                      const storyContent = contentParts.join("\n\n");
+
+                      const handleCopy = async () => {
+                        try {
+                          await navigator.clipboard.writeText(storyContent);
+                          setCopiedStoryId(story.id);
+                          setTimeout(() => setCopiedStoryId(null), 2000);
+                        } catch (err) {
+                          logger.error('[BehavioralPractice] Failed to copy story', { error: err });
+                        }
+                      };
+
+                      return (
+                        <div key={story.id} className="border rounded-lg overflow-hidden">
+                          <Button
+                            variant={isSelected ? "default" : "outline"}
+                            className="w-full justify-start text-left h-auto py-2 rounded-b-none"
+                            onClick={() =>
+                              setSelectedStory(isSelected ? null : story.id)
+                            }
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium">{story.title}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {story.description
+                                  ? story.description.substring(0, 100) + "..."
+                                  : story.situation
+                                    ? story.situation.substring(0, 100) + "..."
+                                    : "No description"}
+                              </div>
                             </div>
-                          </div>
-                        </Button>
-                            
-                            {/* Expanded Content */}
-                            {isExpanded && (
-                              <div className="p-4 bg-muted/30 border-t space-y-4">
-                                {/* Copy Button */}
-                                <div className="flex justify-end">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleCopy}
-                                    className="gap-2"
-                                  >
-                                    {copiedStoryId === story.id ? (
-                                      <>
-                                        <Check className="w-4 h-4" />
-                                        Copied!
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-4 h-4" />
-                                        Copy Experience
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
+                          </Button>
 
-                                {/* Story Content */}
-                                <div className="space-y-3 text-sm">
-                                  {/* Show STAR format if all STAR fields exist, otherwise show description */}
-                                  {story.situation && story.task && story.action && story.result ? (
+                          {/* Expanded Content */}
+                          {isExpanded && (
+                            <div className="p-4 bg-muted/30 border-t space-y-4">
+                              {/* Copy Button */}
+                              <div className="flex justify-end">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleCopy}
+                                  className="gap-2"
+                                >
+                                  {copiedStoryId === story.id ? (
                                     <>
-                                      <div>
-                                        <div className="font-medium mb-1">Situation</div>
-                                        <div className="text-muted-foreground whitespace-pre-wrap">
-                                          {story.situation}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="font-medium mb-1">Task</div>
-                                        <div className="text-muted-foreground whitespace-pre-wrap">
-                                          {story.task}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="font-medium mb-1">Action</div>
-                                        <div className="text-muted-foreground whitespace-pre-wrap">
-                                          {story.action}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="font-medium mb-1">Result</div>
-                                        <div className="text-muted-foreground whitespace-pre-wrap">
-                                          {story.result}
-                                        </div>
-                                      </div>
+                                      <Check className="w-4 h-4" />
+                                      Copied!
                                     </>
                                   ) : (
-                                    story.description && (
-                                      <div>
-                                        <div className="font-medium mb-1">Description</div>
-                                        <div className="text-muted-foreground whitespace-pre-wrap">
+                                    <>
+                                      <Copy className="w-4 h-4" />
+                                      Copy Experience
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+
+                              {/* Story Content */}
+                              <div className="space-y-3 text-sm">
+                                {/* Show STAR format if all STAR fields exist, otherwise show description */}
+                                {story.situation && story.task && story.action && story.result ? (
+                                  <>
+                                    <div>
+                                      <div className="font-medium mb-1">Situation</div>
+                                      <div className="text-muted-foreground whitespace-pre-wrap">
+                                        {story.situation}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="font-medium mb-1">Task</div>
+                                      <div className="text-muted-foreground whitespace-pre-wrap">
+                                        {story.task}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="font-medium mb-1">Action</div>
+                                      <div className="text-muted-foreground whitespace-pre-wrap">
+                                        {story.action}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="font-medium mb-1">Result</div>
+                                      <div className="text-muted-foreground whitespace-pre-wrap">
+                                        {story.result}
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  story.description && (
+                                    <div>
+                                      <div className="font-medium mb-1">Description</div>
+                                      <div className="text-muted-foreground whitespace-pre-wrap">
                                         {story.description}
                                       </div>
                                     </div>
-                                    )
-                                  )}
+                                  )
+                                )}
 
-                                  {story.metrics && (
+                                {story.metrics && (
+                                  <div>
+                                    <div className="font-medium mb-1">Metrics</div>
+                                    <div className="text-muted-foreground">
+                                      {story.metrics}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Metadata */}
+                                <div className="flex flex-wrap gap-2 pt-2 border-t">
+                                  {story.tags && story.tags.length > 0 && (
                                     <div>
-                                      <div className="font-medium mb-1">Metrics</div>
-                                      <div className="text-muted-foreground">
-                                        {story.metrics}
+                                      <div className="text-xs font-medium mb-1">Tags</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {story.tags.map((tag, idx) => (
+                                          <Badge key={idx} variant="secondary" className="text-xs">
+                                            {tag}
+                                          </Badge>
+                                        ))}
                                       </div>
                                     </div>
                                   )}
 
-                                  {/* Metadata */}
-                                  <div className="flex flex-wrap gap-2 pt-2 border-t">
-                                    {story.tags && story.tags.length > 0 && (
-                                      <div>
-                                        <div className="text-xs font-medium mb-1">Tags</div>
-                                        <div className="flex flex-wrap gap-1">
-                                          {story.tags.map((tag, idx) => (
-                                            <Badge key={idx} variant="secondary" className="text-xs">
-                                              {tag}
-                                            </Badge>
-                                          ))}
-                                        </div>
+                                  {story.technical_skills && story.technical_skills.length > 0 && (
+                                    <div>
+                                      <div className="text-xs font-medium mb-1">Technical Skills</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {story.technical_skills.map((skill, idx) => (
+                                          <Badge key={idx} variant="secondary" className="text-xs">
+                                            {skill}
+                                          </Badge>
+                                        ))}
                                       </div>
-                                    )}
+                                    </div>
+                                  )}
 
-                                    {story.technical_skills && story.technical_skills.length > 0 && (
-                                      <div>
-                                        <div className="text-xs font-medium mb-1">Technical Skills</div>
-                                        <div className="flex flex-wrap gap-1">
-                                          {story.technical_skills.map((skill, idx) => (
-                                            <Badge key={idx} variant="secondary" className="text-xs">
-                                              {skill}
-                                            </Badge>
-                                          ))}
-                                        </div>
+                                  {story.technologies && story.technologies.length > 0 && (
+                                    <div>
+                                      <div className="text-xs font-medium mb-1">Technologies</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {story.technologies.map((tech, idx) => (
+                                          <Badge key={idx} variant="secondary" className="text-xs">
+                                            {tech}
+                                          </Badge>
+                                        ))}
                                       </div>
-                                    )}
-
-                                    {story.technologies && story.technologies.length > 0 && (
-                                      <div>
-                                        <div className="text-xs font-medium mb-1">Technologies</div>
-                                        <div className="flex flex-wrap gap-1">
-                                          {story.technologies.map((tech, idx) => (
-                                            <Badge key={idx} variant="secondary" className="text-xs">
-                                              {tech}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -697,11 +698,11 @@ const BehavioralPractice = () => {
                     <div>
                       <CardTitle>Your Answer</CardTitle>
                       <CardDescription>
-                        {(selectedQuestion.evaluation_type || 'star') === 'star' 
+                        {(selectedQuestion.evaluation_type || 'star') === 'star'
                           ? "Structure your answer using the STAR method (Situation, Task, Action, Result)"
                           : selectedQuestion.evaluation_type === 'custom'
-                          ? "Provide a detailed answer that addresses the custom evaluation criteria"
-                          : "Provide a clear and comprehensive answer to the question"}
+                            ? "Provide a detailed answer that addresses the custom evaluation criteria"
+                            : "Provide a clear and comprehensive answer to the question"}
                         {lastAnswer && (
                           <span className="block mt-2 text-sm text-muted-foreground">
                             Your previous answer is loaded below. You can edit it or start fresh.
@@ -729,10 +730,10 @@ const BehavioralPractice = () => {
                           : isProcessing
                             ? "🔄 Processing audio..."
                             : (selectedQuestion.evaluation_type || 'star') === 'star'
-                            ? "Type your answer here... Remember to use the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
-                            : selectedQuestion.evaluation_type === 'custom'
-                            ? "Type your answer here... Make sure to address all aspects mentioned in the custom evaluation criteria below."
-                            : "Type your answer here... Focus on providing a clear, detailed response with specific examples and outcomes."
+                              ? "Type your answer here... Remember to use the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
+                              : selectedQuestion.evaluation_type === 'custom'
+                                ? "Type your answer here... Make sure to address all aspects mentioned in the custom evaluation criteria below."
+                                : "Type your answer here... Focus on providing a clear, detailed response with specific examples and outcomes."
                       }
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
@@ -743,13 +744,12 @@ const BehavioralPractice = () => {
                         type="button"
                         onClick={toggleMicrophone}
                         disabled={isSubmitting}
-                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                          isListening
+                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListening
                             ? "text-red-500 animate-pulse"
                             : isProcessing
                               ? "text-blue-500"
                               : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        }`}
+                          }`}
                         title={
                           isListening
                             ? "Stop listening"
@@ -776,7 +776,7 @@ const BehavioralPractice = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Custom Evaluation Criteria */}
                   {selectedQuestion.evaluation_type === 'custom' && selectedQuestion.custom_evaluation_prompt && (
                     <div className="bg-muted/50 p-4 rounded-lg border">
@@ -813,9 +813,9 @@ const BehavioralPractice = () => {
                     feedback={feedback}
                     evaluationType={selectedQuestion.evaluation_type || 'star'}
                     onTryAgain={() => {
-                          setAnswer("");
-                          setFeedback(null);
-                        }}
+                      setAnswer("");
+                      setFeedback(null);
+                    }}
                   />
                 </div>
               )}

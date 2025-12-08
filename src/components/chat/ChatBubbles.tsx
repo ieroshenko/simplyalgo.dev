@@ -16,6 +16,8 @@ import type { CoachingMode } from "@/types";
 import TextareaAutosize from "react-textarea-autosize";
 import { CodeSnippet, Problem } from "@/types";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import Mermaid from "@/components/diagram/Mermaid";
@@ -23,6 +25,7 @@ import FlowCanvas from "@/components/diagram/FlowCanvas";
 import type { FlowGraph } from "@/types";
 import { CanvasContainer } from "@/components/canvas";
 import { hasInteractiveDemo } from "@/components/visualizations/registry";
+import "katex/dist/katex.min.css";
 
 interface ChatBubblesProps {
   problemId: string;
@@ -324,7 +327,16 @@ const ChatBubbles = ({
                               return (
                                 <div>
                                   <ReactMarkdown
+                                    remarkPlugins={[remarkMath]}
+                                    rehypePlugins={[rehypeKatex]}
                                     components={{
+                                      em({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        // Convert italics to bold for better emphasis
+                                        return <strong {...props}>{children}</strong>;
+                                      },
+                                      strong({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        return <strong {...props}>{children}</strong>;
+                                      },
                                       code({ className, children }) {
                                         const match = /language-(\w+)/.exec(className || "");
                                         const lang = match?.[1] || "python";

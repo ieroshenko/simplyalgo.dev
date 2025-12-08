@@ -48,6 +48,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { logger } from "@/utils/logger";
 
 const TechnicalInterview = () => {
   const navigate = useNavigate();
@@ -97,11 +98,11 @@ const TechnicalInterview = () => {
     voice: selectedVoice,
     onConnectionStatusChange: setConnectionStatus,
     onTranscript: (role, content) => {
-      console.log(`💾 [TechnicalInterview] Saving ${role} transcript:`, content);
+      logger.debug('Saving transcript', { component: 'TechnicalInterview', role, contentLength: content.length });
       addTranscript(role, content);
     },
     onTimeUp: () => {
-      console.log("[TechnicalInterview] Time is up, preparing to end interview");
+      logger.debug("Time is up, preparing to end interview", { component: 'TechnicalInterview' });
       toast.info("Time's up! The interviewer is providing feedback...");
       // Wait a bit for AI to finish feedback, then auto-stop
       setTimeout(() => {
@@ -109,7 +110,7 @@ const TechnicalInterview = () => {
       }, 10000); // 10 seconds for AI to finish
     },
     onFeedbackReceived: async (feedback) => {
-      console.log("[TechnicalInterview] Feedback received from AI:", feedback);
+      logger.debug("Feedback received from AI", { component: 'TechnicalInterview', passed: feedback.passed, score: feedback.overall_score });
       try {
         if (sessionId) {
           // Save feedback to database
@@ -132,7 +133,7 @@ const TechnicalInterview = () => {
           toast.success("Feedback saved!");
         }
       } catch (err) {
-        console.error("[TechnicalInterview] Failed to save feedback:", err);
+        logger.error("Failed to save feedback", err, { component: 'TechnicalInterview' });
         toast.error("Failed to save feedback");
       }
     },
@@ -150,7 +151,7 @@ const TechnicalInterview = () => {
     if (isInterviewActive && sessionId) {
       codeSnapshotIntervalRef.current = setInterval(() => {
         if (codeEditorRef.current && code !== lastCodeSnapshotRef.current) {
-          console.log("[TechnicalInterview] Saving periodic code snapshot");
+          logger.debug("Saving periodic code snapshot", { component: 'TechnicalInterview' });
           saveCodeSnapshot(code);
           lastCodeSnapshotRef.current = code;
         }
@@ -170,10 +171,10 @@ const TechnicalInterview = () => {
       try {
         setLoadingProblems(true);
         const problems = await TechnicalInterviewService.getAllEligibleProblems();
-        console.log(`[TechnicalInterview] Loaded ${problems.length} eligible problems`);
+        logger.debug("Loaded eligible problems", { component: 'TechnicalInterview', count: problems.length });
         setAvailableProblems(problems);
       } catch (err) {
-        console.error("Failed to load problems:", err);
+        logger.error("Failed to load problems", err, { component: 'TechnicalInterview' });
         toast.error("Failed to load problems");
       } finally {
         setLoadingProblems(false);
@@ -195,10 +196,10 @@ const TechnicalInterview = () => {
       // Get problem (random or specific)
       const selectedProblem = await TechnicalInterviewService.getProblem(selectedProblemId);
       
-      console.log('[TechnicalInterview] Selected problem:', {
+      logger.debug('Selected problem', {
+        component: 'TechnicalInterview',
         id: selectedProblem.id,
-        title: selectedProblem.title,
-        description: selectedProblem.description?.substring(0, 100) + '...'
+        title: selectedProblem.title
       });
       
       // Clear any previously saved code - start fresh with function signature
@@ -224,16 +225,16 @@ const TechnicalInterview = () => {
       // Wait for React to process state updates (2 render cycles)
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      console.log('[TechnicalInterview] Starting interview with:', {
+      logger.debug('Starting interview', {
+        component: 'TechnicalInterview',
         problemTitle: selectedProblem.title,
         problemId: selectedProblem.id,
-        hasDescription: !!selectedProblem.description,
         testCaseCount: selectedProblem.testCases?.length || 0
       });
       
       await startInterview();
     } catch (err) {
-      console.error("Failed to start interview:", err);
+      logger.error("Failed to start interview", err, { component: 'TechnicalInterview' });
       toast.error("Failed to start interview. Please try again.");
       setIsInterviewActive(false);
     }
@@ -298,7 +299,7 @@ const TechnicalInterview = () => {
         toast.error(`${passedCount}/${totalCount} test cases passed`);
       }
     } catch (error) {
-      console.error("Failed to run code:", error);
+      logger.error("Failed to run code", error, { component: 'TechnicalInterview' });
       toast.error("Failed to run code");
     } finally {
       setIsRunning(false);

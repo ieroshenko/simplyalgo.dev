@@ -14,6 +14,7 @@ import ResumeUpload from "@/components/behavioral/ResumeUpload";
 import { FeedbackViews } from "@/components/behavioral/FeedbackViews";
 import { Badge } from "@/components/ui/badge";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { logger } from "@/utils/logger";
 
 interface GeneratedQuestion {
   question_text: string;
@@ -74,7 +75,7 @@ const BehavioralMockInterview = () => {
       }));
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralMockInterview] Speech recognition error', { error });
     },
   });
 
@@ -164,7 +165,7 @@ const BehavioralMockInterview = () => {
         mockInterviewId: mockInterviewData.id,
       }));
     } catch (err) {
-      console.error("Error starting interview:", err);
+      logger.error('[BehavioralMockInterview] Error starting interview', { error: err });
       toast({
         title: "Error",
         description: err instanceof Error ? err.message : "Failed to start interview",
@@ -201,7 +202,7 @@ const BehavioralMockInterview = () => {
     setIsSubmittingAnswer(true);
     try {
       const currentQuestion = state.questions[state.currentQuestionIndex];
-      
+
       // Submit answer to database
       if (!state.mockInterviewId || !user?.id) throw new Error("Mock interview not initialized");
 
@@ -272,7 +273,7 @@ const BehavioralMockInterview = () => {
         setState(prev => ({ ...prev, step: 'feedback' }));
       }
     } catch (err) {
-      console.error("Error submitting answer:", err);
+      logger.error('[BehavioralMockInterview] Error submitting answer', { error: err });
       toast({
         title: "Error",
         description: err instanceof Error ? err.message : "Failed to submit answer",
@@ -461,13 +462,12 @@ const BehavioralMockInterview = () => {
                             type="button"
                             onClick={toggleMicrophone}
                             disabled={isSubmittingAnswer}
-                            className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                              isListening
+                            className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListening
                                 ? "text-red-500 animate-pulse"
                                 : isProcessing
                                   ? "text-blue-500"
                                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                            }`}
+                              }`}
                             title={
                               isListening
                                 ? "Stop listening"
@@ -545,11 +545,10 @@ const BehavioralMockInterview = () => {
                 {state.questions.map((_, idx) => (
                   <div
                     key={idx}
-                    className={`flex-1 h-2 rounded ${
-                      idx === state.currentQuestionIndex || state.answers[idx]?.trim()
+                    className={`flex-1 h-2 rounded ${idx === state.currentQuestionIndex || state.answers[idx]?.trim()
                         ? "bg-primary"
                         : "bg-muted"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -597,7 +596,7 @@ const BehavioralMockInterview = () => {
                 {state.questions.map((question, idx) => {
                   const answer = state.answers[idx];
                   const feedback = state.feedbacks[idx];
-                  
+
                   return (
                     <div key={idx} className="border rounded-lg p-4 space-y-4">
                       <div>
@@ -609,8 +608,8 @@ const BehavioralMockInterview = () => {
                         <p className="text-sm whitespace-pre-wrap">{answer || "No answer provided"}</p>
                       </div>
                       {feedback ? (
-                        <FeedbackViews 
-                          feedback={feedback} 
+                        <FeedbackViews
+                          feedback={feedback}
                           evaluationType="star"
                           onTryAgain={() => {
                             // Navigate back to questions step

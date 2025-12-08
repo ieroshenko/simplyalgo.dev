@@ -26,8 +26,37 @@ declare global {
 }
 
 class Logger {
-  private isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
-  
+  // Determine environment: 
+  // - Vercel sets PROD=true in production builds
+  // - import.meta.env.DEV is true only in local dev server
+  // - Also check hostname as fallback (localhost = dev)
+  private isDevelopment = this.detectEnvironment();
+
+  private detectEnvironment(): boolean {
+    // Check Vite's built-in environment flags first
+    if (import.meta.env.DEV) return true;
+    if (import.meta.env.PROD) return false;
+
+    // Check for Vercel environment (always production when deployed)
+    if (import.meta.env.VITE_VERCEL_ENV === 'production') return false;
+    if (import.meta.env.VITE_VERCEL_ENV === 'preview') return false;
+
+    // Fallback: check hostname
+    if (typeof window !== 'undefined') {
+      const hostname = window.location?.hostname || '';
+      if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+      if (hostname.includes('vercel.app') || hostname.includes('simplyalgo')) return false;
+    }
+
+    // Default to production for safety (don't spam console in prod)
+    return false;
+  }
+
+  // Expose environment status for debugging
+  get isProduction(): boolean {
+    return !this.isDevelopment;
+  }
+
   private formatMessage(level: LogLevel, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString();
     const contextStr = context ? ` ${JSON.stringify(context)}` : '';
@@ -63,10 +92,10 @@ class Logger {
       }
     }
   }
-  
+
   warn(message: string, context?: LogContext, ...args: unknown[]) {
     console.warn(this.formatMessage('warn', message, context), ...args);
-    
+
     // In production, also send to New Relic
     if (!this.isDevelopment && window.newrelic) {
       try {
@@ -76,11 +105,11 @@ class Logger {
       }
     }
   }
-  
+
   error(message: string, error?: Error | unknown, context?: LogContext, ...args: unknown[]) {
     const errorObj = error instanceof Error ? error : new Error(String(error));
     console.error(this.formatMessage('error', message, context), errorObj, ...args);
-    
+
     // In production, send to New Relic if available
     if (!this.isDevelopment) {
       if (window.newrelic) {
@@ -99,11 +128,11 @@ class Logger {
   }
 
   apiResponse(method: string, url: string, status: number, duration: number, context?: LogContext) {
-    this.debug(`API ${method} ${url} - ${status} (${duration}ms)`, { 
-      ...context, 
+    this.debug(`API ${method} ${url} - ${status} (${duration}ms)`, {
+      ...context,
       type: 'api_response',
       status,
-      duration 
+      duration
     });
   }
 

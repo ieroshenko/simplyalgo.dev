@@ -3,6 +3,8 @@
  * Handles save, load, remove, and cleanup operations with expiration and validation
  */
 
+import { logger } from '@/utils/logger';
+
 export interface StorageConfig {
   maxAge: number; // milliseconds
   fallbackPosition: { x: number; y: number };
@@ -54,7 +56,7 @@ export class LocalStorageService {
       localStorage.setItem(key, serializedData);
       return true;
     } catch (error) {
-      console.warn('LocalStorageService: Failed to save data', error);
+      logger.warn('[LocalStorageService] Failed to save data', { key, error });
       return false;
     }
   }
@@ -74,7 +76,7 @@ export class LocalStorageService {
       }
 
       const data = JSON.parse(serializedData) as T;
-      
+
       // Check if data has timestamp and is expired
       if (this.hasTimestamp(data) && this.isExpired(data.timestamp)) {
         this.remove(key);
@@ -83,7 +85,7 @@ export class LocalStorageService {
 
       return data;
     } catch (error) {
-      console.warn('LocalStorageService: Failed to load data', error);
+      logger.warn('[LocalStorageService] Failed to load data', { key, error });
       return null;
     }
   }
@@ -99,7 +101,7 @@ export class LocalStorageService {
 
       localStorage.removeItem(key);
     } catch (error) {
-      console.warn('LocalStorageService: Failed to remove data', error);
+      logger.warn('[LocalStorageService] Failed to remove data', { key, error });
     }
   }
 
@@ -140,7 +142,7 @@ export class LocalStorageService {
         this.save(this.STORAGE_KEY, cleanedData);
       }
     } catch (error) {
-      console.warn('LocalStorageService: Failed to cleanup expired entries', error);
+      logger.warn('[LocalStorageService] Failed to cleanup expired entries', { error });
     }
   }
 
@@ -149,13 +151,13 @@ export class LocalStorageService {
    */
   savePosition(problemId: string, position: OverlayPosition): boolean {
     const positionData = this.load<PositionStorage>(this.STORAGE_KEY) || {};
-    
+
     const metadata: PositionMetadata = {
       createdAt: positionData[problemId]?.metadata.createdAt || Date.now(),
       lastUsed: Date.now(),
       deviceType: this.getDeviceType(),
-      screenResolution: typeof window !== 'undefined' && window.screen 
-        ? `${window.screen.width}x${window.screen.height}` 
+      screenResolution: typeof window !== 'undefined' && window.screen
+        ? `${window.screen.width}x${window.screen.height}`
         : '1920x1080'
     };
 
@@ -177,7 +179,7 @@ export class LocalStorageService {
     }
 
     const entry = positionData[problemId];
-    
+
     // Update last used timestamp
     entry.metadata.lastUsed = Date.now();
     this.save(this.STORAGE_KEY, positionData);
@@ -249,11 +251,11 @@ export class LocalStorageService {
    * Check if data has timestamp property
    */
   private hasTimestamp(data: unknown): data is { timestamp: number } {
-    return data !== null && 
-           typeof data === 'object' && 
-           data !== undefined &&
-           'timestamp' in data && 
-           typeof (data as { timestamp: unknown }).timestamp === 'number';
+    return data !== null &&
+      typeof data === 'object' &&
+      data !== undefined &&
+      'timestamp' in data &&
+      typeof (data as { timestamp: unknown }).timestamp === 'number';
   }
 
   /**
@@ -284,7 +286,7 @@ export class LocalStorageService {
       }
       return keys;
     } catch (error) {
-      console.warn('LocalStorageService: Failed to get all keys', error);
+      logger.warn('[LocalStorageService] Failed to get all keys', { error });
       return [];
     }
   }

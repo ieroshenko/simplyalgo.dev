@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { speechRecognitionService } from "@/services/speechRecognition";
+import { logger } from "@/utils/logger";
 
 interface SpeechToTextOptions {
   onResult: (transcript: string) => void;
@@ -84,7 +85,7 @@ export const useSpeechToText = (
       try {
         recognitionRef.current.start();
       } catch (error) {
-        console.error("Failed to start speech recognition:", error);
+        logger.error('[useSpeechToText] Failed to start speech recognition', { error });
         setError("Failed to start speech recognition");
         options.onError("Failed to start speech recognition");
       }
@@ -141,7 +142,7 @@ export const useSpeechToText = (
       };
 
       mediaRecorder.onerror = (event) => {
-        console.error("MediaRecorder error:", event);
+        logger.error('[useSpeechToText] MediaRecorder error', { event });
         setError("Recording failed");
         options.onError("Recording failed");
         setIsListening(false);
@@ -157,7 +158,7 @@ export const useSpeechToText = (
         }
       }, 30000);
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.error('[useSpeechToText] Failed to start recording', { error });
       setError("Microphone access denied");
       options.onError("Microphone access denied");
     }

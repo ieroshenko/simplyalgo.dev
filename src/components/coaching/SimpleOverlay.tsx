@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { Button } from '../ui/button';
 import { X, Check, AlertTriangle, CheckCircle, RotateCcw, Sparkles, Eye, EyeOff, ChevronDown, Minimize2, Move, XCircle, Zap, BookOpen, MapPin } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import "katex/dist/katex.min.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -136,7 +141,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   const logDebug = useCallback((...args: unknown[]) => {
     try {
       if (localStorage.getItem('coach_overlay_debug') === '1') {
-        console.log('[COACH][overlay]', ...args);
+        logger.debug("[COACH][overlay]", { component: "SimpleOverlay", args });
       }
     } catch {
       void 0; // ignore
@@ -175,7 +180,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           editorBoundsCalculator.cleanup();
         };
       } catch (error) {
-        console.warn('Failed to initialize editor bounds calculator:', error);
+        logger.warn("Failed to initialize editor bounds calculator", { component: "SimpleOverlay", error });
       }
     }
   }, [editorRef, editorBoundsCalculator, customPosition, positionManager, problemId, highlightedLine]);
@@ -190,7 +195,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           return bounds;
         }
       } catch (error) {
-        console.warn('EditorBoundsCalculator failed:', error);
+        logger.warn("EditorBoundsCalculator failed", { component: "SimpleOverlay", error });
       }
     }
 
@@ -198,14 +203,14 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     try {
       const editorDom = editorRef?.current?.getDomNode?.();
       if (!editorDom) {
-        console.warn('Editor DOM node not available for bounds calculation');
+        logger.warn("Editor DOM node not available for bounds calculation", { component: "SimpleOverlay" });
         return null;
       }
 
       const editorRect = editorDom.getBoundingClientRect();
 
       if (!editorRect || editorRect.width === 0 || editorRect.height === 0) {
-        console.warn('Invalid editor rect dimensions');
+        logger.warn("Invalid editor rect dimensions", { component: "SimpleOverlay" });
         return null;
       }
 
@@ -218,7 +223,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
         height: editorRect.height,
       };
     } catch (error) {
-      console.warn('Manual editor bounds calculation failed:', error);
+      logger.warn("Manual editor bounds calculation failed", { component: "SimpleOverlay", error });
       return null;
     }
   }, [editorBoundsCalculator, editorRef]);
@@ -320,9 +325,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
     // Never show questions during validation
     if (isValidating) return false;
     // Never show questions if validation shows problem is solved or if there's a next step
-    if (validationResult?.isCorrect && (validationResult.nextAction === 'complete_session' || validationResult.nextStep?.question || validationResult.nextStep?.hint)) return false;
-    // Never show questions if lastValidation indicates completion
-    if (validationResult?.nextAction === 'complete_session') return false;
+    if (validationResult?.isCorrect && (validationResult.nextStep?.question || validationResult.nextStep?.hint)) return false;
     // Show question only if we have one and session is active
     return Boolean(question && question.trim() !== '' && !isSessionCompleted);
   }, [isSessionCompleted, isValidating, question, validationResult]);
@@ -352,15 +355,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           const resolvedPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
 
           setCustomPosition({ x: resolvedPosition.x, y: resolvedPosition.y });
-          console.log('🎯 [SimpleOverlay] Loaded resolved position:', resolvedPosition);
+          logger.debug("Loaded resolved position", { component: "SimpleOverlay", resolvedPosition });
         } else {
           // Use viewport fallback when editor bounds unavailable
           const fallbackPosition = positionManager.getPositionWithFallback();
           setCustomPosition({ x: fallbackPosition.x, y: fallbackPosition.y });
-          console.log('🎯 [SimpleOverlay] Loaded fallback position:', fallbackPosition);
+          logger.debug("Loaded fallback position", { component: "SimpleOverlay", fallbackPosition });
         }
       } catch (error) {
-        console.warn('⚠️ [SimpleOverlay] Failed to load position, using default:', error);
+        logger.warn("Failed to load position, using default", { component: "SimpleOverlay", error });
         // Don't set customPosition to allow getSmartPosition to handle fallback
       }
     }
@@ -447,22 +450,22 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           // Use centralized positioning with fallback handling
           const overlayPosition = positionManager.getPositionWithFallback(editorBounds, highlightedLine);
 
-          console.log('🎯 [SimpleOverlay] Using OverlayPositionManager position:', overlayPosition);
+          logger.debug("Using OverlayPositionManager position", { component: "SimpleOverlay", overlayPosition });
           return { x: overlayPosition.x, y: overlayPosition.y };
         } else {
           // Editor bounds not available, use viewport fallback
           const fallbackPosition = positionManager.getPositionWithFallback();
-          console.log('🎯 [SimpleOverlay] Using viewport fallback position:', fallbackPosition);
+          logger.debug("Using viewport fallback position", { component: "SimpleOverlay", fallbackPosition });
           return { x: fallbackPosition.x, y: fallbackPosition.y };
         }
       } catch (error) {
-        console.warn('⚠️ [SimpleOverlay] OverlayPositionManager failed, using fallback:', error);
+        logger.warn("OverlayPositionManager failed, using fallback", { component: "SimpleOverlay", error });
         // Use position manager's viewport fallback if available
         try {
           const fallbackPosition = positionManager.getPositionWithFallback();
           return { x: fallbackPosition.x, y: fallbackPosition.y };
         } catch (fallbackError) {
-          console.warn('⚠️ [SimpleOverlay] Fallback positioning also failed:', fallbackError);
+          logger.warn("Fallback positioning also failed", { component: "SimpleOverlay", error: fallbackError });
           return getPresetPosition('center');
         }
       }
@@ -491,7 +494,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
   // Enhanced error handling and fallback positioning
   const getErrorRecoveryPosition = useCallback(() => {
-    console.warn('⚠️ [SimpleOverlay] Using error recovery positioning');
+    logger.warn("Using error recovery positioning", { component: "SimpleOverlay" });
 
     // Try to get viewport dimensions safely
     const viewportWidth = window.innerWidth || 1024;
@@ -518,16 +521,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
 
       if (!editorBounds) {
         // Fallback if editor bounds not available
-        console.warn('⚠️ [SimpleOverlay] Editor bounds not available, using error recovery positioning');
+        logger.warn("Editor bounds not available, using error recovery positioning", { component: "SimpleOverlay" });
         return getErrorRecoveryPosition();
       }
 
-      console.log('🎯 [SimpleOverlay] Editor bounds:', editorBounds);
-      console.log('🎯 [SimpleOverlay] Monaco position (editor-relative):', position);
+      logger.debug("Editor bounds and Monaco position", { component: "SimpleOverlay", editorBounds, position });
 
       // Validate editor bounds dimensions
       if (editorBounds.width <= 0 || editorBounds.height <= 0) {
-        console.warn('⚠️ [SimpleOverlay] Invalid editor dimensions, using error recovery positioning');
+        logger.warn("Invalid editor dimensions, using error recovery positioning", { component: "SimpleOverlay" });
         return getErrorRecoveryPosition();
       }
 
@@ -535,13 +537,13 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       const viewportX = editorBounds.left + position.x;
       const viewportY = editorBounds.top + position.y;
 
-      console.log('🎯 [SimpleOverlay] Transformed to viewport:', { x: viewportX, y: viewportY });
+      logger.debug("Transformed to viewport", { component: "SimpleOverlay", x: viewportX, y: viewportY });
 
       if (isMobile) {
         // On mobile, dock at bottom but within editor bounds
         return {
-          x: Math.max(editorRect.left + 16, 16),
-          y: Math.min(editorRect.bottom - 300, window.innerHeight - 300),
+          x: Math.max(editorBounds.left + 16, 16),
+          y: Math.min(editorBounds.bottom - 300, window.innerHeight - 300),
         };
       }
 
@@ -554,8 +556,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       let idealY = viewportY + verticalOffset;
 
       // Constrain within editor bounds horizontally
-      const editorMinX = editorRect.left + horizontalPadding;
-      const editorMaxX = editorRect.right - overlayWidth - horizontalPadding;
+      const editorMinX = editorBounds.left + horizontalPadding;
+      const editorMaxX = editorBounds.right - overlayWidth - horizontalPadding;
 
       if (idealX < editorMinX) {
         idealX = editorMinX;
@@ -564,8 +566,8 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       }
 
       // Constrain within editor bounds vertically
-      const editorMinY = editorRect.top + 20;
-      const editorMaxY = editorRect.bottom - overlayHeight - 20;
+      const editorMinY = editorBounds.top + 20;
+      const editorMaxY = editorBounds.bottom - overlayHeight - 20;
 
       if (idealY > editorMaxY) {
         // Try placing above the highlighted line
@@ -578,11 +580,11 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
       }
 
       const finalPosition = { x: idealX, y: idealY };
-      console.log('🎯 [SimpleOverlay] Final legacy position:', finalPosition);
+      logger.debug("Final legacy position", { component: "SimpleOverlay", finalPosition });
 
       return finalPosition;
     } catch (error) {
-      console.error('🚨 [SimpleOverlay] Legacy positioning failed:', error);
+      logger.error("Legacy positioning failed", error, { component: "SimpleOverlay" });
       return getErrorRecoveryPosition();
     }
   };
@@ -642,7 +644,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             setCustomPosition({ x: validatedPosition.x, y: validatedPosition.y });
           }
 
-          console.log('🎯 [SimpleOverlay] Position saved via OverlayPositionManager (debounced):', validatedPosition);
+          logger.debug("Position saved via OverlayPositionManager (debounced)", { component: "SimpleOverlay", validatedPosition });
         } else {
           // Save without validation if editor bounds unavailable
           const overlayPosition: OverlayPosition = {
@@ -655,10 +657,10 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             },
           };
           positionManager.savePosition(overlayPosition);
-          console.log('🎯 [SimpleOverlay] Position saved without validation (debounced):', overlayPosition);
+          logger.debug("Position saved without validation (debounced)", { component: "SimpleOverlay", overlayPosition });
         }
       } catch (error) {
-        console.warn('⚠️ [SimpleOverlay] Failed to save position via OverlayPositionManager (debounced):', error);
+        logger.warn("Failed to save position via OverlayPositionManager (debounced)", { component: "SimpleOverlay", error });
       }
     }, 300); // 300ms debounce delay
   }, [positionManager, problemId, getEditorBounds]);
@@ -709,15 +711,15 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
               const isValid = positionManager.isPositionValid(overlayPosition, editorBounds);
 
               if (!isValid) {
-                console.log('🎯 [SimpleOverlay] User placed overlay outside editor bounds - allowing it');
+                logger.debug("User placed overlay outside editor bounds - allowing it", { component: "SimpleOverlay" });
               }
             }
 
             // Save the exact position the user chose
             positionManager.savePosition(overlayPosition);
-            console.log('🎯 [SimpleOverlay] User drag position saved:', overlayPosition);
+            logger.debug("User drag position saved", { component: "SimpleOverlay", overlayPosition });
           } catch (error) {
-            console.warn('⚠️ [SimpleOverlay] Failed to save position:', error);
+            logger.warn("Failed to save position", { component: "SimpleOverlay", error });
           }
         }
 
@@ -857,7 +859,21 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           {shouldShowQuestion && (
             <div className="p-4">
               <div className="text-sm font-medium mb-2 text-foreground leading-relaxed">
-                {question}
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                  components={{
+                    em({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                      // Convert italics to bold for better emphasis
+                      return <strong {...props}>{children}</strong>;
+                    },
+                    strong({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                      return <strong {...props}>{children}</strong>;
+                    },
+                  }}
+                >
+                  {question}
+                </ReactMarkdown>
               </div>
               {hint && !validationResult && (
                 <BlurredSection content={hint} />

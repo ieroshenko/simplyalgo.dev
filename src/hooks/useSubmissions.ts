@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { UserAttemptsService, UserAttempt } from "@/services/userAttempts";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeCode } from "@/utils/code";
+import { logger } from "@/utils/logger";
 
 // Use shared normalizeCode from utils
 
@@ -90,11 +91,11 @@ export const useSubmissions = (
   useEffect(() => {
     if (!userId || !problemId) return;
 
-    console.log('[useSubmissions] 🔌 Setting up realtime subscription', { userId, problemId });
+    logger.debug("Setting up realtime subscription", { component: "useSubmissions", userId, problemId });
 
     // Cleanup old channel first
     if (channelRef.current) {
-      console.log('[useSubmissions] 🧹 Cleaning up old channel');
+      logger.debug("Cleaning up old channel", { component: "useSubmissions" });
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
@@ -114,24 +115,17 @@ export const useSubmissions = (
         filter: `user_id=eq.${userId}`,
       },
       (payload: any) => {
-        console.log('[useSubmissions] INSERT event received:', payload);
+        logger.debug("INSERT event received", { component: "useSubmissions", payload });
         const attempt = payload.new as UserAttempt;
         if (!attempt) {
-          console.log('[useSubmissions] INSERT: No attempt data');
+          logger.debug("INSERT: No attempt data", { component: "useSubmissions" });
           return;
         }
         if (attempt.problem_id !== problemId) {
-          console.log('[useSubmissions] INSERT: Wrong problem_id', {
-            received: attempt.problem_id,
-            expected: problemId
-          });
+          logger.debug("INSERT: Wrong problem_id", { component: "useSubmissions", received: attempt.problem_id, expected: problemId });
           return;
         }
-        console.log('[useSubmissions] INSERT: Adding attempt', {
-          id: attempt.id,
-          status: attempt.status,
-          problemId: attempt.problem_id
-        });
+        logger.debug("INSERT: Adding attempt", { component: "useSubmissions", id: attempt.id, status: attempt.status, problemId: attempt.problem_id });
         addOrUpdateIfPassed(attempt);
       },
     );
@@ -173,22 +167,22 @@ export const useSubmissions = (
     );
 
     channel.subscribe((status) => {
-        console.log('[useSubmissions] Channel subscription status:', status);
+        logger.debug("Channel subscription status", { component: "useSubmissions", status });
         if (status === 'SUBSCRIBED') {
-          console.log('[useSubmissions] ✅ Successfully subscribed to realtime for user:', userId, 'problem:', problemId);
+          logger.debug("Successfully subscribed to realtime", { component: "useSubmissions", userId, problemId });
         }
         if (status === 'CHANNEL_ERROR') {
-          console.error('[useSubmissions] ❌ Supabase realtime channel error for submissions');
+          logger.error("Supabase realtime channel error for submissions", null, { component: "useSubmissions" });
         }
         if (status === 'TIMED_OUT') {
-          console.error('[useSubmissions] ⏱️ Channel subscription timed out');
+          logger.error("Channel subscription timed out", null, { component: "useSubmissions" });
         }
       });
 
     channelRef.current = channel;
 
     return () => {
-      console.log('[useSubmissions] 🔌 Cleaning up realtime subscription (effect cleanup)', { userId, problemId });
+      logger.debug("Cleaning up realtime subscription (effect cleanup)", { component: "useSubmissions", userId, problemId });
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -222,18 +216,13 @@ export const useSubmissions = (
 
   // Expose an optimistic add helper for immediate UI updates on known success
   const optimisticAdd = (attempt: UserAttempt | null) => {
-    console.log('[useSubmissions] 🚀 Optimistic add called', { 
-      hasAttempt: !!attempt, 
-      attemptId: attempt?.id,
-      status: attempt?.status,
-      problemId: attempt?.problem_id 
-    });
+    logger.debug("Optimistic add called", { component: "useSubmissions", hasAttempt: !!attempt, attemptId: attempt?.id, status: attempt?.status, problemId: attempt?.problem_id });
     addOrUpdateIfPassed(attempt || undefined);
   };
 
   // Lightweight polling fallback: use when backend updates may lag or realtime is disabled
   const watchForAcceptance = (timeoutMs = 60_000, intervalMs = 2_000) => {
-    console.log('[useSubmissions] 🔄 Starting watchForAcceptance polling', { timeoutMs, intervalMs, userId, problemId });
+    logger.debug("Starting watchForAcceptance polling", { component: "useSubmissions", timeoutMs, intervalMs, userId, problemId });
     if (!userId || !problemId) return;
     // Reset any prior polling
     if (pollTimerRef.current) {
@@ -251,14 +240,14 @@ export const useSubmissions = (
       }
       try {
         const data = await UserAttemptsService.getAcceptedSubmissions(userId, problemId);
-        console.log('[useSubmissions] 📥 Polling fetch result:', { count: data.length, timeRemaining: pollDeadlineRef.current - Date.now() });
+        logger.debug("Polling fetch result", { component: "useSubmissions", count: data.length, timeRemaining: pollDeadlineRef.current - Date.now() });
         // If a new item arrived, update and stop polling
         setSubmissions((prev) => {
           const prevIds = new Set(prev.map((p) => p.id));
           const next = [...data];
           const hasNew = next.some((n) => !prevIds.has(n.id));
           if (hasNew) {
-            console.log('[useSubmissions] ✅ New submission detected via polling! Stopping poll.');
+            logger.debug("New submission detected via polling! Stopping poll.", { component: "useSubmissions" });
             if (pollTimerRef.current) {
               clearInterval(pollTimerRef.current);
               pollTimerRef.current = null;
@@ -267,7 +256,7 @@ export const useSubmissions = (
           return next;
         });
       } catch (err) {
-        console.warn('[useSubmissions] ⚠️ Polling fetch error:', err);
+        logger.warn("Polling fetch error", { component: "useSubmissions", error: err });
       }
     }, intervalMs);
   };

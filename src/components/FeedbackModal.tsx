@@ -15,12 +15,13 @@ import { MessageSquare, Send, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { FeedbackService, type FeedbackSubmission } from "@/services/feedbackService";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 
 interface FeedbackModalProps {
   children: React.ReactNode;
 }
 
-const FeedbackModal = ({ children }: FeedbackModalProps) => {   
+const FeedbackModal = ({ children }: FeedbackModalProps) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -37,7 +38,7 @@ const FeedbackModal = ({ children }: FeedbackModalProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!feedback.trim()) {
       toast({
         title: "Feedback Required",
@@ -57,7 +58,7 @@ const FeedbackModal = ({ children }: FeedbackModalProps) => {
       };
 
       const result = await FeedbackService.submitFeedback(feedbackData);
-      
+
       if (result.success) {
         toast({
           title: "Feedback Submitted",
@@ -76,7 +77,7 @@ const FeedbackModal = ({ children }: FeedbackModalProps) => {
         });
       }
     } catch (error) {
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error submitting feedback', { error });
       toast({
         title: "Submission Failed",
         description: "An unexpected error occurred. Please try again.",

@@ -1,4 +1,5 @@
 import { EditorBounds } from './overlayPositionManager';
+import { logger } from '@/utils/logger';
 
 /**
  * Interface for Monaco editor instance
@@ -102,22 +103,22 @@ export class EditorBoundsCalculator {
    */
   getEditorBounds(): EditorBounds | null {
     if (!this.editor) {
-      console.warn('EditorBoundsCalculator: No editor initialized');
+      logger.warn('[EditorBoundsCalculator] No editor initialized');
       return this.lastKnownBounds;
     }
 
     try {
       const domNode = this.editor.getDomNode();
       if (!domNode) {
-        console.warn('EditorBoundsCalculator: Editor DOM node not available');
+        logger.warn('[EditorBoundsCalculator] Editor DOM node not available');
         return this.lastKnownBounds;
       }
 
       const rect = domNode.getBoundingClientRect();
-      
+
       // Validate DOM rect
       if (!rect || rect.width === 0 || rect.height === 0) {
-        console.warn('EditorBoundsCalculator: Invalid DOM rect dimensions');
+        logger.warn('[EditorBoundsCalculator] Invalid DOM rect dimensions');
         return this.lastKnownBounds;
       }
 
@@ -136,21 +137,21 @@ export class EditorBoundsCalculator {
 
       // Validate calculated bounds
       if (bounds.width <= 0 || bounds.height <= 0) {
-        console.warn('EditorBoundsCalculator: Calculated bounds have invalid dimensions');
+        logger.warn('[EditorBoundsCalculator] Calculated bounds have invalid dimensions');
         return this.lastKnownBounds;
       }
 
       // Additional validation for reasonable bounds
       if (bounds.left < -window.innerWidth || bounds.top < -window.innerHeight ||
-          bounds.right > window.innerWidth * 2 || bounds.bottom > window.innerHeight * 2) {
-        console.warn('EditorBoundsCalculator: Bounds appear to be outside reasonable viewport range');
+        bounds.right > window.innerWidth * 2 || bounds.bottom > window.innerHeight * 2) {
+        logger.warn('[EditorBoundsCalculator] Bounds appear to be outside reasonable viewport range');
         return this.lastKnownBounds;
       }
 
       this.lastKnownBounds = bounds;
       return bounds;
     } catch (error) {
-      console.warn('EditorBoundsCalculator: Failed to calculate editor bounds:', error);
+      logger.warn('[EditorBoundsCalculator] Failed to calculate editor bounds', { error });
       return this.lastKnownBounds;
     }
   }
@@ -169,7 +170,7 @@ export class EditorBoundsCalculator {
         left: this.editor.getScrollLeft(),
       };
     } catch (error) {
-      console.warn('Failed to get scroll position:', error);
+      logger.warn('[EditorBoundsCalculator] Failed to get scroll position', { error });
       return null;
     }
   }
@@ -185,7 +186,7 @@ export class EditorBoundsCalculator {
     try {
       const layoutInfo = this.editor.getLayoutInfo();
       const scrollPosition = this.getScrollPosition();
-      
+
       if (!scrollPosition) {
         return null;
       }
@@ -207,7 +208,7 @@ export class EditorBoundsCalculator {
         },
       };
     } catch (error) {
-      console.warn('Failed to get viewport info:', error);
+      logger.warn('[EditorBoundsCalculator] Failed to get viewport info', { error });
       return null;
     }
   }
@@ -236,7 +237,7 @@ export class EditorBoundsCalculator {
         height: position.height,
       };
     } catch (error) {
-      console.warn('Failed to get line bounds:', error);
+      logger.warn('[EditorBoundsCalculator] Failed to get line bounds', { error });
       return null;
     }
   }
@@ -246,7 +247,7 @@ export class EditorBoundsCalculator {
    */
   areBoundsValid(bounds?: EditorBounds): boolean {
     const targetBounds = bounds || this.getEditorBounds();
-    
+
     if (!targetBounds) {
       return false;
     }
@@ -269,7 +270,7 @@ export class EditorBoundsCalculator {
    */
   onBoundsChange(listener: BoundsChangeListener): () => void {
     this.boundsChangeListeners.add(listener);
-    
+
     // Return unsubscribe function
     return () => {
       this.boundsChangeListeners.delete(listener);
@@ -372,7 +373,7 @@ export class EditorBoundsCalculator {
       try {
         listener(bounds);
       } catch (error) {
-        console.warn('Error in bounds change listener:', error);
+        logger.warn('[EditorBoundsCalculator] Error in bounds change listener', { error });
       }
     });
   }

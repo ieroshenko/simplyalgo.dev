@@ -45,7 +45,7 @@ export class UserAttemptsService {
       .limit(limit)) as SupabaseQueryResult<RecentActivityRow[]>;
 
     if (error || !data) {
-      console.error("Error fetching recent activity:", error);
+      logger.error('[UserAttemptsService] Error fetching recent activity', { userId, error });
       return [];
     }
 
@@ -57,9 +57,9 @@ export class UserAttemptsService {
       updated_at: row.updated_at,
       problem: row.problems
         ? {
-            title: row.problems.title ?? row.problem_id,
-            difficulty: row.problems.difficulty as "Easy" | "Medium" | "Hard",
-          }
+          title: row.problems.title ?? row.problem_id,
+          difficulty: row.problems.difficulty as "Easy" | "Medium" | "Hard",
+        }
         : null,
     }));
   }
@@ -78,7 +78,7 @@ export class UserAttemptsService {
       .maybeSingle()) as SupabaseQueryResult<UserAttempt>;
 
     if (error) {
-      console.error("Error fetching latest attempt:", error);
+      logger.error('[UserAttemptsService] Error fetching latest attempt', { userId, problemId, error });
       return null;
     }
 
@@ -113,7 +113,7 @@ export class UserAttemptsService {
         .single()) as SupabaseQueryResult<UserAttempt>;
 
       if (error) {
-        console.error("Error updating draft:", error);
+        logger.error('[UserAttemptsService] Error updating draft', { userId, problemId, draftId: existingDraft.id, error });
         return null;
       }
 
@@ -132,7 +132,7 @@ export class UserAttemptsService {
         .single()) as SupabaseQueryResult<UserAttempt>;
 
       if (error) {
-        console.error("Error creating draft:", error);
+        logger.error('[UserAttemptsService] Error creating draft', { userId, problemId, error });
         return null;
       }
 
@@ -160,7 +160,7 @@ export class UserAttemptsService {
       .single()) as SupabaseQueryResult<UserAttempt>;
 
     if (error) {
-      console.error("Error submitting code:", error);
+      logger.error('[UserAttemptsService] Error submitting code', { userId, problemId, error });
       return null;
     }
 
@@ -200,7 +200,7 @@ export class UserAttemptsService {
       .single()) as SupabaseQueryResult<UserAttempt>;
 
     if (error) {
-      console.error("Error marking problem as solved:", error);
+      logger.error('[UserAttemptsService] Error marking problem as solved', { userId, problemId, error });
       return null;
     }
 
@@ -241,7 +241,7 @@ export class UserAttemptsService {
       .order("updated_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching user problem statuses:", error);
+      logger.error('[UserAttemptsService] Error fetching user problem statuses', { userId, problemIds, error });
       return {};
     }
 
@@ -259,7 +259,7 @@ export class UserAttemptsService {
       if (
         !latestAttempts[attempt.problem_id] ||
         new Date(attempt.updated_at) >
-          new Date(latestAttempts[attempt.problem_id].updated_at)
+        new Date(latestAttempts[attempt.problem_id].updated_at)
       ) {
         latestAttempts[attempt.problem_id] = attempt;
       }
@@ -284,7 +284,7 @@ export class UserAttemptsService {
       .eq("status", "pending");
 
     if (error) {
-      console.error("Error clearing draft:", error);
+      logger.error('[UserAttemptsService] Error clearing draft', { userId, problemId, error });
       return false;
     }
 
@@ -303,8 +303,8 @@ export class UserAttemptsService {
       .eq("problem_id", problemId)
       .eq("status", "passed")
       .order("created_at", { ascending: false })) as SupabaseQueryResult<
-      UserAttempt[]
-    >;
+        UserAttempt[]
+      >;
 
     if (error) {
       logger.error('[UserAttemptsService] Error fetching accepted submissions', { userId, problemId, error });
@@ -339,7 +339,7 @@ export class UserAttemptsService {
   ): Promise<UserAttempt | null> {
     logger.info('[UserAttemptsService] Saving analysis for submission', { submissionId });
     logger.debug('[UserAttemptsService] Analysis payload', { submissionId, analysis });
-    
+
     const { data, error } = (await supabase
       .from("user_problem_attempts")
       .update({

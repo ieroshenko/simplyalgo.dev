@@ -1,4 +1,5 @@
 import { OverlayPosition, EditorBounds } from './overlayPositionManager';
+import { logger } from '@/utils/logger';
 
 /**
  * Error recovery strategies for overlay positioning
@@ -71,15 +72,15 @@ export class ErrorRecoveryService {
     });
 
     // Log error for debugging
-    console.warn(`[ErrorRecovery] Handling ${context.errorType}:`, context.originalError?.message);
+    logger.warn('[ErrorRecovery] Handling error', { errorType: context.errorType, errorMessage: context.originalError?.message });
 
     // Choose recovery strategy based on error type and history
     const strategy = this.selectRecoveryStrategy(context);
-    
+
     try {
       return this.executeRecoveryStrategy(strategy, context);
     } catch (recoveryError) {
-      console.error('[ErrorRecovery] Recovery strategy failed:', recoveryError);
+      logger.error('[ErrorRecovery] Recovery strategy failed', { recoveryError });
       return this.getEmergencyFallback();
     }
   }
@@ -89,7 +90,7 @@ export class ErrorRecoveryService {
    */
   private selectRecoveryStrategy(context: ErrorContext): ErrorRecoveryStrategy {
     const errorCount = this.getErrorCount(context.errorType);
-    
+
     // Use configured strategy for first attempt
     if (errorCount === 1) {
       return this.config.strategy;
@@ -99,16 +100,16 @@ export class ErrorRecoveryService {
     switch (context.errorType) {
       case 'editor_unavailable':
         return errorCount > 2 ? ErrorRecoveryStrategy.SAFE_CORNER : ErrorRecoveryStrategy.VIEWPORT_CENTER;
-      
+
       case 'bounds_invalid':
         return errorCount > 1 ? ErrorRecoveryStrategy.VIEWPORT_CENTER : ErrorRecoveryStrategy.LAST_KNOWN_GOOD;
-      
+
       case 'storage_failed':
         return ErrorRecoveryStrategy.VIEWPORT_CENTER;
-      
+
       case 'calculation_failed':
         return errorCount > 2 ? ErrorRecoveryStrategy.SAFE_CORNER : ErrorRecoveryStrategy.LAST_KNOWN_GOOD;
-      
+
       default:
         return ErrorRecoveryStrategy.VIEWPORT_CENTER;
     }
@@ -121,16 +122,16 @@ export class ErrorRecoveryService {
     switch (strategy) {
       case ErrorRecoveryStrategy.VIEWPORT_CENTER:
         return this.getViewportCenterPosition();
-      
+
       case ErrorRecoveryStrategy.SAFE_CORNER:
         return this.getSafeCornerPosition();
-      
+
       case ErrorRecoveryStrategy.LAST_KNOWN_GOOD:
         return this.getLastKnownGoodPosition(context);
-      
+
       case ErrorRecoveryStrategy.ADAPTIVE_FALLBACK:
         return this.getAdaptiveFallbackPosition(context);
-      
+
       default:
         return this.getViewportCenterPosition();
     }
@@ -179,7 +180,7 @@ export class ErrorRecoveryService {
         height: window.innerHeight,
       };
 
-      const isValid = 
+      const isValid =
         this.lastKnownGoodPosition.x >= 0 &&
         this.lastKnownGoodPosition.y >= 0 &&
         this.lastKnownGoodPosition.x + this.config.minOverlaySize.width <= viewport.width &&
@@ -302,7 +303,7 @@ export class ErrorRecoveryService {
     const recentErrors = this.errorHistory.filter(
       error => error.errorType === errorType && Date.now() - (error.lastKnownPosition?.timestamp || 0) < 5000
     );
-    
+
     return recentErrors.length >= this.config.maxRetries;
   }
 
@@ -318,11 +319,11 @@ export class ErrorRecoveryService {
    */
   getErrorStats(): { [key: string]: number } {
     const stats: { [key: string]: number } = {};
-    
+
     this.errorHistory.forEach(error => {
       stats[error.errorType] = (stats[error.errorType] || 0) + 1;
     });
-    
+
     return stats;
   }
 }

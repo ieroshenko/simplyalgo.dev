@@ -6,6 +6,8 @@
  * external speech recognition services like OpenAI Whisper, Google Cloud Speech, etc.
  */
 
+import { logger } from '@/utils/logger';
+
 export interface SpeechRecognitionResult {
   transcript: string;
   confidence: number;
@@ -68,7 +70,7 @@ export class SpeechRecognitionService {
         }, 1500); // Simulate API call delay
       });
     } catch (error) {
-      console.error("Transcription error:", error);
+      logger.error('[SpeechRecognition] Transcription error', { error });
       throw new Error("Failed to transcribe audio");
     }
   }

@@ -42,29 +42,29 @@ export const TechnicalInterviewService = {
       logger.debug('[TechnicalInterviewService] Fetching specific problem:', { problemId: problemIdOrRandom });
       const { data: problem, error } = await supabase
         .from('problems')
-        .select('*, categories(name), test_cases(*)') 
+        .select('*, categories(name), test_cases(*)')
         .eq('id', problemIdOrRandom)
         .single();
-      
+
       if (error) {
         logger.error('[TechnicalInterviewService] Error fetching problem:', { error: error instanceof Error ? error.message : String(error), problemId: problemIdOrRandom });
         throw new Error(`Problem "${problemIdOrRandom}" not found`);
       }
-      
+
       logger.debug('[TechnicalInterviewService] Selected problem:', {
         id: problem.id,
         title: problem.title,
         testCaseCount: problem.test_cases?.length || 0,
         hasDescription: !!problem.description
       });
-      
+
       // Rename test_cases to testCases for consistency
       return {
         ...problem,
         testCases: problem.test_cases || []
       };
     }
-    
+
     // Random selection
     return this.getRandomProblem();
   },
@@ -77,7 +77,7 @@ export const TechnicalInterviewService = {
     const { data: problems, error } = await supabase
       .from('problems')
       .select('*, categories!inner(name), test_cases(*)');
-    
+
     if (error) {
       logger.error('[TechnicalInterviewService] Error fetching problems:', { error: error instanceof Error ? error.message : String(error) });
       throw error;
@@ -90,19 +90,19 @@ export const TechnicalInterviewService = {
     // Filter out System Design and Data Structure Implementation problems client-side
     const eligibleProblems = problems.filter((problem: any) => {
       const categoryName = problem.categories?.name || '';
-      return categoryName !== 'System Design' && 
-             categoryName !== 'Data Structure Implementations' &&
-             !problem.id.startsWith('sd_'); // Also filter by ID prefix for system design
+      return categoryName !== 'System Design' &&
+        categoryName !== 'Data Structure Implementations' &&
+        !problem.id.startsWith('sd_'); // Also filter by ID prefix for system design
     });
 
     if (eligibleProblems.length === 0) {
       throw new Error('No eligible problems found after filtering');
     }
-    
+
     // Pick a random problem from the eligible list
     const randomIndex = Math.floor(Math.random() * eligibleProblems.length);
     const randomProblem = eligibleProblems[randomIndex];
-    
+
     logger.debug('[TechnicalInterviewService] Selected random problem:', {
       id: randomProblem.id,
       title: randomProblem.title,
@@ -110,7 +110,7 @@ export const TechnicalInterviewService = {
       testCaseCount: randomProblem.test_cases?.length || 0,
       hasDescription: !!randomProblem.description
     });
-    
+
     // Rename test_cases to testCases for consistency
     return {
       ...randomProblem,
@@ -126,7 +126,7 @@ export const TechnicalInterviewService = {
       .from('problems')
       .select('id, title, difficulty, categories(name)')
       .order('title', { ascending: true });
-    
+
     if (error) {
       logger.error('[TechnicalInterviewService] Error fetching problems:', { error: error instanceof Error ? error.message : String(error) });
       throw error;
@@ -137,14 +137,14 @@ export const TechnicalInterviewService = {
     // Filter out System Design and Data Structure Implementation problems
     const eligibleProblems = problems?.filter((problem: any) => {
       const categoryName = problem.categories?.name || '';
-      const isEligible = categoryName !== 'System Design' && 
-                        categoryName !== 'Data Structure Implementations' &&
-                        !problem.id.startsWith('sd_');
-      
+      const isEligible = categoryName !== 'System Design' &&
+        categoryName !== 'Data Structure Implementations' &&
+        !problem.id.startsWith('sd_');
+
       if (!isEligible) {
         logger.debug(`[TechnicalInterviewService] Filtered out: ${problem.title} (${categoryName})`);
       }
-      
+
       return isEligible;
     }) || [];
 
@@ -324,7 +324,7 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error fetching session:', error);
+      logger.error('[TechnicalInterviewService] Error fetching session', { sessionId, error });
       throw error;
     }
 
@@ -342,7 +342,7 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-      console.error('[TechnicalInterviewService] Error fetching feedback:', error);
+      logger.error('[TechnicalInterviewService] Error fetching feedback', { sessionId, error });
       throw error;
     }
 
@@ -360,7 +360,7 @@ export const TechnicalInterviewService = {
       .order('test_case_number', { ascending: true });
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error fetching test results:', error);
+      logger.error('[TechnicalInterviewService] Error fetching test results', { sessionId, error });
       throw error;
     }
 
@@ -378,7 +378,7 @@ export const TechnicalInterviewService = {
       .order('started_at', { ascending: false });
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error fetching user sessions:', error);
+      logger.error('[TechnicalInterviewService] Error fetching user sessions', { userId, error });
       throw error;
     }
 

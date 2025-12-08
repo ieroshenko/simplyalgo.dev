@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { logger } from "@/utils/logger";
 
 interface UseTechnicalInterviewProps {
   problemTitle: string;
@@ -46,7 +47,7 @@ function extractFeedbackFromTranscript(transcript: string): any | null {
   
   if (!hasStructuredFeedback) return null;
   
-  console.log('[Feedback Extraction] Detected structured feedback, parsing...');
+  logger.debug("Detected structured feedback, parsing...", { component: "TechnicalInterview" });
   
   // Extract OVERALL_RESULT (PASS or FAIL)
   const resultMatch = transcript.match(/OVERALL_RESULT:\s*(PASS|FAIL)/i);
@@ -114,7 +115,8 @@ function extractFeedbackFromTranscript(transcript: string): any | null {
     ? interviewerNotesMatch[1].trim() 
     : 'Candidate performed interview';
   
-  console.log('[Feedback Extraction] Successfully parsed:', {
+  logger.debug("Successfully parsed feedback", {
+    component: "TechnicalInterview",
     passed,
     overall_score,
     problem_solving_score,
@@ -163,7 +165,7 @@ export const useTechnicalInterview = ({
 
   // Cleanup function
   const cleanup = useCallback(() => {
-    console.log("[TechnicalInterview] Cleaning up resources...");
+    logger.debug("Cleaning up resources...", { component: "TechnicalInterview" });
 
     // Stop timer
     if (timerIntervalRef.current) {
@@ -209,7 +211,7 @@ export const useTechnicalInterview = ({
   const sendCodeUpdate = useCallback(
     debounce((code: string) => {
       if (dataChannelRef.current?.readyState === 'open') {
-        console.log('[TechnicalInterview] Sending code update to AI');
+        logger.debug("Sending code update to AI", { component: "TechnicalInterview" });
         dataChannelRef.current.send(JSON.stringify({
           type: 'conversation.item.create',
           item: {
@@ -229,7 +231,7 @@ export const useTechnicalInterview = ({
   // Request evaluation (user clicks "Evaluate Now" button)
   const requestEvaluation = useCallback(() => {
     if (dataChannelRef.current?.readyState === 'open') {
-      console.log('[TechnicalInterview] User requested evaluation');
+      logger.debug("User requested evaluation", { component: "TechnicalInterview" });
       dataChannelRef.current.send(JSON.stringify({
         type: 'conversation.item.create',
         item: {
@@ -249,10 +251,10 @@ export const useTechnicalInterview = ({
     try {
       setError(null);
       onConnectionStatusChange("connecting");
-      console.log("[TechnicalInterview] Starting interview...");
+      logger.debug("Starting interview...", { component: "TechnicalInterview" });
 
       // Get ephemeral token from backend
-      console.log("[TechnicalInterview] Requesting ephemeral token...");
+      logger.debug("Requesting ephemeral token...", { component: "TechnicalInterview" });
       const tokenResponse = await fetch("/api/ephemeral-token", {
         method: "POST",
         headers: {
@@ -270,7 +272,7 @@ export const useTechnicalInterview = ({
       }
 
       const { token } = await tokenResponse.json();
-      console.log("[TechnicalInterview] Received ephemeral token");
+      logger.debug("Received ephemeral token", { component: "TechnicalInterview" });
 
       // Create peer connection
       const pc = new RTCPeerConnection();
@@ -284,7 +286,7 @@ export const useTechnicalInterview = ({
       audioContextRef.current = audioContext;
 
       // Get user media (microphone)
-      console.log("[TechnicalInterview] Requesting microphone access...");
+      logger.debug("Requesting microphone access...", { component: "TechnicalInterview" });
       const localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -298,7 +300,7 @@ export const useTechnicalInterview = ({
       localStream.getTracks().forEach((track) => {
         pc.addTrack(track, localStream);
       });
-      console.log("[TechnicalInterview] Local audio track added");
+      logger.debug("Local audio track added", { component: "TechnicalInterview" });
 
       // Create data channel for control events
       const dataChannel = pc.createDataChannel("oai-events");
@@ -306,7 +308,7 @@ export const useTechnicalInterview = ({
 
       // Handle data channel events
       dataChannel.addEventListener("open", () => {
-        console.log("[TechnicalInterview] Data channel opened");
+        logger.debug("Data channel opened", { component: "TechnicalInterview" });
 
         // Send session configuration with technical interview prompt
         const sessionConfig = {
@@ -508,12 +510,12 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
           },
         };
 
-        console.log("[TechnicalInterview] Sending session configuration");
+        logger.debug("Sending session configuration", { component: "TechnicalInterview" });
         dataChannel.send(JSON.stringify(sessionConfig));
 
         // Send initial greeting trigger after a short delay
         setTimeout(() => {
-          console.log("[TechnicalInterview] Sending response.create to start interview");
+          logger.debug("Sending response.create to start interview", { component: "TechnicalInterview" });
           const responseCreate = {
             type: "response.create",
             response: {
@@ -531,7 +533,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
           setTimeRemaining(remaining);
 
           if (remaining === 0) {
-            console.log("[TechnicalInterview] Time is up!");
+            logger.debug("Time is up!", { component: "TechnicalInterview" });
             // Send time-up message to AI
             if (dataChannelRef.current?.readyState === 'open') {
               dataChannelRef.current.send(JSON.stringify({
@@ -562,23 +564,23 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
       dataChannel.addEventListener("message", (e) => {
         try {
           const event = JSON.parse(e.data);
-          console.log("[TechnicalInterview] Server event:", event.type);
+          logger.debug("Server event", { component: "TechnicalInterview", eventType: event.type });
 
           if (event.type === "session.updated") {
-            console.log("[TechnicalInterview] Session updated successfully");
+            logger.debug("Session updated successfully", { component: "TechnicalInterview" });
             onConnectionStatusChange("connected");
           } else if (event.type === "error") {
-            console.error("[TechnicalInterview] Server error:", event);
+            logger.error("Server error", event, { component: "TechnicalInterview" });
             setError(event.error?.message || "Server error occurred");
           } else if (event.type === "conversation.item.input_audio_transcription.completed") {
             // User speech transcribed
-            console.log("🗣️ [TechnicalInterview] USER TRANSCRIPT:", event.transcript);
+            logger.debug("User transcript received", { component: "TechnicalInterview", transcript: event.transcript });
             if (onTranscript && event.transcript) {
               onTranscript("user", event.transcript);
             }
           } else if (event.type === "response.audio_transcript.done") {
             // Assistant response transcribed
-            console.log("🤖 [TechnicalInterview] ASSISTANT TRANSCRIPT:", event.transcript);
+            logger.debug("Assistant transcript received", { component: "TechnicalInterview", transcript: event.transcript });
             if (event.transcript) {
               accumulatedTranscriptRef.current += event.transcript + " ";
               
@@ -586,7 +588,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
               if (onFeedbackReceived) {
                 const feedback = extractFeedbackFromTranscript(accumulatedTranscriptRef.current);
                 if (feedback) {
-                  console.log("[TechnicalInterview] Extracted feedback:", feedback);
+                  logger.debug("Extracted feedback", { component: "TechnicalInterview", feedback });
                   onFeedbackReceived(feedback);
                 }
               }
@@ -596,28 +598,28 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
               }
             }
           } else if (event.type === "input_audio_buffer.speech_started") {
-            console.log("🎤 [TechnicalInterview] User started speaking");
+            logger.debug("User started speaking", { component: "TechnicalInterview" });
           } else if (event.type === "input_audio_buffer.speech_stopped") {
-            console.log("🎤 [TechnicalInterview] User stopped speaking");
+            logger.debug("User stopped speaking", { component: "TechnicalInterview" });
           }
         } catch (err) {
-          console.error("[TechnicalInterview] Failed to parse server message:", err);
+          logger.error("Failed to parse server message", err, { component: "TechnicalInterview" });
         }
       });
 
       dataChannel.addEventListener("error", (e) => {
-        console.error("[TechnicalInterview] Data channel error:", e);
+        logger.error("Data channel error", e, { component: "TechnicalInterview" });
         setError("Connection error occurred");
       });
 
       dataChannel.addEventListener("close", () => {
-        console.log("[TechnicalInterview] Data channel closed");
+        logger.debug("Data channel closed", { component: "TechnicalInterview" });
         cleanup();
       });
 
       // Handle incoming audio (AI voice)
       pc.addEventListener("track", (e) => {
-        console.log("[TechnicalInterview] Received remote audio track");
+        logger.debug("Received remote audio track", { component: "TechnicalInterview" });
         const remoteStream = e.streams[0];
         if (!remoteAudioRef.current) {
           const audioEl = document.createElement("audio");
@@ -630,7 +632,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
         remoteAudioRef.current.srcObject = remoteStream;
         remoteAudioRef.current
           .play()
-          .catch((err) => console.warn("[TechnicalInterview] Autoplay blocked", err));
+          .catch((err) => logger.warn("Autoplay blocked", { component: "TechnicalInterview", error: err }));
 
         // Connect to analyser for visualization
         const analyser = audioContext.createAnalyser();
@@ -640,12 +642,12 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
         source.connect(audioContext.destination);
 
         setAudioAnalyser(analyser);
-        console.log("[TechnicalInterview] Audio analyser connected");
+        logger.debug("Audio analyser connected", { component: "TechnicalInterview" });
       });
 
       // Handle connection state changes
       pc.addEventListener("connectionstatechange", () => {
-        console.log("[TechnicalInterview] Connection state:", pc.connectionState);
+        logger.debug("Connection state changed", { component: "TechnicalInterview", connectionState: pc.connectionState });
         if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           setError("Connection lost");
           cleanup();
@@ -653,12 +655,12 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
       });
 
       // Create offer
-      console.log("[TechnicalInterview] Creating SDP offer...");
+      logger.debug("Creating SDP offer...", { component: "TechnicalInterview" });
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
       // Send offer to OpenAI Realtime API using ephemeral token
-      console.log("[TechnicalInterview] Sending offer to OpenAI...");
+      logger.debug("Sending offer to OpenAI...", { component: "TechnicalInterview" });
       const model = "gpt-realtime";
       const response = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
         method: "POST",
@@ -676,7 +678,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
 
       // Get answer SDP
       const answerSdp = await response.text();
-      console.log("[TechnicalInterview] Received answer from OpenAI");
+      logger.debug("Received answer from OpenAI", { component: "TechnicalInterview" });
 
       // Set remote description
       await pc.setRemoteDescription({
@@ -684,9 +686,9 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
         sdp: answerSdp,
       });
 
-      console.log("[TechnicalInterview] WebRTC connection established");
+      logger.debug("WebRTC connection established", { component: "TechnicalInterview" });
     } catch (err) {
-      console.error("[TechnicalInterview] Failed to start interview:", err);
+      logger.error("Failed to start interview", err, { component: "TechnicalInterview" });
       setError(err instanceof Error ? err.message : "Failed to start interview");
       cleanup();
     }
@@ -694,7 +696,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
 
   // Stop interview
   const stopInterview = useCallback(() => {
-    console.log("[TechnicalInterview] Stopping interview...");
+    logger.debug("Stopping interview...", { component: "TechnicalInterview" });
     cleanup();
   }, [cleanup]);
 
