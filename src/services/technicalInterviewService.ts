@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { TestResult } from "@/types";
+import { logger } from "@/utils/logger";
 
 export interface TechnicalInterviewSession {
   id: string;
@@ -38,7 +39,7 @@ export const TechnicalInterviewService = {
   async getProblem(problemIdOrRandom: string = "random") {
     // If specific problem ID is provided
     if (problemIdOrRandom !== "random") {
-      console.log('[TechnicalInterviewService] Fetching specific problem:', problemIdOrRandom);
+      logger.debug('[TechnicalInterviewService] Fetching specific problem:', { problemId: problemIdOrRandom });
       const { data: problem, error } = await supabase
         .from('problems')
         .select('*, categories(name), test_cases(*)') 
@@ -46,11 +47,11 @@ export const TechnicalInterviewService = {
         .single();
       
       if (error) {
-        console.error('[TechnicalInterviewService] Error fetching problem:', error);
+        logger.error('[TechnicalInterviewService] Error fetching problem:', { error: error instanceof Error ? error.message : String(error), problemId: problemIdOrRandom });
         throw new Error(`Problem "${problemIdOrRandom}" not found`);
       }
       
-      console.log('[TechnicalInterviewService] Selected problem:', {
+      logger.debug('[TechnicalInterviewService] Selected problem:', {
         id: problem.id,
         title: problem.title,
         testCaseCount: problem.test_cases?.length || 0,
@@ -78,7 +79,7 @@ export const TechnicalInterviewService = {
       .select('*, categories!inner(name), test_cases(*)');
     
     if (error) {
-      console.error('[TechnicalInterviewService] Error fetching problems:', error);
+      logger.error('[TechnicalInterviewService] Error fetching problems:', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
 
@@ -102,7 +103,7 @@ export const TechnicalInterviewService = {
     const randomIndex = Math.floor(Math.random() * eligibleProblems.length);
     const randomProblem = eligibleProblems[randomIndex];
     
-    console.log('[TechnicalInterviewService] Selected random problem:', {
+    logger.debug('[TechnicalInterviewService] Selected random problem:', {
       id: randomProblem.id,
       title: randomProblem.title,
       category: randomProblem.categories?.name,
@@ -127,11 +128,11 @@ export const TechnicalInterviewService = {
       .order('title', { ascending: true });
     
     if (error) {
-      console.error('[TechnicalInterviewService] Error fetching problems:', error);
+      logger.error('[TechnicalInterviewService] Error fetching problems:', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
 
-    console.log(`[TechnicalInterviewService] Fetched ${problems?.length || 0} total problems from DB`);
+    logger.info(`[TechnicalInterviewService] Fetched ${problems?.length || 0} total problems from DB`);
 
     // Filter out System Design and Data Structure Implementation problems
     const eligibleProblems = problems?.filter((problem: any) => {
@@ -141,13 +142,13 @@ export const TechnicalInterviewService = {
                         !problem.id.startsWith('sd_');
       
       if (!isEligible) {
-        console.log(`[TechnicalInterviewService] Filtered out: ${problem.title} (${categoryName})`);
+        logger.debug(`[TechnicalInterviewService] Filtered out: ${problem.title} (${categoryName})`);
       }
       
       return isEligible;
     }) || [];
 
-    console.log(`[TechnicalInterviewService] ${eligibleProblems.length} eligible problems after filtering`);
+    logger.info(`[TechnicalInterviewService] ${eligibleProblems.length} eligible problems after filtering`);
     return eligibleProblems;
   },
 
@@ -167,11 +168,11 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error creating session:', error);
+      logger.error('[TechnicalInterviewService] Error creating session:', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
 
-    console.log('[TechnicalInterviewService] Created session:', data.id);
+    logger.info('[TechnicalInterviewService] Created session:', { sessionId: data.id });
     return data as unknown as TechnicalInterviewSession;
   },
 
@@ -193,11 +194,11 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error ending session:', error);
+      logger.error('[TechnicalInterviewService] Error ending session:', { error: error instanceof Error ? error.message : String(error), sessionId });
       throw error;
     }
 
-    console.log('[TechnicalInterviewService] Ended session:', sessionId);
+    logger.info('[TechnicalInterviewService] Ended session:', { sessionId });
     return data;
   },
 
@@ -216,7 +217,7 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error adding transcript:', error);
+      logger.error('[TechnicalInterviewService] Error adding transcript:', { error: error instanceof Error ? error.message : String(error), sessionId, role });
       throw error;
     }
 
@@ -237,11 +238,11 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error saving code snapshot:', error);
+      logger.error('[TechnicalInterviewService] Error saving code snapshot:', { error: error instanceof Error ? error.message : String(error), sessionId });
       throw error;
     }
 
-    console.log('[TechnicalInterviewService] Saved code snapshot for session:', sessionId);
+    logger.info('[TechnicalInterviewService] Saved code snapshot for session:', { sessionId });
     return data;
   },
 
@@ -265,11 +266,11 @@ export const TechnicalInterviewService = {
       .select();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error saving test results:', error);
+      logger.error('[TechnicalInterviewService] Error saving test results:', { error: error instanceof Error ? error.message : String(error), sessionId });
       throw error;
     }
 
-    console.log('[TechnicalInterviewService] Saved test results for session:', sessionId);
+    logger.info('[TechnicalInterviewService] Saved test results for session:', { sessionId });
     return data;
   },
 
@@ -298,7 +299,7 @@ export const TechnicalInterviewService = {
       .single();
 
     if (error) {
-      console.error('[TechnicalInterviewService] Error saving feedback:', error);
+      logger.error('[TechnicalInterviewService] Error saving feedback:', { error: error instanceof Error ? error.message : String(error), sessionId });
       throw error;
     }
 
@@ -308,7 +309,7 @@ export const TechnicalInterviewService = {
       .update({ feedback_generated: true })
       .eq('id', sessionId);
 
-    console.log('[TechnicalInterviewService] Saved feedback for session:', sessionId);
+    logger.info('[TechnicalInterviewService] Saved feedback for session:', { sessionId });
     return data;
   },
 

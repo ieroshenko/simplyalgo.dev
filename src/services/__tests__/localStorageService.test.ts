@@ -54,6 +54,14 @@ describe('LocalStorageService', () => {
   let service: LocalStorageService;
   let config: StorageConfig;
 
+  // Shared mock position for tests that need it
+  const mockPosition: OverlayPosition = {
+    x: 100,
+    y: 200,
+    timestamp: Date.now(),
+    screenSize: { width: 1920, height: 1080 }
+  };
+
   beforeEach(() => {
     // Clear localStorage before each test
     mockLocalStorage.clear();
@@ -163,12 +171,7 @@ describe('LocalStorageService', () => {
   });
 
   describe('Position-Specific Operations', () => {
-    const mockPosition: OverlayPosition = {
-      x: 100,
-      y: 200,
-      timestamp: Date.now(),
-      screenSize: { width: 1920, height: 1080 }
-    };
+    // Uses shared mockPosition defined at describe block level
 
     test('should save and load position for specific problem', () => {
       const problemId = 'test-problem-1';

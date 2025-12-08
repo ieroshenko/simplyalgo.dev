@@ -1,0 +1,104 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+
+// Mock useAuth
+vi.mock('@/hooks/useAuth', () => ({
+    useAuth: () => ({
+        user: { id: 'user-123' },
+    }),
+}));
+
+// Mock Supabase
+let mockSelectResponse: any = { data: [], error: null };
+
+vi.mock('@/integrations/supabase/client', () => {
+    const createChainableMock = () => {
+        const mock: any = {};
+        mock.select = vi.fn(() => mock);
+        mock.eq = vi.fn(() => mock);
+        mock.order = vi.fn(() => mock);
+        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        return mock;
+    };
+
+    return {
+        supabase: {
+            from: vi.fn(() => createChainableMock()),
+        },
+    };
+});
+
+import { useTrialEligibility } from '../useTrialEligibility';
+
+describe('useTrialEligibility', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.spyOn(console, 'error').mockImplementation(() => { });
+        mockSelectResponse = { data: [], error: null };
+    });
+
+    it('should return initial loading state', () => {
+        const { result } = renderHook(() => useTrialEligibility());
+        expect(result.current.isLoading).toBe(true);
+    });
+
+    it('should return isEligibleForTrial property', () => {
+        const { result } = renderHook(() => useTrialEligibility());
+        expect(result.current).toHaveProperty('isEligibleForTrial');
+    });
+
+    it('should be eligible for trial when no subscriptions exist', async () => {
+        mockSelectResponse = { data: [], error: null };
+
+        const { result } = renderHook(() => useTrialEligibility());
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.isEligibleForTrial).toBe(true);
+    });
+
+    it('should not be eligible when user had trial before', async () => {
+        mockSelectResponse = {
+            data: [{ status: 'trialing', user_id: 'user-123' }],
+            error: null
+        };
+
+        const { result } = renderHook(() => useTrialEligibility());
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.isEligibleForTrial).toBe(false);
+    });
+
+    it('should not be eligible when user cancelled subscription', async () => {
+        mockSelectResponse = {
+            data: [{ status: 'cancelled', user_id: 'user-123' }],
+            error: null
+        };
+
+        const { result } = renderHook(() => useTrialEligibility());
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.isEligibleForTrial).toBe(false);
+    });
+
+    it('should default to eligible on error', async () => {
+        mockSelectResponse = { data: null, error: { message: 'Database error' } };
+
+        const { result } = renderHook(() => useTrialEligibility());
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.isEligibleForTrial).toBe(true);
+    });
+});

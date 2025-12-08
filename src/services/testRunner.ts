@@ -1,5 +1,6 @@
 import { TestCase, TestResult } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface RunCodePayload {
   language: string;
