@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Monitor, Moon, Sun, Palette, User, Bell, Shield, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/utils/logger";
 
 const Settings = () => {
   const { theme, setTheme } = useTheme();
@@ -28,7 +29,7 @@ const Settings = () => {
       navigate("/");
     } catch (error) {
       toast.error("Failed to log out");
-      console.error("Logout error:", error);
+      logger.error('[Settings] Logout error', { error });
     }
   };
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SurveyData } from '@/types/survey';
+import { logger } from '@/utils/logger';
 
 export interface SurveyResponse {
   id: string;
@@ -29,7 +30,7 @@ export class SurveyService {
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching existing survey:', fetchError);
+        logger.error('[SurveyService] Error fetching existing survey', { userId, error: fetchError });
         return null;
       }
 
@@ -51,7 +52,7 @@ export class SurveyService {
           .single();
 
         if (error) {
-          console.error('Error updating survey:', error);
+          logger.error('[SurveyService] Error updating survey', { userId, surveyId: existing.id, error });
           return null;
         }
 
@@ -70,14 +71,14 @@ export class SurveyService {
           .single();
 
         if (error) {
-          console.error('Error creating survey:', error);
+          logger.error('[SurveyService] Error creating survey', { userId, error });
           return null;
         }
 
         return data;
       }
     } catch (error) {
-      console.error('Unexpected error saving survey:', error);
+      logger.error('[SurveyService] Unexpected error saving survey', { userId, error });
       return null;
     }
   }
@@ -98,13 +99,13 @@ export class SurveyService {
           // No survey found
           return null;
         }
-        console.error('Error fetching survey:', error);
+        logger.error('[SurveyService] Error fetching survey', { userId, error });
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('Unexpected error fetching survey:', error);
+      logger.error('[SurveyService] Unexpected error fetching survey', { userId, error });
       return null;
     }
   }
@@ -124,13 +125,13 @@ export class SurveyService {
         if (error.code === 'PGRST116') {
           return false; // No survey found
         }
-        console.error('Error checking survey completion:', error);
+        logger.error('[SurveyService] Error checking survey completion', { userId, error });
         return false;
       }
 
       return data.completed_at !== null;
     } catch (error) {
-      console.error('Unexpected error checking survey completion:', error);
+      logger.error('[SurveyService] Unexpected error checking survey completion', { userId, error });
       return false;
     }
   }

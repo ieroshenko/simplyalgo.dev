@@ -14,6 +14,7 @@ import {
 } from './positionCalculationUtils';
 import { ErrorRecoveryService, ErrorRecoveryStrategy, type ErrorContext } from './errorRecoveryService';
 import { debounce, memoize, performanceMonitor, CleanupManager } from './performanceOptimizer';
+import { logger } from '@/utils/logger';
 
 export interface OverlayPosition {
   x: number;
@@ -54,7 +55,7 @@ export class OverlayPositionManager {
     this.overlayDimensions = overlayDimensions;
     this.constraints = constraints;
     this.responsiveConfig = responsiveConfig;
-    
+
     this.storageService = new LocalStorageService({
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       fallbackPosition: { x: 0, y: 0 }
@@ -69,9 +70,9 @@ export class OverlayPositionManager {
       safeMargin: constraints.minMargin,
       minOverlaySize: { width: overlayDimensions.width, height: overlayDimensions.height },
     });
-    
+
     this.cleanupManager = new CleanupManager();
-    
+
     // Create debounced save function to prevent excessive storage writes
     this.debouncedSave = debounce((position: OverlayPosition) => {
       this.savePositionImmediate(position);
@@ -83,7 +84,7 @@ export class OverlayPositionManager {
    */
   calculateDefaultPosition = memoize((editorBounds: EditorBounds, highlightedLine?: number): OverlayPosition => {
     const endMeasurement = performanceMonitor.startMeasurement('calculateDefaultPosition');
-    
+
     try {
       // Convert line number to HighlightedLineInfo if provided
       let highlightedLineInfo: HighlightedLineInfo | undefined;
@@ -100,7 +101,7 @@ export class OverlayPositionManager {
     } finally {
       endMeasurement();
     }
-  }, (editorBounds, highlightedLine) => 
+  }, (editorBounds, highlightedLine) =>
     `${editorBounds.left}-${editorBounds.top}-${editorBounds.width}-${editorBounds.height}-${highlightedLine || 'none'}-${window.innerWidth}-${window.innerHeight}`
   );
 
@@ -110,14 +111,14 @@ export class OverlayPositionManager {
   getSavedPosition(): OverlayPosition | null {
     try {
       const saved = this.storageService.load<OverlayPosition>(this.storageKey);
-      
+
       if (!saved || this.storageService.isExpired(saved.timestamp)) {
         return null;
       }
 
       return saved;
     } catch (error) {
-      console.warn('Failed to load saved position:', error);
+      logger.warn('[OverlayPositionManager] Failed to load saved position', { problemId: this.storageKey, error });
       return null;
     }
   }
@@ -147,7 +148,7 @@ export class OverlayPositionManager {
       // Record successful position for error recovery
       this.errorRecovery.recordSuccessfulPosition(positionWithTimestamp);
     } catch (error) {
-      console.warn('Failed to save position:', error);
+      logger.warn('[OverlayPositionManager] Failed to save position', { problemId: this.storageKey, error });
       // Handle storage failure but don't throw - this is not critical
       this.errorRecovery.handleError({
         errorType: 'storage_failed',
@@ -215,10 +216,10 @@ export class OverlayPositionManager {
           if (savedPosition) {
             const validatedPosition = this.validatePosition(savedPosition, editorBounds);
             // If the validated position is significantly different, it means the saved position was invalid
-            const isSignificantlyDifferent = 
+            const isSignificantlyDifferent =
               Math.abs(validatedPosition.x - savedPosition.x) > 50 ||
               Math.abs(validatedPosition.y - savedPosition.y) > 50;
-            
+
             if (!isSignificantlyDifferent) {
               this.errorRecovery.recordSuccessfulPosition(validatedPosition);
               return validatedPosition;
@@ -231,7 +232,7 @@ export class OverlayPositionManager {
           return defaultPosition;
         } catch (error) {
           // Handle calculation errors
-          console.warn('Position calculation failed, using error recovery:', error);
+          logger.warn('[OverlayPositionManager] Position calculation failed, using error recovery', { error });
           return this.errorRecovery.handleError({
             errorType: 'calculation_failed',
             originalError: error instanceof Error ? error : new Error(String(error)),
@@ -248,7 +249,7 @@ export class OverlayPositionManager {
       });
     } catch (error) {
       // Ultimate fallback for any unexpected errors
-      console.error('Critical error in getPositionWithFallback:', error);
+      logger.error('[OverlayPositionManager] Critical error in getPositionWithFallback', { error });
       return this.errorRecovery.handleError({
         errorType: 'calculation_failed',
         originalError: error instanceof Error ? error : new Error(String(error)),
@@ -339,7 +340,7 @@ export class OverlayPositionManager {
       // Get all stored positions for cleanup
       const allKeys = this.storageService.getAllKeys?.() || [];
       const positionKeys = allKeys.filter(key => key.startsWith('overlay_position_'));
-      
+
       let cleanedCount = 0;
       positionKeys.forEach(key => {
         try {
@@ -356,10 +357,10 @@ export class OverlayPositionManager {
       });
 
       if (cleanedCount > 0) {
-        console.log(`Cleaned up ${cleanedCount} expired position entries`);
+        logger.debug('[OverlayPositionManager] Cleaned up expired position entries', { cleanedCount });
       }
     } catch (error) {
-      console.warn('Failed to cleanup expired data:', error);
+      logger.warn('[OverlayPositionManager] Failed to cleanup expired data', { error });
     }
   }
 
@@ -385,13 +386,13 @@ export class OverlayPositionManager {
     try {
       // Cleanup expired data
       this.cleanupExpiredData();
-      
+
       // Cleanup manager handles intervals, timeouts, etc.
       this.cleanupManager.cleanup();
-      
-      console.log('OverlayPositionManager cleanup completed');
+
+      logger.debug('[OverlayPositionManager] Cleanup completed');
     } catch (error) {
-      console.warn('Error during OverlayPositionManager cleanup:', error);
+      logger.warn('[OverlayPositionManager] Error during cleanup', { error });
     }
   }
 

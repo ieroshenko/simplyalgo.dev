@@ -20,12 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, X, Loader2, Mic, MicOff } from "lucide-react";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { UserStory } from "@/types";
+import { logger } from "@/utils/logger";
 
 const BehavioralStories = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { stories, loading, updateStory } = useUserStories();
-  
+
   // Edit dialog state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingStory, setEditingStory] = useState<UserStory | null>(null);
@@ -40,7 +41,7 @@ const BehavioralStories = () => {
   const [editTechnicalSkills, setEditTechnicalSkills] = useState<string[]>([]);
   const [editTechnologies, setEditTechnologies] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Input states for adding new tags/skills/technologies
   const [tagInput, setTagInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
@@ -59,7 +60,7 @@ const BehavioralStories = () => {
       setEditTitle((prev) => prev + (prev ? ' ' : '') + transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralStories] Speech recognition error (title)', { error });
     },
   });
 
@@ -76,7 +77,7 @@ const BehavioralStories = () => {
       setEditDescription((prev) => prev + (prev ? ' ' : '') + transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[BehavioralStories] Speech recognition error (description)', { error });
     },
   });
 
@@ -313,9 +314,9 @@ const BehavioralStories = () => {
                         <div className="text-sm">{story.metrics}</div>
                       </div>
                     )}
-                    {(story.technical_skills && story.technical_skills.length > 0) || 
-                     (story.technologies && story.technologies.length > 0) || 
-                     (story.tags && story.tags.length > 0) ? (
+                    {(story.technical_skills && story.technical_skills.length > 0) ||
+                      (story.technologies && story.technologies.length > 0) ||
+                      (story.tags && story.tags.length > 0) ? (
                       <div className="flex flex-wrap gap-2 pt-2">
                         {story.technical_skills?.map((skill) => (
                           <Badge key={skill} variant="secondary" className="text-xs">
@@ -335,8 +336,8 @@ const BehavioralStories = () => {
                       </div>
                     ) : null}
                     <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleOpenEditDialog(story)}
                       >
@@ -383,13 +384,12 @@ const BehavioralStories = () => {
                         type="button"
                         onClick={toggleMicrophoneTitle}
                         disabled={isSubmitting}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                          isListeningTitle
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListeningTitle
                             ? "text-red-500 animate-pulse"
                             : isProcessingTitle
                               ? "text-blue-500"
                               : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        }`}
+                          }`}
                         title={
                           isListeningTitle
                             ? "Stop listening"
@@ -441,13 +441,12 @@ const BehavioralStories = () => {
                         type="button"
                         onClick={toggleMicrophoneDescription}
                         disabled={isSubmitting}
-                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                          isListeningDescription
+                        className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListeningDescription
                             ? "text-red-500 animate-pulse"
                             : isProcessingDescription
                               ? "text-blue-500"
                               : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        }`}
+                          }`}
                         title={
                           isListeningDescription
                             ? "Stop listening"

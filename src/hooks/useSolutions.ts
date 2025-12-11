@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface Solution {
   id: string;
@@ -41,13 +42,13 @@ export const useSolutions = (problemId?: string) => {
         const now = Date.now();
 
         if (cached && cacheTime && (now - cacheTime) < CACHE_DURATION) {
-          console.log(`📦 Loading solutions from cache for ${problemId}`);
+          logger.debug('[useSolutions] Loading from cache', { problemId });
           setSolutions(cached);
           setLoading(false);
           return;
         }
 
-        console.log(`🔍 Fetching solutions from database for ${problemId}`);
+        logger.debug('[useSolutions] Fetching from database', { problemId });
 
         // Fetch from database
         const { data, error: fetchError } = await supabase
@@ -64,14 +65,14 @@ export const useSolutions = (problemId?: string) => {
         }
 
         const solutionsData = (data as unknown as Solution[]) || [];
-        
+
         // Cache the results
         solutionCache.set(problemId, solutionsData);
         cacheTimestamps.set(problemId, now);
 
         setSolutions(solutionsData);
       } catch (err) {
-        console.error("Error loading solutions:", err);
+        logger.error('[useSolutions] Error loading solutions', { error: err, problemId });
         setError(err instanceof Error ? err.message : "Failed to load solutions");
         setSolutions([]);
       } finally {

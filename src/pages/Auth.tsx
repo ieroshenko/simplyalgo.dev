@@ -4,6 +4,7 @@ import { Brain, TrendingUp, Target, Github } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 import logoImage from "@/assets/simplyalgo-logo.jpg";
 
 const Auth = () => {
@@ -14,9 +15,9 @@ const Auth = () => {
   useEffect(() => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Auth: getSession result:", session ? "logged in" : "not logged in");
+      logger.debug('[Auth] getSession result', { hasSession: !!session });
       if (session) {
-        console.log("Auth: Navigating to /dashboard");
+        logger.debug('[Auth] Navigating to /dashboard');
         navigate("/dashboard");
       }
     });
@@ -25,9 +26,9 @@ const Auth = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth: onAuthStateChange event:", event, "session:", session ? "exists" : "null");
+      logger.debug('[Auth] onAuthStateChange event', { event, hasSession: !!session });
       if (event === "SIGNED_IN" && session) {
-        console.log("Auth: User signed in, navigating to /dashboard");
+        logger.debug('[Auth] User signed in, navigating to /dashboard');
         navigate("/dashboard");
       }
     });
@@ -62,8 +63,7 @@ const Auth = () => {
       setError("");
 
       const redirectTo = `${window.location.origin}/dashboard`;
-      console.log("[Auth] Starting GitHub OAuth flow");
-      console.log("[Auth] Redirect URL:", redirectTo);
+      logger.debug('[Auth] Starting GitHub OAuth flow', { redirectTo });
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
@@ -74,7 +74,7 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error) {
-      console.error("[Auth] GitHub Sign-In Error:", error);
+      logger.error('[Auth] GitHub Sign-In Error', { error });
       const message = error instanceof Error ? error.message : "Failed to sign in with GitHub";
       setError(message);
     } finally {

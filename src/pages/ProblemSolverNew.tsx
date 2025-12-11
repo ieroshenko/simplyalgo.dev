@@ -48,6 +48,7 @@ import CoachProgress from "@/components/coaching/CoachProgress";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
+import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import {
   Dialog,
@@ -57,7 +58,6 @@ import {
 } from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
-import { logger } from "@/utils/logger";
 import { CodeDiffDialog } from "@/components/CodeDiffDialog";
 
 
@@ -92,7 +92,7 @@ const ProblemSolverNew = () => {
 
   // Initialize OverlayPositionManager for coaching overlay positioning
   const overlayPositionManager = useRef<OverlayPositionManager | null>(null);
-  
+
   // Initialize position manager when problem ID is available
   useEffect(() => {
     if (problemId) {
@@ -186,11 +186,11 @@ const ProblemSolverNew = () => {
     problemsCount: problems.length,
     problemIds: problems.map((p) => p.id),
   });
-  
+
   const problem = problems.find((p) => p.id === problemId);
-  
+
   logger.debug('ProblemSolverNew problem resolved', { problemId, title: problem?.title });
-  
+
   const {
     submissions,
     loading: subsLoading,
@@ -250,8 +250,8 @@ const ProblemSolverNew = () => {
         insertionType: (insertionType as any) || "smart",
         insertionHint: {
           type: "statement",
-          scope: "function", 
-          description: context?.isCoachingCorrection 
+          scope: "function",
+          description: context?.isCoachingCorrection
             ? `AI coaching correction: ${context.feedback || 'Code fix'}`
             : "AI coaching generated code"
         }
@@ -285,7 +285,7 @@ const ProblemSolverNew = () => {
 
   const handleConfirmReplacement = () => {
     if (!pendingReplacementCode || !codeEditorRef.current) return;
-    
+
     const currentCode = codeEditorRef.current.getValue();
     const newCodeFromBackend = pendingReplacementCode;
 
@@ -307,7 +307,7 @@ const ProblemSolverNew = () => {
 
       logger.info('[ProblemSolverNew] Editor updated successfully');
     }
-    
+
     setShowReplacementDialog(false);
     setPendingReplacementCode(null);
   };
@@ -396,10 +396,10 @@ const ProblemSolverNew = () => {
       }
 
       const result = await response.json();
-      
+
       // Handle the response structure from the backend
       const analysis = result.complexityAnalysis || result;
-      
+
       const analysisData = {
         time_complexity: analysis.timeComplexity,
         time_explanation: analysis.timeExplanation,
@@ -498,14 +498,14 @@ const ProblemSolverNew = () => {
       let newCodeFromBackend: string | null = null;
       let insertedAtLine: number | undefined;
       let backendRationale: string | undefined;
-      
+
       logger.debug('[ProblemSolverNew] Starting AI-powered insertion', {
         snippetCode: snippet.code,
         currentCodeLength: currentCode.length,
         cursorPosition,
         snippetType: snippet.insertionHint?.type
       });
-      
+
       try {
         const { data, error } = await supabase.functions.invoke("ai-chat", {
           body: {
@@ -515,20 +515,20 @@ const ProblemSolverNew = () => {
             cursorPosition,
             problemDescription: problem.description,
             // Enhanced context for better insertion decisions
-            message: snippet.insertionHint?.description?.includes('coaching correction') 
+            message: snippet.insertionHint?.description?.includes('coaching correction')
               ? `[coaching correction] Fix specific issue: ${snippet.insertionHint.description}. Replace incorrect code with corrected version.`
               : `[ai-chat snippet insertion] Context: User asked for code fix/improvement. Current code may have bugs that need replacement rather than addition.`,
             conversationHistory: [],
           },
         });
-        
-        logger.debug('[ProblemSolverNew] AI insertion response', { 
-          error: !!error, 
+
+        logger.debug('[ProblemSolverNew] AI insertion response', {
+          error: !!error,
           hasData: !!data,
           dataKeys: data ? Object.keys(data) : [],
           newCodeLength: data?.newCode?.length || 0
         });
-        
+
         if (error) throw error;
         if (data && typeof data.newCode === "string") {
           newCodeFromBackend = data.newCode;
@@ -537,7 +537,7 @@ const ProblemSolverNew = () => {
               ? data.insertedAtLine
               : undefined;
           backendRationale = typeof data.rationale === "string" ? data.rationale : undefined;
-          
+
           logger.info('[ProblemSolverNew] AI insertion successful', {
             insertedAtLine,
             codeLengthChange: newCodeFromBackend.length - currentCode.length,
@@ -553,10 +553,10 @@ const ProblemSolverNew = () => {
       }
 
       // Only use AI insertion - no fallback
-      logger.debug('[ProblemSolverNew] AI insertion result', { 
-        success: !!newCodeFromBackend, 
+      logger.debug('[ProblemSolverNew] AI insertion result', {
+        success: !!newCodeFromBackend,
         insertedAt: insertedAtLine,
-        codeLength: newCodeFromBackend?.length || 0 
+        codeLength: newCodeFromBackend?.length || 0
       });
 
       // Client-side safety: ask before applying destructive replacements
@@ -581,9 +581,12 @@ const ProblemSolverNew = () => {
         return;
       }
 
-      // Only skip if the new code is identical to current code
-      if (newCodeFromBackend === currentCode) {
-        logger.info('[ProblemSolverNew] New code identical to current code', {
+      // Only skip if the new code is identical to current code AND the AI didn't report making changes
+      const aiMadeChanges = insertedAtLine !== undefined || (backendRationale && backendRationale.length > 0);
+      const codesAreIdentical = newCodeFromBackend === currentCode;
+
+      if (codesAreIdentical && !aiMadeChanges) {
+        logger.info('[ProblemSolverNew] New code identical to current code, no AI changes reported', {
           currentLength: currentCode.length,
           newLength: newCodeFromBackend.length,
           rationale: backendRationale,
@@ -592,11 +595,24 @@ const ProblemSolverNew = () => {
         return;
       }
 
+      // If codes look identical but AI says it made changes, trust the AI and apply anyway
+      if (codesAreIdentical && aiMadeChanges) {
+        logger.warn('[ProblemSolverNew] Codes appear identical but AI reported changes', {
+          insertedAtLine,
+          rationale: backendRationale,
+          currentLength: currentCode.length,
+          newLength: newCodeFromBackend.length,
+        });
+        // Continue to apply the code - the AI might have made subtle changes
+      }
+
       logger.info('[ProblemSolverNew] Updating editor with new code', {
         oldLength: currentCode.length,
         newLength: newCodeFromBackend.length,
         insertedAtLine,
         rationale: backendRationale,
+        codesAreIdentical,
+        aiMadeChanges,
         codePreview: newCodeFromBackend.substring(0, 300) + "..."
       });
 
@@ -604,6 +620,15 @@ const ProblemSolverNew = () => {
       setCode(newCodeFromBackend);
 
       logger.info('[ProblemSolverNew] Editor updated successfully');
+
+      // Provide feedback about what was inserted
+      if (insertedAtLine !== undefined) {
+        toast.success(`Code inserted at line ${insertedAtLine}`);
+      } else if (backendRationale) {
+        toast.success("Code updated successfully");
+      } else {
+        toast.success("Code inserted");
+      }
     } catch (error) {
       logger.error('[ProblemSolverNew] Failed to insert code snippet', { error });
       toast.error("Failed to insert code snippet");
@@ -869,18 +894,18 @@ const ProblemSolverNew = () => {
                                     : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20";
                                 }
                                 return (
-                                <button
-                                  key={index}
-                                  onClick={() => setActiveTestCase(index)}
+                                  <button
+                                    key={index}
+                                    onClick={() => setActiveTestCase(index)}
                                     className={buttonClass}
-                                >
-                                  {result.passed ? (
-                                    <Check className="w-3 h-3" />
-                                  ) : (
-                                    <X className="w-3 h-3" />
-                                  )}
-                                  <span>Case {index + 1}</span>
-                                </button>
+                                  >
+                                    {result.passed ? (
+                                      <Check className="w-3 h-3" />
+                                    ) : (
+                                      <X className="w-3 h-3" />
+                                    )}
+                                    <span>Case {index + 1}</span>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -889,11 +914,10 @@ const ProblemSolverNew = () => {
                           <div className="flex-1 px-4 pb-4 overflow-y-auto">
                             {testResults[activeTestCase] && (
                               <div
-                                className={`p-4 rounded-lg border-2 ${
-                                  testResults[activeTestCase].passed
-                                    ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
-                                    : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
-                                }`}
+                                className={`p-4 rounded-lg border-2 ${testResults[activeTestCase].passed
+                                  ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                                  : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                                  }`}
                               >
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center space-x-3">
@@ -906,11 +930,10 @@ const ProblemSolverNew = () => {
                                       Test Case {activeTestCase + 1}
                                     </span>
                                     <Badge
-                                      className={`text-xs font-semibold px-3 py-1 ${
-                                        testResults[activeTestCase].passed
-                                          ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
-                                          : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
-                                      }`}
+                                      className={`text-xs font-semibold px-3 py-1 ${testResults[activeTestCase].passed
+                                        ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                                        : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
+                                        }`}
                                     >
                                       {testResults[activeTestCase].passed ? "✅ PASSED" : "❌ FAILED"}
                                     </Badge>
@@ -948,11 +971,10 @@ const ProblemSolverNew = () => {
                                         Your Output:
                                       </div>
                                       <pre
-                                        className={`text-sm font-mono whitespace-pre overflow-x-auto ${
-                                          testResults[activeTestCase].passed
-                                            ? "text-green-700 dark:text-green-300"
-                                            : "text-red-700 dark:text-red-300"
-                                        }`}
+                                        className={`text-sm font-mono whitespace-pre overflow-x-auto ${testResults[activeTestCase].passed
+                                          ? "text-green-700 dark:text-green-300"
+                                          : "text-red-700 dark:text-red-300"
+                                          }`}
                                       >
                                         {renderValue(testResults[activeTestCase].actual) ||
                                           "No output"}
@@ -1044,7 +1066,7 @@ const ProblemSolverNew = () => {
       {coachingState.isCoachModeActive && coachingState.session && (
         <>
           {/* Progress and question now integrated into SimpleOverlay below */}
-          
+
           {/* Enhanced Coaching Overlay */}
           {coachingState.showInputOverlay && coachingState.inputPosition && coachingState.session && (
             <SimpleOverlay
@@ -1054,14 +1076,14 @@ const ProblemSolverNew = () => {
                 // Get code from the highlighted area in the main editor
                 const editor = codeEditorRef.current;
                 if (!editor) {
-                  console.error("Editor not available for code validation");
+                  logger.error('[ProblemSolverNew] Editor not available for code validation');
                   return;
                 }
-                
+
                 // Get the current code from the editor
                 const currentCode = editor.getValue();
-                console.log("Validating code from editor:", currentCode);
-                
+                logger.debug('[ProblemSolverNew] Validating code from editor', { codeLength: currentCode.length });
+
                 // Submit the current editor code for validation with optional explanation
                 submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
               }}
@@ -1088,7 +1110,7 @@ const ProblemSolverNew = () => {
               onFinishCoaching={async () => {
                 // When coaching completes successfully, save as submission
                 if (user?.id && problem?.id && code) {
-                  console.log('[ProblemSolverNew] Coaching completed - saving submission');
+                  logger.debug('[ProblemSolverNew] Coaching completed - saving submission');
                   try {
                     const saved = await UserAttemptsService.markProblemSolved(
                       user.id,
@@ -1104,7 +1126,7 @@ const ProblemSolverNew = () => {
                     );
                     toast.success("Solution saved to submissions! 🎉");
                   } catch (error) {
-                    console.error('[ProblemSolverNew] Failed to save coaching completion:', error);
+                    logger.error('[ProblemSolverNew] Failed to save coaching completion', { error });
                     toast.error("Failed to save submission");
                   }
                 }
@@ -1114,7 +1136,7 @@ const ProblemSolverNew = () => {
               hasAlternative={coachingState.lastValidation?.hasAlternative} // New prop
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
-                console.log("Exiting coach mode due to AI service error");
+                logger.debug('[ProblemSolverNew] Exiting coach mode due to AI service error');
                 stopCoaching();
               }}
               highlightedLine={coachingState.session.highlightArea?.startLine}
@@ -1130,8 +1152,8 @@ const ProblemSolverNew = () => {
 
       {/* Loading Spinner for AI Coaching */}
       {coachingState.isWaitingForResponse && (
-        <LoadingSpinner 
-          message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."} 
+        <LoadingSpinner
+          message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."}
         />
       )}
 

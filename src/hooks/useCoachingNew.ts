@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import {  CoachStep, CoachHighlightArea, InteractiveCoachSession } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "../services/overlayPositionManager";
 
 interface UseCoachingProps {
@@ -143,7 +144,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         );
       }
     } catch (error) {
-      console.error("Error applying highlight:", error);
+      logger.error("Error applying highlight", error, { component: "Coaching" });
     }
   }, [editorRef]);
 
@@ -172,7 +173,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         y: Math.max(30, Math.min(window.innerHeight - 300, estimatedY))
       };
     } catch (error) {
-      console.warn('Error calculating position:', error);
+      logger.warn("Error calculating position", { component: "Coaching", error });
       return { x: 100, y: 150 };
     }
   }, [editorRef]);
@@ -211,7 +212,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       const position = positionManager.getPositionWithFallback(editorBounds, totalLines);
       return { x: position.x, y: position.y };
     } catch (error) {
-      console.warn('Error calculating position using OverlayPositionManager:', error);
+      logger.warn("Error calculating position using OverlayPositionManager", { component: "Coaching", error });
       // Fallback to basic positioning
       return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
     }
@@ -223,7 +224,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
     hint?: string;
     highlightArea?: CoachHighlightArea;
   }) => {
-    console.log("🎯 [SHOW QUESTION] Showing interactive question:", { question, hint, highlightArea });
+    logger.debug("Showing interactive question", { component: "Coaching", question, hint, highlightArea });
 
     // Use the highlight area provided by the AI backend - it already calculates the correct insertion point
     const finalHighlight = highlightArea || null;
@@ -257,17 +258,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       } : prev.session,
     }));
     
-    console.log("🎯 [STATE] Overlay now showing:", {
-      showInputOverlay: true,
-      isWaitingForResponse: false,
-      currentQuestion: question
-    });
+    logger.debug("Overlay now showing", { component: "Coaching", showInputOverlay: true, isWaitingForResponse: false, currentQuestion: question });
   }, [applyHighlight, getPositionBelowLastLine]);
 
   // Start coaching session
   const startCoaching = useCallback(async () => {
     if (!editorRef.current) {
-      console.error("🚨 [COACHING] Editor not available");
+      logger.error("Editor not available", null, { component: "Coaching" });
       return;
     }
 
@@ -292,7 +289,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       if (error) throw error;
 
-      console.log("✅ [COACHING] Session started:", data);
+      logger.debug("Session started", { component: "Coaching", data });
 
       startTimeRef.current = new Date();
 
@@ -305,9 +302,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       // Check if session started as already completed
       if (data.isCompleted) {
-        console.log("✅ [COACHING] Solution already complete at session start", { 
-          isOptimizable: data.isOptimizable 
-        });
+        logger.debug("Solution already complete at session start", { component: "Coaching", isOptimizable: data.isOptimizable });
 
         // Initialize session state as completed - show the congratulations message in overlay
         setCoachingState(prev => ({
@@ -373,9 +368,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           applyHighlight(null);
           const pos = getPositionBelowLastLine();
 
-          console.log("✅ [COACHING] Solution validated as complete", { 
-            isOptimizable: validation.isOptimizable 
-          });
+          logger.debug("Solution validated as complete", { component: "Coaching", isOptimizable: validation.isOptimizable });
 
           setCoachingState(prev => ({
             ...prev,
@@ -402,7 +395,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           });
         }
       } catch (vError) {
-        console.warn('[COACHING] Initial validation failed; proceeding with first question', vError);
+        logger.warn("Initial validation failed; proceeding with first question", { component: "Coaching", error: vError });
         showInteractiveQuestion({
           question: data.question,
           hint: data.hint,
@@ -411,7 +404,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       }
 
     } catch (error) {
-      console.error("🚨 [COACHING] Error starting coaching:", error);
+      logger.error("Error starting coaching", error, { component: "Coaching" });
       
       setCoachingState(prev => ({
         ...prev,
@@ -463,11 +456,11 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
   // Submit coaching code for validation
   const submitCoachingCode = useCallback(async (userCode: string, userInput: string = "") => {
     if (!coachingState.session) {
-      console.error("🚨 [COACHING] No active session");
+      logger.error("No active session", null, { component: "Coaching" });
       return;
     }
 
-    console.log("🎯 [SUBMIT] Submitting code for validation:", { userCode, userInput });
+    logger.debug("Submitting code for validation", { component: "Coaching", userCode, userInput });
 
     setCoachingState(prev => ({
       ...prev,
@@ -481,7 +474,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       if (coachingState.isOptimizationMode) {
         // Validate optimization step instead of correctness
-        console.debug('[COACHING][payload] validate_optimization_step codeLen=', currentCode.length);
+        logger.debug("validate_optimization_step payload", { component: "Coaching", codeLen: currentCode.length });
         const { data, error } = await supabase.functions.invoke('ai-chat', {
           body: {
             action: 'validate_optimization_step',
@@ -494,7 +487,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         });
 
         if (error) throw error;
-        console.log('✅ [OPTIMIZATION] Validation response:', data);
+        logger.debug("Optimization validation response", { component: "Coaching", data });
 
         setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
 
@@ -551,7 +544,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       }
 
       // Default: validate correctness flow
-      console.debug('[COACHING][payload] validate_coaching_submission codeLen=', currentCode.length);
+      logger.debug("validate_coaching_submission payload", { component: "Coaching", codeLen: currentCode.length });
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           action: 'validate_coaching_submission',
@@ -567,7 +560,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       if (error) throw error;
 
-      console.log("✅ [COACHING] Validation response:", data);
+      logger.debug("Validation response", { component: "Coaching", data });
 
       // Update context state with new response ID
       if (data.responseId) {
@@ -582,7 +575,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
 
       if (data.isCorrect && data.nextAction === "insert_and_continue") {
-        console.log("🎉 [COACHING] Code validated successfully!");
+        logger.debug("Code validated successfully", { component: "Coaching" });
 
         if (data.codeToAdd && data.codeToAdd.trim()) {
           const codeToInsert = data.codeToAdd.trim();
@@ -592,7 +585,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
             // Use same smart insertion as chat snippets
             if (!codeContainsSnippet(before, codeToInsert)) {
-              console.log("🎯 [INSERT CODE] Using smart insertion for coaching code");
+              logger.debug("Using smart insertion for coaching code", { component: "Coaching" });
               
               const position = editor?.getPosition();
               const cursorPosition = {
@@ -627,26 +620,26 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
                 });
 
                 if (insertError) {
-                  console.error("❌ [COACHING] Smart insertion failed:", insertError);
+                  logger.error("Smart insertion failed", insertError, { component: "Coaching" });
                   throw new Error(`Smart insertion failed: ${insertError.message}`);
                 } else if (insertResult?.newCode) {
-                  console.log("✅ [COACHING] Smart insertion successful");
+                  logger.debug("Smart insertion successful", { component: "Coaching" });
                   editor?.setValue(insertResult.newCode);
                 } else {
-                  console.warn("⚠️ [COACHING] No new code returned from smart insertion");
+                  logger.warn("No new code returned from smart insertion", { component: "Coaching" });
                   throw new Error("Smart insertion returned no code");
                 }
               } catch (error) {
-                console.error("❌ [COACHING] Smart insertion error:", error);
+                logger.error("Smart insertion error", error, { component: "Coaching" });
                 throw error; // Re-throw to be caught by outer try-catch
               }
             } else {
-              console.log("[COACHING] Suggested code already present; skipping insertion.");
+              logger.debug("Suggested code already present; skipping insertion", { component: "Coaching" });
             }
 
             // After insertion, show next question if available
             if (data.nextStep?.question) {
-              console.log("🎯 [COACHING] Showing next question after code insertion");
+              logger.debug("Showing next question after code insertion", { component: "Coaching" });
               showInteractiveQuestion({
                 question: data.nextStep.question,
                 hint: data.nextStep.hint,
@@ -666,7 +659,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               }));
             }
           } catch (insertError) {
-            console.error("🚨 [COACHING] Insertion/revalidation failed:", insertError);
+            logger.error("Insertion/revalidation failed", insertError, { component: "Coaching" });
             setCoachingState(prev => ({
               ...prev,
               feedback: {
@@ -679,7 +672,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           }
         } else {
           // No code to add, student's answer was correct
-          console.log("✅ [COACHING] Answer correct, no code to add");
+          logger.debug("Answer correct, no code to add", { component: "Coaching" });
 
           // Store validation result to show feedback
           setCoachingState(prev => ({
@@ -703,7 +696,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             }, 2000); // 2 second delay to show success feedback
           } else {
             // Step completed without next step - finish session
-            console.log("🎉 [COACHING] Solution complete, ending session");
+            logger.debug("Solution complete, ending session", { component: "Coaching" });
             
             setCoachingState(prev => ({
               ...prev,
@@ -726,12 +719,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               },
             }));
             
-            console.log("🎯 [STATE] Solution completed - state updated:", {
-              isCompleted: true,
-              currentQuestion: "",
-              showInputOverlay: false,
-              feedback: "success"
-            });
+            logger.debug("Solution completed - state updated", { component: "Coaching", isCompleted: true, showInputOverlay: false });
             
             // Clear highlights
             if (applyHighlight) {
@@ -743,7 +731,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         }
       // Require explicit success to complete session; avoids completing on undefined/null
       } else if (data.isCorrect === true && data.nextAction === "complete_session") {
-        console.log("🎉 [COACHING] Session completed!");
+        logger.debug("Session completed", { component: "Coaching" });
         
         // CRITICAL: Clear all overlay state when completing
         setCoachingState(prev => ({
@@ -772,7 +760,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           applyHighlight(null);
         }
       } else {
-        console.log("🎯 [COACHING] Code needs correction - showing feedback");
+        logger.debug("Code needs correction - showing feedback", { component: "Coaching" });
         
         // Store the validation result for retry
         setCoachingState(prev => ({
@@ -784,7 +772,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       }
       
     } catch (error) {
-      console.error("🚨 [COACHING] Error submitting code:", error);
+      logger.error("Error submitting code", error, { component: "Coaching" });
       
       setCoachingState(prev => ({
         ...prev,
@@ -830,9 +818,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           }
         } else {
           // For smaller corrections, use smart replacement without confirmation
-          console.log("🎯 [COACHING] Using smart replacement for code correction");
+          logger.debug("Using smart replacement for code correction", { component: "Coaching" });
         }
-        console.log("🎯 [INSERT CODE] Using smart insertion for correct code");
+        logger.debug("Using smart insertion for correct code", { component: "Coaching" });
         
         const position = editor?.getPosition();
         const cursorPosition = {
@@ -854,7 +842,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         };
 
         try {
-          console.log("🔧 [COACHING] Using shared insertion logic for consistency with chat mode");
+          logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
           
           // Use the shared onCodeInsert callback with coaching context
           await onCodeInsert(codeToInsert, cursorPosition, insertionType, {
@@ -862,13 +850,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             feedback: coachingState.lastValidation.feedback
           });
           
-          console.log("✅ [COACHING] Shared insertion completed successfully");
+          logger.debug("Shared insertion completed successfully", { component: "Coaching" });
         } catch (error) {
-          console.error("❌ [COACHING] Shared insertion error:", error);
+          logger.error("Shared insertion error", error, { component: "Coaching" });
           throw error; // Re-throw to be caught by outer try-catch
         }
       } else {
-        console.log("[COACHING] Suggested code already present; skipping insertion.");
+        logger.debug("Suggested code already present; skipping insertion", { component: "Coaching" });
       }
 
       // After insertion, keep overlay open but change to "next step" mode
@@ -886,7 +874,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       }));
     } catch (aiError) {
-      console.error("🚨 [AI INSERTION] Failed:", aiError);
+      logger.error("AI insertion failed", aiError, { component: "Coaching" });
       setCoachingState(prev => ({
         ...prev,
         feedback: {
@@ -926,13 +914,13 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
   // Legacy submit response function - simplified for compatibility
   const submitResponse = useCallback(async (response: string) => {
-    console.log("🎯 [LEGACY] submitResponse called - redirecting to submitCoachingCode");
+    logger.debug("submitResponse called - redirecting to submitCoachingCode", { component: "Coaching" });
     await submitCoachingCode(response, response);
   }, [submitCoachingCode]);
 
   // Skip current step
   const skipStep = useCallback(() => {
-    console.log("🎯 [SKIP] Skip step called - ending coaching session");
+    logger.debug("Skip step called - ending coaching session", { component: "Coaching" });
     stopCoaching();
   }, [stopCoaching]);
 
@@ -982,7 +970,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         }));
       }
     } catch (e) {
-      console.error('❌ [OPTIMIZATION] Failed to start:', e);
+      logger.error("Failed to start optimization", e, { component: "Coaching" });
       setCoachingState(prev => ({
         ...prev,
         feedback: { show: true, type: 'error', message: 'Failed to start optimization. Please try again.', showConfetti: false },
@@ -1025,7 +1013,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           positionManager.savePosition(validatedPosition);
         }
       } catch (error) {
-        console.warn('Failed to save position:', error);
+        logger.warn("Failed to save position", { component: "Coaching", error });
       }
     }
   }, [positionManager, editorRef]);

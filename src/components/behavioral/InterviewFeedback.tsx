@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, Loader2, TrendingUp, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 interface FeedbackData {
   overall_score: number;
@@ -51,7 +52,7 @@ const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
           setFeedback(data as FeedbackData);
         }
       } catch (err) {
-        console.error("Failed to fetch feedback:", err);
+        logger.error("[InterviewFeedback] Failed to fetch feedback", { error: err });
         setError(err instanceof Error ? err.message : "Failed to load feedback");
       } finally {
         setIsLoading(false);
@@ -88,7 +89,7 @@ const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
       if (fetchError) throw fetchError;
       setFeedback(data as FeedbackData);
     } catch (err) {
-      console.error("Failed to generate feedback:", err);
+      logger.error("[InterviewFeedback] Failed to generate feedback", { error: err });
       setError(err instanceof Error ? err.message : "Failed to generate feedback");
     } finally {
       setIsGenerating(false);

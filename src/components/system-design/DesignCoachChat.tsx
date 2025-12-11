@@ -5,6 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Trash2, Loader2, Mic, MicOff } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { prism as prismLight } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -12,6 +14,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { Badge } from "@/components/ui/badge";
 import type { CompletenessAnalysis } from "@/types";
+import "katex/dist/katex.min.css";
 
 interface DesignCoachChatProps {
   messages: Array<{
@@ -221,6 +224,8 @@ const DesignCoachChat = ({
                           ) : (
                             <div className={`prose prose-sm max-w-none overflow-x-hidden ${isDark ? "prose-invert" : ""}`} style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
                               <ReactMarkdown
+                                remarkPlugins={[remarkMath]}
+                                rehypePlugins={[rehypeKatex]}
                                 components={{
                                   code({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
                                     const match = /language-(\w+)/.exec(className || "");

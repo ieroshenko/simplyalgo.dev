@@ -25,7 +25,12 @@ let openrouterClient: OpenAI | null = null;
  * Full list: https://openrouter.ai/models
  */
 export const OPENROUTER_MODELS = {
+    // xAI Grok
+    GROK_BETA: "x-ai/grok-beta",
+    GROK_CODE_FAST_1: "x-ai/grok-code-fast-1",
+
     // Google Gemini
+    GEMINI_2_5_FLASH_PREVIEW: "google/gemini-2.5-flash-preview-09-2025",
     GEMINI_2_5_FLASH: "google/gemini-2.5-flash",
     GEMINI_2_0_FLASH: "google/gemini-2.0-flash",
     GEMINI_PRO_1_5: "google/gemini-pro-1.5",
@@ -51,15 +56,15 @@ export const OPENROUTER_MODELS = {
     MISTRAL_LARGE: "mistralai/mistral-large",
 } as const;
 
-// Model selection via env var; default to Gemini 2.5 Flash if not set
+// Model selection via env var; default to Gemini 2.5 Flash Preview
 const configuredModel = (
     Deno.env.get("OPENROUTER_MODEL") ||
-    OPENROUTER_MODELS.GEMINI_2_5_FLASH
+    OPENROUTER_MODELS.GEMINI_2_5_FLASH_PREVIEW
 ).trim();
 
 const modelSource = Deno.env.get("OPENROUTER_MODEL")
     ? "OPENROUTER_MODEL env set"
-    : "defaulted to gemini-2.5-flash (no OPENROUTER_MODEL)";
+    : "defaulted to gemini-2.5-flash-preview-09-2025 (no OPENROUTER_MODEL)";
 
 /**
  * Initialize OpenRouter client with API key validation
@@ -128,6 +133,15 @@ export function getModelParameters(model: string): {
     maxTokens?: number;
     topP?: number;
 } {
+    // Grok models
+    if (model.includes("grok")) {
+        return {
+            temperature: 0.7,
+            maxTokens: 8192,
+            topP: 0.9,
+        };
+    }
+
     // Gemini models
     if (model.includes("gemini")) {
         return {

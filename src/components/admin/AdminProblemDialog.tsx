@@ -24,6 +24,7 @@ import { Loader2, Trash2, Save } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 
 export interface Problem {
   id: string;
@@ -205,7 +206,7 @@ export function AdminProblemDialog({
         hints,
       };
       
-      console.log("AdminProblemDialog: Saving payload:", problemData);
+      logger.info("[AdminProblemDialog] Saving payload", problemData);
 
       if (problem) {
         // Verify permission by ensuring data is returned
@@ -219,7 +220,7 @@ export function AdminProblemDialog({
         if (error) throw error;
 
         if (formData.function_signature !== initialSignature) {
-          console.log("AdminProblemDialog: Signature changed", {
+          logger.info("[AdminProblemDialog] Signature changed", {
             old: initialSignature,
             new: formData.function_signature,
             problemId: problem.id
@@ -233,9 +234,9 @@ export function AdminProblemDialog({
             .eq("status", "pending");
           
           if (deleteError) {
-            console.error("AdminProblemDialog: Failed to delete drafts", deleteError);
+            logger.error("[AdminProblemDialog] Failed to delete drafts", deleteError);
           } else {
-            console.log("AdminProblemDialog: Drafts deleted", { count });
+            logger.info("[AdminProblemDialog] Drafts deleted", { count });
           }
 
           if (user?.id) {
@@ -248,17 +249,17 @@ export function AdminProblemDialog({
              });
              
              if (insertError) {
-                 console.error("AdminProblemDialog: Failed to insert new draft", insertError);
+                 logger.error("[AdminProblemDialog] Failed to insert new draft", insertError);
                  toast({ variant: "destructive", title: "Problem updated but failed to reset editor" });
              } else {
-                 console.log("AdminProblemDialog: Inserted new draft with updated signature");
+                 logger.info("[AdminProblemDialog] Inserted new draft with updated signature");
                  toast({ title: "Problem updated & editor reset" });
              }
           } else {
              toast({ title: "Problem updated (Sign in to reset editor)" });
           }
         } else {
-          console.log("AdminProblemDialog: Signature unchanged");
+          logger.info("[AdminProblemDialog] Signature unchanged");
           toast({ title: "Problem updated" });
         }
         
@@ -271,7 +272,7 @@ export function AdminProblemDialog({
         onSaved(insertedProblem as Problem);
       }
     } catch (error: any) {
-      console.error("AdminProblemDialog: Save error", error);
+      logger.error("[AdminProblemDialog] Save error", error);
       toast({
         variant: "destructive",
         title: "Error saving problem",

@@ -30,3 +30,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test coverage
+coverage/
+
+# Supabase migrations (managed separately)
+supabase/migrations/
+
+# Documentation (internal notes)
+documents/

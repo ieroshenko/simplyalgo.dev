@@ -11,6 +11,7 @@ import InterviewControls from "@/components/behavioral/InterviewControls";
 import InterviewFeedback from "@/components/behavioral/InterviewFeedback";
 import { useRealtimeInterview } from "@/hooks/useRealtimeInterview";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
+import { logger } from "@/utils/logger";
 
 const BehavioralInterview = () => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ const BehavioralInterview = () => {
     onConnectionStatusChange: setConnectionStatus,
     onTranscript: (role, content) => {
       // Save transcripts to database
-      console.log(`💾 [BehavioralInterview] Saving ${role} transcript to database:`, content);
+      logger.debug('[BehavioralInterview] Saving transcript to database', { role, contentLength: content.length });
       addTranscript(role, content);
     },
   });
@@ -54,7 +55,7 @@ const BehavioralInterview = () => {
       setIsInterviewActive(true);
       await startInterview();
     } catch (err) {
-      console.error("Failed to start interview:", err);
+      logger.error('[BehavioralInterview] Failed to start interview', { error: err });
       alert("Failed to start interview. Please try again.");
     }
   };
@@ -154,15 +155,14 @@ const BehavioralInterview = () => {
 
             {/* Connection Status */}
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === "connected" ? "bg-green-500" :
-                connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
-                "bg-gray-400"
-              }`} />
+              <div className={`w-2 h-2 rounded-full ${connectionStatus === "connected" ? "bg-green-500" :
+                  connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
+                    "bg-gray-400"
+                }`} />
               <span className="text-sm text-muted-foreground">
                 {connectionStatus === "connected" ? "Connected" :
-                 connectionStatus === "connecting" ? "Connecting..." :
-                 "Not Connected"}
+                  connectionStatus === "connecting" ? "Connecting..." :
+                    "Not Connected"}
               </span>
             </div>
           </div>

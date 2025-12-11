@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 interface FlashcardReviewInterfaceProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export const FlashcardReviewInterface = ({
   // Start new card when currentCardIndex changes (for navigation/skip)
   useEffect(() => {
     if (isOpen && dueCards.length > 0 && currentSession === null) {
-      console.log('currentCardIndex changed to:', currentCardIndex, 'starting new card');
+      logger.debug('currentCardIndex changed, starting new card', { component: 'FlashcardReview', currentCardIndex });
       // Add a small delay to ensure state is properly updated
       setTimeout(() => {
         startNewCard();
@@ -107,7 +108,7 @@ export const FlashcardReviewInterface = ({
 
   // Start a new card review
   const startNewCard = async () => {
-    console.log('startNewCard called with currentCardIndex:', currentCardIndex);
+    logger.debug('startNewCard called', { component: 'FlashcardReview', currentCardIndex });
 
     if (currentCardIndex >= dueCards.length) {
       setSessionComplete(true);
@@ -115,17 +116,17 @@ export const FlashcardReviewInterface = ({
     }
 
     const card = dueCards[currentCardIndex];
-    console.log('Using card:', {
+    logger.debug('Using card', {
+      component: 'FlashcardReview',
       index: currentCardIndex,
       problemId: card?.problem_id,
       problemTitle: card?.problem_title,
       solutionTitle: card?.solution_title,
-      solutionCodeLength: card?.solution_code?.length,
-      solutionCodePreview: card?.solution_code?.substring(0, 100) + '...'
+      solutionCodeLength: card?.solution_code?.length
     });
 
     if (!card) {
-      console.error('No card found at index', currentCardIndex);
+      logger.error('No card found at index', null, { component: 'FlashcardReview', currentCardIndex });
       setSessionComplete(true);
       return;
     }
@@ -144,16 +145,17 @@ export const FlashcardReviewInterface = ({
 
       if (error) throw error;
       problemData = fetchedData;
-      console.log('Fetched problem data for card index', currentCardIndex, ':', {
+      logger.debug('Fetched problem data for card', {
+        component: 'FlashcardReview',
+        currentCardIndex,
         problemId: card.problem_id,
         title: problemData?.title,
-        descriptionLength: problemData?.description?.length,
-        cardTitle: card.problem_title
+        descriptionLength: problemData?.description?.length
       });
       setCurrentProblemData(problemData);
-      console.log('Set currentProblemData to:', problemData?.title);
+      logger.debug('Set currentProblemData', { component: 'FlashcardReview', title: problemData?.title });
     } catch (error) {
-      console.error("Error fetching problem data:", error);
+      logger.error("Error fetching problem data", error, { component: 'FlashcardReview' });
       setCurrentProblemData(null);
     }
 
@@ -169,11 +171,11 @@ export const FlashcardReviewInterface = ({
       cardData: card, // Store the card data to avoid sync issues
     };
 
-    console.log('Creating new session with:', {
+    logger.debug('Creating new session', {
+      component: 'FlashcardReview',
       cardIndex: currentCardIndex,
       cardProblemId: card.problem_id,
       problemDataTitle: problemData?.title,
-      cardTitle: card.problem_title,
       finalTitle: newSession.problemTitle
     });
 
@@ -232,7 +234,7 @@ export const FlashcardReviewInterface = ({
       // The useEffect will trigger startNewCard when currentCardIndex changes
 
     } catch (error) {
-      console.error('Error submitting review:', error);
+      logger.error('Error submitting review', error, { component: 'FlashcardReview' });
       toast.error('Failed to submit review. Please try again.');
     }
   };
@@ -293,10 +295,10 @@ export const FlashcardReviewInterface = ({
   const currentQuestion = REVIEW_QUESTIONS[currentSession?.currentQuestionIndex || 0];
 
   // Debug: Log what card is being rendered
-  console.log('Rendering with currentCard:', {
+  logger.debug('Rendering with currentCard', {
+    component: 'FlashcardReview',
     index: currentCardIndex,
     problemId: currentCard?.problem_id,
-    solutionCodePreview: currentCard?.solution_code?.substring(0, 50) + '...',
     problemDataTitle: currentProblemData?.title,
     usingSessionCard: !!currentSession?.cardData
   });
@@ -323,7 +325,7 @@ export const FlashcardReviewInterface = ({
                     size="sm"
                     onClick={() => {
                       if (currentCardIndex > 0) {
-                        console.log('Previous button clicked, moving from', currentCardIndex, 'to', currentCardIndex - 1);
+                        logger.debug('Previous button clicked', { component: 'FlashcardReview', from: currentCardIndex, to: currentCardIndex - 1 });
                         setCurrentSession(null);
                         setShowRatingOptions(false);
                         setCurrentProblemData(null);
@@ -343,7 +345,7 @@ export const FlashcardReviewInterface = ({
                     size="sm"
                     onClick={() => {
                       if (currentCardIndex < dueCards.length - 1) {
-                        console.log('Next button clicked, moving from', currentCardIndex, 'to', currentCardIndex + 1);
+                        logger.debug('Next button clicked', { component: 'FlashcardReview', from: currentCardIndex, to: currentCardIndex + 1 });
                         setCurrentSession(null);
                         setShowRatingOptions(false);
                         setCurrentProblemData(null);
@@ -433,7 +435,7 @@ export const FlashcardReviewInterface = ({
                       size="sm"
                       onClick={() => {
                         const newShowSolution = !showSolution;
-                        console.log('Toggling solution visibility:', newShowSolution, 'for card:', currentCard?.problem_id);
+                        logger.debug('Toggling solution visibility', { component: 'FlashcardReview', showSolution: newShowSolution, problemId: currentCard?.problem_id });
                         setShowSolution(newShowSolution);
                       }}
                       className="text-xs"
@@ -502,60 +504,84 @@ export const FlashcardReviewInterface = ({
             </div>
           </div>
 
-          {/* Questions Panel */}
+          {/* Practice Code Panel */}
           <div className="w-1/2 flex flex-col">
             {!showRatingOptions ? (
               <>
-                {/* Current Question */}
-                <div className="flex-1 p-6">
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <div className="text-sm text-muted-foreground mb-2">
-                        Question {(currentSession?.currentQuestionIndex || 0) + 1} of {REVIEW_QUESTIONS.length}
-                      </div>
-                      <h3 className="text-xl font-semibold mb-2">
-                        {currentQuestion?.question}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {currentQuestion?.description}
-                      </p>
-                    </div>
+                {/* Code Practice Area */}
+                <div className="flex-1 p-6 flex flex-col">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Try to Recall Your Solution</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Write out your solution or pseudocode below. Click "Show Solution" when ready to compare.
+                    </p>
+                  </div>
 
-                    {/* <div className="bg-muted/20 rounded-lg p-6 text-center">
-                      <p className="text-lg font-medium mb-2">Think it through</p>
-                      <p className="text-sm text-muted-foreground">
-                        Take your time to recall the answer. You can check your solution code if needed.
-                      </p>
-                    </div> */}
+                  {/* Editable Code Editor */}
+                  <div className="flex-1 min-h-0">
+                    {currentProblemData?.function_signature ? (
+                      <div className="h-full rounded overflow-hidden border">
+                        <Editor
+                          key={`practice-${currentCard?.problem_id}-${currentCardIndex}`}
+                          height="100%"
+                          language="python"
+                          theme={editorTheme}
+                          defaultValue={currentProblemData.function_signature}
+                          loading={<div className="flex items-center justify-center h-full">Loading editor...</div>}
+                          options={{
+                            minimap: { enabled: false },
+                            lineNumbers: 'on',
+                            folding: false,
+                            wordWrap: 'on',
+                            scrollBeyondLastLine: false,
+                            renderWhitespace: 'none',
+                            fontSize: 13,
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            readOnly: false, // Allow editing
+                            tabSize: 4,
+                            insertSpaces: true,
+                          }}
+                          onMount={(editor, monaco) => {
+                            defineCustomThemes(monaco);
+                            setIsEditorReady(true);
+                            // Focus the editor
+                            editor.focus();
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center border rounded bg-muted/20">
+                        <div className="text-center">
+                          <Code className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm text-muted-foreground">
+                            Loading problem signature...
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Next Question Button */}
+                {/* Bottom Action Bar */}
                 <div className="p-6 border-t">
                   <div className="flex justify-between items-center">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        // Skip to next card without rating (no penalty to spaced repetition)
-                        console.log('Skip button clicked, moving from', currentCardIndex, 'to', currentCardIndex + 1);
                         setCurrentSession(null);
                         setShowRatingOptions(false);
                         setShowSolution(false);
                         setCurrentProblemData(null);
                         setCurrentCardIndex(prev => prev + 1);
-                        // The useEffect will trigger startNewCard when currentCardIndex changes
                       }}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       Skip Card
                     </Button>
 
-                    <Button onClick={nextQuestion}>
-                      {(currentSession?.currentQuestionIndex || 0) < REVIEW_QUESTIONS.length - 1
-                        ? "Next Question"
-                        : "Rate My Memory"
-                      }
+                    <Button onClick={() => setShowRatingOptions(true)}>
+                      Rate My Memory
                     </Button>
                   </div>
                 </div>

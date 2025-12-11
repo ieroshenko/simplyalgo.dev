@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface Problem {
   id: string;
@@ -99,9 +100,10 @@ export const useProblems = (userId?: string) => {
 
       const { data: problemsData, error: problemsError } = await query;
 
-      console.log('🔍 useProblems: Fetched problems count:', problemsData?.length);
-      console.log('🔍 useProblems: Looking for implement-linked-list:',
-        problemsData?.find((p: any) => p.id === 'implement-linked-list'));
+      logger.debug('[useProblems] Fetched problems', {
+        count: problemsData?.length,
+        hasLinkedList: !!problemsData?.find((p: any) => p.id === 'implement-linked-list')
+      });
 
       if (problemsError) throw problemsError;
 
@@ -157,9 +159,10 @@ export const useProblems = (userId?: string) => {
         };
       });
 
-      console.log('🔍 useProblems: Formatted problems count:', formattedProblems.length);
-      console.log('🔍 useProblems: implement-linked-list in formatted:',
-        formattedProblems.find(p => p.id === 'implement-linked-list'));
+      logger.debug('[useProblems] Formatted problems', {
+        count: formattedProblems.length,
+        hasLinkedList: !!formattedProblems.find(p => p.id === 'implement-linked-list')
+      });
 
       setProblems(formattedProblems);
     } catch (err: unknown) {

@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { logger } from "@/utils/logger";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -52,13 +53,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   // If no user, redirect to auth
   if (!user) {
-    console.log("No user, redirecting to auth");
+    logger.debug("[ProtectedRoute] No user, redirecting to auth");
     return <Navigate to="/" replace />;
   }
 
   // If user exists but subscription is still loading, show loading
   if (subscriptionLoading) {
-    console.log("Subscription loading, showing loading spinner");
+    logger.debug("[ProtectedRoute] Subscription loading, showing loading spinner");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -69,28 +70,28 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Now we know user is authenticated and subscription state is loaded
   // If user has subscription and is on survey page, redirect to dashboard
   if (hasActiveSubscription && isSurveyPage) {
-    console.log("User has subscription and is on survey page, redirecting to dashboard");
+    logger.debug("[ProtectedRoute] User has subscription and is on survey page, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
   // If user doesn't have subscription and is on protected page, redirect to survey
   if (!hasActiveSubscription && !isPublicPage) {
-    console.log("User doesn't have subscription and is on protected page, redirecting to survey");
+    logger.debug("[ProtectedRoute] User doesn't have subscription and is on protected page, redirecting to survey");
     return <Navigate to="/survey/1" replace />;
   }
 
   // If user has subscription and is on survey page, don't render (will redirect)
   if (hasActiveSubscription && isSurveyPage) {
-    console.log("User has subscription and is on survey page, don't render");
+    logger.debug("[ProtectedRoute] User has subscription and is on survey page, don't render");
     return null;
   }
 
   // If user doesn't have subscription and is on protected page, don't render (will redirect)
   if (!hasActiveSubscription && !isPublicPage) {
-    console.log("User doesn't have subscription and is on protected page, don't render");
+    logger.debug("[ProtectedRoute] User doesn't have subscription and is on protected page, don't render");
     return null;
   }
-  console.log("User has subscription and is on protected page, rendering children");
+  logger.debug("[ProtectedRoute] User has subscription and is on protected page, rendering children");
   // Render children if user has subscription (and not on survey) or is on public page
   return <>{children}</>;
 };

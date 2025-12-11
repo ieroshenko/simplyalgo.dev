@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface UserStats {
   totalSolved: number;
@@ -71,7 +72,7 @@ export const useUserStats = (userId?: string) => {
         }
       }
     } catch (err: any) {
-      console.error("Error fetching user stats:", err.message);
+      logger.error("Error fetching user stats", err, { component: "UserStats" });
     }
   };
 
@@ -95,7 +96,7 @@ export const useUserStats = (userId?: string) => {
         });
       }
     } catch (err: any) {
-      console.error("Error fetching user profile:", err.message);
+      logger.error("Error fetching user profile", err, { component: "UserStats" });
     } finally {
       setLoading(false);
     }
@@ -106,13 +107,11 @@ export const useUserStats = (userId?: string) => {
     problemId: string,
   ) => {
     if (!userId) {
-      console.error("❌ Cannot update stats: No user ID");
+      logger.error("Cannot update stats: No user ID", null, { component: "UserStats" });
       return;
     }
 
-    console.log("📊 Starting stats update for difficulty:", difficulty);
-    console.log("🔍 User ID:", userId);
-    console.log("🎯 Problem ID:", problemId);
+    logger.debug("Starting stats update", { component: "UserStats", difficulty, userId, problemId });
 
     try {
       // First check if user has already solved this problem before (excluding the current solve)
@@ -128,13 +127,10 @@ export const useUserStats = (userId?: string) => {
 
       // Check if there are multiple solves (more than just the current one)
       const isFirstTimeSolving = !previousSolves || previousSolves.length <= 1;
-      console.log("🎯 Previous solves count:", previousSolves?.length || 0);
-      console.log("🎯 Is first time solving this problem:", isFirstTimeSolving);
+      logger.debug("Previous solves check", { component: "UserStats", previousSolvesCount: previousSolves?.length || 0, isFirstTimeSolving });
 
       if (!isFirstTimeSolving) {
-        console.log(
-          "⏭️ User has already solved this problem before, skipping stats update",
-        );
+        logger.debug("User has already solved this problem before, skipping stats update", { component: "UserStats" });
         return;
       }
 
@@ -147,15 +143,13 @@ export const useUserStats = (userId?: string) => {
 
       if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
 
-      console.log("📈 Current stats from DB:", currentStats);
+      logger.debug("Current stats from DB", { component: "UserStats", currentStats });
 
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
       const lastActivityDate = currentStats?.last_activity_date?.split("T")[0];
       const currentStreak = currentStats?.current_streak || 0;
 
-      console.log("📅 Today:", today);
-      console.log("📅 Last activity:", lastActivityDate);
-      console.log("🔥 Current streak:", currentStreak);
+      logger.debug("Streak calculation", { component: "UserStats", today, lastActivityDate, currentStreak });
 
       // Calculate new streak
       let newStreak = 1;
@@ -185,14 +179,7 @@ export const useUserStats = (userId?: string) => {
       const newTotalSolved = newEasySolved + newMediumSolved + newHardSolved;
       const newMaxStreak = Math.max(currentStats?.max_streak || 0, newStreak);
 
-      console.log("🎯 New stats to save:", {
-        newTotalSolved,
-        newEasySolved,
-        newMediumSolved,
-        newHardSolved,
-        newStreak,
-        newMaxStreak,
-      });
+      logger.debug("New stats to save", { component: "UserStats", newTotalSolved, newEasySolved, newMediumSolved, newHardSolved, newStreak, newMaxStreak });
 
       // Update or insert stats
       const { error: upsertError } = await supabase
@@ -216,11 +203,11 @@ export const useUserStats = (userId?: string) => {
         );
 
       if (upsertError) {
-        console.error("🚨 Upsert error details:", upsertError);
+        logger.error("Upsert error details", upsertError, { component: "UserStats" });
         throw upsertError;
       }
 
-      console.log("✅ Stats successfully saved to database");
+      logger.debug("Stats successfully saved to database", { component: "UserStats" });
 
       // Update local state
       setStats({
@@ -232,12 +219,9 @@ export const useUserStats = (userId?: string) => {
         maxStreak: newMaxStreak,
       });
 
-      console.log("🎊 Local state updated successfully!");
+      logger.debug("Local state updated successfully", { component: "UserStats" });
     } catch (err) {
-      console.error(
-        "❌ Error updating user stats:",
-        err instanceof Error ? err.message : "Unknown error",
-      );
+      logger.error("Error updating user stats", err, { component: "UserStats" });
     }
   };
 
@@ -273,7 +257,7 @@ export const useUserStats = (userId?: string) => {
         })
         .eq("user_id", userId);
     } catch (error) {
-      console.error("Error updating streak in database:", error);
+      logger.error("Error updating streak in database", error, { component: "UserStats" });
     }
   };
 

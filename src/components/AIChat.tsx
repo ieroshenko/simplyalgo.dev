@@ -24,10 +24,14 @@ import FlowCanvas from "@/components/diagram/FlowCanvas";
 import type { FlowGraph } from "@/types";
 import CodeSnippetButton from "@/components/CodeSnippetButton";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { CanvasContainer } from "@/components/canvas";
 import { hasInteractiveDemo } from "@/components/visualizations/registry";
+import "katex/dist/katex.min.css";
+import { logger } from "@/utils/logger";
 
 interface AIChatProps {
   problemId: string;
@@ -102,7 +106,7 @@ const AIChat = ({
       });
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error('[AIChat] Speech recognition error', { error });
     },
   });
 
@@ -168,17 +172,14 @@ const AIChat = ({
 
   const handleGenerateComponent = async (messageContent: string) => {
     if (!problem) {
-      console.error("No problem context available for visualization");
+      logger.error('[AIChat] No problem context available for visualization');
       return;
     }
 
     // Simply open the modal with our direct component
     setCanvasTitle(`${problem.title} - Interactive Demo`);
     setIsCanvasOpen(true);
-    console.debug(
-      "[InteractiveDemo] Opening visualization for:",
-      problem.title,
-    );
+    logger.debug('[AIChat] Opening visualization', { problemTitle: problem.title });
   };
 
   const openDiagramDialog = (diagram: ActiveDiagram) => {
@@ -206,7 +207,7 @@ const AIChat = ({
           scrollAreaRef.current.querySelector("[data-radix-scroll-area-content]") ||
           scrollAreaRef.current;
 
-        console.log('Attempting to scroll:', {
+        logger.debug('[AIChat] Attempting to scroll', {
           scrollAreaRef: !!scrollAreaRef.current,
           scrollElement: !!scrollElement,
           scrollHeight: scrollElement?.scrollHeight,
@@ -217,7 +218,7 @@ const AIChat = ({
           // Use requestAnimationFrame to ensure DOM has updated
           requestAnimationFrame(() => {
             scrollElement.scrollTop = scrollElement.scrollHeight;
-            console.log('Scrolled to:', scrollElement.scrollTop);
+            logger.debug('[AIChat] Scrolled to bottom', { scrollTop: scrollElement.scrollTop });
           });
         }
       }
@@ -463,6 +464,8 @@ const AIChat = ({
         {isRevealed ? (
           <div className="mt-3 text-foreground prose prose-sm max-w-none">
             <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
               components={{
                 code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                   const match = /language-(\w+)/.exec(className || "");
@@ -480,7 +483,7 @@ const AIChat = ({
                     );
                   }
                   return (
-                    <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                    <em className="text-blue-600 dark:text-blue-400 font-medium">{children}</em>
                   );
                 },
               }}
@@ -666,7 +669,23 @@ const AIChat = ({
                               return (
                                 <div>
                                   <ReactMarkdown
+                                    remarkPlugins={[remarkMath]}
+                                    rehypePlugins={[rehypeKatex]}
                                     components={{
+                                      em({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        // Convert italics to bold for better emphasis
+                                        return <strong {...props}>{children}</strong>;
+                                      },
+                                      strong({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        return <strong {...props}>{children}</strong>;
+                                      },
+                                      span({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                        // Handle KaTeX math spans
+                                        if (className && className.includes('katex')) {
+                                          return <span className={className} {...props}>{children}</span>;
+                                        }
+                                        return <span className={className} {...props}>{children}</span>;
+                                      },
                                       code({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
                                         const match = /language-(\w+)/.exec(className || "");
                                         const lang = match?.[1] || "python";
@@ -687,7 +706,7 @@ const AIChat = ({
                                           );
                                         }
                                         return (
-                                          <code className="bg-muted-foreground/10 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                                          <em className="text-blue-600 dark:text-blue-400 font-medium" {...props}>{children}</em>
                                         );
                                       },
                                       p: ({ children }) => (

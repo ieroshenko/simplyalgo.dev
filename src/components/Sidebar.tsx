@@ -31,16 +31,24 @@ import {
   Binary,
   User,
   MessageSquare,
+  Shield,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/hooks/useProblems";
+
+const ADMIN_EMAILS = [
+  "tazigrigolia@gmail.com",
+  "ivaneroshenko@gmail.com"
+];
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { categories } = useProblems(user?.id);
+
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
   const navigationItems = [
     { icon: Sparkles, label: "Dashboard", path: "/dashboard" },
@@ -73,11 +81,10 @@ const Sidebar = () => {
             <Button
               key={item.path}
               variant={isActive ? "default" : "ghost"}
-              className={`w-full justify-start ${
-                isActive
+              className={`w-full justify-start ${isActive
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-secondary text-foreground"
-              }`}
+                }`}
               onClick={() => navigate(item.path)}
             >
               <Icon className="w-4 h-4 mr-3" />
@@ -85,7 +92,22 @@ const Sidebar = () => {
             </Button>
           );
         })}
-        
+
+        {/* Admin Button - Only show for admin users */}
+        {isAdmin && (
+          <Button
+            variant={location.pathname === "/admin" ? "default" : "ghost"}
+            className={`w-full justify-start ${location.pathname === "/admin"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-secondary text-foreground"
+              }`}
+            onClick={() => navigate("/admin")}
+          >
+            <Shield className="w-4 h-4 mr-3" />
+            Admin
+          </Button>
+        )}
+
         {/* Feedback Modal Trigger */}
         <FeedbackModal>
           <Button
@@ -101,40 +123,40 @@ const Sidebar = () => {
       {/* Category Progress - Only show on DSA Arena pages */}
       {(location.pathname === "/problems" ||
         location.pathname === "/arena") && (
-        <div className="px-4 pb-4 flex-1">
-          <Card className="p-4 space-y-4">
-            <h3 className="font-semibold text-foreground text-sm">
-              Category Progress
-            </h3>
-            <div className="space-y-3">
-              {categories
-                .filter((category) =>
-                  category.name !== "Data Structure Implementations" &&
-                  category.name !== "System Design"
-                )
-                .map((category) => {
-                  const percentage = (category.solved / category.total) * 100;
+          <div className="px-4 pb-4 flex-1">
+            <Card className="p-4 space-y-4">
+              <h3 className="font-semibold text-foreground text-sm">
+                Category Progress
+              </h3>
+              <div className="space-y-3">
+                {categories
+                  .filter((category) =>
+                    category.name !== "Data Structure Implementations" &&
+                    category.name !== "System Design"
+                  )
+                  .map((category) => {
+                    const percentage = (category.solved / category.total) * 100;
 
-                  return (
-                    <div key={category.name} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-foreground">
-                            {category.name}
+                    return (
+                      <div key={category.name} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-foreground">
+                              {category.name}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {category.solved}/{category.total}
                           </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {category.solved}/{category.total}
-                        </span>
+                        <Progress value={percentage} className="h-2" />
                       </div>
-                      <Progress value={percentage} className="h-2" />
-                    </div>
-                  );
-                })}
-            </div>
-          </Card>
-        </div>
-      )}
+                    );
+                  })}
+              </div>
+            </Card>
+          </div>
+        )}
     </div>
   );
 };

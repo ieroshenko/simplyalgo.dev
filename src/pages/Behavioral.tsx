@@ -14,13 +14,14 @@ import {
   ArrowRight,
   Users,
 } from "lucide-react";
+import { logger } from "@/utils/logger";
 
 const Behavioral = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { getProgress, getQuestionScores } = usePracticeAnswers();
   const { stories, loading: storiesLoading } = useUserStories();
-  
+
   const [stats, setStats] = useState<{
     totalQuestionsPracticed: number;
     totalQuestions: number;
@@ -45,7 +46,7 @@ const Behavioral = () => {
         setStatsLoading(true);
         const progress = await getProgress();
         const storiesCount = stories.length;
-        
+
         setStats({
           totalQuestionsPracticed: progress.totalPracticed,
           totalQuestions: progress.totalQuestions,
@@ -53,7 +54,7 @@ const Behavioral = () => {
           averageScore: progress.averageScore,
         });
       } catch (err) {
-        console.error("Error loading stats:", err);
+        logger.error('[Behavioral] Error loading stats', { error: err });
       } finally {
         setStatsLoading(false);
       }

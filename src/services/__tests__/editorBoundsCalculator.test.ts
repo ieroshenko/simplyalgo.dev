@@ -167,6 +167,7 @@ describe('EditorBoundsCalculator', () => {
     });
 
     it('should return null for invalid bounds', () => {
+      // Test: When DOM rect has zero dimensions, should return null (or lastKnownBounds)
       const editorWithInvalidBounds = createMockEditor();
       (editorWithInvalidBounds.getDomNode() as any).getBoundingClientRect = vi.fn(() => ({
         left: 100,
@@ -176,12 +177,11 @@ describe('EditorBoundsCalculator', () => {
         width: 0,
         height: 0,
       }));
-      
+
       calculator.initialize(editorWithInvalidBounds);
       const bounds = calculator.getEditorBounds();
-      // With minWidth and minHeight enforced, it won't be null but will have minimum dimensions
-      expect(bounds?.width).toBe(100); // minWidth from default config
-      expect(bounds?.height).toBe(100); // minHeight from default config
+      // Implementation returns lastKnownBounds (null) for zero-dimension rects
+      expect(bounds).toBeNull();
     });
 
     it('should handle errors gracefully and return last known bounds', () => {

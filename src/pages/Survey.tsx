@@ -24,6 +24,7 @@ import { CustomizedResultsStep } from '@/components/survey/steps/CustomizedResul
 import { PaywallStep } from '@/components/survey/steps/PaywallStep';
 import { useSurveyData } from '@/hooks/useSurveyData';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/utils/logger';
 
 const TOTAL_STEPS = 20;
 
@@ -31,13 +32,13 @@ const Survey: React.FC = () => {
   const { stepNumber } = useParams<{ stepNumber: string }>();
   const navigate = useNavigate();
   const currentStep = parseInt(stepNumber || '1', 10);
-  
+
   // Get survey data, passing user as parameter
-  const { 
-    surveyData, 
-    completedSteps, 
-    isLoading, 
-    isSaving, 
+  const {
+    surveyData,
+    completedSteps,
+    isLoading,
+    isSaving,
     updateSurveyData,
     saveToLocalStorage,
     saveToDatabase
@@ -54,12 +55,12 @@ const Survey: React.FC = () => {
     if (currentStep > 1) {
       const canAccess = Array.from({ length: currentStep - 1 }, (_, i) => i + 1)
         .every(step => completedSteps.has(step));
-      
+
       if (!canAccess) {
         // Find the first incomplete step
         const firstIncomplete = Array.from({ length: currentStep - 1 }, (_, i) => i + 1)
           .find(step => !completedSteps.has(step));
-        
+
         if (firstIncomplete) {
           navigate(`/survey/${firstIncomplete}`);
         }
@@ -71,11 +72,11 @@ const Survey: React.FC = () => {
     // Define which steps are question steps (require answer selection)
     const questionSteps = [1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14, 15];
     const isQuestionStep = questionSteps.includes(step);
-    
+
     // For question steps, only mark as completed if it's a valid answer (not empty)
     // For non-question steps, always mark as completed when they call onAnswer
     const shouldMarkCompleted = !isQuestionStep || (answer && answer.trim() !== '');
-    
+
     await updateSurveyData(step, answer, shouldMarkCompleted);
   };
 
@@ -86,7 +87,7 @@ const Survey: React.FC = () => {
     }
     if (currentStep < TOTAL_STEPS) {
       navigate(`/survey/${currentStep + 1}`);
-      
+
       // If we're going to the analyzing step (step 17), save data asynchronously
       if (currentStep + 1 === 17) {
         // Save data in background during analyzing step
@@ -104,7 +105,7 @@ const Survey: React.FC = () => {
   };
 
   const handlePaymentError = (error: string) => {
-    console.error('Payment error:', error);
+    logger.error('[Survey] Payment error', { error });
     // You could show a toast notification here
   };
 
@@ -117,9 +118,9 @@ const Survey: React.FC = () => {
   const saveAllSurveyDataAsync = async () => {
     try {
       await saveToDatabase();
-      console.log('Survey data saved successfully');
+      logger.debug('[Survey] Survey data saved successfully');
     } catch (error) {
-      console.error('Failed to save survey data:', error);
+      logger.error('[Survey] Failed to save survey data', { error });
     }
   };
 
@@ -171,10 +172,10 @@ const Survey: React.FC = () => {
   // Define which steps are question steps (require answer selection)
   const questionSteps = [1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14, 15];
   const isQuestionStep = questionSteps.includes(currentStep);
-  
+
   // For question steps, require an actual answer to be selected
   // For non-question steps, they're auto-completed when viewed
-  const canContinue = isQuestionStep 
+  const canContinue = isQuestionStep
     ? surveyData[currentStep] && surveyData[currentStep].trim() !== ''
     : true;
 
@@ -200,11 +201,11 @@ const Survey: React.FC = () => {
           canGoBack={currentStep > 1}
         />
       )}
-      
+
       <main className={`flex-1 flex flex-col ${showFooter ? 'pb-24' : ''}`}>
         {renderStep()}
       </main>
-      
+
       {showFooter && (
         <div className="fixed bottom-0 left-0 right-0 z-10">
           <SurveyFooter

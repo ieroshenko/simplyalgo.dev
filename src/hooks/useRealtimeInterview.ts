@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { logger } from "@/utils/logger";
 
 interface UseRealtimeInterviewProps {
   resumeText: string;
@@ -31,7 +32,7 @@ export const useRealtimeInterview = ({
 
   // Cleanup function
   const cleanup = useCallback(() => {
-    console.log("[Realtime] Cleaning up resources...");
+    logger.debug("Cleaning up resources...", { component: "Realtime" });
 
     // Close data channel
     if (dataChannelRef.current) {
@@ -72,10 +73,10 @@ export const useRealtimeInterview = ({
     try {
       setError(null);
       onConnectionStatusChange("connecting");
-      console.log("[Realtime] Starting interview...");
+      logger.debug("Starting interview...", { component: "Realtime" });
 
       // Get ephemeral token from backend
-      console.log("[Realtime] Requesting ephemeral token...");
+      logger.debug("Requesting ephemeral token...", { component: "Realtime" });
       const tokenResponse = await fetch("/api/ephemeral-token", {
         method: "POST",
         headers: {
@@ -93,7 +94,7 @@ export const useRealtimeInterview = ({
       }
 
       const { token } = await tokenResponse.json();
-      console.log("[Realtime] Received ephemeral token");
+      logger.debug("Received ephemeral token", { component: "Realtime" });
 
       // Create peer connection
       const pc = new RTCPeerConnection();
@@ -107,7 +108,7 @@ export const useRealtimeInterview = ({
       audioContextRef.current = audioContext;
 
       // Get user media (microphone)
-      console.log("[Realtime] Requesting microphone access...");
+      logger.debug("Requesting microphone access...", { component: "Realtime" });
       const localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -121,7 +122,7 @@ export const useRealtimeInterview = ({
       localStream.getTracks().forEach((track) => {
         pc.addTrack(track, localStream);
       });
-      console.log("[Realtime] Local audio track added");
+      logger.debug("Local audio track added", { component: "Realtime" });
 
       // Create data channel for control events
       const dataChannel = pc.createDataChannel("oai-events");
@@ -129,7 +130,7 @@ export const useRealtimeInterview = ({
 
       // Handle data channel events
       dataChannel.addEventListener("open", () => {
-        console.log("[Realtime] Data channel opened");
+        logger.debug("Data channel opened", { component: "Realtime" });
 
         // Send session configuration
         const sessionConfig = {
@@ -160,12 +161,12 @@ ${resumeText.slice(0, 20000)}`,
           },
         };
 
-        console.log("[Realtime] Sending session configuration:", sessionConfig);
+        logger.debug("Sending session configuration", { component: "Realtime", sessionConfig });
         dataChannel.send(JSON.stringify(sessionConfig));
 
         // Send initial greeting trigger after a short delay
         setTimeout(() => {
-          console.log("[Realtime] Sending response.create to start interview");
+          logger.debug("Sending response.create to start interview", { component: "Realtime" });
           const responseCreate = {
             type: "response.create",
             response: {
@@ -281,18 +282,18 @@ ${resumeText.slice(0, 20000)}`,
       });
 
       dataChannel.addEventListener("error", (e) => {
-        console.error("[Realtime] Data channel error:", e);
+        logger.error("Data channel error", e, { component: "Realtime" });
         setError("Connection error occurred");
       });
 
       dataChannel.addEventListener("close", () => {
-        console.log("[Realtime] Data channel closed");
+        logger.debug("Data channel closed", { component: "Realtime" });
         cleanup();
       });
 
       // Handle connection state changes
       pc.addEventListener("connectionstatechange", () => {
-        console.log("[Realtime] Connection state:", pc.connectionState);
+        logger.debug("Connection state changed", { component: "Realtime", connectionState: pc.connectionState });
         if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           setError("Connection lost");
           cleanup();
@@ -300,12 +301,12 @@ ${resumeText.slice(0, 20000)}`,
       });
 
       // Create offer
-      console.log("[Realtime] Creating SDP offer...");
+      logger.debug("Creating SDP offer...", { component: "Realtime" });
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
       // Send offer to OpenAI Realtime API using ephemeral token
-      console.log("[Realtime] Sending offer to OpenAI...");
+      logger.debug("Sending offer to OpenAI...", { component: "Realtime" });
       const model = "gpt-realtime";
       const response = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
         method: "POST",
@@ -323,7 +324,7 @@ ${resumeText.slice(0, 20000)}`,
 
       // Get answer SDP
       const answerSdp = await response.text();
-      console.log("[Realtime] Received answer from OpenAI");
+      logger.debug("Received answer from OpenAI", { component: "Realtime" });
 
       // Set remote description
       await pc.setRemoteDescription({
@@ -331,9 +332,9 @@ ${resumeText.slice(0, 20000)}`,
         sdp: answerSdp,
       });
 
-      console.log("[Realtime] WebRTC connection established");
+      logger.debug("WebRTC connection established", { component: "Realtime" });
     } catch (err) {
-      console.error("[Realtime] Failed to start interview:", err);
+      logger.error("Failed to start interview", err, { component: "Realtime" });
       setError(err instanceof Error ? err.message : "Failed to start interview");
       cleanup();
     }
@@ -341,7 +342,7 @@ ${resumeText.slice(0, 20000)}`,
 
   // Stop interview
   const stopInterview = useCallback(() => {
-    console.log("[Realtime] Stopping interview...");
+    logger.debug("Stopping interview...", { component: "Realtime" });
     cleanup();
   }, [cleanup]);
 

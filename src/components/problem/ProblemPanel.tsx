@@ -10,10 +10,14 @@ import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { toast } from "sonner";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
+import "katex/dist/katex.min.css";
+import { logger } from "@/utils/logger";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -55,23 +59,24 @@ const ProblemPanel = ({
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
   const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
   const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
-  
+
   // Select syntax highlighting theme based on current color scheme
   const syntaxTheme = isDark ? vscDarkPlus : vs;
 
   // Load existing complexity analysis from submissions
   React.useEffect(() => {
-    console.log('🔍 [ProblemPanel] Loading analysis from submissions:', submissions?.length || 0, 'submissions');
+    logger.debug('[ProblemPanel] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
       const results: Record<string, any> = {};
       submissions.forEach(submission => {
-        console.log('📊 [ProblemPanel] Submission:', submission.id, 'has analysis:', !!submission.complexity_analysis);
+        logger.debug('[ProblemPanel] Processing submission for analysis', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
-          console.log('✅ [ProblemPanel] Loading analysis:', submission.complexity_analysis);
+          logger.debug('📊 [ProblemPanel] Submission has analysis', { id: submission.id });
+          logger.debug('[ProblemPanel] Loading analysis data', { analysis: submission.complexity_analysis });
           results[submission.id] = submission.complexity_analysis;
         }
       });
-      console.log('✅ [ProblemPanel] Total loaded analysis:', Object.keys(results).length);
+      logger.debug('✅ [ProblemPanel] Total loaded analysis', { count: Object.keys(results).length });
       setComplexityResults(results);
     }
   }, [submissions]);
@@ -152,19 +157,19 @@ const ProblemPanel = ({
       }));
 
       // Save to database for persistence
-      console.log('💾 [ProblemPanel] Saving analysis for submission:', submissionId);
-      console.log('📝 [ProblemPanel] Analysis data:', analysisData);
+      logger.info('[ProblemPanel] Saving analysis for submission', { submissionId });
+      logger.debug('[ProblemPanel] Analysis data', analysisData);
       const { UserAttemptsService } = await import("@/services/userAttempts");
       const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
-      console.log('✅ [ProblemPanel] Save result:', saved ? 'Success' : 'Failed');
+      logger.info('[ProblemPanel] Save result', { success: saved });
 
       if (!saved) {
-        console.error('❌ [ProblemPanel] Failed to save analysis to database');
+        logger.error('[ProblemPanel] Failed to save analysis to database');
       }
 
       toast.success("Complexity analysis complete!");
     } catch (error) {
-      console.error("Complexity analysis error:", error);
+      logger.error("[ProblemPanel] Complexity analysis error", { error });
       toast.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);
@@ -235,8 +240,10 @@ const ProblemPanel = ({
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Problem Description
             </h2>
-            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground">
+            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground prose-code:bg-transparent prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-img:rounded-lg prose-img:border prose-img:border-border prose-strong:text-foreground prose-strong:font-semibold prose-headings:text-foreground">
               <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   code({ inline, className, children }: any) {
                     const match = /language-(\w+)/.exec(className || "");
@@ -256,6 +263,23 @@ const ProblemPanel = ({
                       </SyntaxHighlighter>
                     ) : (
                       <code className={className}>{children}</code>
+                    );
+                  },
+                  // Enhanced image rendering with responsive sizing and dark mode support
+                  img({ src, alt }: any) {
+                    return (
+                      <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
+                        <img
+                          src={src}
+                          alt={alt || "Problem illustration"}
+                          className="max-w-full h-auto rounded shadow-sm mx-auto"
+                          style={{
+                            maxHeight: "400px",
+                            objectFit: "contain",
+                          }}
+                          loading="lazy"
+                        />
+                      </div>
                     );
                   },
                 }}

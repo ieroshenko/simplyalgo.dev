@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 import type {
   SystemDesignSession,
   SystemDesignBoardState,
@@ -84,9 +85,9 @@ export const useSystemDesignSession = ({
           .limit(1)
           .single();
         existingSession = result.data;
-        console.log("[SystemDesignChat] initializeSession - found existing:", existingSession?.id);
+        logger.debug("initializeSession - found existing", { component: "SystemDesignChat", sessionId: existingSession?.id });
       } else {
-        console.log("[SystemDesignChat] initializeSession - forceNew=true, creating new session");
+        logger.debug("initializeSession - forceNew=true, creating new session", { component: "SystemDesignChat" });
       }
 
       let currentSession: SystemDesignSession;
@@ -181,7 +182,7 @@ export const useSystemDesignSession = ({
         }
       }
     } catch (err) {
-      console.error("[SystemDesignChat] Error initializing session:", err);
+      logger.error("Error initializing session", err, { component: "SystemDesignChat" });
       setError(err instanceof Error ? err.message : "Failed to initialize session");
     } finally {
       setLoading(false);
@@ -196,16 +197,17 @@ export const useSystemDesignSession = ({
   const updateBoard = useCallback(
     async (state: SystemDesignBoardState) => {
       if (!session) {
-        console.log("[SystemDesignChat] updateBoard called but no session");
+        logger.debug("updateBoard called but no session", { component: "SystemDesignChat" });
         return;
       }
 
       if (!state) {
-        console.warn("[SystemDesignChat] updateBoard called with invalid state:", state);
+        logger.warn("updateBoard called with invalid state", { component: "SystemDesignChat", state });
         return;
       }
 
-      console.log("[SystemDesignChat] Board state updated:", {
+      logger.debug("Board state updated", {
+        component: "SystemDesignChat",
         elementCount: state.elements?.length || 0,
         nodeCount: state.nodes?.length || 0,
         edgeCount: state.edges?.length || 0,
@@ -221,7 +223,7 @@ export const useSystemDesignSession = ({
       // Debounced save to database and AI reaction (every 3 seconds)
       boardUpdateTimeoutRef.current = setTimeout(async () => {
         try {
-          console.log("[SystemDesignChat] Saving board state to database (debounced 3s)");
+          logger.debug("Saving board state to database (debounced 3s)", { component: "SystemDesignChat" });
           await supabase.functions.invoke("system-design-chat", {
             body: {
               action: "update_board_state",
@@ -229,7 +231,7 @@ export const useSystemDesignSession = ({
               boardState: state,
             },
           });
-          console.log("[SystemDesignChat] Board state saved successfully");
+          logger.debug("Board state saved successfully", { component: "SystemDesignChat" });
 
           // Check if board changed significantly before triggering AI reaction
           // Detect changes in: node count, edge count, or node labels
@@ -260,7 +262,7 @@ export const useSystemDesignSession = ({
 
           const hasContent = (state.elements && state.elements.length > 0) || (state.nodes && state.nodes.length > 0);
           if (hasSignificantChange && hasContent) {
-            console.log("[SystemDesignChat] Board changed significantly, triggering AI reaction");
+            logger.debug("Board changed significantly, triggering AI reaction", { component: "SystemDesignChat" });
             setLoading(true);
 
             const { data, error } = await supabase.functions.invoke("system-design-chat", {
@@ -272,9 +274,9 @@ export const useSystemDesignSession = ({
             });
 
             if (error) {
-              console.error("[SystemDesignChat] AI reaction failed:", error);
+              logger.error("AI reaction failed", error, { component: "SystemDesignChat" });
             } else if (data?.message) {
-              console.log("[SystemDesignChat] AI reacted to board changes");
+              logger.debug("AI reacted to board changes", { component: "SystemDesignChat" });
 
               // Reload messages to show the new AI reaction
               const { data: responses } = await supabase
@@ -302,7 +304,7 @@ export const useSystemDesignSession = ({
             setLoading(false);
           }
         } catch (err) {
-          console.error("[SystemDesignChat] Failed to save board state or get AI reaction:", err);
+          logger.error("Failed to save board state or get AI reaction", err, { component: "SystemDesignChat" });
           setLoading(false);
         }
       }, 3000); // 3 seconds debounce
@@ -315,21 +317,18 @@ export const useSystemDesignSession = ({
   const sendMessage = useCallback(
     async (message: string) => {
       if (!session || !message.trim()) {
-        console.log("[SystemDesignChat] sendMessage called but no session or empty message");
+        logger.debug("sendMessage called but no session or empty message", { component: "SystemDesignChat" });
         return;
       }
 
       // Cancel pending board update auto-reaction when user sends a message
       if (boardUpdateTimeoutRef.current) {
-        console.log("[SystemDesignChat] Canceling pending auto-reaction - user sent message");
+        logger.debug("Canceling pending auto-reaction - user sent message", { component: "SystemDesignChat" });
         clearTimeout(boardUpdateTimeoutRef.current);
         boardUpdateTimeoutRef.current = null;
       }
 
-      console.log("[SystemDesignChat] Sending message:", {
-        message,
-        sessionId: session.id,
-      });
+      logger.debug("Sending message", { component: "SystemDesignChat", message, sessionId: session.id });
 
       const userMessage = {
         role: "user" as const,
@@ -341,7 +340,7 @@ export const useSystemDesignSession = ({
       setIsTyping(true); // Start typing indicator
 
       try {
-        console.log("[SystemDesignChat] Invoking Edge Function: coach_message");
+        logger.debug("Invoking Edge Function: coach_message", { component: "SystemDesignChat" });
         const { data, error: invokeError } = await supabase.functions.invoke(
           "system-design-chat",
           {
@@ -353,12 +352,12 @@ export const useSystemDesignSession = ({
           },
         );
 
-        console.log("[SystemDesignChat] Edge Function response:", { data, error: invokeError });
+        logger.debug("Edge Function response", { component: "SystemDesignChat", data, error: invokeError });
 
         if (invokeError) throw invokeError;
 
         if (data?.message) {
-          console.log("[SystemDesignChat] Adding AI response to messages");
+          logger.debug("Adding AI response to messages", { component: "SystemDesignChat" });
           setMessages((prev) => [
             ...prev,
             {
@@ -368,16 +367,16 @@ export const useSystemDesignSession = ({
             },
           ]);
         } else {
-          console.warn("[SystemDesignChat] No message in response data:", data);
+          logger.warn("No message in response data", { component: "SystemDesignChat", data });
         }
 
         // Update completeness state if provided
         if (data?.completeness) {
-          console.log("[SystemDesignChat] Updating completeness state:", data.completeness);
+          logger.debug("Updating completeness state", { component: "SystemDesignChat", completeness: data.completeness });
           setCompleteness(data.completeness);
         }
       } catch (err) {
-        console.error("[SystemDesignChat] Error sending message:", err);
+        logger.error("Error sending message", err, { component: "SystemDesignChat" });
         setError(err instanceof Error ? err.message : "Failed to send message");
         // Remove user message on error
         setMessages((prev) => prev.slice(0, -1));
@@ -389,16 +388,16 @@ export const useSystemDesignSession = ({
   );
 
   const clearConversation = useCallback(async () => {
-    console.log("[SystemDesignChat] ========== CLEAR CONVERSATION START ==========");
-    console.log("[SystemDesignChat] Current session:", session);
+    logger.debug("========== CLEAR CONVERSATION START ==========", { component: "SystemDesignChat" });
+    logger.debug("Current session", { component: "SystemDesignChat", session });
 
     if (!session) {
-      console.warn("[SystemDesignChat] No session found, aborting");
+      logger.warn("No session found, aborting", { component: "SystemDesignChat" });
       return;
     }
 
     const sessionIdToDelete = session.id;
-    console.log("[SystemDesignChat] Will delete session:", sessionIdToDelete);
+    logger.debug("Will delete session", { component: "SystemDesignChat", sessionIdToDelete });
 
     try {
       // Start typing animation to show we're working on it
@@ -407,52 +406,52 @@ export const useSystemDesignSession = ({
       // Small delay to show fade-out animation
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      console.log("[SystemDesignChat] Step 1: Deleting responses...");
+      logger.debug("Step 1: Deleting responses...", { component: "SystemDesignChat" });
       const { error: responsesError } = await supabase
         .from("system_design_responses")
         .delete()
         .eq("session_id", sessionIdToDelete);
 
       if (responsesError) {
-        console.error("[SystemDesignChat] Responses delete error:", responsesError);
+        logger.error("Responses delete error", responsesError, { component: "SystemDesignChat" });
         throw responsesError;
       }
-      console.log("[SystemDesignChat] ✓ Responses deleted");
+      logger.debug("Responses deleted successfully", { component: "SystemDesignChat" });
 
-      console.log("[SystemDesignChat] Step 2: Deleting board state...");
+      logger.debug("Step 2: Deleting board state...", { component: "SystemDesignChat" });
       const { error: boardError } = await supabase
         .from("system_design_boards")
         .delete()
         .eq("session_id", sessionIdToDelete);
 
       if (boardError) {
-        console.error("[SystemDesignChat] Board delete error:", boardError);
+        logger.error("Board delete error", boardError, { component: "SystemDesignChat" });
         throw boardError;
       }
-      console.log("[SystemDesignChat] ✓ Board deleted");
+      logger.debug("Board deleted successfully", { component: "SystemDesignChat" });
 
-      console.log("[SystemDesignChat] Step 3: Deleting session...");
+      logger.debug("Step 3: Deleting session...", { component: "SystemDesignChat" });
       const { error: sessionError } = await supabase
         .from("system_design_sessions")
         .delete()
         .eq("id", sessionIdToDelete);
 
       if (sessionError) {
-        console.error("[SystemDesignChat] Session delete error:", sessionError);
+        logger.error("Session delete error", sessionError, { component: "SystemDesignChat" });
         throw sessionError;
       }
-      console.log("[SystemDesignChat] ✓ Session deleted");
+      logger.debug("Session deleted successfully", { component: "SystemDesignChat" });
 
-      console.log("[SystemDesignChat] Step 4: Resetting local state...");
+      logger.debug("Step 4: Resetting local state...", { component: "SystemDesignChat" });
       setMessages([]);
       setBoardState({ elements: [], appState: {}, files: {} });
       lastBoardStateRef.current = null;
       setEvaluation(null);
       setCompleteness(null);
       setSession(null);
-      console.log("[SystemDesignChat] ✓ Local state reset");
+      logger.debug("Local state reset successfully", { component: "SystemDesignChat" });
 
-      console.log("[SystemDesignChat] Step 5: Creating new session...");
+      logger.debug("Step 5: Creating new session...", { component: "SystemDesignChat" });
       const { data: newSessionData, error: createError } = await supabase.functions.invoke(
         "system-design-chat",
         {
@@ -465,11 +464,11 @@ export const useSystemDesignSession = ({
       );
 
       if (createError) {
-        console.error("[SystemDesignChat] Create session error:", createError);
+        logger.error("Create session error", createError, { component: "SystemDesignChat" });
         throw createError;
       }
 
-      console.log("[SystemDesignChat] New session data:", newSessionData);
+      logger.debug("New session data", { component: "SystemDesignChat", newSessionData });
 
       const newSession: SystemDesignSession = {
         id: newSessionData.sessionId,
@@ -480,11 +479,11 @@ export const useSystemDesignSession = ({
         startedAt: new Date(),
       };
 
-      console.log("[SystemDesignChat] Step 6: Setting new session...");
+      logger.debug("Step 6: Setting new session...", { component: "SystemDesignChat" });
       setSession(newSession);
 
       if (newSessionData.message) {
-        console.log("[SystemDesignChat] Step 7: Setting initial message...");
+        logger.debug("Step 7: Setting initial message...", { component: "SystemDesignChat" });
         setMessages([
           {
             role: "assistant",
@@ -496,10 +495,9 @@ export const useSystemDesignSession = ({
 
       setIsTyping(false);
 
-      console.log("[SystemDesignChat] ========== CLEAR CONVERSATION SUCCESS ==========");
+      logger.debug("========== CLEAR CONVERSATION SUCCESS ==========", { component: "SystemDesignChat" });
     } catch (err) {
-      console.error("[SystemDesignChat] ========== CLEAR CONVERSATION ERROR ==========");
-      console.error("[SystemDesignChat] Error details:", err);
+      logger.error("========== CLEAR CONVERSATION ERROR ==========", err, { component: "SystemDesignChat" });
       setError(err instanceof Error ? err.message : "Failed to clear conversation");
       setIsTyping(false);
     }
@@ -554,7 +552,7 @@ export const useSystemDesignSession = ({
 
   const saveDraft = useCallback(async () => {
     if (!session) {
-      console.log("[SystemDesignChat] saveDraft: No session, skipping");
+      logger.debug("saveDraft: No session, skipping", { component: "SystemDesignChat" });
       return;
     }
 
@@ -562,13 +560,13 @@ export const useSystemDesignSession = ({
     const hasContent = (boardState.elements && boardState.elements.length > 0) ||
                        (boardState.nodes && boardState.nodes.length > 0);
     if (!hasContent) {
-      console.log("[SystemDesignChat] saveDraft: No elements/nodes, skipping");
+      logger.debug("saveDraft: No elements/nodes, skipping", { component: "SystemDesignChat" });
       return;
     }
 
     try {
       const draftHash = JSON.stringify(boardState ?? {});
-      console.log("[SystemDesignChat] Saving current work as draft...");
+      logger.debug("Saving current work as draft...", { component: "SystemDesignChat" });
       const { error: updateError } = await supabase
         .from("system_design_sessions")
         .update({ draft_board_state: boardState, draft_hash: draftHash })
@@ -578,23 +576,23 @@ export const useSystemDesignSession = ({
 
       setHasDraft(true);
       setLastSavedDraftHash(draftHash);
-      console.log("[SystemDesignChat] ✓ Draft saved successfully");
+      logger.debug("Draft saved successfully", { component: "SystemDesignChat" });
     } catch (err) {
-      console.error("[SystemDesignChat] Failed to save draft:", err);
+      logger.error("Failed to save draft", err, { component: "SystemDesignChat" });
       setError(err instanceof Error ? err.message : "Failed to save draft");
     }
   }, [session, boardState]);
 
   const restoreDraft = useCallback(async (): Promise<boolean> => {
     if (!session) {
-      console.log("[SystemDesignChat] restoreDraft: No session, skipping");
+      logger.debug("restoreDraft: No session, skipping", { component: "SystemDesignChat" });
       return false;
     }
 
     const backupState = lastBoardStateRef.current ?? boardState;
 
     try {
-      console.log("[SystemDesignChat] Restoring draft...");
+      logger.debug("Restoring draft...", { component: "SystemDesignChat" });
       const { data, error: fetchError } = await supabase
         .from("system_design_sessions")
         .select("draft_board_state, draft_hash")
@@ -605,7 +603,8 @@ export const useSystemDesignSession = ({
 
       if (data?.draft_board_state) {
         const draftState = data.draft_board_state as SystemDesignBoardState;
-        console.log("[SystemDesignChat] Captured backup of current board state before restore", {
+        logger.debug("Captured backup of current board state before restore", {
+          component: "SystemDesignChat",
           hasElements: !!backupState?.elements?.length,
           hasNodes: !!backupState?.nodes?.length,
         });
@@ -620,14 +619,14 @@ export const useSystemDesignSession = ({
           .eq("id", session.id);
 
         setHasDraft(false);
-        console.log("[SystemDesignChat] ✓ Draft restored successfully");
+        logger.debug("Draft restored successfully", { component: "SystemDesignChat" });
         return true;
       } else {
-        console.log("[SystemDesignChat] No draft found to restore");
+        logger.debug("No draft found to restore", { component: "SystemDesignChat" });
         return false;
       }
     } catch (err) {
-      console.error("[SystemDesignChat] Failed to restore draft:", err);
+      logger.error("Failed to restore draft", err, { component: "SystemDesignChat" });
       setError(err instanceof Error ? err.message : "Failed to restore draft");
       return false;
     }
@@ -648,7 +647,7 @@ export const useSystemDesignSession = ({
           .single();
 
         if (fetchError) {
-          console.error("[SystemDesignChat] Failed to check draft:", fetchError);
+          logger.error("Failed to check draft", fetchError, { component: "SystemDesignChat" });
           if (mounted) {
             setError(fetchError.message || "Failed to check draft");
           }
@@ -662,7 +661,7 @@ export const useSystemDesignSession = ({
           setLastSavedDraftHash(data.draft_hash ?? JSON.stringify(data.draft_board_state));
         }
       } catch (err) {
-        console.error("[SystemDesignChat] Failed to check draft:", err);
+        logger.error("Failed to check draft", err, { component: "SystemDesignChat" });
         if (mounted) {
           setError(err instanceof Error ? err.message : "Failed to check draft");
         }

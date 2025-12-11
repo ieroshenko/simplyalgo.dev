@@ -5,8 +5,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-expect-error - Deno URL import
 import { encode as base64Encode, decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
+// New Strategy Pattern Architecture (feature-flagged)
+import { StrategyRegistry } from "./strategies/registry.ts";
+import { ExecutorRegistry } from "./executors/registry.ts";
+
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
+
+// Feature flag for new architecture
+const USE_STRATEGY_PATTERN = Deno.env.get("USE_STRATEGY_PATTERN") === "true";
+
+// Initialize registries if feature flag is enabled
+const strategyRegistry = USE_STRATEGY_PATTERN ? new StrategyRegistry() : null;
+const executorRegistry = USE_STRATEGY_PATTERN ? new ExecutorRegistry() : null;
+
+if (USE_STRATEGY_PATTERN) {
+  console.log("[CODE-EXECUTOR] 🚀 Using new Strategy Pattern architecture");
+  console.log("[CODE-EXECUTOR] Registered strategies:", strategyRegistry?.getAllStrategyTypes());
+  console.log("[CODE-EXECUTOR] Supported languages:", executorRegistry?.getSupportedLanguages());
+} else {
+  console.log("[CODE-EXECUTOR] Using legacy monolithic architecture");
+}
 
 // Judge0 configuration
 const JUDGE0_API_URL =
@@ -157,6 +176,7 @@ async function fetchTestCasesFromDB(problemId: string) {
         input: inputParams,
         expected: expectedOutput,
         isExample: tc.is_example,
+        functionSignature: problem.function_signature, // Add function signature for main function detection
       };
     });
 
@@ -526,6 +546,7 @@ def listnode_to_array(head):
   if (isClassBasedProblem) {
     functionName = "class_based";
   } else {
+    // Extract all function names from user code
     const allFunctionMatches = [...userCode.matchAll(/def\s+(\w+)\s*\(/g)];
     const validFunctions = allFunctionMatches
       .map((match) => match[1])
@@ -535,7 +556,30 @@ def listnode_to_array(head):
       throw new Error("No function definition found in Python code");
     }
 
-    functionName = validFunctions[0];
+    // Try to determine the main function from the problem's function signature
+    // This helps distinguish between main functions and helper functions
+    let mainFunctionName: string | null = null;
+
+    // Check if we have a function signature from the problem (passed via testCases metadata or problemId lookup)
+    // The function signature should be in the format: "def functionName(params): ..."
+    if (testCases.length > 0 && testCases[0].functionSignature) {
+      const sigMatch = testCases[0].functionSignature.match(/def\s+(\w+)\s*\(/);
+      if (sigMatch) {
+        mainFunctionName = sigMatch[1];
+      }
+    }
+
+    // If we found a main function name from the signature, use it if it exists in the user's code
+    if (mainFunctionName && validFunctions.includes(mainFunctionName)) {
+      functionName = mainFunctionName;
+      console.log(`Using main function from signature: ${functionName}`);
+    } else {
+      // Fallback: Use the first function (legacy behavior)
+      functionName = validFunctions[0];
+      if (validFunctions.length > 1) {
+        console.warn(`Multiple functions found: ${validFunctions.join(", ")}. Using first function: ${functionName}. Consider adding function signature to problem definition.`);
+      }
+    }
   }
 
   // Extract function signature
@@ -770,9 +814,9 @@ function generateTestExecutionCode(
   const paramMatch = signature.match(/def\s+\w+\s*\(([^)]+)\)/);
   const params = paramMatch
     ? paramMatch[1]
-        .split(",")
-        .map((p) => p.split(":")[0].trim())
-        .filter((p) => p !== "self")
+      .split(",")
+      .map((p) => p.split(":")[0].trim())
+      .filter((p) => p !== "self")
     : [];
 
   // Generate function call
@@ -1303,13 +1347,51 @@ serve(async (req) => {
         );
       }
 
-      // Auto-process Python code for DSA-style execution
+      // Auto-process code using Strategy Pattern (if enabled) or legacy processing
       let processedCode = code;
-      if (
-        language.toLowerCase() === "python" ||
-        language.toLowerCase() === "python3"
-      ) {
-        processedCode = processPythonCode(code, testCases, problemId || "");
+
+      if (USE_STRATEGY_PATTERN && strategyRegistry && executorRegistry) {
+        // NEW: Use Strategy Pattern architecture
+        console.log(`[NEW-EXECUTOR] Processing ${language} code for problem ${problemId}`);
+
+        try {
+          // Select appropriate strategy based on problem characteristics
+          const problem = await supabase
+            .from("problems")
+            .select("function_signature")
+            .eq("id", problemId)
+            .single();
+
+          const strategy = strategyRegistry.selectStrategy(
+            problemId || "",
+            code,
+            problem?.data?.function_signature
+          );
+
+          console.log(`[NEW-EXECUTOR] Selected strategy: ${strategy.getType()}`);
+
+          // Prepare code with strategy (adds helpers, imports, etc.)
+          processedCode = strategy.prepareCode(code, language);
+          console.log(`[NEW-EXECUTOR] Code prepared (${processedCode.length} chars)`);
+
+        } catch (error: any) {
+          console.error("[NEW-EXECUTOR] Strategy processing failed, falling back to legacy:", error);
+          // Fall back to legacy processing on error
+          if (
+            language.toLowerCase() === "python" ||
+            language.toLowerCase() === "python3"
+          ) {
+            processedCode = processPythonCode(code, testCases, problemId || "");
+          }
+        }
+      } else {
+        // LEGACY: Use monolithic processing
+        if (
+          language.toLowerCase() === "python" ||
+          language.toLowerCase() === "python3"
+        ) {
+          processedCode = processPythonCode(code, testCases, problemId || "");
+        }
       }
 
       // Prepare batched submissions for all test cases

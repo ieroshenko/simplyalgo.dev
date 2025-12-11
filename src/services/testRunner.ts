@@ -1,5 +1,6 @@
 import { TestCase, TestResult } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface RunCodePayload {
   language: string;
@@ -14,9 +15,7 @@ export interface RunCodeResponse {
 
 export class TestRunnerService {
   static async runCode(payload: RunCodePayload): Promise<RunCodeResponse> {
-    console.log(
-      `🚀 Calling Code Executor Edge Function`,
-    );
+    logger.debug('[TestRunner] Calling Code Executor Edge Function', { language: payload.language, problemId: payload.problemId });
 
     try {
       // New system: Send problemId for dynamic test case fetching
@@ -30,7 +29,7 @@ export class TestRunnerService {
           : { testCases: payload.testCases }), // Manual: use provided test cases
       };
 
-      console.log("📤 Request payload:", requestBody);
+      logger.debug('[TestRunner] Request payload', { requestBody });
 
       // Get session for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -53,14 +52,14 @@ export class TestRunnerService {
         throw new Error("Invalid response from Code Executor API");
       }
 
-      console.log(
-        `✅ Code Executor API: Executed ${payload.language} code successfully`,
-      );
-      console.log(`📊 Results: ${data.results.length} test cases processed`);
+      logger.debug('[TestRunner] Code executed successfully', {
+        language: payload.language,
+        testCaseCount: data.results.length
+      });
 
       return { results: data.results };
     } catch (error: any) {
-      console.error("❌ Code Executor API execution failed:", error);
+      logger.error('[TestRunner] Code Executor API execution failed', { error, language: payload.language });
 
       // Return error results instead of fallback
       const errorResults: TestResult[] = payload.testCases.map((testCase) => ({

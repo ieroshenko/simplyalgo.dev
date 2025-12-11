@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { TechnicalInterviewService, TechnicalInterviewSession } from "@/services/technicalInterviewService";
 import { TestResult } from "@/types";
+import { logger } from "@/utils/logger";
 
 interface UseTechnicalInterviewSessionReturn {
   sessionId: string | null;
@@ -29,15 +30,15 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
 
   const createSession = useCallback(async (userId: string, problemId: string, voice: string) => {
     try {
-      console.log('[useTechnicalInterviewSession] Creating session for problem:', problemId);
+      logger.debug("Creating session for problem", { component: "TechnicalInterviewSession", problemId });
       const newSession = await TechnicalInterviewService.createSession(userId, problemId, voice);
       setSessionId(newSession.id);
       setSession(newSession);
       setError(null);
-      console.log('[useTechnicalInterviewSession] Session created:', newSession.id);
+      logger.debug("Session created", { component: "TechnicalInterviewSession", sessionId: newSession.id });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create session";
-      console.error('[useTechnicalInterviewSession] Create session error:', err);
+      logger.error("Create session error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;
     }
@@ -45,17 +46,17 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
 
   const endSession = useCallback(async (duration: number, passed?: boolean, score?: number) => {
     if (!sessionId) {
-      console.warn('[useTechnicalInterviewSession] No active session to end');
+      logger.warn("No active session to end", { component: "TechnicalInterviewSession" });
       return;
     }
 
     try {
-      console.log('[useTechnicalInterviewSession] Ending session:', sessionId);
+      logger.debug("Ending session", { component: "TechnicalInterviewSession", sessionId });
       await TechnicalInterviewService.endSession(sessionId, duration, passed, score);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to end session";
-      console.error('[useTechnicalInterviewSession] End session error:', err);
+      logger.error("End session error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;
     }
@@ -63,45 +64,45 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
 
   const addTranscript = useCallback(async (role: "user" | "assistant", content: string) => {
     if (!sessionId) {
-      console.warn('[useTechnicalInterviewSession] No active session for transcript');
+      logger.warn("No active session for transcript", { component: "TechnicalInterviewSession" });
       return;
     }
 
     try {
-      console.log(`[useTechnicalInterviewSession] Adding ${role} transcript to session ${sessionId}`);
+      logger.debug("Adding transcript to session", { component: "TechnicalInterviewSession", role, sessionId });
       await TechnicalInterviewService.addTranscript(sessionId, role, content);
     } catch (err) {
-      console.error('[useTechnicalInterviewSession] Add transcript error:', err);
+      logger.error("Add transcript error", err, { component: "TechnicalInterviewSession" });
       // Don't set error state or throw - transcripts are non-critical
     }
   }, [sessionId]);
 
   const saveCodeSnapshot = useCallback(async (code: string) => {
     if (!sessionId) {
-      console.warn('[useTechnicalInterviewSession] No active session for code snapshot');
+      logger.warn("No active session for code snapshot", { component: "TechnicalInterviewSession" });
       return;
     }
 
     try {
-      console.log('[useTechnicalInterviewSession] Saving code snapshot for session:', sessionId);
+      logger.debug("Saving code snapshot for session", { component: "TechnicalInterviewSession", sessionId });
       await TechnicalInterviewService.saveCodeSnapshot(sessionId, code);
     } catch (err) {
-      console.error('[useTechnicalInterviewSession] Save code snapshot error:', err);
+      logger.error("Save code snapshot error", err, { component: "TechnicalInterviewSession" });
       // Don't set error state or throw - snapshots are non-critical
     }
   }, [sessionId]);
 
   const saveTestResults = useCallback(async (results: TestResult[]) => {
     if (!sessionId) {
-      console.warn('[useTechnicalInterviewSession] No active session for test results');
+      logger.warn("No active session for test results", { component: "TechnicalInterviewSession" });
       return;
     }
 
     try {
-      console.log('[useTechnicalInterviewSession] Saving test results for session:', sessionId);
+      logger.debug("Saving test results for session", { component: "TechnicalInterviewSession", sessionId });
       await TechnicalInterviewService.saveTestResults(sessionId, results);
     } catch (err) {
-      console.error('[useTechnicalInterviewSession] Save test results error:', err);
+      logger.error("Save test results error", err, { component: "TechnicalInterviewSession" });
       // Don't set error state or throw - test results are non-critical
     }
   }, [sessionId]);
@@ -116,17 +117,17 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
     interviewer_notes?: string;
   }) => {
     if (!sessionId) {
-      console.warn('[useTechnicalInterviewSession] No active session for feedback');
+      logger.warn("No active session for feedback", { component: "TechnicalInterviewSession" });
       return;
     }
 
     try {
-      console.log('[useTechnicalInterviewSession] Saving feedback for session:', sessionId);
+      logger.debug("Saving feedback for session", { component: "TechnicalInterviewSession", sessionId });
       await TechnicalInterviewService.saveFeedback(sessionId, feedback);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save feedback";
-      console.error('[useTechnicalInterviewSession] Save feedback error:', err);
+      logger.error("Save feedback error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;
     }

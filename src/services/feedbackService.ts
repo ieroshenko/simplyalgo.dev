@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 export interface FeedbackSubmission {
   category: 'general' | 'bug' | 'feature' | 'ui' | 'performance';
@@ -19,13 +20,13 @@ export class FeedbackService {
         .single();
 
       if (error) {
-        console.error('Error submitting feedback:', error);
+        logger.error('[FeedbackService] Error submitting feedback', { userId: feedback.user_id, category: feedback.category, error });
         return { success: false, error: error.message };
       }
 
       return { success: true };
     } catch (error) {
-      console.error('Unexpected error submitting feedback:', error);
+      logger.error('[FeedbackService] Unexpected error submitting feedback', { userId: feedback.user_id, error });
       return { success: false, error: 'An unexpected error occurred' };
     }
   }

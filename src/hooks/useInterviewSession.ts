@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 interface InterviewSession {
   id: string;
@@ -49,10 +50,10 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
         if (dbError) throw dbError;
 
         setSessionId(data.id);
-        console.log("[Session] Created session:", data.id);
+        logger.debug('[useInterviewSession] Created session', { sessionId: data.id });
         return data.id;
       } catch (err) {
-        console.error("[Session] Failed to create session:", err);
+        logger.error('[useInterviewSession] Failed to create session', { error: err });
         setError(
           err instanceof Error ? err.message : "Failed to create session"
         );
@@ -78,9 +79,9 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
           .eq("id", sessionId);
 
         if (dbError) throw dbError;
-        console.log("[Session] Ended session:", sessionId);
+        logger.debug('[useInterviewSession] Ended session', { sessionId });
       } catch (err) {
-        console.error("[Session] Failed to end session:", err);
+        logger.error('[useInterviewSession] Failed to end session', { error: err, sessionId });
         setError(err instanceof Error ? err.message : "Failed to end session");
       }
     },
@@ -101,9 +102,9 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
           });
 
         if (dbError) throw dbError;
-        console.log(`[Session] Added ${role} transcript`);
+        logger.debug('[useInterviewSession] Added transcript', { role, sessionId });
       } catch (err) {
-        console.error("[Session] Failed to add transcript:", err);
+        logger.error('[useInterviewSession] Failed to add transcript', { error: err, role, sessionId });
         // Don't set error state for transcripts to avoid disrupting interview
       }
     },
@@ -121,9 +122,9 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
           .eq("id", sessionId);
 
         if (dbError) throw dbError;
-        console.log("[Session] Set call ID:", callId);
+        logger.debug('[useInterviewSession] Set call ID', { callId, sessionId });
       } catch (err) {
-        console.error("[Session] Failed to set call ID:", err);
+        logger.error('[useInterviewSession] Failed to set call ID', { error: err, callId, sessionId });
       }
     },
     [sessionId]

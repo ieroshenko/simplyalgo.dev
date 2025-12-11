@@ -113,12 +113,12 @@ export async function generateConversationResponse(
     console.log("[chat] No session ID provided, using legacy approach");
     // For legacy approach, validate and use coaching mode
     const validatedMode = validateCoachingMode(options?.coachingMode);
-    const serializedTests = Array.isArray(testCases) && testCases.length > 0 
-        ? JSON.stringify(testCases)
-        : undefined;
-    
+    const serializedTests = Array.isArray(testCases) && testCases.length > 0
+      ? JSON.stringify(testCases)
+      : undefined;
+
     const prompt = generateModeSpecificPrompt(validatedMode, problemDescription, serializedTests, currentCode);
-    
+
     const fullPrompt = `${prompt}
 
 RECENT CONVERSATION:
@@ -141,18 +141,18 @@ Analyze their current code and respond naturally based on their question.`;
   }
 
   // Use context-aware approach for optimal token usage
-  const serializedTests = Array.isArray(testCases) && testCases.length > 0 
-      ? JSON.stringify(testCases)
-      : undefined;
+  const serializedTests = Array.isArray(testCases) && testCases.length > 0
+    ? JSON.stringify(testCases)
+    : undefined;
 
   let contextualResponse: ContextualResponse;
-  
+
 
 
   try {
     // Get coaching mode from options, validate and default to comprehensive
     const validatedMode = validateCoachingMode(options?.coachingMode);
-    
+
     // Generate mode-specific prompt
     const chatContext = `${generateModeSpecificPrompt(validatedMode, problemDescription, serializedTests, currentCode)}
 
@@ -186,7 +186,7 @@ Analyze their current code and respond naturally based on their question.`;
 
     console.log(`[chat] Context-aware response generated - Tokens saved: ${contextualResponse.tokensSaved || 0}`);
     return contextualResponse.content || "I'm sorry, I couldn't generate a response. Please try again.";
-    
+
   } catch (error) {
     console.error("[chat] Context-aware generation failed:", error);
     return "Sorry, I hit a snag generating a response. Please try again.";
@@ -364,21 +364,21 @@ Respond by extracting any concrete, safe-to-insert scaffolding (e.g., pointer in
         insertionType:
           typeof snippet.insertionType === "string"
             ? (snippet.insertionType as
-                | "smart"
-                | "cursor"
-                | "append"
-                | "prepend"
-                | "replace")
+              | "smart"
+              | "cursor"
+              | "append"
+              | "prepend"
+              | "replace")
             : "smart",
         insertionHint: {
           type:
             typeof snippet.insertionHint?.type === "string"
               ? (snippet.insertionHint.type as
-                  | "import"
-                  | "variable"
-                  | "function"
-                  | "statement"
-                  | "class")
+                | "import"
+                | "variable"
+                | "function"
+                | "statement"
+                | "class")
               : "statement",
           scope:
             typeof snippet.insertionHint?.scope === "string"
@@ -466,8 +466,17 @@ export async function insertSnippetSmart(
   problemDescription: string,
   cursorPosition?: { line: number; column: number },
   contextHint?: string,
-): Promise<{ newCode: string; insertedAtLine?: number; rationale?: string }> {
-  
+): Promise<{
+  newCode: string;
+  insertedAtLine?: number;
+  rationale?: string;
+  mergeError?: {
+    reason: string;
+    type: string;
+    usedFallback: boolean;
+  }
+}> {
+
   const mergePrompt = `You are a smart code merging assistant. Your job is to intelligently merge the current code with the new snippet while PRESERVING as much of the existing code as possible.
 
 CURRENT CODE:
@@ -512,25 +521,80 @@ Return JSON:
   try {
     const raw = await llmJson(mergePrompt, { maxTokens: 1500 });
     const result = JSON.parse(raw || '{}');
-    
+
     if (!result.newCode) {
       throw new Error("AI did not return newCode");
     }
-    
+
     return {
       newCode: result.newCode,
       insertedAtLine: result.action === "replace" ? 0 : 1, // Use 1 for merge, 0 for replace
       rationale: result.rationale || `Applied ${result.action} strategy`
     };
-    
+
   } catch (error) {
-    console.error("[ai-chat] Smart merge failed:", error);
-    
-    // Fallback: simple replacement
+    // Capture detailed error information for logging and user feedback
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+
+    console.error("[ai-chat] Smart merge failed:", {
+      error: errorMessage,
+      errorName,
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      codeLength: code?.length || 0,
+      snippetLength: snippet?.code?.length || 0,
+    });
+
+    // Fallback: Try to intelligently insert the snippet instead of replacing everything
+    // Find a reasonable insertion point (after variable declarations, before return)
+    const lines = code.split('\n');
+    let insertionLine = lines.length - 1; // Default to end
+
+    // Find the last variable declaration or the line before the first return
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+
+      // If we find a return statement, insert before it
+      if (line.startsWith('return ')) {
+        insertionLine = i;
+        break;
+      }
+
+      // If we find a variable assignment, insert after it
+      if (line.includes('=') && !line.startsWith('def ') && !line.startsWith('class ')) {
+        insertionLine = i + 1;
+        break;
+      }
+    }
+
+    // Get the indentation of the surrounding code
+    const surroundingLine = lines[Math.max(0, insertionLine - 1)];
+    const indentMatch = surroundingLine.match(/^(\s*)/);
+    const baseIndent = indentMatch ? indentMatch[1] : '    ';
+
+    // Indent the snippet properly
+    const indentedSnippet = snippet.code.split('\n')
+      .map(line => line.trim() ? baseIndent + line : line)
+      .join('\n');
+
+    // Insert the snippet at the determined location
+    const newLines = [
+      ...lines.slice(0, insertionLine),
+      '',  // Add blank line before snippet
+      indentedSnippet,
+      '',  // Add blank line after snippet
+      ...lines.slice(insertionLine)
+    ];
+
     return {
-      newCode: snippet.code,
-      insertedAtLine: 0,
-      rationale: "Fallback: replaced with snippet code due to merge error"
+      newCode: newLines.join('\n'),
+      insertedAtLine: insertionLine,
+      rationale: `Fallback: Inserted snippet at intelligent location (before return or after last variable)`,
+      mergeError: {
+        reason: errorMessage,
+        type: errorName,
+        usedFallback: true
+      }
     };
   }
 }
@@ -565,13 +629,13 @@ ${problem.description}
 
 **Examples:**
 ${problem.examples
-  .map(
-    (ex, i) => `Example ${i + 1}:
+      .map(
+        (ex, i) => `Example ${i + 1}:
 Input: ${ex.input}
 Output: ${ex.output}
 ${ex.explanation ? `Explanation: ${ex.explanation}` : ""}`,
-  )
-  .join("\n\n")}
+      )
+      .join("\n\n")}
 
 **Requirements:**
 1. Create a complete React component that demonstrates the algorithm step-by-step
