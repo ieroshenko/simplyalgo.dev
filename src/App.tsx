@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 import { AdminRoute } from "./components/route/AdminRoute";
+import { Analytics } from '@vercel/analytics/react';
 
 const queryClient = new QueryClient();
 
@@ -242,6 +243,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <Analytics />
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
