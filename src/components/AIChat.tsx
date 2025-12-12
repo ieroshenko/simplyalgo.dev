@@ -640,7 +640,7 @@ const AIChat = ({
                     <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`} style={{ backgroundColor: message.role === "user" ? "rgba(255,0,0,0.1)" : "rgba(0,255,0,0.1)" }}>
                       {/* Avatar for assistant (left side) */}
                       {message.role === "assistant" && (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-chat-accent text-chat-accent-foreground">
                           <Bot className="w-4 h-4" />
                         </div>
                       )}
@@ -648,9 +648,9 @@ const AIChat = ({
                       {/* Message Content */}
                       <div className="max-w-[80%] min-w-0">
                         <div
-                          className={`prose prose-sm max-w-none text-muted-foreground rounded-lg p-3 ${message.role === "user"
-                            ? "border border-primary/60 bg-card text-foreground"
-                            : "border-l-4 border-accent/60 bg-accent/10 dark:bg-accent/15 pl-4"
+                          className={`rounded-lg p-3 ${message.role === "user"
+                              ? "border-l-4 border-primary/60 bg-card pl-4"
+                              : "border-l-4 border-chat-accent/60 bg-chat-accent/10 dark:bg-chat-accent/15 pl-4"
                             }`}
                           onMouseEnter={() => {
                             if (message.role === 'assistant') setHoveredMessageId(message.id);
@@ -777,7 +777,7 @@ const AIChat = ({
                             if (!diag) return null;
                             return (
                               <div className="mt-3">
-                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                <div className="border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15 rounded-lg p-3">
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="text-xs text-muted-foreground">
                                       Diagram{" "}
@@ -829,7 +829,7 @@ const AIChat = ({
                             if (!diag) return null;
                             return (
                               <div className="mt-3">
-                                <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                                <div className="border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15 rounded-lg p-3">
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="text-xs text-muted-foreground">
                                       Diagram{" "}
@@ -866,7 +866,7 @@ const AIChat = ({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="h-8 px-2 gap-1.5 text-foreground border-accent/40 hover:bg-accent/10"
+                                className="h-8 px-2 gap-1.5 text-foreground border-chat-accent/40 hover:bg-chat-accent/10"
                                 onClick={() =>
                                   handleGenerateComponent(message.content)
                                 }
@@ -953,11 +953,11 @@ const AIChat = ({
                 ))}
 
                 {isTyping && (
-                  <div className="flex justify-start gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-chat-accent text-chat-accent-foreground">
                       <Bot className="w-4 h-4" />
                     </div>
-                    <div className="border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15 rounded-lg p-3">
+                    <div className="border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15 rounded-lg p-3">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                         <div

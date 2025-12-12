@@ -2,50 +2,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { FlashcardDeck, FlashcardReview, FlashcardStats } from "@/types/api";
+import type { FlashcardDeckRow, FlashcardReviewRow, FlashcardDeckWithRelations } from "@/types/supabase";
 
-export interface FlashcardDeck {
-  id: string;
-  user_id: string;
-  problem_id: string;
-  solution_id: string | null; // Can be null for custom solutions
-  solution_code?: string; // For custom solutions
-  solution_title?: string; // For custom solutions OR curated solution title
-  created_at: string;
-  last_reviewed_at: string | null;
-  next_review_date: string;
-  mastery_level: number; // 0=new, 1=learning, 2=good, 3=mastered
-  review_count: number;
-  ease_factor: number;
-  interval_days: number;
-  days_overdue?: number;
-  is_custom_solution?: boolean;
-  // Joined data
-  problem_title?: string;
-  deck_id?: string; // For due cards query
-}
-
-export interface FlashcardReview {
-  id: string;
-  deck_id: string;
-  reviewed_at: string;
-  ai_questions: any[];
-  user_answers: any[];
-  ai_evaluation: any;
-  user_difficulty_rating: number; // 1=Again, 2=Hard, 3=Good, 4=Easy
-  time_spent_seconds?: number;
-  notes?: string;
-}
-
-export interface FlashcardStats {
-  totalCards: number;
-  dueToday: number;
-  newCards: number;
-  learningCards: number;
-  masteredCards: number;
-  averageEaseFactor: number;
-  longestStreak: number;
-  currentStreak: number;
-}
 
 export const useFlashcards = (userId?: string) => {
   const queryClient = useQueryClient();
@@ -60,7 +19,7 @@ export const useFlashcards = (userId?: string) => {
     queryFn: async () => {
       if (!userId) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("flashcard_decks")
         .select(`
           *,
@@ -72,7 +31,7 @@ export const useFlashcards = (userId?: string) => {
 
       if (error) throw error;
 
-      return ((data as any[]) ?? []).map((deck: any) => ({
+      return ((data as FlashcardDeckWithRelations[]) ?? []).map((deck: FlashcardDeckWithRelations) => ({
         ...deck,
         problem_title: deck.problems?.title,
         solution_title: deck.problem_solutions?.title || deck.solution_title,
@@ -124,12 +83,24 @@ export const useFlashcards = (userId?: string) => {
 
       const totalCards = decks.length;
       const today = new Date().toISOString().split("T")[0];
+      if (!today) {
+        return {
+          totalCards: 0,
+          dueToday: 0,
+          newCards: 0,
+          learningCards: 0,
+          masteredCards: 0,
+          averageEaseFactor: 2.5,
+          longestStreak: 0,
+          currentStreak: 0,
+        };
+      }
       const dueToday = decks.filter((deck) => deck.next_review_date <= today).length;
       const newCards = decks.filter((deck) => deck.mastery_level === 0).length;
       const learningCards = decks.filter((deck) => deck.mastery_level === 1).length;
       const masteredCards = decks.filter((deck) => deck.mastery_level === 3).length;
       const averageEaseFactor =
-        decks.reduce((sum, deck) => sum + deck.ease_factor, 0) / decks.length || 2.5;
+        decks.reduce((sum, deck) => sum + (deck.ease_factor ?? 2.5), 0) / decks.length || 2.5;
 
       // TODO: Calculate streak data from review history
       const longestStreak = 0;
@@ -171,10 +142,16 @@ export const useFlashcards = (userId?: string) => {
       if (!userId) throw new Error("User not authenticated");
 
       // Determine if this is a curated solution or custom solution
-      const insertData: any = {
+      const nextReviewDate = new Date().toISOString().split("T")[0];
+      if (!nextReviewDate) throw new Error("Unable to generate review date");
+      
+      const insertData: Omit<FlashcardDeckRow, 'id' | 'created_at' | 'last_reviewed_at' | 'mastery_level' | 'review_count' | 'ease_factor' | 'interval_days' | 'ai_code_skeleton' | 'ai_hints' | 'ai_key_insights' | 'ai_summary' | 'notes_highlight'> = {
         user_id: userId,
         problem_id: problemId,
-        next_review_date: new Date().toISOString().split("T")[0], // Due today
+        solution_id: null, // Will be set below based on customSolution or solutionId
+        solution_code: null, // Will be set below based on customSolution
+        solution_title: null, // Will be set below based on customSolution
+        next_review_date: nextReviewDate, // Due today
       };
 
       if (customSolution) {
@@ -203,9 +180,12 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
       toast.success("Added to flashcards! Ready for review.");
     },
-    onError: (error: any) => {
+    onError: (error: { message?: string; code?: string } | unknown) => {
       console.error("Error adding to flashcards:", error);
-      if (error.code === "23505") {
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
+      const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+      
+      if (errorCode === "23505") {
         toast.error("This problem is already in your flashcards.");
       } else {
         toast.error("Failed to add to flashcards. Please try again.");
@@ -216,6 +196,7 @@ export const useFlashcards = (userId?: string) => {
   // Remove a problem from flashcards
   const removeFromFlashcards = useMutation({
     mutationFn: async (deckId: string) => {
+      if (!userId) throw new Error("User not authenticated");
       const { error } = await supabase
         .from("flashcard_decks")
         .delete()
@@ -230,8 +211,9 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
       toast.success("Removed from flashcards.");
     },
-    onError: (error) => {
+    onError: (error: { message?: string } | unknown) => {
       console.error("Error removing from flashcards:", error);
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
       toast.error("Failed to remove from flashcards. Please try again.");
     },
   });
@@ -240,17 +222,17 @@ export const useFlashcards = (userId?: string) => {
   const submitReview = useMutation({
     mutationFn: async ({
       deckId,
-      aiQuestions,
+      reviewQuestions,
       userAnswers,
-      aiEvaluation,
+      evaluationSummary,
       difficultyRating,
       timeSpent,
       notes,
     }: {
       deckId: string;
-      aiQuestions: any[];
-      userAnswers: any[];
-      aiEvaluation: any;
+      reviewQuestions: string[];
+      userAnswers: string[];
+      evaluationSummary: string;
       difficultyRating: number;
       timeSpent?: number;
       notes?: string;
@@ -260,9 +242,9 @@ export const useFlashcards = (userId?: string) => {
         .from("flashcard_reviews")
         .insert({
           deck_id: deckId,
-          ai_questions: aiQuestions,
+          ai_questions: reviewQuestions, // Map to actual database column
           user_answers: userAnswers,
-          ai_evaluation: aiEvaluation,
+          ai_evaluation: evaluationSummary, // Map to actual database column
           user_difficulty_rating: difficultyRating,
           time_spent_seconds: timeSpent,
           notes,
@@ -287,8 +269,9 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
       toast.success("Review submitted successfully!");
     },
-    onError: (error) => {
+    onError: (error: { message?: string } | unknown) => {
       console.error("Error submitting review:", error);
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
       toast.error("Failed to submit review. Please try again.");
     },
   });

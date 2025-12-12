@@ -14,7 +14,8 @@ import {
   Code,
   Lightbulb,
 } from "lucide-react";
-import { useFlashcards, type FlashcardDeck } from "@/hooks/useFlashcards";
+import { useFlashcards } from "@/hooks/useFlashcards";
+import type { FlashcardDeck } from "@/types/api";
 import { toast } from "sonner";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
@@ -162,7 +163,7 @@ export const FlashcardReviewInterface = ({
     startTimeRef.current = new Date();
 
     const newSession: ReviewSession = {
-      deckId: card.deck_id,
+      deckId: card.deck_id || card.id, // Use deck_id if available, fallback to id
       problemTitle: problemData?.title || card.problem_title || card.problem_id,
       solutionTitle: card.solution_title || "Solution",
       startTime: startTimeRef.current,
@@ -212,9 +213,9 @@ export const FlashcardReviewInterface = ({
       // Submit the review
       submitReview({
         deckId: currentSession.deckId,
-        aiQuestions: REVIEW_QUESTIONS.map(q => q.question),
+        reviewQuestions: REVIEW_QUESTIONS.map(q => q.question),
         userAnswers: ["Self-evaluated"], // No actual answers since it's self-evaluation
-        aiEvaluation: { overallUnderstanding: "self-evaluated" },
+        evaluationSummary: "self-evaluated",
         difficultyRating: rating,
         timeSpent,
       });

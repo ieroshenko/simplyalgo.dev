@@ -91,7 +91,13 @@ export const useSubmissions = (
   useEffect(() => {
     if (!userId || !problemId) return;
 
-    logger.debug("Setting up realtime subscription", { component: "useSubmissions", userId, problemId });
+    logger.info("Setting up realtime subscription", { 
+      component: "useSubmissions", 
+      userId, 
+      problemId,
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      isProduction: !import.meta.env.DEV
+    });
 
     // Cleanup old channel first
     if (channelRef.current) {
@@ -172,10 +178,18 @@ export const useSubmissions = (
         logger.debug("Successfully subscribed to realtime", { component: "useSubmissions", userId, problemId });
       }
       if (status === 'CHANNEL_ERROR') {
-        logger.error("Supabase realtime channel error for submissions", { error: err, status }, { component: "useSubmissions" });
+        logger.error("Supabase realtime channel error for submissions", { 
+          error: err, 
+          component: "useSubmissions", 
+          status,
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+          userId: userId?.substring(0, 8) + '...', // Partial ID for privacy
+          problemId,
+          channelName: `user_attempts_${userId}_${problemId}`
+        });
       }
       if (status === 'TIMED_OUT') {
-        logger.error("Channel subscription timed out", { error: err, status }, { component: "useSubmissions" });
+        logger.error("Channel subscription timed out", err, { component: "useSubmissions", status });
       }
     });
 

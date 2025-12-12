@@ -1,6 +1,7 @@
 import { Flame, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStats } from "@/hooks/useUserStats";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const MissionStrip = () => {
   const { user } = useAuth();
@@ -23,7 +24,7 @@ const MissionStrip = () => {
         <div className="flex items-center space-x-2">
           <Flame className="w-5 h-5 text-accent" />
           <span className="font-semibold text-foreground">
-            Streak: {loading ? "..." : stats.streak}
+            Streak: {loading ? <Skeleton className="h-5 w-8 inline-block" /> : stats.streak}
           </span>
         </div>
 

@@ -30,7 +30,8 @@ import {
   Clock,
   Brain,
 } from "lucide-react";
-import { useFlashcards, type FlashcardDeck } from "@/hooks/useFlashcards";
+import { useFlashcards } from "@/hooks/useFlashcards";
+import type { FlashcardDeck } from "@/types/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 

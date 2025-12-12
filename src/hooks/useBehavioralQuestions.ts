@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 import type { BehavioralQuestion, BehavioralQuestionCategory, QuestionDifficulty } from "@/types";
+import type { BehavioralQuestionRow } from "@/types/supabase";
 
 export const useBehavioralQuestions = (
   filters?: {
@@ -34,7 +36,7 @@ export const useBehavioralQuestions = (
 
       try {
         setLoading(true);
-        let query = (supabase as any)
+        let query = supabase
           .from("behavioral_questions")
           .select("*");
 
@@ -43,11 +45,11 @@ export const useBehavioralQuestions = (
           // Fetch both curated and user's custom questions using OR condition
           // Format: user_id.is.null,user_id.eq.{user_id}
           query = query.or(`user_id.is.null,user_id.eq.${user.id}`);
-          console.log("Fetching questions with user_id:", user.id);
+          logger.debug("Fetching questions with user_id", { component: "useBehavioralQuestions", userId: user.id });
         } else {
           // Only show curated questions (user_id IS NULL)
           query = query.is("user_id", null);
-          console.log("Fetching only curated questions (user:", user, "includeCustom:", filters?.includeCustom);
+          logger.debug("Fetching only curated questions", { component: "useBehavioralQuestions", user, includeCustom: filters?.includeCustom });
         }
 
         query = query.order("created_at", { ascending: false });
@@ -68,22 +70,22 @@ export const useBehavioralQuestions = (
         const { data, error: fetchError } = await query;
 
         if (fetchError) {
-          console.error("Error fetching questions:", fetchError);
+          logger.error("Error fetching questions", fetchError, { component: "useBehavioralQuestions" });
           throw fetchError;
         }
 
-        console.log("Fetched questions count:", data?.length, "User ID:", user?.id);
+        logger.debug("Fetched questions", { component: "useBehavioralQuestions", count: data?.length, userId: user?.id });
         if (filters?.includeCustom && user?.id) {
-          const customCount = data?.filter((q: any) => q.user_id === user.id).length || 0;
-          const curatedCount = data?.filter((q: any) => !q.user_id).length || 0;
-          console.log("Custom questions:", customCount, "Curated questions:", curatedCount);
+          const customCount = data?.filter((q) => q.user_id === user.id).length || 0;
+          const curatedCount = data?.filter((q) => !q.user_id).length || 0;
+          logger.debug("Question counts", { component: "useBehavioralQuestions", customCount, curatedCount });
         }
 
         // Transform database format to TypeScript interface
-        const transformedQuestions: BehavioralQuestion[] = ((data as any) || []).map((q: any) => ({
+        const transformedQuestions: BehavioralQuestion[] = (data || []).map((q) => ({
           id: q.id,
           question_text: q.question_text,
-          category: q.category || [],
+          category: q.category as BehavioralQuestionCategory[],
           difficulty: q.difficulty as QuestionDifficulty,
           follow_up_questions: q.follow_up_questions as string[] | undefined,
           key_traits: q.key_traits || [],
@@ -92,8 +94,8 @@ export const useBehavioralQuestions = (
           user_id: q.user_id || undefined,
           evaluation_type: (q.evaluation_type || 'star') as 'star' | 'none' | 'custom',
           custom_evaluation_prompt: q.custom_evaluation_prompt || undefined,
-          created_at: q.created_at,
-          updated_at: q.updated_at,
+          created_at: q.created_at || '',
+          updated_at: q.updated_at || '',
         }));
 
         setQuestions(transformedQuestions);

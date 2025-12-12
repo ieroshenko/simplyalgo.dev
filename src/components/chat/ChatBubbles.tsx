@@ -306,7 +306,7 @@ const ChatBubbles = ({
                   <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                     {/* Avatar for assistant (left side) */}
                     {message.role === "assistant" && (
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-chat-accent text-chat-accent-foreground">
                         <Bot className="w-4 h-4" />
                       </div>
                     )}
@@ -316,7 +316,7 @@ const ChatBubbles = ({
                       <div
                         className={`rounded-lg p-3 ${message.role === "user"
                           ? "border border-primary/60 bg-card text-foreground"
-                          : "border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15"
+                          : "border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15"
                           }`}
                       >
                         <div className={`prose prose-sm max-w-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
@@ -438,7 +438,7 @@ const ChatBubbles = ({
                                 : null;
                             return diag ? (
                               <div className="mt-3">
-                                <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg">
+                                <div className="p-3 bg-chat-accent/5 border border-chat-accent/20 rounded-lg">
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="text-xs text-muted-foreground">
                                       Diagram{" "}
@@ -488,7 +488,7 @@ const ChatBubbles = ({
                                 : null;
                             return diag ? (
                               <div className="mt-3">
-                                <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg">
+                                <div className="p-3 bg-chat-accent/5 border border-chat-accent/20 rounded-lg">
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="text-xs text-muted-foreground">
                                       Diagram{" "}
@@ -553,11 +553,11 @@ const ChatBubbles = ({
               {isTyping && (
                 <div className="mb-6">
                   <div className="flex gap-3 justify-start">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-chat-accent text-chat-accent-foreground">
                       <Bot className="w-4 h-4" />
                     </div>
                     <div className="max-w-[80%] min-w-0">
-                      <div className="rounded-lg p-3 border border-accent/40 bg-accent/10 text-foreground dark:border-accent/30 dark:bg-accent/15">
+                      <div className="rounded-lg p-3 border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                           <div

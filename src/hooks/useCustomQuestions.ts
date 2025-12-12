@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 import type { BehavioralQuestion, BehavioralQuestionCategory, QuestionDifficulty, EvaluationType } from "@/types";
 
 export const useCustomQuestions = () => {
@@ -67,7 +68,10 @@ export const useCustomQuestions = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
-      console.error("Error creating custom question:", err);
+      logger.error("Error creating custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+      });
       return null;
     } finally {
       setLoading(false);
@@ -130,7 +134,11 @@ export const useCustomQuestions = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update question";
       setError(errorMessage);
-      console.error("Error updating custom question:", err);
+      logger.error("Error updating custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+        questionId,
+      });
       return false;
     } finally {
       setLoading(false);
@@ -159,7 +167,11 @@ export const useCustomQuestions = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to delete question";
       setError(errorMessage);
-      console.error("Error deleting custom question:", err);
+      logger.error("Error deleting custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+        questionId,
+      });
       return false;
     } finally {
       setLoading(false);

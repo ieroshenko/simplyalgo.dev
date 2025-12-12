@@ -556,6 +556,10 @@ export type Database = {
       }
       flashcard_decks: {
         Row: {
+          ai_code_skeleton: string | null
+          ai_hints: Json | null
+          ai_key_insights: Json | null
+          ai_summary: string | null
           created_at: string | null
           ease_factor: number | null
           id: string
@@ -563,6 +567,7 @@ export type Database = {
           last_reviewed_at: string | null
           mastery_level: number | null
           next_review_date: string
+          notes_highlight: string | null
           problem_id: string
           review_count: number | null
           solution_code: string | null
@@ -571,6 +576,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_code_skeleton?: string | null
+          ai_hints?: Json | null
+          ai_key_insights?: Json | null
+          ai_summary?: string | null
           created_at?: string | null
           ease_factor?: number | null
           id?: string
@@ -578,6 +587,7 @@ export type Database = {
           last_reviewed_at?: string | null
           mastery_level?: number | null
           next_review_date?: string
+          notes_highlight?: string | null
           problem_id: string
           review_count?: number | null
           solution_code?: string | null
@@ -586,6 +596,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_code_skeleton?: string | null
+          ai_hints?: Json | null
+          ai_key_insights?: Json | null
+          ai_summary?: string | null
           created_at?: string | null
           ease_factor?: number | null
           id?: string
@@ -593,6 +607,7 @@ export type Database = {
           last_reviewed_at?: string | null
           mastery_level?: number | null
           next_review_date?: string
+          notes_highlight?: string | null
           problem_id?: string
           review_count?: number | null
           solution_code?: string | null
@@ -1120,7 +1135,6 @@ export type Database = {
           completed_at: string | null
           context_thread_id: string | null
           draft_board_state: Json | null
-          draft_hash: string | null
           evaluation_feedback: string | null
           id: string
           is_completed: boolean | null
@@ -1134,7 +1148,6 @@ export type Database = {
           completed_at?: string | null
           context_thread_id?: string | null
           draft_board_state?: Json | null
-          draft_hash?: string | null
           evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null
@@ -1148,7 +1161,6 @@ export type Database = {
           completed_at?: string | null
           context_thread_id?: string | null
           draft_board_state?: Json | null
-          draft_hash?: string | null
           evaluation_feedback?: string | null
           id?: string
           is_completed?: boolean | null
@@ -1533,6 +1545,95 @@ export type Database = {
         }
         Relationships: []
       }
+      user_ai_restrictions: {
+        Row: {
+          ai_chat_enabled: boolean | null
+          ai_coach_enabled: boolean | null
+          cooldown_reason: string | null
+          cooldown_until: string | null
+          created_at: string | null
+          daily_limit_tokens: number | null
+          id: string
+          monthly_limit_tokens: number | null
+          restricted_by: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_chat_enabled?: boolean | null
+          ai_coach_enabled?: boolean | null
+          cooldown_reason?: string | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          daily_limit_tokens?: number | null
+          id?: string
+          monthly_limit_tokens?: number | null
+          restricted_by?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_chat_enabled?: boolean | null
+          ai_coach_enabled?: boolean | null
+          cooldown_reason?: string | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          daily_limit_tokens?: number | null
+          id?: string
+          monthly_limit_tokens?: number | null
+          restricted_by?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_ai_usage: {
+        Row: {
+          created_at: string | null
+          estimated_cost: number | null
+          feature: string | null
+          id: string
+          model: string | null
+          session_id: string | null
+          tokens_input: number | null
+          tokens_output: number | null
+          tokens_total: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          estimated_cost?: number | null
+          feature?: string | null
+          id?: string
+          model?: string | null
+          session_id?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          estimated_cost?: number | null
+          feature?: string | null
+          id?: string
+          model?: string | null
+          session_id?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ai_usage_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_behavioral_stats: {
         Row: {
           average_overall_score: number | null
@@ -1842,6 +1943,13 @@ export type Database = {
           max_streak: number
         }[]
       }
+      can_user_use_ai: {
+        Args: { p_feature: string; p_user_id: string }
+        Returns: {
+          allowed: boolean
+          reason: string
+        }[]
+      }
       get_cards_due_for_review: {
         Args: { p_user_id: string }
         Returns: {
@@ -1865,6 +1973,21 @@ export type Database = {
           problem_title: string
         }[]
       }
+      get_user_daily_usage: {
+        Args: { p_user_id: string }
+        Returns: {
+          cost_today: number
+          tokens_today: number
+        }[]
+      }
+      get_user_monthly_usage: {
+        Args: { p_user_id: string }
+        Returns: {
+          cost_month: number
+          tokens_month: number
+        }[]
+      }
+      is_admin: { Args: never; Returns: boolean }
       migrate_test_case_to_json: {
         Args: {
           expected_text: string

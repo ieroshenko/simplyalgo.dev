@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import Problems from "./pages/Problems";
 import SystemDesign from "./pages/SystemDesign";
 import SystemDesignSolver from "./pages/SystemDesignSolver";
-import ExcalidrawDesign from "./pages/ExcalidrawDesign";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";

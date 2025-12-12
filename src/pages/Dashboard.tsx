@@ -7,6 +7,7 @@ import CoreBattleCards from "@/components/CoreBattleCards";
 import ProgressRadar from "@/components/ProgressRadar";
 import RecentActivity from "@/components/RecentActivity";
 import { PersonalPlanCard } from "@/components/PersonalPlanCard";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useSurveyData } from "@/hooks/useSurveyData";
 
@@ -22,11 +23,7 @@ const Dashboard = () => {
   }, [user, loading, navigate]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!user) return null;
@@ -45,7 +42,7 @@ const Dashboard = () => {
           </div>
 
           <div className="w-full xl:w-80 xl:flex-shrink-0 space-y-6">
-            <PersonalPlanCard 
+            <PersonalPlanCard
               surveyData={surveyData}
             />
             <ProgressRadar />

@@ -1,6 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database, Json } from "@/integrations/supabase/types";
 import { SurveyData } from '@/types/survey';
 import { logger } from '@/utils/logger';
+
+// Proper type definition for survey response from database
+type SurveyResponseRow = Database['public']['Tables']['survey_responses']['Row'];
 
 export interface SurveyResponse {
   id: string;
@@ -13,6 +17,21 @@ export interface SurveyResponse {
 }
 
 export class SurveyService {
+  /**
+   * Transform database row to SurveyResponse interface
+   */
+  private static transformSurveyData(row: SurveyResponseRow): SurveyResponse {
+    return {
+      id: row.id,
+      user_id: row.user_id,
+      survey_data: row.survey_data as SurveyData, // Safe cast since we control the data structure
+      completed_steps: row.completed_steps || [],
+      completed_at: row.completed_at,
+      created_at: row.created_at || '',
+      updated_at: row.updated_at || '',
+    };
+  }
+
   /**
    * Save survey data to the database
    */
@@ -42,7 +61,7 @@ export class SurveyService {
         const { data, error } = await supabase
           .from('survey_responses')
           .update({
-            survey_data: surveyData,
+            survey_data: surveyData as Json, // Cast to Json type
             completed_steps: completedSteps,
             completed_at: isCompleted ? now : null,
             updated_at: now,
@@ -56,16 +75,18 @@ export class SurveyService {
           return null;
         }
 
-        return data;
+        return this.transformSurveyData(data as SurveyResponseRow);
       } else {
         // Create new survey response
         const { data, error } = await supabase
           .from('survey_responses')
           .insert({
             user_id: userId,
-            survey_data: surveyData,
+            survey_data: surveyData as Json, // Cast to Json type
             completed_steps: completedSteps,
             completed_at: isCompleted ? now : null,
+            created_at: now,
+            updated_at: now,
           })
           .select()
           .single();
@@ -75,7 +96,7 @@ export class SurveyService {
           return null;
         }
 
-        return data;
+        return this.transformSurveyData(data as SurveyResponseRow);
       }
     } catch (error) {
       logger.error('[SurveyService] Unexpected error saving survey', { userId, error });
@@ -103,7 +124,7 @@ export class SurveyService {
         return null;
       }
 
-      return data;
+      return data as SurveyResponse;
     } catch (error) {
       logger.error('[SurveyService] Unexpected error fetching survey', { userId, error });
       return null;

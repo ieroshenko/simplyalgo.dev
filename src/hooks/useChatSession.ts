@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, ChatSession, CodeSnippet, FlowGraph, CoachingMode } from "@/types";
 import { validateCoachingModeWithRecovery, logCoachingModeError } from "@/services/coachingModeErrorRecovery";
-import { useAuth } from "./useAuth";
-import { useToast } from "./use-toast";
 import { logger } from "@/utils/logger";
+import { useToast } from "./use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 // --- Diagram payload helper & types ---
 type DiagramPayload =
@@ -322,10 +322,13 @@ export const useChatSession = ({
           });
         }
 
-
-
         // Debug: Log what mode is being sent
-        console.log('🎯 Coaching mode being sent:', validatedCoachingMode);
+        logger.debug("Coaching mode being sent", {
+          component: "useChatSession",
+          coachingMode: validatedCoachingMode,
+          sessionId: session?.id,
+          userId: user?.id,
+        });
 
         // Call AI function with context tracking
         const { data, error } = await supabase.functions.invoke("ai-coach-chat", {

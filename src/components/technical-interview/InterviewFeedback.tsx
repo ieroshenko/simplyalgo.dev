@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Trophy, TrendingUp, MessageSquare, Code, AlertCircle } from "lucide-react";
 import { TechnicalInterviewService } from "@/services/technicalInterviewService";
+import { logger } from "@/utils/logger";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface InterviewFeedbackProps {
@@ -37,7 +38,10 @@ const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
         const testResultsData = await TechnicalInterviewService.getTestResults(sessionId);
         setTestResults(testResultsData || []);
       } catch (err) {
-        console.error("[InterviewFeedback] Error fetching feedback:", err);
+        logger.error("Error fetching interview feedback", err, {
+          component: "InterviewFeedback",
+          sessionId,
+        });
         setError("Failed to load interview feedback");
       } finally {
         setLoading(false);

@@ -73,7 +73,7 @@ export const FlashcardButton = ({
     }
 
     // If only one solution, add it directly
-    if (solutions.length === 1) {
+    if (solutions.length === 1 && solutions[0]) {
       addToFlashcards({
         problemId,
         solutionId: solutions[0].id,

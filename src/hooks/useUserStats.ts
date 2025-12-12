@@ -92,7 +92,7 @@ export const useUserStats = (userId?: string) => {
         setProfile({
           name: profileData.name || "User",
           email: profileData.email || "",
-          avatarUrl: profileData.avatar_url,
+          avatarUrl: profileData.avatar_url || undefined,
         });
       }
     } catch (err: any) {
@@ -155,7 +155,7 @@ export const useUserStats = (userId?: string) => {
       let newStreak = 1;
       if (lastActivityDate) {
         const lastDate = new Date(lastActivityDate);
-        const todayDate = new Date(today);
+        const todayDate = new Date(today || '');
         const diffTime = todayDate.getTime() - lastDate.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -233,7 +233,7 @@ export const useUserStats = (userId?: string) => {
     if (!lastActivityDate) return 0;
 
     const lastDate = new Date(lastActivityDate);
-    const todayDate = new Date(today);
+    const todayDate = new Date(today || '');
     const diffTime = todayDate.getTime() - lastDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

@@ -11,113 +11,181 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* simplyalgo Nature-Inspired Design System */
-    --background: 43 33% 98%; /* #FDFBF7 - Soft cream */
-    --foreground: 152 17% 25%; /* #3D5A40 - Deep forest green */
+    /* Garden Project - Nature-Inspired Design System */
+    --background: 38 20% 97%;
+    /* #FAF8F4 - Warm White */
+    --foreground: 145 20% 15%;
+    /* Deep Dark Green/Black for text */
 
-    --card: 43 33% 98%; /* #FDFBF7 */
-    --card-foreground: 152 17% 25%;
+    --card: 38 25% 96%;
+    /* Slightly lighter beige for cards */
+    --card-foreground: 145 20% 15%;
 
-    --popover: 43 33% 98%;
-    --popover-foreground: 152 17% 25%;
+    --popover: 38 25% 96%;
+    --popover-foreground: 145 20% 15%;
 
-    --primary: 98 28% 63%; /* #A1C181 - Primary green */
-    --primary-foreground: 152 17% 25%;
+    --primary: 145 35% 35%;
+    /* #3A7A54 - Deep Garden Green */
+    --primary-foreground: 38 20% 97%;
+    /* Warm White */
 
-    --secondary: 76 26% 83%; /* #DBE4C6 - Light green */
-    --secondary-foreground: 152 17% 25%;
+    --secondary: 100 25% 85%;
+    /* Soft Sage/Moss */
+    --secondary-foreground: 145 35% 25%;
+    /* Dark Green */
 
-    --muted: 76 26% 83%;
-    --muted-foreground: 0 0% 51%; /* #818181 - Secondary text */
+    --muted: 100 10% 92%;
+    /* Natural Grayish Green */
+    --muted-foreground: 145 10% 40%;
+    /* Medium Green-Gray */
 
-    --accent: 25 100% 65%; /* #FF914D - Orange accent */
-    --accent-foreground: 43 33% 98%;
+    --accent: 100 25% 85%;
+    /* Same as Secondary - Highlight Green */
+    --accent-foreground: 145 35% 25%;
+    /* Dark Green */
 
-    --success: 100 50% 85%; /* #DAF0D5 - Success badge */
-    --success-foreground: 152 17% 25%;
+    --success: 100 25% 85%;
+    /* Light sage green */
+    --success-foreground: 145 35% 25%;
 
-    --profile-header: 100 30% 93%; /* #E7F1E5 */
-    --profile-header-foreground: 152 17% 25%;
+    --profile-header: 100 10% 95%;
+    /* Very light green/off-white */
+    --profile-header-foreground: 145 20% 15%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 43 33% 98%;
+    /* Red for errors/warnings */
+    --destructive-foreground: 0 0% 98%;
+    /* Near White */
 
-    --border: 0 0% 88%; /* #E0E0E0 - Inactive elements */
-    --input: 76 26% 83%;
-    --ring: 98 28% 63%;
+    --border: 100 15% 85%;
+    /* Light Green-Gray */
+    --input: 100 15% 85%;
+    /* Same as Border */
+    --ring: 145 35% 35%;
+    /* Same as Primary */
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 38 20% 97%;
+    /* Warm White */
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-foreground: 145 20% 15%;
+    /* Deep Dark Green */
 
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 145 35% 35%;
+    /* Deep Garden Green */
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary-foreground: 38 20% 97%;
+    /* Warm White */
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 100 25% 85%;
+    /* Soft Sage */
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent-foreground: 145 35% 25%;
+    /* Dark Green */
 
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 100 15% 85%;
+    /* Light Green-Gray */
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 145 35% 35%;
+    /* Deep Garden Green */
+
+    /* AI Chat specific accent - warm orange */
+    --chat-accent: 25 100% 65%;
+    /* #FF914D - Orange accent for AI chat bubbles */
+    --chat-accent-foreground: 38 20% 97%;
+    /* Warm White */
   }
 
   .dark {
     /* Modern Coding Platform Dark Theme (DSA/NeetCode style) */
-    --background: 220 13% 9%; /* #0f1419 - Very dark blue-gray background */
-    --foreground: 0 0% 95%; /* #f2f2f2 - Light foreground text */
+    --background: 220 13% 9%;
+    /* #0f1419 - Very dark blue-gray background */
+    --foreground: 0 0% 95%;
+    /* #f2f2f2 - Light foreground text */
 
-    --card: 220 13% 11%; /* #1a1e23 - Slightly lighter than background */
-    --card-foreground: 0 0% 95%; /* #f2f2f2 */
+    --card: 220 13% 11%;
+    /* #1a1e23 - Slightly lighter than background */
+    --card-foreground: 0 0% 95%;
+    /* #f2f2f2 */
 
-    --popover: 220 13% 11%; /* #1a1e23 */
-    --popover-foreground: 0 0% 95%; /* #f2f2f2 */
+    --popover: 220 13% 11%;
+    /* #1a1e23 */
+    --popover-foreground: 0 0% 95%;
+    /* #f2f2f2 */
 
-    --primary: 210 100% 60%; /* #3b82f6 - Blue primary color */
-    --primary-foreground: 0 0% 100%; /* #ffffff */
+    --primary: 210 100% 60%;
+    /* #3b82f6 - Blue primary color */
+    --primary-foreground: 0 0% 100%;
+    /* #ffffff */
 
-    --secondary: 220 13% 16%; /* #262a30 - Darker secondary */
-    --secondary-foreground: 0 0% 95%; /* #f2f2f2 */
+    --secondary: 220 13% 16%;
+    /* #262a30 - Darker secondary */
+    --secondary-foreground: 0 0% 95%;
+    /* #f2f2f2 */
 
-    --muted: 220 13% 16%; /* #262a30 - Muted background */
-    --muted-foreground: 0 0% 60%; /* #999999 - Muted text */
+    --muted: 220 13% 16%;
+    /* #262a30 - Muted background */
+    --muted-foreground: 0 0% 60%;
+    /* #999999 - Muted text */
 
-    --accent: 142 71% 45%; /* #22c55e - Green accent (success color) */
-    --accent-foreground: 0 0% 100%; /* #ffffff */
+    --accent: 142 71% 45%;
+    /* #22c55e - Green accent (success color) */
+    --accent-foreground: 0 0% 100%;
+    /* #ffffff */
 
-    --success: 142 71% 45%; /* #22c55e - Green for success */
-    --success-foreground: 0 0% 100%; /* #ffffff */
+    --success: 142 71% 45%;
+    /* #22c55e - Green for success */
+    --success-foreground: 0 0% 100%;
+    /* #ffffff */
 
-    --destructive: 0 84% 60%; /* #ef4444 - Red for errors */
-    --destructive-foreground: 0 0% 100%; /* #ffffff */
+    --destructive: 0 84% 60%;
+    /* #ef4444 - Red for errors */
+    --destructive-foreground: 0 0% 100%;
+    /* #ffffff */
 
-    --border: 220 13% 20%; /* #2f343a - Border color */
-    --input: 220 13% 16%; /* #262a30 - Input background */
-    --ring: 210 100% 60%; /* #3b82f6 - Focus ring */
-    
+    --border: 220 13% 20%;
+    /* #2f343a - Border color */
+    --input: 220 13% 16%;
+    /* #262a30 - Input background */
+    --ring: 210 100% 60%;
+    /* #3b82f6 - Focus ring */
+
     /* Sidebar colors */
-    --sidebar-background: 220 13% 9%; /* #0f1419 - Same as main background */
-    --sidebar-foreground: 0 0% 95%; /* #f2f2f2 */
-    --sidebar-primary: 210 100% 60%; /* #3b82f6 - Blue */
-    --sidebar-primary-foreground: 0 0% 100%; /* #ffffff */
-    --sidebar-accent: 220 13% 11%; /* #1a1e23 - Accent background */
-    --sidebar-accent-foreground: 0 0% 95%; /* #f2f2f2 */
-    --sidebar-border: 220 13% 20%; /* #2f343a - Border */
-    --sidebar-ring: 210 100% 60%; /* #3b82f6 - Blue */
+    --sidebar-background: 220 13% 9%;
+    /* #0f1419 - Same as main background */
+    --sidebar-foreground: 0 0% 95%;
+    /* #f2f2f2 */
+    --sidebar-primary: 210 100% 60%;
+    /* #3b82f6 - Blue */
+    --sidebar-primary-foreground: 0 0% 100%;
+    /* #ffffff */
+    --sidebar-accent: 220 13% 11%;
+    /* #1a1e23 - Accent background */
+    --sidebar-accent-foreground: 0 0% 95%;
+    /* #f2f2f2 */
+    --sidebar-border: 220 13% 20%;
+    /* #2f343a - Border */
+    --sidebar-ring: 210 100% 60%;
+    /* #3b82f6 - Blue */
 
     /* Profile header */
-    --profile-header: 220 13% 11%; /* #1a1e23 */
-    --profile-header-foreground: 0 0% 95%; /* #f2f2f2 */
+    --profile-header: 220 13% 11%;
+    /* #1a1e23 */
+    --profile-header-foreground: 0 0% 95%;
+    /* #f2f2f2 */
 
     /* Additional accent colors for coding platforms */
-    --code-yellow: 48 96% 53%; /* #fbbf24 - Warning/yellow */
-    --code-orange: 25 95% 53%; /* #f97316 - Orange accent */
-    --code-red: 0 84% 60%; /* #ef4444 - Error red */
-    --code-green: 142 71% 45%; /* #22c55e - Success green */
-    --code-purple: 262 83% 58%; /* #8b5cf6 - Purple accent */
+    --code-yellow: 48 96% 53%;
+    /* #fbbf24 - Warning/yellow */
+    --code-orange: 25 95% 53%;
+    /* #f97316 - Orange accent */
+    --code-red: 0 84% 60%;
+    /* #ef4444 - Error red */
+    --code-green: 142 71% 45%;
+    /* #22c55e - Success green */
+    --code-purple: 262 83% 58%;
+    /* #8b5cf6 - Purple accent */
   }
 }
 
@@ -128,6 +196,53 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Custom AI Chat Accent Colors */
+@layer components {
+  .bg-chat-accent {
+    background-color: hsl(var(--chat-accent));
+  }
+
+  .text-chat-accent-foreground {
+    color: hsl(var(--chat-accent-foreground));
+  }
+
+  .border-chat-accent {
+    border-color: hsl(var(--chat-accent));
+  }
+
+  .bg-chat-accent\/5 {
+    background-color: hsl(var(--chat-accent) / 0.05);
+  }
+
+  .bg-chat-accent\/10 {
+    background-color: hsl(var(--chat-accent) / 0.1);
+  }
+
+  .bg-chat-accent\/15 {
+    background-color: hsl(var(--chat-accent) / 0.15);
+  }
+
+  .border-chat-accent\/20 {
+    border-color: hsl(var(--chat-accent) / 0.2);
+  }
+
+  .border-chat-accent\/30 {
+    border-color: hsl(var(--chat-accent) / 0.3);
+  }
+
+  .border-chat-accent\/40 {
+    border-color: hsl(var(--chat-accent) / 0.4);
+  }
+
+  .border-chat-accent\/60 {
+    border-color: hsl(var(--chat-accent) / 0.6);
+  }
+
+  .hover\:bg-chat-accent\/10:hover {
+    background-color: hsl(var(--chat-accent) / 0.1);
   }
 }
 

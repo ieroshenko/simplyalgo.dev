@@ -4,36 +4,36 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Import modular components
-import { 
-  RequestBody, 
-  AIResponse, 
+import {
+  RequestBody,
+  AIResponse,
   CodeSnippet,
-  ChatMessage 
+  ChatMessage
 } from "./types.ts";
 import { logger } from "./utils/logger.ts";
-import { 
-  initializeOpenAI, 
-  configuredModel, 
-  modelSource, 
+import {
+  initializeOpenAI,
+  configuredModel,
+  modelSource,
   useResponsesApi,
   llmJson,
 } from "./openai-utils.ts";
-import { 
-  startInteractiveCoaching, 
+import {
+  startInteractiveCoaching,
   validateCoachingSubmission,
   generateNextCoachingStep,
   startOptimizationCoaching,
   validateOptimizationStep,
 } from "./coaching.ts";
-import { 
-  maybeGenerateDiagram, 
-  explainMermaid 
+import {
+  maybeGenerateDiagram,
+  explainMermaid
 } from "./diagrams.ts";
-import { 
-  generateConversationResponse, 
-  analyzeCodeSnippets, 
-  insertSnippetSmart, 
-  generateVisualizationComponent 
+import {
+  generateConversationResponse,
+  analyzeCodeSnippets,
+  insertSnippetSmart,
+  generateVisualizationComponent
 } from "./code-analysis.ts";
 import { validateCoachingMode } from "./prompts.ts";
 
@@ -76,7 +76,7 @@ serve(async (req) => {
     console.log(
       `[ai-chat] Model selection: model=${configuredModel} | api=${useResponsesApi ? "Responses" : "Chat"} | source=${modelSource}`,
     );
-    
+
     // Parse request body
     const body: RequestBody = await req.json();
     const {
@@ -107,6 +107,10 @@ serve(async (req) => {
     // Validate coaching mode and ensure fallback to comprehensive for invalid/missing mode
     const validatedCoachingMode = validateCoachingMode(coachingMode);
 
+    // NOTE: AI access control is now handled on the frontend for zero latency.
+    // The frontend uses useAIAccessStatus hook to check restrictions before making requests.
+    // Usage logging happens async after successful responses (non-blocking).
+
     // Initialize OpenAI client with error handling
     try {
       initializeOpenAI();
@@ -126,14 +130,14 @@ serve(async (req) => {
 
     // Start interactive coaching session action
     if (req.method === "POST" && action === "start_interactive_coaching") {
-      logger.coaching("Generate session request", { 
-        problemId, 
-        userId, 
-        hasCurrentCode: !!currentCode, 
+      logger.coaching("Generate session request", {
+        problemId,
+        userId,
+        hasCurrentCode: !!currentCode,
         difficulty,
         action: 'start_interactive_coaching'
       });
-      
+
       if (!problemId || !userId || !currentCode) {
         return new Response(
           JSON.stringify({
@@ -145,7 +149,7 @@ serve(async (req) => {
           },
         );
       }
-      
+
       // Ensure we have a problem description for coaching
       if (!problemDescription) {
         return new Response(
@@ -160,10 +164,10 @@ serve(async (req) => {
       }
 
       try {
-        logger.coaching("Starting interactive coaching session", { 
-          problemId, 
-          userId, 
-          difficulty: difficulty || "beginner" 
+        logger.coaching("Starting interactive coaching session", {
+          problemId,
+          userId,
+          difficulty: difficulty || "beginner"
         });
         const coachingSession = await startInteractiveCoaching(
           problemId,
@@ -172,12 +176,12 @@ serve(async (req) => {
           problemDescription || "",
           difficulty || "beginner"
         );
-        logger.coaching("Interactive session started", { 
-          problemId, 
-          userId, 
-          sessionId: coachingSession?.sessionId 
+        logger.coaching("Interactive session started", {
+          problemId,
+          userId,
+          sessionId: coachingSession?.sessionId
         });
-        
+
         return new Response(JSON.stringify(coachingSession), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -189,7 +193,7 @@ serve(async (req) => {
           errorName: (error as Error)?.name,
           errorCause: (error as unknown as { cause?: unknown })?.cause
         });
-        
+
         // Check if this is an AI service unavailable error
         const errorMessage = (error as Error)?.message || "Unknown error";
         if (errorMessage.includes("AI_SERVICE_UNAVAILABLE")) {
@@ -205,7 +209,7 @@ serve(async (req) => {
             }
           );
         }
-        
+
         return new Response(
           JSON.stringify({
             error: "Failed to generate coaching session",
@@ -222,13 +226,13 @@ serve(async (req) => {
 
     // Validate interactive coaching submission action
     if (req.method === "POST" && action === "validate_coaching_submission") {
-      logger.coaching("Validate submission request", { 
-        sessionId, 
+      logger.coaching("Validate submission request", {
+        sessionId,
         hasStudentCode: !!studentCode,
         hasCurrentEditorCode: !!currentEditorCode,
         action: 'validate_coaching_submission'
       });
-      
+
       if (!sessionId || !studentCode || !currentEditorCode) {
         return new Response(
           JSON.stringify({
@@ -252,14 +256,14 @@ serve(async (req) => {
           userId     // Pass userId for test execution
         );
         console.log("🎯 [COACHING] Validation result:", validation);
-        
+
         return new Response(JSON.stringify(validation), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (error) {
         console.error("🚨 [COACHING] Error validating submission:", error);
         console.error("🚨 [COACHING] Error stack:", (error as Error)?.stack);
-        
+
         // Check if this is an AI service unavailable error
         const errorMessage = (error as Error)?.message || "Unknown error";
         if (errorMessage.includes("AI_SERVICE_UNAVAILABLE")) {
@@ -275,7 +279,7 @@ serve(async (req) => {
             }
           );
         }
-        
+
         return new Response(
           JSON.stringify({
             error: "Failed to validate coaching submission",
@@ -333,7 +337,7 @@ serve(async (req) => {
     // Generate next coaching step action
     if (req.method === "POST" && action === "generate_next_coaching_step") {
       const { sessionId, currentCode, previousResponse, problemDescription, difficulty } = body;
-      
+
       if (!sessionId || !currentCode) {
         return new Response(
           JSON.stringify({
@@ -354,7 +358,7 @@ serve(async (req) => {
           problemDescription || "",
           difficulty || "medium"
         );
-        
+
         return new Response(JSON.stringify(nextStep), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -485,7 +489,7 @@ serve(async (req) => {
       console.log("[ai-chat] insert_snippet request received");
       console.log("[ai-chat] code length:", code?.length || 0);
       console.log("[ai-chat] snippet:", snippet);
-      
+
       if (!code || !snippet?.code) {
         console.error("[ai-chat] Missing required fields - code:", !!code, "snippet.code:", !!snippet?.code);
         return new Response(
@@ -665,11 +669,11 @@ Respond in JSON format:
     // Flashcard conversation action
     if (req.method === "POST" && action === "flashcard_conversation") {
       console.log("[ai-chat] flashcard conversation request received");
-      
-      const { 
-        problemId, 
-        problemDescription, 
-        solutionCode, 
+
+      const {
+        problemId,
+        problemDescription,
+        solutionCode,
         solutionTitle,
         conversationHistory,
         currentQuestionIndex = 0,
@@ -789,7 +793,7 @@ Conversation: ${JSON.stringify(conversationHistory)}`;
           maxTokens: completionParams.max_completion_tokens,
           temperature: completionParams.temperature
         });
-        
+
         console.log("[ai-chat] Full system prompt:", completionParams.messages[0].content);
         console.log("[ai-chat] Full question prompt:", completionParams.messages[1].content);
 
@@ -810,7 +814,7 @@ Conversation: ${JSON.stringify(conversationHistory)}`;
           preview: response.substring(0, 200),
           isEmpty: !response || response.trim() === ""
         });
-        
+
         if (!response || response.trim() === "") {
           console.error("[ai-chat] Empty response from OpenAI for flashcard conversation");
           console.error("[ai-chat] Full completion object:", JSON.stringify(completion, null, 2));
@@ -846,7 +850,7 @@ Conversation: ${JSON.stringify(conversationHistory)}`;
 
     // Generate or retrieve chat session ID for context continuity
     const chatSessionId = sessionId || `chat_${userId || 'anonymous'}_${problemId || Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-    
+
     console.log(`[ai-chat] Using chat session: ${chatSessionId}`);
 
     // Default chat behavior: generate conversation + analyze snippets + opportunistic diagram

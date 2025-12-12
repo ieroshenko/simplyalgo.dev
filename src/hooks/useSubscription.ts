@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from "@/utils/logger";
 import { useAuth } from './useAuth';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -23,11 +24,11 @@ export const useSubscription = () => {
           .single();
 
         if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-          console.error('Error fetching subscription:', error);
+          logger.error('Error fetching subscription:', { error, component: 'useSubscription' });
         }
         setSubscription(data);
       } catch (error) {
-        console.error('Error fetching subscription:', error);
+        logger.error('Error fetching subscription:', { error, component: 'useSubscription' });
       } finally {
         setIsLoading(false);
       }

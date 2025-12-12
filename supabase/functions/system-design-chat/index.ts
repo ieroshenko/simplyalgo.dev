@@ -1272,6 +1272,9 @@ serve(async (req) => {
     const body: SystemDesignRequest = await req.json();
     const { action } = body;
 
+    // NOTE: AI access control is now handled on the frontend for zero latency.
+    // The frontend uses useAIAccessStatus hook to check restrictions before making requests.
+
     console.log(`[system-design-chat] Received request: action=${action}, timestamp=${new Date().toISOString()}`);
 
     if (action === "coach_message") {

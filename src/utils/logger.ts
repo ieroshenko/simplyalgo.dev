@@ -82,14 +82,9 @@ class Logger {
     if (this.isDevelopment) {
       console.debug(this.formatMessage('debug', message, context), ...args);
     } else {
-      // In production, send to New Relic if available
-      if (window.newrelic) {
-        try {
-          window.newrelic.log(message, { ...context, level: 'debug' });
-        } catch (nrError) {
-          console.error('Failed to send log to New Relic:', nrError);
-        }
-      }
+      // In production, only send debug logs to console, not New Relic
+      // to reduce noise and costs. Use info() for production debugging.
+      console.debug(this.formatMessage('debug', message, context), ...args);
     }
   }
 

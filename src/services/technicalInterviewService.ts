@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { TestResult } from "@/types";
 import { logger } from "@/utils/logger";
+
+// Type for database row
+type TechnicalInterviewFeedbackRow = Database['public']['Tables']['technical_interview_feedback']['Row'];
 
 export interface TechnicalInterviewSession {
   id: string;
@@ -20,7 +24,7 @@ export interface TechnicalInterviewSession {
 
 export interface TechnicalInterviewFeedback {
   id: string;
-  session_id: string;
+  session_id: string | null; // Can be null in database
   problem_solving_score?: number;
   code_quality_score?: number;
   communication_score?: number;
@@ -32,6 +36,24 @@ export interface TechnicalInterviewFeedback {
 }
 
 export const TechnicalInterviewService = {
+  /**
+   * Transform database row to TechnicalInterviewFeedback interface
+   */
+  transformFeedback(row: TechnicalInterviewFeedbackRow): TechnicalInterviewFeedback {
+    return {
+      id: row.id,
+      session_id: row.session_id,
+      problem_solving_score: row.problem_solving_score || undefined,
+      code_quality_score: row.code_quality_score || undefined,
+      communication_score: row.communication_score || undefined,
+      strengths: row.strengths || undefined,
+      areas_for_improvement: row.areas_for_improvement || undefined,
+      detailed_feedback: row.detailed_feedback || undefined,
+      interviewer_notes: row.interviewer_notes || undefined,
+      created_at: row.created_at || '',
+    };
+  },
+
   /**
    * Get a problem by ID or random
    * @param problemIdOrRandom - Problem ID (e.g., "reverse-linked-list") or "random" for random selection
@@ -102,6 +124,10 @@ export const TechnicalInterviewService = {
     // Pick a random problem from the eligible list
     const randomIndex = Math.floor(Math.random() * eligibleProblems.length);
     const randomProblem = eligibleProblems[randomIndex];
+
+    if (!randomProblem) {
+      throw new Error('No available problems for technical interview');
+    }
 
     logger.debug('[TechnicalInterviewService] Selected random problem:', {
       id: randomProblem.id,
@@ -346,7 +372,7 @@ export const TechnicalInterviewService = {
       throw error;
     }
 
-    return data;
+    return data ? this.transformFeedback(data) : null;
   },
 
   /**

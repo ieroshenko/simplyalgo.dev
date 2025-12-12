@@ -148,7 +148,8 @@ const Settings = () => {
             </CardContent>
           </Card>
 
-          {/* Notification Settings */}
+          {/* TODO: MVP - Implement Notification Settings (Low Priority - Post Launch) */}
+          {/*
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -165,8 +166,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+          */}
 
-          {/* Privacy & Security */}
+          {/* TODO: MVP - Implement Privacy & Security Settings (Low Priority - Post Launch) */}
+          {/*
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -184,6 +187,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+          */}
         </div>
       </div>
     </div>

@@ -5,6 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     Users,
     TrendingUp,
@@ -17,11 +26,33 @@ import {
     UserMinus,
     Gift,
     CreditCard,
-    ArrowLeft
+    ArrowLeft,
+    Bot,
+    Ban,
+    Clock,
+    Settings,
+    Zap
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { logger } from "@/utils/logger";
+import { AdminDashboardSkeleton } from "./AdminDashboardSkeleton";
+
+interface UserAIRestriction {
+    ai_coach_enabled: boolean;
+    ai_chat_enabled: boolean;
+    daily_limit_tokens: number;
+    monthly_limit_tokens: number;
+    cooldown_until: string | null;
+    cooldown_reason: string | null;
+}
+
+interface UserAIUsage {
+    tokens_today: number;
+    tokens_month: number;
+    cost_today: number;
+    cost_month: number;
+}
 
 interface UserStats {
     id: string;
@@ -33,6 +64,8 @@ interface UserStats {
     coaching_sessions: number;
     last_active: string | null;
     recent_problems: string[];
+    ai_restriction?: UserAIRestriction;
+    ai_usage?: UserAIUsage;
 }
 
 interface OpenRouterUsage {
@@ -51,6 +84,18 @@ export function AdminDashboardNew() {
     const [premiumUsers, setPremiumUsers] = useState(0);
     const [activeToday, setActiveToday] = useState(0);
     const [mrr, setMrr] = useState(0);
+
+    // Set Limits Dialog state
+    const [limitsDialogOpen, setLimitsDialogOpen] = useState(false);
+    const [limitsDialogUser, setLimitsDialogUser] = useState<{ id: string; email: string } | null>(null);
+    const [dailyLimitInput, setDailyLimitInput] = useState("100000");
+    const [monthlyLimitInput, setMonthlyLimitInput] = useState("2000000");
+
+    // Cooldown Dialog state
+    const [cooldownDialogOpen, setCooldownDialogOpen] = useState(false);
+    const [cooldownDialogUser, setCooldownDialogUser] = useState<{ id: string; email: string } | null>(null);
+    const [cooldownHoursInput, setCooldownHoursInput] = useState("24");
+    const [cooldownReasonInput, setCooldownReasonInput] = useState("Admin action");
 
     useEffect(() => {
         fetchDashboardData();
@@ -136,6 +181,22 @@ export function AdminDashboardNew() {
                 .select("*", { count: "exact", head: true })
                 .eq("user_id", userId);
 
+            // Get AI restrictions
+            const { data: aiRestriction } = await supabase
+                .from("user_ai_restrictions")
+                .select("*")
+                .eq("user_id", userId)
+                .single();
+
+            // Get AI usage (today and this month)
+            // For now, set default values - actual usage will come from user_ai_usage table once it's implemented
+            const aiUsage = {
+                tokens_today: 0,
+                tokens_month: 0,
+                cost_today: 0,
+                cost_month: 0,
+            };
+
             const solvedCount = statsData?.total_solved || passedCount || 0;
 
             return {
@@ -148,6 +209,15 @@ export function AdminDashboardNew() {
                 coaching_sessions: coachingCount || 0,
                 last_active: statsData?.last_activity_date || null,
                 recent_problems: (recentProblems || []).map(p => p.problem_id),
+                ai_restriction: aiRestriction ? {
+                    ai_coach_enabled: aiRestriction.ai_coach_enabled ?? true,
+                    ai_chat_enabled: aiRestriction.ai_chat_enabled ?? true,
+                    daily_limit_tokens: aiRestriction.daily_limit_tokens ?? 100000,
+                    monthly_limit_tokens: aiRestriction.monthly_limit_tokens ?? 2000000,
+                    cooldown_until: aiRestriction.cooldown_until,
+                    cooldown_reason: aiRestriction.cooldown_reason,
+                } : undefined,
+                ai_usage: aiUsage,
             };
         });
 
@@ -306,24 +376,59 @@ export function AdminDashboardNew() {
 
     const grantPremium = async (userId: string, email: string) => {
         try {
-            // Create a subscription record
-            const { error } = await supabase
+            // First check if subscription already exists
+            const { data: existingSubscription } = await supabase
                 .from("user_subscriptions")
-                .upsert({
-                    user_id: userId,
-                    stripe_customer_id: `admin_granted_${userId}`,
-                    stripe_subscription_id: `admin_granted_${Date.now()}`,
-                    plan: "yearly",
-                    status: "active"
-                }, { onConflict: "user_id" });
+                .select("*")
+                .eq("user_id", userId)
+                .single();
 
-            if (error) throw error;
+            const subscriptionData = {
+                user_id: userId,
+                stripe_customer_id: `admin_granted_${userId}`,
+                stripe_subscription_id: `admin_granted_${Date.now()}`,
+                plan: "yearly",
+                status: "active",
+                updated_at: new Date().toISOString(),
+            };
+
+            let error;
+            if (existingSubscription) {
+                // Update existing subscription
+                const result = await supabase
+                    .from("user_subscriptions")
+                    .update(subscriptionData)
+                    .eq("user_id", userId);
+                error = result.error;
+            } else {
+                // Insert new subscription
+                const result = await supabase
+                    .from("user_subscriptions")
+                    .insert({
+                        ...subscriptionData,
+                        created_at: new Date().toISOString(),
+                    });
+                error = result.error;
+            }
+
+            if (error) {
+                logger.error("[AdminDashboard] Error granting premium", {
+                    error,
+                    errorMessage: error.message,
+                    errorCode: error.code,
+                    errorDetails: error.details,
+                    userId,
+                    email
+                });
+                toast.error(`Failed to grant premium: ${error.message}`);
+                return;
+            }
 
             toast.success(`Premium access granted to ${email}`);
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
-            logger.error("[AdminDashboard] Error granting premium", { error });
+            logger.error("[AdminDashboard] Unexpected error granting premium", { error, userId, email });
             toast.error("Failed to grant premium access");
         }
     };
@@ -369,6 +474,205 @@ export function AdminDashboardNew() {
         }
     };
 
+    // AI Access Control Functions
+    const toggleAIAccess = async (userId: string, email: string, feature: 'ai_coach' | 'ai_chat', enabled: boolean) => {
+        try {
+            // Check if restriction record exists
+            const { data: existing } = await supabase
+                .from("user_ai_restrictions")
+                .select("*")
+                .eq("user_id", userId)
+                .single();
+
+            const updateData = feature === 'ai_coach'
+                ? { ai_coach_enabled: enabled, updated_at: new Date().toISOString() }
+                : { ai_chat_enabled: enabled, updated_at: new Date().toISOString() };
+
+            let error;
+            if (existing) {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .update(updateData)
+                    .eq("user_id", userId);
+                error = result.error;
+            } else {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .insert({
+                        user_id: userId,
+                        ...updateData,
+                        ai_coach_enabled: feature === 'ai_coach' ? enabled : true,
+                        ai_chat_enabled: feature === 'ai_chat' ? enabled : true,
+                        daily_limit_tokens: 100000,
+                        monthly_limit_tokens: 2000000,
+                        created_at: new Date().toISOString(),
+                    });
+                error = result.error;
+            }
+
+            if (error) {
+                logger.error("[AdminDashboard] Error toggling AI access", { error, userId, feature, enabled });
+                toast.error(`Failed to update AI access: ${error.message}`);
+                return;
+            }
+
+            const featureName = feature === 'ai_coach' ? 'AI Coach' : 'AI Chat';
+            toast.success(`${featureName} ${enabled ? 'enabled' : 'disabled'} for ${email}`);
+            fetchUserStats();
+        } catch (error) {
+            logger.error("[AdminDashboard] Unexpected error toggling AI access", { error, userId, feature });
+            toast.error("Failed to update AI access");
+        }
+    };
+
+    const setCooldown = async (userId: string, email: string, hours: number, reason: string) => {
+        try {
+            const cooldownUntil = new Date();
+            cooldownUntil.setHours(cooldownUntil.getHours() + hours);
+
+            // Check if restriction record exists
+            const { data: existing } = await supabase
+                .from("user_ai_restrictions")
+                .select("*")
+                .eq("user_id", userId)
+                .single();
+
+            const updateData = {
+                cooldown_until: cooldownUntil.toISOString(),
+                cooldown_reason: reason,
+                updated_at: new Date().toISOString(),
+            };
+
+            let error;
+            if (existing) {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .update(updateData)
+                    .eq("user_id", userId);
+                error = result.error;
+            } else {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .insert({
+                        user_id: userId,
+                        ...updateData,
+                        ai_coach_enabled: true,
+                        ai_chat_enabled: true,
+                        daily_limit_tokens: 100000,
+                        monthly_limit_tokens: 2000000,
+                        created_at: new Date().toISOString(),
+                    });
+                error = result.error;
+            }
+
+            if (error) {
+                logger.error("[AdminDashboard] Error setting cooldown", { error, userId, hours });
+                toast.error(`Failed to set cooldown: ${error.message}`);
+                return;
+            }
+
+            toast.success(`Cooldown set for ${email}: ${hours} hours - ${reason}`);
+            fetchUserStats();
+        } catch (error) {
+            logger.error("[AdminDashboard] Unexpected error setting cooldown", { error, userId });
+            toast.error("Failed to set cooldown");
+        }
+    };
+
+    const removeCooldown = async (userId: string, email: string) => {
+        try {
+            const { error } = await supabase
+                .from("user_ai_restrictions")
+                .update({
+                    cooldown_until: null,
+                    cooldown_reason: null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("user_id", userId);
+
+            if (error) {
+                logger.error("[AdminDashboard] Error removing cooldown", { error, userId });
+                toast.error(`Failed to remove cooldown: ${error.message}`);
+                return;
+            }
+
+            toast.success(`Cooldown removed for ${email}`);
+            fetchUserStats();
+        } catch (error) {
+            logger.error("[AdminDashboard] Unexpected error removing cooldown", { error, userId });
+            toast.error("Failed to remove cooldown");
+        }
+    };
+
+    const updateUserLimits = async (userId: string, email: string, dailyLimit: number, monthlyLimit: number) => {
+        try {
+            // Check if restriction record exists
+            const { data: existing } = await supabase
+                .from("user_ai_restrictions")
+                .select("*")
+                .eq("user_id", userId)
+                .single();
+
+            const updateData = {
+                daily_limit_tokens: dailyLimit,
+                monthly_limit_tokens: monthlyLimit,
+                updated_at: new Date().toISOString(),
+            };
+
+            let error;
+            if (existing) {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .update(updateData)
+                    .eq("user_id", userId);
+                error = result.error;
+            } else {
+                const result = await supabase
+                    .from("user_ai_restrictions")
+                    .insert({
+                        user_id: userId,
+                        ...updateData,
+                        ai_coach_enabled: true,
+                        ai_chat_enabled: true,
+                        created_at: new Date().toISOString(),
+                    });
+                error = result.error;
+            }
+
+            if (error) {
+                logger.error("[AdminDashboard] Error updating limits", { error, userId });
+                toast.error(`Failed to update limits: ${error.message}`);
+                return;
+            }
+
+            toast.success(`Limits updated for ${email}: Daily ${(dailyLimit / 1000).toFixed(0)}k, Monthly ${(monthlyLimit / 1000000).toFixed(1)}M tokens`);
+            fetchUserStats();
+        } catch (error) {
+            logger.error("[AdminDashboard] Unexpected error updating limits", { error, userId });
+            toast.error("Failed to update limits");
+        }
+    };
+
+    // Format tokens for display
+    const formatTokens = (tokens: number) => {
+        if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
+        if (tokens >= 1000) return `${(tokens / 1000).toFixed(0)}k`;
+        return tokens.toString();
+    };
+
+    // Calculate usage percentage
+    const getUsagePercentage = (used: number, limit: number) => {
+        if (limit === 0) return 0;
+        return Math.min((used / limit) * 100, 100);
+    };
+
+    // Get usage bar color based on percentage
+    const getUsageColor = (percentage: number) => {
+        if (percentage >= 90) return "bg-red-500";
+        if (percentage >= 70) return "bg-yellow-500";
+        return "bg-green-500";
+    };
+
     const filteredUsers = users.filter(user =>
         user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -384,11 +688,7 @@ export function AdminDashboardNew() {
     };
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-lg">Loading dashboard...</div>
-            </div>
-        );
+        return <AdminDashboardSkeleton />;
     }
 
     return (
@@ -572,6 +872,143 @@ export function AdminDashboardNew() {
                                                             </p>
                                                         </div>
                                                     )}
+
+                                                    {/* AI Access Controls */}
+                                                    <div className="mt-4 pt-4 border-t">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <Bot className="h-4 w-4 text-muted-foreground" />
+                                                            <span className="text-sm font-medium">AI Access Controls</span>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                                            {/* AI Coach Toggle */}
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">AI Coach</span>
+                                                                <Button
+                                                                    variant={user.ai_restriction?.ai_coach_enabled !== false ? "default" : "outline"}
+                                                                    size="sm"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => toggleAIAccess(
+                                                                        user.id,
+                                                                        user.email,
+                                                                        'ai_coach',
+                                                                        user.ai_restriction?.ai_coach_enabled === false
+                                                                    )}
+                                                                >
+                                                                    {user.ai_restriction?.ai_coach_enabled !== false ? (
+                                                                        <><Zap className="h-3 w-3 mr-1" /> Enabled</>
+                                                                    ) : (
+                                                                        <><Ban className="h-3 w-3 mr-1" /> Disabled</>
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+
+                                                            {/* AI Chat Toggle */}
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">AI Chat</span>
+                                                                <Button
+                                                                    variant={user.ai_restriction?.ai_chat_enabled !== false ? "default" : "outline"}
+                                                                    size="sm"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => toggleAIAccess(
+                                                                        user.id,
+                                                                        user.email,
+                                                                        'ai_chat',
+                                                                        user.ai_restriction?.ai_chat_enabled === false
+                                                                    )}
+                                                                >
+                                                                    {user.ai_restriction?.ai_chat_enabled !== false ? (
+                                                                        <><MessageSquare className="h-3 w-3 mr-1" /> Enabled</>
+                                                                    ) : (
+                                                                        <><Ban className="h-3 w-3 mr-1" /> Disabled</>
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+
+                                                            {/* Daily Usage */}
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Daily Usage</span>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full ${getUsageColor(getUsagePercentage(user.ai_usage?.tokens_today || 0, user.ai_restriction?.daily_limit_tokens || 100000))}`}
+                                                                            style={{ width: `${getUsagePercentage(user.ai_usage?.tokens_today || 0, user.ai_restriction?.daily_limit_tokens || 100000)}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs font-mono">
+                                                                        {formatTokens(user.ai_usage?.tokens_today || 0)} / {formatTokens(user.ai_restriction?.daily_limit_tokens || 100000)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Monthly Usage */}
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Monthly Usage</span>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full ${getUsageColor(getUsagePercentage(user.ai_usage?.tokens_month || 0, user.ai_restriction?.monthly_limit_tokens || 2000000))}`}
+                                                                            style={{ width: `${getUsagePercentage(user.ai_usage?.tokens_month || 0, user.ai_restriction?.monthly_limit_tokens || 2000000)}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs font-mono">
+                                                                        {formatTokens(user.ai_usage?.tokens_month || 0)} / {formatTokens(user.ai_restriction?.monthly_limit_tokens || 2000000)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Cooldown Status */}
+                                                        {user.ai_restriction?.cooldown_until && new Date(user.ai_restriction.cooldown_until) > new Date() && (
+                                                            <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Clock className="h-4 w-4 text-yellow-600" />
+                                                                    <span className="text-xs text-yellow-800 dark:text-yellow-200">
+                                                                        Cooldown until {formatDateTime(user.ai_restriction.cooldown_until)}
+                                                                        {user.ai_restriction.cooldown_reason && ` - ${user.ai_restriction.cooldown_reason}`}
+                                                                    </span>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-6 text-xs"
+                                                                    onClick={() => removeCooldown(user.id, user.email)}
+                                                                >
+                                                                    Remove
+                                                                </Button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Quick Actions */}
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-6 text-xs"
+                                                                onClick={() => {
+                                                                    setCooldownDialogUser({ id: user.id, email: user.email });
+                                                                    setCooldownHoursInput("1");
+                                                                    setCooldownReasonInput("Admin action");
+                                                                    setCooldownDialogOpen(true);
+                                                                }}
+                                                            >
+                                                                <Clock className="h-3 w-3 mr-1" /> Cooldown
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-6 text-xs"
+                                                                onClick={() => {
+                                                                    setLimitsDialogUser({ id: user.id, email: user.email });
+                                                                    setDailyLimitInput(String(user.ai_restriction?.daily_limit_tokens || 100000));
+                                                                    setMonthlyLimitInput(String(user.ai_restriction?.monthly_limit_tokens || 2000000));
+                                                                    setLimitsDialogOpen(true);
+                                                                }}
+                                                            >
+                                                                <Settings className="h-3 w-3 mr-1" /> Set Limits
+                                                            </Button>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex flex-col gap-2 ml-4">
@@ -666,7 +1103,135 @@ export function AdminDashboardNew() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Set Limits Dialog */}
+            <Dialog open={limitsDialogOpen} onOpenChange={setLimitsDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Settings className="h-5 w-5" />
+                            Set AI Token Limits
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure daily and monthly token limits for <span className="font-medium">{limitsDialogUser?.email}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="daily-limit">Daily Token Limit</Label>
+                            <Input
+                                id="daily-limit"
+                                type="number"
+                                value={dailyLimitInput}
+                                onChange={(e) => setDailyLimitInput(e.target.value)}
+                                placeholder="100000"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Default: 100,000 tokens (~$0.05/day at typical rates)
+                            </p>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="monthly-limit">Monthly Token Limit</Label>
+                            <Input
+                                id="monthly-limit"
+                                type="number"
+                                value={monthlyLimitInput}
+                                onChange={(e) => setMonthlyLimitInput(e.target.value)}
+                                placeholder="2000000"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Default: 2,000,000 tokens (~$1.00/month at typical rates)
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setLimitsDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (limitsDialogUser) {
+                                    updateUserLimits(
+                                        limitsDialogUser.id,
+                                        limitsDialogUser.email,
+                                        parseInt(dailyLimitInput) || 100000,
+                                        parseInt(monthlyLimitInput) || 2000000
+                                    );
+                                    setLimitsDialogOpen(false);
+                                }
+                            }}
+                        >
+                            Save Limits
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Set Cooldown Dialog */}
+            <Dialog open={cooldownDialogOpen} onOpenChange={setCooldownDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Clock className="h-5 w-5" />
+                            Set AI Cooldown
+                        </DialogTitle>
+                        <DialogDescription>
+                            Temporarily restrict AI access for <span className="font-medium">{cooldownDialogUser?.email}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="cooldown-hours">Cooldown Duration (hours)</Label>
+                            <Input
+                                id="cooldown-hours"
+                                type="number"
+                                value={cooldownHoursInput}
+                                onChange={(e) => setCooldownHoursInput(e.target.value)}
+                                placeholder="24"
+                                min="1"
+                            />
+                            <div className="flex gap-2 mt-1">
+                                <Button size="sm" variant="outline" className="text-xs h-6" onClick={() => setCooldownHoursInput("1")}>1h</Button>
+                                <Button size="sm" variant="outline" className="text-xs h-6" onClick={() => setCooldownHoursInput("6")}>6h</Button>
+                                <Button size="sm" variant="outline" className="text-xs h-6" onClick={() => setCooldownHoursInput("24")}>24h</Button>
+                                <Button size="sm" variant="outline" className="text-xs h-6" onClick={() => setCooldownHoursInput("72")}>3 days</Button>
+                                <Button size="sm" variant="outline" className="text-xs h-6" onClick={() => setCooldownHoursInput("168")}>1 week</Button>
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="cooldown-reason">Reason (optional)</Label>
+                            <Input
+                                id="cooldown-reason"
+                                type="text"
+                                value={cooldownReasonInput}
+                                onChange={(e) => setCooldownReasonInput(e.target.value)}
+                                placeholder="Reason for cooldown"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCooldownDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (cooldownDialogUser) {
+                                    setCooldown(
+                                        cooldownDialogUser.id,
+                                        cooldownDialogUser.email,
+                                        parseInt(cooldownHoursInput) || 24,
+                                        cooldownReasonInput
+                                    );
+                                    setCooldownDialogOpen(false);
+                                }
+                            }}
+                        >
+                            Apply Cooldown
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
-

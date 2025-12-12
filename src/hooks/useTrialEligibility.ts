@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { Tables } from '@/integrations/supabase/types';
+import { logger } from '@/utils/logger';
 
 type UserSubscription = Tables<'user_subscriptions'>;
 
@@ -26,7 +27,10 @@ export const useTrialEligibility = () => {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('Error checking trial eligibility:', error);
+          logger.error('Error checking trial eligibility', error, {
+            component: 'useTrialEligibility',
+            userId: user.id,
+          });
           setIsEligibleForTrial(true); // Default to eligible on error
           return;
         }
@@ -41,7 +45,10 @@ export const useTrialEligibility = () => {
 
         setIsEligibleForTrial(!hasHadTrial);
       } catch (error) {
-        console.error('Error checking trial eligibility:', error);
+        logger.error('Error checking trial eligibility', error, {
+          component: 'useTrialEligibility',
+          userId: user.id,
+        });
         setIsEligibleForTrial(true); // Default to eligible on error
       } finally {
         setIsLoading(false);

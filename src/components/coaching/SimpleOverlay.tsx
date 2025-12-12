@@ -1146,33 +1146,6 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
                     <Eye className="w-4 h-4 mr-2" />
                     View Code
                   </Button>
-                  {onInsertCorrectCode && (
-                    <Button
-                      onClick={async () => {
-                        try {
-                          setIsInserting(true);
-                          await onInsertCorrectCode();
-                        } finally {
-                          setIsInserting(false);
-                        }
-                      }}
-                      disabled={isInserting}
-                      size="sm"
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                    >
-                      {isInserting ? (
-                        <>
-                          <div className="w-4 h-4 mr-2 border border-white/30 border-t-white rounded-full animate-spin" />
-                          Applying fix...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Apply Code
-                        </>
-                      )}
-                    </Button>
-                  )}
                 </>
               )}
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAttemptsService } from "@/services/userAttempts";
@@ -76,7 +77,17 @@ const RecentActivity = () => {
       <CardContent>
         <div className="space-y-3">
           {loading ? (
-            <div className="text-sm text-muted-foreground">Loading...</div>
+            <>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-4" />
+                </div>
+              ))}
+            </>
           ) : items.length === 0 ? (
             <div className="text-sm text-muted-foreground">No recent activity yet.</div>
           ) : (
@@ -93,8 +104,8 @@ const RecentActivity = () => {
                     {a.status === "passed"
                       ? "Solved"
                       : a.status === "failed"
-                      ? "Attempt failed"
-                      : "Attempted"}
+                        ? "Attempt failed"
+                        : "Attempted"}
                     : {a.title}
                   </div>
                   <div className="text-sm text-muted-foreground">

@@ -2,6 +2,8 @@
  * Performance optimization utilities for overlay positioning system
  */
 
+import { logger } from "@/utils/logger";
+
 /**
  * Debounced function wrapper with configurable delay
  */
@@ -65,7 +67,9 @@ export function memoize<T extends (...args: any[]) => any>(
     // Limit cache size to prevent memory leaks
     if (cache.size > 100) {
       const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
+      if (firstKey) {
+        cache.delete(firstKey);
+      }
     }
     
     return result;
@@ -245,7 +249,10 @@ export class CleanupManager {
       try {
         task();
       } catch (error) {
-        console.warn('Cleanup task failed:', error);
+        logger.warn("Cleanup task failed", {
+          component: "CleanupManager",
+          error,
+        });
       }
     });
 
@@ -304,7 +311,11 @@ export class ViewportMonitor {
       try {
         listener(viewport);
       } catch (error) {
-        console.warn('Viewport listener error:', error);
+        logger.warn("Viewport listener error", {
+          component: "ViewportMonitor",
+          error,
+          viewport,
+        });
       }
     });
   }

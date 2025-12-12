@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 import type { PracticeAnswer } from "@/types";
 
 export const usePracticeAnswers = () => {
@@ -72,7 +73,10 @@ export const usePracticeAnswers = () => {
 
         return answer;
       } catch (err) {
-        console.error("Error fetching last answer:", err);
+        logger.error("Error fetching last answer", err, {
+          component: "usePracticeAnswers",
+          userId: user?.id,
+        });
         setError(err instanceof Error ? err.message : "Failed to fetch last answer");
         return null;
       } finally {
@@ -125,7 +129,10 @@ export const usePracticeAnswers = () => {
 
       return scores;
     } catch (err) {
-      console.error("Error fetching question scores:", err);
+      logger.error("Error fetching question scores", err, {
+        component: "usePracticeAnswers",
+        userId: user?.id,
+      });
       setError(err instanceof Error ? err.message : "Failed to fetch question scores");
       return {};
     } finally {
@@ -197,7 +204,10 @@ export const usePracticeAnswers = () => {
 
       return { totalPracticed, totalQuestions, averageScore };
     } catch (err) {
-      console.error("Error fetching progress:", err);
+      logger.error("Error fetching progress", err, {
+        component: "usePracticeAnswers",
+        userId: user?.id,
+      });
       setError(err instanceof Error ? err.message : "Failed to fetch progress");
       return { totalPracticed: 0, totalQuestions: 0, averageScore: 0 };
     } finally {
