@@ -8,7 +8,7 @@ declare const Deno: { env: { get(name: string): string | undefined } };
 
 // LLM Provider Configuration
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
-const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash-preview-09-2025";
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
 const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
 // Model configuration

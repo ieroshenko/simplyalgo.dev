@@ -8,6 +8,7 @@ import {
 import CodeEditor from "@/components/CodeEditor";
 import ChatBubbles from "@/components/chat/ChatBubbles";
 import ProblemPanel from "@/components/problem/ProblemPanel";
+import { ProblemSelector } from "@/components/problem/ProblemSelector";
 import Notes, { NotesHandle } from "@/components/Notes";
 import {
   ArrowLeft,
@@ -746,6 +747,10 @@ const ProblemSolverNew = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
+            <ProblemSelector
+              problems={problems}
+              currentProblemId={problemId}
+            />
             <div className="flex items-center space-x-3">
               <h1 className="text-xl font-bold text-foreground">
                 {problem.title}

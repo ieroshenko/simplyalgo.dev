@@ -13,7 +13,10 @@ import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { Monitor, Moon, Sun, Palette, User, Bell, Shield, LogOut } from "lucide-react";
+import { Monitor, Moon, Sun, Palette, User, Bell, Shield, LogOut, FileText, FlaskConical } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Switch } from "@/components/ui/switch";
+import { isFeatureEnabled } from "@/config/features";
 import { toast } from "sonner";
 import { logger } from "@/utils/logger";
 
@@ -117,6 +120,39 @@ const Settings = () => {
             </CardContent>
           </Card>
 
+          {/* Lab Features */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FlaskConical className="w-5 h-5" />
+                <span>Lab Features</span>
+              </CardTitle>
+              <CardDescription>
+                Experimental features and UI variations
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between space-x-2">
+                <Label htmlFor="os-theme-mode" className="flex flex-col space-y-1">
+                  <span>SimplyAlgo OS Aesthetic</span>
+                  <span className="font-normal text-xs text-muted-foreground">
+                    Enable the new technical, high-contrast "OS" UI style
+                  </span>
+                </Label>
+                <Switch
+                  id="os-theme-mode"
+                  checked={isFeatureEnabled('OS_THEME')}
+                  onCheckedChange={(checked) => {
+                    localStorage.setItem('feature_OS_THEME', String(checked));
+                    toast.success(`OS Theme ${checked ? 'enabled' : 'disabled'}. Refresh to see all changes.`);
+                    // Small delay to let toast show
+                    setTimeout(() => window.location.reload(), 800);
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Account Settings */}
           <Card>
             <CardHeader>
@@ -187,7 +223,34 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          */}
+          {/* Legal Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FileText className="w-5 h-5" />
+                <span>Legal</span>
+              </CardTitle>
+              <CardDescription>
+                View our Terms of Service and Privacy Policy
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col space-y-2">
+                <Link
+                  to="/terms"
+                  className="text-sm font-medium text-primary hover:underline flex items-center"
+                >
+                  Terms of Service
+                </Link>
+                <Link
+                  to="/privacy"
+                  className="text-sm font-medium text-primary hover:underline flex items-center"
+                >
+                  Privacy Policy
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

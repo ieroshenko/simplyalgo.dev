@@ -53,13 +53,16 @@ const CodeEditor = ({
   const [code, setCode] = useState(initialCode);
   const [vimMode, setVimMode] = useState(() => {
     // Load vim mode preference from localStorage
-    const saved = localStorage.getItem("editor-vim-mode");
+    if (typeof window === "undefined") return false;
+    const saved = window.localStorage.getItem("editor-vim-mode");
     return saved === "true";
   });
   const { currentTheme, selectedTheme, setCurrentTheme, defineCustomThemes } =
     useEditorTheme();
   const editorRef = useRef<any>(null);
   const vimModeRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
+  const vimInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { saveCode, loadLatestCode, isSaving, lastSaved, hasUnsavedChanges } =
     useAutoSave(problemId, {
@@ -74,6 +77,7 @@ const CodeEditor = ({
     if (typeof window !== "undefined" && editorRef.current) {
       try {
         const { initVimMode } = await import("monaco-vim");
+        if (!isMountedRef.current) return;
         if (vimStatusbarRef.current) {
           // Dispose existing vim mode if it exists
           if (vimModeRef.current) {
@@ -87,9 +91,10 @@ const CodeEditor = ({
         }
       } catch (error) {
         logger.warn("[CodeEditor] Vim mode not available", { error });
+        if (!isMountedRef.current) return;
         toast.error("Failed to load Vim mode");
         setVimMode(false);
-        localStorage.setItem("editor-vim-mode", "false");
+        window.localStorage.setItem("editor-vim-mode", "false");
       }
     }
   };
@@ -97,7 +102,9 @@ const CodeEditor = ({
   const handleVimModeToggle = async (enabled: boolean) => {
     setVimMode(enabled);
     // Persist vim mode preference to localStorage
-    localStorage.setItem("editor-vim-mode", enabled.toString());
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("editor-vim-mode", enabled.toString());
+    }
 
     if (enabled) {
       await loadVimMode();
@@ -140,6 +147,11 @@ const CodeEditor = ({
   // Cleanup vim mode on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
+      if (vimInitTimeoutRef.current) {
+        clearTimeout(vimInitTimeoutRef.current);
+        vimInitTimeoutRef.current = null;
+      }
       if (vimModeRef.current) {
         vimModeRef.current.dispose();
         vimModeRef.current = null;
@@ -287,7 +299,9 @@ const CodeEditor = ({
             // Load vim mode if enabled (after editor is fully mounted)
             if (vimMode) {
               // Give editor more time to fully initialize
-              setTimeout(() => loadVimMode(), 500);
+              vimInitTimeoutRef.current = setTimeout(() => {
+                void loadVimMode();
+              }, 500);
             }
           }}
           theme={currentTheme}

@@ -37,14 +37,14 @@ test.describe('Dashboard', () => {
 
   test.describe('Assessment Prep Cards', () => {
     test('should display Problem Solving card', async ({ page }) => {
-      // Should show Problem Solving card
-      await expect(page.getByText('Problem Solving')).toBeVisible();
+      // Should show Problem Solving card - use heading role to be specific
+      await expect(page.getByRole('heading', { name: 'Problem Solving', exact: true })).toBeVisible();
       await expect(page.getByText(/Master common coding patterns/i)).toBeVisible();
     });
 
     test('should navigate to problems page when clicking Problem Solving', async ({ page }) => {
-      // Click on Problem Solving card
-      await page.getByText('Problem Solving').first().click();
+      // Click on Problem Solving card using the heading
+      await page.getByRole('heading', { name: 'Problem Solving', exact: true }).click();
 
       // Should navigate to problems page
       await expect(page).toHaveURL(/\/problems/);
@@ -58,14 +58,14 @@ test.describe('Dashboard', () => {
 
   test.describe('Interview Prep Cards', () => {
     test('should display Behavioral Interviews card', async ({ page }) => {
-      // Should show Behavioral Interviews card
-      await expect(page.getByText('Behavioral Interviews')).toBeVisible();
-      await expect(page.getByText(/Soft skills & behavioral/i)).toBeVisible();
+      // Should show Behavioral Interviews card - use heading role to be specific
+      await expect(page.getByRole('heading', { name: 'Behavioral Interviews' })).toBeVisible();
+      await expect(page.getByText(/Soft skills \& behavioral/i)).toBeVisible();
     });
 
     test('should navigate to behavioral page when clicking Behavioral Interviews', async ({ page }) => {
-      // Click on Behavioral Interviews card
-      await page.getByText('Behavioral Interviews').click();
+      // Click on Behavioral Interviews card using the heading
+      await page.getByRole('heading', { name: 'Behavioral Interviews' }).click();
 
       // Should navigate to behavioral page
       await expect(page).toHaveURL(/\/behavioral/);

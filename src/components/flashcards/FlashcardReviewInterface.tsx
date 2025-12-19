@@ -21,6 +21,13 @@ import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/hooks/useTheme";
+import "katex/dist/katex.min.css";
 
 interface FlashcardReviewInterfaceProps {
   isOpen: boolean;
@@ -70,6 +77,10 @@ export const FlashcardReviewInterface = ({
 }: FlashcardReviewInterfaceProps) => {
   const { dueCards, submitReview, isSubmittingReview } = useFlashcards(userId);
   const { currentTheme: editorTheme, defineCustomThemes } = useEditorTheme();
+  const { isDark } = useTheme();
+
+  // Select syntax highlighting theme based on current color scheme
+  const syntaxTheme = isDark ? vscDarkPlus : vs;
   const [isEditorReady, setIsEditorReady] = useState(false);
 
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -385,11 +396,51 @@ export const FlashcardReviewInterface = ({
               {/* Problem Description */}
               {currentProblemData ? (
                 <div className="space-y-4">
-                  <div className="prose prose-sm max-w-none">
-                    <div
-                      className="text-sm text-muted-foreground"
-                      dangerouslySetInnerHTML={{ __html: currentProblemData.description }}
-                    />
+                  <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground prose-code:bg-transparent prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-img:rounded-lg prose-img:border prose-img:border-border prose-strong:text-foreground prose-strong:font-semibold prose-headings:text-foreground">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        code({ inline, className, children }: any) {
+                          const match = /language-(\w+)/.exec(className || "");
+                          const codeString = String(children).replace(/\n$/, "");
+                          return !inline && match ? (
+                            <SyntaxHighlighter
+                              style={syntaxTheme}
+                              language={match[1]}
+                              PreTag="div"
+                              customStyle={{
+                                margin: 0,
+                                borderRadius: "0.375rem",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              {codeString}
+                            </SyntaxHighlighter>
+                          ) : (
+                            <code className={className}>{children}</code>
+                          );
+                        },
+                        img({ src, alt }: any) {
+                          return (
+                            <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
+                              <img
+                                src={src}
+                                alt={alt || "Problem illustration"}
+                                className="max-w-full h-auto rounded shadow-sm mx-auto"
+                                style={{
+                                  maxHeight: "300px",
+                                  objectFit: "contain",
+                                }}
+                                loading="lazy"
+                              />
+                            </div>
+                          );
+                        },
+                      }}
+                    >
+                      {currentProblemData.description}
+                    </ReactMarkdown>
                   </div>
 
                   {/* Examples */}

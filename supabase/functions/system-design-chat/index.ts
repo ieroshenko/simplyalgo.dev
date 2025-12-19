@@ -25,7 +25,7 @@ const supabaseAdmin = supabaseServiceKey
 // LLM Provider Configuration
 // Supports both OpenRouter (preferred) and OpenAI (fallback)
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
-const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
 const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
 export const configuredModel = useOpenRouter ? openrouterModel : openaiModel;

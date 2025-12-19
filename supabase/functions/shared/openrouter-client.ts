@@ -1,14 +1,14 @@
 /**
  * OpenRouter client setup and API interaction utilities
- * 
+ *
  * OpenRouter provides a unified API to access multiple LLMs including:
- * - Google Gemini 2.5 Flash
+ * - Google Gemini 3 Flash (default)
  * - GPT-4, GPT-5
  * - Claude, Llama, and many more
- * 
+ *
  * Usage:
  * 1. Set OPENROUTER_API_KEY in your environment
- * 2. Set OPENROUTER_MODEL to your desired model (e.g., "google/gemini-2.5-flash")
+ * 2. Set OPENROUTER_MODEL to your desired model (e.g., "google/gemini-3-flash-preview")
  * 3. Optionally set OPENROUTER_SITE_URL and OPENROUTER_APP_NAME for better analytics
  */
 
@@ -30,6 +30,7 @@ export const OPENROUTER_MODELS = {
     GROK_CODE_FAST_1: "x-ai/grok-code-fast-1",
 
     // Google Gemini
+    GEMINI_3_FLASH_PREVIEW: "google/gemini-3-flash-preview",
     GEMINI_2_5_FLASH_PREVIEW: "google/gemini-2.5-flash-preview-09-2025",
     GEMINI_2_5_FLASH: "google/gemini-2.5-flash",
     GEMINI_2_0_FLASH: "google/gemini-2.0-flash",
@@ -56,15 +57,15 @@ export const OPENROUTER_MODELS = {
     MISTRAL_LARGE: "mistralai/mistral-large",
 } as const;
 
-// Model selection via env var; default to Gemini 2.5 Flash Preview
+// Model selection via env var; default to Gemini 3 Flash Preview
 const configuredModel = (
     Deno.env.get("OPENROUTER_MODEL") ||
-    OPENROUTER_MODELS.GEMINI_2_5_FLASH_PREVIEW
+    OPENROUTER_MODELS.GEMINI_3_FLASH_PREVIEW
 ).trim();
 
 const modelSource = Deno.env.get("OPENROUTER_MODEL")
     ? "OPENROUTER_MODEL env set"
-    : "defaulted to gemini-2.5-flash-preview-09-2025 (no OPENROUTER_MODEL)";
+    : "defaulted to google/gemini-3-flash-preview (no OPENROUTER_MODEL)";
 
 /**
  * Initialize OpenRouter client with API key validation
@@ -250,10 +251,10 @@ export async function llmJsonFast(
     prompt: string,
     opts?: { maxTokens?: number }
 ): Promise<string> {
-    // Use Gemini 2.5 Flash for fast responses
+    // Use Gemini 3 Flash for fast responses
     return await llmJson(prompt, {
         maxTokens: opts?.maxTokens ?? 600,
-        model: OPENROUTER_MODELS.GEMINI_2_5_FLASH,
+        model: OPENROUTER_MODELS.GEMINI_3_FLASH_PREVIEW,
         temperature: 0.3, // Lower temperature for more consistent JSON
     });
 }

@@ -25,6 +25,8 @@ import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 import { AdminRoute } from "./components/route/AdminRoute";
 import { Analytics } from '@vercel/analytics/react';
@@ -45,6 +47,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Auth />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route
               path="/dashboard"
               element={
