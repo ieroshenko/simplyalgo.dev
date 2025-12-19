@@ -12,10 +12,12 @@ test.describe('Problem Solving - Code Submission', () => {
     await page.waitForSelector('tbody tr', { timeout: 10000 });
 
     // Click the first Start button to open a problem
-    await page.getByRole('button', { name: /Start/i }).first().click();
+    const startButton = page.getByRole('button', { name: /Start/i }).first();
+    await expect(startButton).toBeVisible();
+    await startButton.click();
 
-    // Wait for problem solver page to load
-    await expect(page).toHaveURL(/\/problem\/[\w-]+/);
+    // Wait for navigation to complete
+    await page.waitForURL(/\/problem\/[\w-]+/, { timeout: 10000 });
 
     // Wait for Monaco editor to load - use the code role or editor textbox which is reliably visible
     await expect(page.getByRole('code').first()).toBeVisible({ timeout: 10000 });
@@ -141,8 +143,10 @@ test.describe('Language Switching', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/problems');
     await page.waitForSelector('tbody tr', { timeout: 10000 });
-    await page.getByRole('button', { name: /Start/i }).first().click();
-    await expect(page).toHaveURL(/\/problem\/[\w-]+/);
+    const startButton = page.getByRole('button', { name: /Start/i }).first();
+    await expect(startButton).toBeVisible();
+    await startButton.click();
+    await page.waitForURL(/\/problem\/[\w-]+/, { timeout: 10000 });
     await expect(page.getByRole('code').first()).toBeVisible({ timeout: 10000 });
   });
 

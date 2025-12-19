@@ -52,7 +52,7 @@ export const useSolutions = (problemId?: string) => {
 
         // Fetch from database
         const { data, error: fetchError } = await supabase
-          .from("problem_solutions" as any)
+          .from("problem_solutions" as unknown)
           .select("*")
           .eq("problem_id", problemId)
           .eq("language", "python") // For now, only Python

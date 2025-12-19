@@ -39,8 +39,12 @@ interface SubmissionPreviewModalProps {
   onClose: () => void;
 }
 
+interface NodeData {
+  label: string;
+}
+
 // Icon mapping (same as DesignCanvas)
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   client: TbDeviceDesktop,
   api: TbServer,
   loadbalancer: TbRouteAltLeft,
@@ -65,7 +69,7 @@ const ReadOnlyNode = ({
   color: string;
   bgColor: string;
   shape?: string;
-  icon?: any;
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 }) => {
   // Invisible handles for edge connections
   const Handles = () => (
@@ -106,8 +110,13 @@ const ReadOnlyNode = ({
 };
 
 // Custom node types (same as DesignCanvas but read-only)
-const createNodeType = (color: string, bgColor: string, icon?: any, shape?: string) => {
-  return ({ data }: { data: any }) => (
+const createNodeType = (
+  color: string,
+  bgColor: string,
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>,
+  shape?: string
+) => {
+  return ({ data }: { data: NodeData }) => (
     <ReadOnlyNode color={color} bgColor={bgColor} icon={icon} shape={shape}>
       {data.label}
     </ReadOnlyNode>
@@ -138,7 +147,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
   const { isDark } = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<unknown>(null);
   const nodeColors = useMemo(() => getNodeColors(isDark), [isDark]);
 
   const nodeTypes: NodeTypes = useMemo(
@@ -186,7 +195,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
         undefined,
         "diamond",
       ),
-      text: ({ data }: { data: any }) => (
+      text: ({ data }: { data: NodeData }) => (
         <div className="relative px-2 py-1 bg-transparent">
           <div className="font-medium text-foreground whitespace-pre-wrap">{data.label || "Text"}</div>
           <Handle id="text-right-source" type="source" position={Position.Right} style={{ opacity: 0 }} />

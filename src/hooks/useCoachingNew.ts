@@ -805,7 +805,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         const looksLarge = lines.length > 8 || /\b(def\s+\w+\s*\(|class\s+\w+|if\s+__name__\s*==)/.test(codeToInsert);
         
         // For coaching corrections, default to 'replace' mode to fix incorrect code
-        let insertionType: 'smart' | 'replace' = 'replace';
+        const insertionType: 'smart' | 'replace' = 'replace';
         
         if (looksLarge) {
           const ok = window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');

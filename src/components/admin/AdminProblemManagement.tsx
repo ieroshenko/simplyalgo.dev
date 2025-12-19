@@ -64,11 +64,11 @@ const AdminProblemManagement = () => {
             const typedProblems = (problemsData as unknown as Problem[]) || [];
             setProblems(typedProblems);
             setCategories(categoriesData || []);
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast({
                 variant: "destructive",
                 title: "Error fetching data",
-                description: error.message,
+                description: error instanceof Error ? error.message : "An error occurred",
             });
         } finally {
             setLoading(false);

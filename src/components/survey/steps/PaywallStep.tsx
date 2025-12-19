@@ -92,7 +92,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
       } else {
         throw new Error('No client secret or URL received');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[PaywallStep] Error creating checkout session', { error });
       
       // Check if user already has an active subscription

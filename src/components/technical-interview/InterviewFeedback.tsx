@@ -16,8 +16,8 @@ interface InterviewFeedbackProps {
 const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<any>(null);
-  const [feedback, setFeedback] = useState<any>(null);
+  const [session, setSession] = useState<unknown>(null);
+  const [feedback, setFeedback] = useState<unknown>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
 
   useEffect(() => {

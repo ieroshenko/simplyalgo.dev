@@ -1,4 +1,3 @@
-import { Flame, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserStats } from "@/hooks/useUserStats";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,34 +5,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 const MissionStrip = () => {
   const { user } = useAuth();
   const { stats, loading } = useUserStats(user?.id);
+
   return (
-    <div className="bg-secondary/50 p-4 mx-6 mt-6 rounded-lg border border-secondary">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground mb-2">
-          Welcome back!
-        </h2>
-        <div className="text-right">
-          <div className="text-lg font-bold text-foreground">Progress</div>
-          <div className="text-sm text-muted-foreground">
-            Keep pushing forward!
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-8 mt-2">
-        <div className="flex items-center space-x-2">
-          <Flame className="w-5 h-5 text-accent" />
-          <span className="font-semibold text-foreground">
-            Streak: {loading ? <Skeleton className="h-5 w-8 inline-block" /> : stats.streak}
+    <div className="border-b border-border/20 px-6 py-4">
+      <div className="flex items-center gap-8 flex-wrap text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status:</span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground uppercase">Active</span>
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
           </span>
         </div>
 
-        {/* <div className="flex items-center space-x-2">
-          <Clock className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            System Design: TinyURL at 20:00
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Focus:</span>
+          <span className="text-xs font-semibold text-foreground uppercase">Interview</span>
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Streak:</span>
+          <span className="text-xs font-semibold text-foreground">
+            {loading ? <Skeleton className="h-4 w-6 inline-block" /> : `${stats.streak} days`}
           </span>
-        </div> */}
+        </div>
       </div>
     </div>
   );

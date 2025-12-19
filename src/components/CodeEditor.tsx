@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useEditorTheme, EditorTheme } from "@/hooks/useEditorTheme";
 import EditorSettings from "@/components/EditorSettings";
@@ -27,7 +28,7 @@ interface CodeEditorProps {
   onRun: () => void;
   onSubmit?: () => void;
   isRunning: boolean;
-  editorRef?: React.MutableRefObject<any>;
+  editorRef?: React.MutableRefObject<editor.IStandaloneCodeEditor | null>;
   hideSubmit?: boolean;
   // Coach Mode props
   onStartCoaching?: () => void;
@@ -59,8 +60,8 @@ const CodeEditor = ({
   });
   const { currentTheme, selectedTheme, setCurrentTheme, defineCustomThemes } =
     useEditorTheme();
-  const editorRef = useRef<any>(null);
-  const vimModeRef = useRef<any>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const vimModeRef = useRef<{ dispose: () => void } | null>(null);
   const isMountedRef = useRef(true);
   const vimInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

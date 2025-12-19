@@ -21,8 +21,8 @@ test.describe('Behavioral Interview Hub', () => {
         test('should display stats cards', async ({ page }) => {
             // Should show Questions Practiced stat
             await expect(page.getByText('Questions Practiced')).toBeVisible();
-            // Should show Experiences Added stat
-            await expect(page.getByText('Experiences Added')).toBeVisible();
+            // Should show Experiences Created stat
+            await expect(page.getByText('Experiences Created')).toBeVisible();
             // Should show Average Score stat
             await expect(page.getByText('Average Score')).toBeVisible();
         });

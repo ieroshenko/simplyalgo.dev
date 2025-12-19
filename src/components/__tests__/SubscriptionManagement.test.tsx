@@ -28,7 +28,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 // Mock Supabase
-let mockInvokeResponse: any = { data: null, error: null };
+let mockInvokeResponse: { data: unknown; error: unknown } = { data: null, error: null };
 
 vi.mock('@/integrations/supabase/client', () => ({
     supabase: {

@@ -222,7 +222,7 @@ export const useChatSession = ({
         suggest_diagram?: boolean | null;
       };
       const formattedMessages: ChatMessage[] = (
-        sessionMessages as any[]
+        sessionMessages as unknown[]
       ).map((msg) => ({
         id: msg.id,
         role: msg.role as "user" | "assistant",

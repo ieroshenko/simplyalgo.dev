@@ -34,7 +34,7 @@ export interface Problem {
   description: string;
   function_signature: string;
   companies: string[];
-  examples: any[];
+  examples: Record<string, unknown>[];
   constraints: string[];
   hints: string[];
   recommended_time_complexity: string;
@@ -177,13 +177,13 @@ export function AdminProblemDialog({
 
       if (solError) throw solError;
 
-      setTestCases(tcs as any || []);
-      setSolutions(sols as any || []);
-    } catch (error: any) {
+      setTestCases((tcs as TestCase[]) || []);
+      setSolutions((sols as Solution[]) || []);
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Error loading related data",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An error occurred",
       });
     } finally {
       setLoading(false);
@@ -271,12 +271,12 @@ export function AdminProblemDialog({
         toast({ title: "Problem created" });
         onSaved(insertedProblem as Problem);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[AdminProblemDialog] Save error", error);
       toast({
         variant: "destructive",
         title: "Error saving problem",
-        description: error.message || "Failed to save. Check permissions.",
+        description: error instanceof Error ? error.message : "Failed to save. Check permissions.",
       });
     } finally {
       setLoading(false);
@@ -305,8 +305,8 @@ export function AdminProblemDialog({
         
       if (error) throw error;
       toast({ title: "Test case updated" });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error updating test case", description: error.message });
+    } catch (error: unknown) {
+      toast({ variant: "destructive", title: "Error updating test case", description: error instanceof Error ? error.message : "An error occurred" });
     }
   };
 
@@ -317,8 +317,8 @@ export function AdminProblemDialog({
       if (error) throw error;
       toast({ title: "Test case deleted" });
       if (problem) loadRelatedData(problem.id);
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error deleting test case", description: error.message });
+    } catch (error: unknown) {
+      toast({ variant: "destructive", title: "Error deleting test case", description: error instanceof Error ? error.message : "An error occurred" });
     }
   };
 
@@ -336,8 +336,8 @@ export function AdminProblemDialog({
         .eq("id", sol.id);
       if (error) throw error;
       toast({ title: "Solution updated" });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error updating solution", description: error.message });
+    } catch (error: unknown) {
+      toast({ variant: "destructive", title: "Error updating solution", description: error instanceof Error ? error.message : "An error occurred" });
     }
   };
 
@@ -348,8 +348,8 @@ export function AdminProblemDialog({
       if (error) throw error;
       toast({ title: "Solution deleted" });
       if (problem) loadRelatedData(problem.id);
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error deleting solution", description: error.message });
+    } catch (error: unknown) {
+      toast({ variant: "destructive", title: "Error deleting solution", description: error instanceof Error ? error.message : "An error occurred" });
     }
   };
 
@@ -407,7 +407,7 @@ export function AdminProblemDialog({
                   <Label>Difficulty</Label>
                   <Select
                     value={formData.difficulty}
-                    onValueChange={(v: any) =>
+                    onValueChange={(v: string) =>
                       setFormData({ ...formData, difficulty: v })
                     }
                   >

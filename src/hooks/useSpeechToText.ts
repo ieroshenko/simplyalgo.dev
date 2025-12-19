@@ -29,7 +29,7 @@ export const useSpeechToText = (
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<unknown>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Initialize speech recognition capabilities
@@ -39,8 +39,8 @@ export const useSpeechToText = (
       setIsSupported(true);
       setHasNativeSupport(true);
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+        (window as unknown).SpeechRecognition ||
+        (window as unknown).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
 
       const recognition = recognitionRef.current;

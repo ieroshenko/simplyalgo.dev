@@ -16,13 +16,13 @@ let mockUpdateResponse: any = { error: null };
 
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
         mock.insert = vi.fn(() => mock);
         mock.update = vi.fn(() => mock);
         mock.eq = vi.fn(() => mock);
         mock.single = vi.fn(() => Promise.resolve(mockInsertResponse));
-        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve(mockSelectResponse).then(resolve);
         return mock;
     };
 

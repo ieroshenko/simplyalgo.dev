@@ -1,173 +1,203 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import { SurveyService } from '@/services/surveyService';
 import { SurveyData } from '@/types/survey';
 
+// Cache configuration
+const STALE_TIME = 10 * 60 * 1000; // 10 minutes - survey data rarely changes
+const GC_TIME = 60 * 60 * 1000; // 60 minutes - keep in memory for long session
+
+// Helper to get localStorage data
+function getLocalStorageData(): { surveyData: SurveyData; completedSteps: Set<number> } {
+  try {
+    const savedData = localStorage.getItem('surveyData');
+    const savedCompleted = localStorage.getItem('surveyCompletedSteps');
+
+    return {
+      surveyData: savedData ? JSON.parse(savedData) : {},
+      completedSteps: savedCompleted ? new Set(JSON.parse(savedCompleted)) : new Set(),
+    };
+  } catch {
+    return { surveyData: {}, completedSteps: new Set() };
+  }
+}
+
+// Helper to save to localStorage
+function saveToLocalStorage(surveyData: SurveyData, completedSteps: Set<number>) {
+  localStorage.setItem('surveyData', JSON.stringify(surveyData));
+  localStorage.setItem('surveyCompletedSteps', JSON.stringify(Array.from(completedSteps)));
+}
+
+// Fetch survey data from database (with localStorage fallback)
+async function fetchSurveyData(userId: string | undefined): Promise<{
+  surveyData: SurveyData;
+  completedSteps: number[];
+}> {
+  // Always start with localStorage data
+  const localData = getLocalStorageData();
+
+  if (!userId) {
+    return {
+      surveyData: localData.surveyData,
+      completedSteps: Array.from(localData.completedSteps),
+    };
+  }
+
+  try {
+    const dbSurvey = await SurveyService.getSurveyData(userId);
+
+    if (dbSurvey) {
+      // Use database data if available (it's more authoritative)
+      const surveyData = dbSurvey.survey_data || {};
+      const completedSteps = dbSurvey.completed_steps || [];
+
+      // Sync to localStorage
+      saveToLocalStorage(surveyData, new Set(completedSteps));
+
+      return { surveyData, completedSteps };
+    }
+  } catch (dbError) {
+    console.warn('Database not available, using localStorage data:', dbError);
+  }
+
+  return {
+    surveyData: localData.surveyData,
+    completedSteps: Array.from(localData.completedSteps),
+  };
+}
+
 export const useSurveyData = () => {
   const { user } = useAuth();
-  const [surveyData, setSurveyData] = useState<SurveyData>({});
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Load survey data from database and localStorage
-  const loadSurveyData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      
-      // Always load from localStorage first (fastest)
-      const savedData = localStorage.getItem('surveyData');
-      const savedCompleted = localStorage.getItem('surveyCompletedSteps');
-      
-      if (savedData) {
-        setSurveyData(JSON.parse(savedData));
-      }
-      
-      if (savedCompleted) {
-        setCompletedSteps(new Set(JSON.parse(savedCompleted)));
-      }
-      
-      // If user is logged in, try to load from database as well
+  // Query for survey data - cached for 10 minutes
+  const {
+    data,
+    isLoading,
+  } = useQuery({
+    queryKey: ['surveyData', user?.id],
+    queryFn: () => fetchSurveyData(user?.id),
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    // Use localStorage data as initial data for instant display
+    initialData: () => {
+      const local = getLocalStorageData();
+      return {
+        surveyData: local.surveyData,
+        completedSteps: Array.from(local.completedSteps),
+      };
+    },
+  });
+
+  const surveyData = data?.surveyData ?? {};
+  const completedSteps = useMemo(
+    () => new Set(data?.completedSteps ?? []),
+    [data?.completedSteps]
+  );
+
+  // Mutation to save survey data
+  const saveMutation = useMutation({
+    mutationFn: async ({
+      newSurveyData,
+      newCompletedSteps,
+    }: {
+      newSurveyData: SurveyData;
+      newCompletedSteps: Set<number>;
+    }) => {
+      // Always save to localStorage first
+      saveToLocalStorage(newSurveyData, newCompletedSteps);
+
+      // Save to database if user is available
       if (user) {
-        try {
-          const dbSurvey = await SurveyService.getSurveyData(user.id);
-          
-          if (dbSurvey) {
-            // Use database data if available (it's more authoritative)
-            setSurveyData(dbSurvey.survey_data || {});
-            setCompletedSteps(new Set(dbSurvey.completed_steps || []));
-            // update localStorage
-            saveToLocalStorage(dbSurvey.survey_data || {}, new Set(dbSurvey.completed_steps || []));
-          }
-        } catch (dbError) {
-          console.warn('Database not available, using localStorage data:', dbError);
-          // Continue with localStorage data
-        }
+        const savePromise = SurveyService.saveSurveyData(
+          user.id,
+          newSurveyData,
+          Array.from(newCompletedSteps)
+        );
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Save timeout')), 5000)
+        );
+
+        await Promise.race([savePromise, timeoutPromise]);
       }
-      
-    } catch (error) {
-      console.error('Error loading survey data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
 
-  // Save to localStorage only (immediate)
-  const saveToLocalStorage = useCallback((
-    newSurveyData: SurveyData,
-    newCompletedSteps: Set<number>
-  ) => {
-    localStorage.setItem('surveyData', JSON.stringify(newSurveyData));
-    localStorage.setItem('surveyCompletedSteps', JSON.stringify(Array.from(newCompletedSteps)));
-  }, []);
+      return {
+        surveyData: newSurveyData,
+        completedSteps: Array.from(newCompletedSteps),
+      };
+    },
+    onSuccess: (newData) => {
+      queryClient.setQueryData(['surveyData', user?.id], newData);
+    },
+    onError: (error) => {
+      console.warn('Database save error:', error);
+      // Data is still in localStorage, so we continue
+    },
+  });
 
-  // Save to database only (async) - reads from localStorage
+  // Update survey data
+  const updateSurveyData = useCallback(
+    async (step: number, answer: string, markCompleted: boolean = false) => {
+      const newSurveyData = {
+        ...surveyData,
+        [step]: answer,
+      };
+
+      const newCompletedSteps = new Set(completedSteps);
+      if (markCompleted) {
+        newCompletedSteps.add(step);
+      }
+
+      saveMutation.mutate({ newSurveyData, newCompletedSteps });
+    },
+    [surveyData, completedSteps, saveMutation]
+  );
+
+  // Load data function (for manual refresh)
+  const loadSurveyData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['surveyData', user?.id] });
+  }, [queryClient, user?.id]);
+
+  // Save to localStorage (immediate)
+  const saveToLocalStorageCallback = useCallback(
+    (newSurveyData: SurveyData, newCompletedSteps: Set<number>) => {
+      saveToLocalStorage(newSurveyData, newCompletedSteps);
+    },
+    []
+  );
+
+  // Save to database
   const saveToDatabase = useCallback(async () => {
     if (!user) {
       console.warn('No user available for database save');
       return;
     }
 
-    try {
-      // Read data from localStorage
-      const savedData = localStorage.getItem('surveyData');
-      const savedCompleted = localStorage.getItem('surveyCompletedSteps');
-      
-      if (!savedData || !savedCompleted) {
-        console.warn('No survey data found in localStorage');
-        return;
-      }
+    const localData = getLocalStorageData();
+    saveMutation.mutate({
+      newSurveyData: localData.surveyData,
+      newCompletedSteps: localData.completedSteps,
+    });
+  }, [user, saveMutation]);
 
-      const surveyData: SurveyData = JSON.parse(savedData);
-      const completedSteps = new Set(JSON.parse(savedCompleted) as number[]);
-
-      setIsSaving(true);
-      
-      // Add timeout to prevent infinite saving state
-      const savePromise = SurveyService.saveSurveyData(
-        user.id,
-        surveyData,
-        Array.from(completedSteps)
-      );
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Save timeout')), 5000)
-      );
-      
-      const result = await Promise.race([savePromise, timeoutPromise]);
-      
-      if (!result) {
-        console.warn('Database save failed');
-        throw new Error('Database save failed');
-      }
-      
-      return result;
-      
-    } catch (error) {
-      console.warn('Database save error:', error);
-      throw error;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [user]);
-
-  // Save survey data to both database and localStorage
-  const saveSurveyData = useCallback(async (
-    newSurveyData: SurveyData,
-    newCompletedSteps: Set<number>
-  ) => {
-    // Always save to localStorage first for immediate persistence
-    saveToLocalStorage(newSurveyData, newCompletedSteps);
-    
-    // if (!user) {
-    //   // If no user, just use localStorage
-    //   return;
-    // }
-
-    // try {
-    //   await saveToDatabase();
-    // } catch (error) {
-    //   console.warn('Database not available, using localStorage only:', error);
-    //   // Don't throw error, just log it and continue with localStorage
-    // }
-  }, [user, saveToLocalStorage, saveToDatabase]);
-
-  // Update survey data
-  const updateSurveyData = useCallback(async (
-    step: number,
-    answer: string,
-    markCompleted: boolean = false
-  ) => {
-    const newSurveyData = {
-      ...surveyData,
-      [step]: answer
-    };
-    
-    const newCompletedSteps = new Set(completedSteps);
-    if (markCompleted) {
-      newCompletedSteps.add(step);
-    }
-    
-    setSurveyData(newSurveyData);
-    setCompletedSteps(newCompletedSteps);
-    
-    // Save to database and localStorage
-    await saveSurveyData(newSurveyData, newCompletedSteps);
-  }, [surveyData, completedSteps, saveSurveyData]);
-
-  // Load data on mount
-  useEffect(() => {
-    loadSurveyData();
-  }, [loadSurveyData]);
+  // Save survey data
+  const saveSurveyData = useCallback(
+    async (newSurveyData: SurveyData, newCompletedSteps: Set<number>) => {
+      saveMutation.mutate({ newSurveyData, newCompletedSteps });
+    },
+    [saveMutation]
+  );
 
   return {
     surveyData,
     completedSteps,
     isLoading,
-    isSaving,
+    isSaving: saveMutation.isPending,
     updateSurveyData,
     loadSurveyData,
-    saveToLocalStorage,
+    saveToLocalStorage: saveToLocalStorageCallback,
     saveToDatabase,
     saveSurveyData,
   };

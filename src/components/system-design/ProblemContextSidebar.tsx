@@ -49,7 +49,7 @@ const ProblemContextSidebar = ({ spec }: ProblemContextSidebarProps) => {
         <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground">
           <ReactMarkdown
             components={{
-              code({ inline, className, children }: any) {
+              code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                 const match = /language-(\w+)/.exec(className || "");
                 const codeString = String(children).replace(/\n$/, "");
                 return !inline && match ? (

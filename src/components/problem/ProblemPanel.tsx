@@ -19,6 +19,23 @@ import { useTheme } from "@/hooks/useTheme";
 import "katex/dist/katex.min.css";
 import { logger } from "@/utils/logger";
 
+interface Submission {
+  id: string;
+  code: string;
+  status: string;
+  language?: string;
+  created_at: string;
+  complexity_analysis?: ComplexityAnalysis;
+}
+
+interface ComplexityAnalysis {
+  time_complexity?: string;
+  time_explanation?: string;
+  space_complexity?: string;
+  space_explanation?: string;
+  analysis?: string;
+}
+
 interface ProblemPanelProps {
   problem: Problem;
   problemId: string;
@@ -28,7 +45,7 @@ interface ProblemPanelProps {
   leftPanelTabs: Array<{ id: string; label: string }>;
   notesRef: React.RefObject<NotesHandle>;
   onFullscreenCode?: (code: string, lang: string, title: string) => void;
-  submissions: any[];
+  submissions: Submission[];
   submissionsLoading: boolean;
   submissionsError: string | null;
 }
@@ -57,7 +74,7 @@ const ProblemPanel = ({
 
   const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
-  const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
+  const [complexityResults, setComplexityResults] = useState<Record<string, ComplexityAnalysis>>({});
   const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
 
   // Select syntax highlighting theme based on current color scheme
@@ -67,7 +84,7 @@ const ProblemPanel = ({
   React.useEffect(() => {
     logger.debug('[ProblemPanel] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
-      const results: Record<string, any> = {};
+      const results: Record<string, ComplexityAnalysis> = {};
       submissions.forEach(submission => {
         logger.debug('[ProblemPanel] Processing submission for analysis', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
@@ -245,7 +262,7 @@ const ProblemPanel = ({
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeKatex]}
                 components={{
-                  code({ inline, className, children }: any) {
+                  code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                     const match = /language-(\w+)/.exec(className || "");
                     const codeString = String(children).replace(/\n$/, "");
                     return !inline && match ? (
@@ -266,7 +283,7 @@ const ProblemPanel = ({
                     );
                   },
                   // Enhanced image rendering with responsive sizing and dark mode support
-                  img({ src, alt }: any) {
+                  img({ src, alt }: { src?: string; alt?: string }) {
                     return (
                       <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
                         <img

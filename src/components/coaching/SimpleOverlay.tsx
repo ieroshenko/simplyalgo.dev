@@ -821,7 +821,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
             <DropdownMenuContent align="end" className="w-44 z-[2001]">
               <DropdownMenuLabel>Overlay Position</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuRadioGroup value={positionPreset} onValueChange={(v) => applyPreset(v as any)}>
+              <DropdownMenuRadioGroup value={positionPreset} onValueChange={(v) => applyPreset(v as unknown)}>
                 <DropdownMenuRadioItem value="auto">Auto (smart)</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="center">Center</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="center-bottom">Center bottom</DropdownMenuRadioItem>

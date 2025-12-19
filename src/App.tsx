@@ -31,7 +31,17 @@ import { ProtectedRoute } from "./components/route/ProtectedRoute";
 import { AdminRoute } from "./components/route/AdminRoute";
 import { Analytics } from '@vercel/analytics/react';
 
-const queryClient = new QueryClient();
+// Configure React Query with sensible cache defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000, // 2 minutes - data is fresh for 2 mins
+      gcTime: 30 * 60 * 1000, // 30 minutes - cache kept in memory
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

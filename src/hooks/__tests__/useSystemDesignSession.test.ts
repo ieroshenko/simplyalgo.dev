@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react';
 // Mock supabase responses
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
         mock.insert = vi.fn(() => mock);
         mock.update = vi.fn(() => mock);
@@ -14,7 +14,7 @@ vi.mock('@/integrations/supabase/client', () => {
         mock.limit = vi.fn(() => mock);
         mock.single = vi.fn(() => Promise.resolve({ data: null, error: null }));
         mock.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-        mock.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
         return mock;
     };
 

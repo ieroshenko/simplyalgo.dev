@@ -174,7 +174,7 @@ export default function ComponentCompiler({
         
         // Return the default export or the last declared component
         if (module.exports && module.exports.default) return module.exports.default;
-        if (exports && (exports as any).default) return (exports as any).default;
+        if (exports && (exports as unknown).default) return (exports as unknown).default;
         
         // Find the last function/class declaration that looks like a component
         const componentMatch = \`${sourceCode}\`.match(/(?:export\\s+default\\s+)?(?:function|class|const)\\s+(\\w+)/g);

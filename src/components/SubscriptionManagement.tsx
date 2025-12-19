@@ -135,11 +135,12 @@ export const SubscriptionManagement: React.FC = () => {
       } else {
         setError('Failed to get customer portal URL. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('[SubscriptionManagement] Error creating customer portal session', { error: err });
-      if (err.message?.includes('No active subscription found')) {
+      const errorMessage = err instanceof Error ? err.message : '';
+      if (errorMessage.includes('No active subscription found')) {
         setError('No active subscription found. Please contact support if you believe this is an error.');
-      } else if (err.message?.includes('Customer portal not configured')) {
+      } else if (errorMessage.includes('Customer portal not configured')) {
         setError('Subscription management is temporarily unavailable. Please contact support for assistance.');
       } else {
         setError('Failed to open subscription management. Please try again.');

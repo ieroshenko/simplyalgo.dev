@@ -1,16 +1,33 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { logger } from "@/utils/logger";
 
+interface TestCase {
+  input: unknown;
+  expected: unknown;
+}
+
+interface TechnicalInterviewFeedback {
+  passed: boolean;
+  overall_score: number;
+  problem_solving_score: number;
+  code_quality_score: number;
+  communication_score: number;
+  strengths: string[];
+  areas_for_improvement: string[];
+  detailed_feedback: string;
+  interviewer_notes: string;
+}
+
 interface UseTechnicalInterviewProps {
   problemTitle: string;
   problemDescription: string;
   problemId: string;
-  testCases: any[];
+  testCases: TestCase[];
   voice: string;
   onConnectionStatusChange: (status: "disconnected" | "connecting" | "connected") => void;
   onTranscript?: (role: "user" | "assistant", content: string) => void;
   onTimeUp?: () => void;
-  onFeedbackReceived?: (feedback: any) => void;
+  onFeedbackReceived?: (feedback: TechnicalInterviewFeedback) => void;
 }
 
 interface UseTechnicalInterviewReturn {
@@ -24,6 +41,7 @@ interface UseTechnicalInterviewReturn {
 }
 
 // Debounce utility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
@@ -36,7 +54,7 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 // Extract feedback from AI transcript using structured keywords
-function extractFeedbackFromTranscript(transcript: string): any | null {
+function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFeedback | null {
   const upperTranscript = transcript.toUpperCase();
   
   // Check if this contains the structured feedback format

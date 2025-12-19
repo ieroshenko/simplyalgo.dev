@@ -137,7 +137,7 @@ describe('useChatSession', () => {
             if (table === 'ai_chat_sessions') {
                 const builder = createQueryBuilder([mockSession]);
                 builder.single.mockReturnValue({
-                    then: (resolve: Function) => resolve({ data: mockSession, error: null }),
+                    then: (resolve: (value: any) => void) => resolve({ data: mockSession, error: null }),
                 });
                 return builder;
             }
@@ -228,7 +228,7 @@ describe('useChatSession', () => {
                 if (table === 'ai_chat_sessions') {
                     const builder = createQueryBuilder([]);
                     builder.single.mockReturnValue({
-                        then: (resolve: Function) => resolve({ data: mockSession, error: null }),
+                        then: (resolve: (value: any) => void) => resolve({ data: mockSession, error: null }),
                     });
                     return builder;
                 }
@@ -333,7 +333,7 @@ describe('useChatSession', () => {
         });
 
         it('should set isTyping while waiting for AI response', async () => {
-            let resolveInvoke: Function;
+            let resolveInvoke: (value?: any) => void;
             const invokePromise = new Promise((resolve) => {
                 resolveInvoke = resolve;
             });
@@ -658,7 +658,7 @@ describe('useChatSession', () => {
                 if (table === 'ai_chat_sessions') {
                     const builder = createQueryBuilder([mockSession]);
                     builder.single.mockReturnValue({
-                        then: (resolve: Function) => resolve({ data: mockSession, error: null }),
+                        then: (resolve: (value: any) => void) => resolve({ data: mockSession, error: null }),
                     });
                     return builder;
                 }
@@ -694,7 +694,7 @@ describe('useChatSession', () => {
                 if (table === 'ai_chat_sessions') {
                     const builder = createQueryBuilder([mockSession]);
                     builder.single.mockReturnValue({
-                        then: (resolve: Function) => resolve({ data: mockSession, error: null }),
+                        then: (resolve: (value: any) => void) => resolve({ data: mockSession, error: null }),
                     });
                     return builder;
                 }

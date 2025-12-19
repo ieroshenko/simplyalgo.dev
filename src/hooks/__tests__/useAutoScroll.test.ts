@@ -11,7 +11,7 @@ describe('useAutoScroll', () => {
 
     it('should return scrollToBottom function', () => {
         const scrollAreaRef = { current: null };
-        const messages: any[] = [];
+        const messages: unknown[] = [];
 
         const { result } = renderHook(() => useAutoScroll(scrollAreaRef, messages));
 
@@ -21,7 +21,7 @@ describe('useAutoScroll', () => {
 
     it('should accept options', () => {
         const scrollAreaRef = { current: null };
-        const messages: any[] = [];
+        const messages: unknown[] = [];
 
         const { result } = renderHook(() => useAutoScroll(scrollAreaRef, messages, { enabled: false }));
 

@@ -137,7 +137,7 @@ Categories should be from: general, technical_leadership, code_review_collaborat
 
 Make sure the questions are diverse and cover different behavioral aspects relevant to the role.`;
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [
         { role: "system", content: systemPrompt },

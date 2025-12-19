@@ -5,7 +5,6 @@ export const FEATURE_FLAGS = {
   FLASHCARDS: true, // Anki-style spaced repetition flashcards for solved problems
   BEHAVIORAL_INTERVIEW: false, // AI-powered behavioral interview practice
   TECHNICAL_INTERVIEW: false, // AI-powered technical mock interview
-  OS_THEME: true, // New "SimplyAlgo OS" aesthetic
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
@@ -19,6 +18,6 @@ export const isFeatureEnabled = (feature: FeatureFlag): boolean => {
   return FEATURE_FLAGS[feature];
 };
 
-export const isFeatureEnabledBooleal = (isEnabled: boolean): boolean => {
+export const isFeatureEnabledBoolean = (isEnabled: boolean): boolean => {
   return isEnabled;
 };

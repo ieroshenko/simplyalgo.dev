@@ -64,7 +64,7 @@ const TechnicalInterview = () => {
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [showFeedback, setShowFeedback] = useState(false);
-  const [problem, setProblem] = useState<any>(null);
+  const [problem, setProblem] = useState<unknown>(null);
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);

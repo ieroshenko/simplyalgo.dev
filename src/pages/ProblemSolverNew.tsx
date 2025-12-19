@@ -248,7 +248,7 @@ const ProblemSolverNew = () => {
         code,
         language: "python",
         isValidated: true,
-        insertionType: (insertionType as any) || "smart",
+        insertionType: (insertionType as unknown) || "smart",
         insertionHint: {
           type: "statement",
           scope: "function",

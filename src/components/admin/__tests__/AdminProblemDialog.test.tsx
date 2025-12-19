@@ -16,10 +16,21 @@ vi.mock('sonner', () => ({
     },
 }));
 
+interface ChainableMock {
+    select: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    order: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+    then: (resolve: (value: unknown) => unknown) => Promise<{ data: unknown[]; error: null }>;
+}
+
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => {
-    const createChainableMock = () => {
-        const mock: any = {};
+    const createChainableMock = (): ChainableMock => {
+        const mock = {} as ChainableMock;
         mock.select = vi.fn(() => mock);
         mock.insert = vi.fn(() => mock);
         mock.update = vi.fn(() => mock);
@@ -27,7 +38,7 @@ vi.mock('@/integrations/supabase/client', () => {
         mock.eq = vi.fn(() => mock);
         mock.order = vi.fn(() => mock);
         mock.single = vi.fn(() => Promise.resolve({ data: null, error: null }));
-        mock.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
         return mock;
     };
 
@@ -62,7 +73,7 @@ describe('AdminProblemDialog', () => {
     };
 
     const defaultProps = {
-        problem: null as any,
+        problem: null,
         open: true,
         onOpenChange: vi.fn(),
         onSaved: vi.fn(),

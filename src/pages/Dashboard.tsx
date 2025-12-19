@@ -7,6 +7,7 @@ import CoreBattleCards from "@/components/CoreBattleCards";
 import ProgressRadar from "@/components/ProgressRadar";
 import RecentActivity from "@/components/RecentActivity";
 import { PersonalPlanCard } from "@/components/PersonalPlanCard";
+import PrimaryFocusCard from "@/components/PrimaryFocusCard";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useSurveyData } from "@/hooks/useSurveyData";
@@ -38,6 +39,7 @@ const Dashboard = () => {
         <div className="flex flex-col xl:flex-row gap-6 p-6">
           <div className="flex-1 space-y-6">
             <MissionStrip />
+            <PrimaryFocusCard />
             <CoreBattleCards />
           </div>
 

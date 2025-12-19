@@ -15,7 +15,7 @@ vi.mock('@/integrations/supabase/client', () => {
         mock.order = vi.fn(() => mock);
         mock.single = vi.fn(() => Promise.resolve(mockSingleResponse));
         // Also make it thenable for queries that don't end with single/order
-        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve(mockSelectResponse).then(resolve);
         return mock;
     };
 

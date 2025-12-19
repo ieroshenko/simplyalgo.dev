@@ -7,6 +7,7 @@ import { logger } from "@/utils/logger";
 /**
  * Debounced function wrapper with configurable delay
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number
@@ -22,6 +23,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttled function wrapper with configurable interval
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
   interval: number
@@ -48,6 +50,7 @@ export function throttle<T extends (...args: any[]) => any>(
 /**
  * Memoization wrapper for expensive calculations
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function memoize<T extends (...args: any[]) => any>(
   func: T,
   keyGenerator?: (...args: Parameters<T>) => string
@@ -79,6 +82,7 @@ export function memoize<T extends (...args: any[]) => any>(
 /**
  * Request animation frame wrapper for smooth updates
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rafScheduler<T extends (...args: any[]) => any>(
   func: T
 ): (...args: Parameters<T>) => void {
@@ -338,6 +342,7 @@ export const performanceMonitor = new PerformanceMonitor();
 /**
  * Utility to create optimized position calculation functions
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createOptimizedPositionCalculator<T extends (...args: any[]) => any>(
   calculator: T,
   options: {

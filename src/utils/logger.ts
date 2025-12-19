@@ -13,10 +13,10 @@ interface LogContext {
 declare global {
   interface Window {
     newrelic?: {
-      log: (message: string, attributes?: Record<string, any>) => void;
-      noticeError: (error: Error, attributes?: Record<string, any>) => void;
-      addPageAction: (name: string, attributes?: Record<string, any>) => void;
-      setCustomAttribute: (name: string, value: any) => void;
+      log: (message: string, attributes?: Record<string, unknown>) => void;
+      noticeError: (error: Error, attributes?: Record<string, unknown>) => void;
+      addPageAction: (name: string, attributes?: Record<string, unknown>) => void;
+      setCustomAttribute: (name: string, value: unknown) => void;
       setUserId: (userId: string) => void;
       interaction: (name?: string) => void;
       finished: (startTime?: number) => void;

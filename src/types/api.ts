@@ -3,6 +3,32 @@
  * Centralized to avoid duplication across hooks/components
  */
 
+// Generic API response types
+export interface ApiResponse<T = unknown> {
+  data?: T;
+  error?: {
+    message: string;
+    details?: unknown;
+  };
+}
+
+export type EdgeFunctionResponse<T = unknown> = ApiResponse<T>;
+
+// OpenAI/LLM response types
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatCompletionResponse {
+  choices: Array<{
+    message: {
+      content: string;
+      role: string;
+    };
+  }>;
+}
+
 // Flashcard types (moved from useFlashcards for reuse)
 export interface FlashcardDeck {
   id: string;

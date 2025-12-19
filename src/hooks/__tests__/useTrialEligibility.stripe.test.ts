@@ -4,6 +4,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock useAuth
 vi.mock('@/hooks/useAuth', () => ({
@@ -27,7 +29,7 @@ let mockSelectResponse: any = { data: [], error: null };
 
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
         mock.eq = vi.fn(() => mock);
         mock.in = vi.fn(() => mock);
@@ -45,6 +47,21 @@ vi.mock('@/integrations/supabase/client', () => {
 
 import { useTrialEligibility } from '../useTrialEligibility';
 
+// Create wrapper with QueryClientProvider
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                gcTime: 0,
+            },
+        },
+    });
+    const Wrapper = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+    return Wrapper;
+};
+
 describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -56,7 +73,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
         it('should be eligible for trial when user has no subscription history', async () => {
             mockSelectResponse = { data: [], error: null };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -78,7 +97,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -99,7 +120,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -118,7 +141,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -136,7 +161,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -153,7 +180,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: { message: 'Database connection failed' }
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -169,7 +198,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: { message: 'Network timeout' }
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -190,7 +221,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);
@@ -211,7 +244,9 @@ describe('useTrialEligibility - Stripe Subscription Edge Cases', () => {
                 error: null
             };
 
-            const { result } = renderHook(() => useTrialEligibility());
+            const { result } = renderHook(() => useTrialEligibility(), {
+                wrapper: createWrapper(),
+            });
 
             await waitFor(() => {
                 expect(result.current.isLoading).toBe(false);

@@ -48,8 +48,12 @@ interface DesignCanvasProps {
   onBoardChange: (state: SystemDesignBoardState) => void;
 }
 
+interface NodeData {
+  label: string;
+}
+
 // Icon mapping with Tabler icons
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   client: TbDeviceDesktop,
   api: TbServer,
   loadbalancer: TbRouteAltLeft,
@@ -193,7 +197,7 @@ const HandDrawnNode = ({
   color: string;
   bgColor: string;
   shape?: string;
-  icon?: any;
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   selected: boolean;
 }) => {
   return (
@@ -222,8 +226,13 @@ const HandDrawnNode = ({
 };
 
 // Custom node types with icons
-const createNodeType = (color: string, bgColor: string, icon?: any, shape?: string) => {
-  return ({ data, selected }: { data: any; selected: boolean }) => (
+const createNodeType = (
+  color: string,
+  bgColor: string,
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>,
+  shape?: string
+) => {
+  return ({ data, selected }: { data: NodeData; selected: boolean }) => (
     <HandDrawnNode color={color} bgColor={bgColor} icon={icon} shape={shape} selected={selected}>
       {data.label}
     </HandDrawnNode>
@@ -249,7 +258,7 @@ const nodeTypes: NodeTypes = {
   diamond: createNodeType("#1f2937", "#f9fafb", undefined, "diamond"),
 
   // Text node
-  text: ({ data, selected }: { data: any; selected: boolean }) => (
+  text: ({ data, selected }: { data: NodeData; selected: boolean }) => (
     <div className="relative">
       {selected && <NodeResizer minWidth={50} minHeight={20} />}
       <div className="px-2 py-1 bg-transparent">
@@ -295,7 +304,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
     initialValue: "",
   });
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<unknown>(null);
 
   // Pan/Zoom state
   const [panZoom, setPanZoom] = useState<{ x: number; y: number; zoom: number }>({
@@ -357,6 +366,9 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
     [setEdges]
   );
 
+  // Copy/Paste state
+  const [copiedNodes, setCopiedNodes] = useState<Node[]>([]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -400,10 +412,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [nodes, setNodes]);
-
-  // Copy/Paste
-  const [copiedNodes, setCopiedNodes] = useState<any[]>([]);
+  }, [nodes, setNodes, copiedNodes, setCopiedNodes]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -538,7 +547,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
         setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
       }
     },
-    [selectedTool, deleteEdgeById, setNodes]
+    [selectedTool, deleteEdgeById, setNodes, setEdges]
   );
 
   // Clear canvas
@@ -550,7 +559,7 @@ const DesignCanvas = ({ boardState, onBoardChange }: DesignCanvasProps) => {
   }, [setNodes, setEdges]);
 
   // Pan/zoom tracking
-  const onMoveEnd = useCallback((event: any, viewport: any) => {
+  const onMoveEnd = useCallback((_event: unknown, viewport: { x: number; y: number; zoom: number }) => {
     setPanZoom({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
   }, []);
 

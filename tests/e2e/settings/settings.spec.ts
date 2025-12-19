@@ -83,19 +83,18 @@ test.describe('Profile Page', () => {
     });
 
     test('should show problems solved section', async ({ page }) => {
-        // Use .first() to avoid strict mode violation
-        await expect(page.getByText('Total Solved')).toBeVisible();
+        // Use case-insensitive match for "problems solved" text
+        await expect(page.getByText(/problems solved/i).first()).toBeVisible();
     });
 
     test('should show streak information', async ({ page }) => {
-        // Use specific text to avoid strict mode violation
-        await expect(page.getByText('Current Streak')).toBeVisible();
+        // New UI shows current streak and max streak
+        await expect(page.getByText(/current streak|max streak/i).first()).toBeVisible();
     });
 
     test('should show category progress', async ({ page }) => {
-        // Look for category section or progress bars
-        const hasProgress = await page.getByText(/Problems Solved by Difficulty|category|progress/i).first().count() > 0 ||
-            await page.locator('[class*="progress"], [role="progressbar"]').count() > 0;
-        expect(hasProgress).toBeTruthy();
+        // New UI shows "Problem Distribution" section
+        const hasDistribution = await page.getByText(/Problem Distribution|Easy|Medium|Hard/i).first().count() > 0;
+        expect(hasDistribution).toBeTruthy();
     });
 });

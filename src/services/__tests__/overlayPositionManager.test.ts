@@ -34,8 +34,8 @@ vi.mock('../errorRecoveryService', () => ({
 }));
 
 vi.mock('../performanceOptimizer', () => ({
-  debounce: (fn: Function, _delay: number) => fn, // Remove debounce delay for testing
-  memoize: (fn: Function) => fn, // Remove memoization for testing
+  debounce: <T extends (...args: any[]) => any>(fn: T, _delay: number) => fn, // Remove debounce delay for testing
+  memoize: <T extends (...args: any[]) => any>(fn: T) => fn, // Remove memoization for testing
   performanceMonitor: {
     startMeasurement: () => () => {},
     getAllStats: () => ({})

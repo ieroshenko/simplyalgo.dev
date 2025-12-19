@@ -57,12 +57,12 @@ export const usePracticeAnswers = () => {
           answer_audio_url: data.answer_audio_url || undefined,
           transcript: data.transcript || undefined,
           time_spent_seconds: data.time_spent_seconds || undefined,
-          star_score: data.star_score as any || undefined,
+          star_score: data.star_score as unknown || undefined,
           content_score: data.content_score || 0,
           delivery_score: data.delivery_score || 0,
           overall_score: data.overall_score || 0,
-          custom_metrics: (data.feedback as any)?.custom_metrics || undefined,
-          feedback: (data.feedback as any) || {
+          custom_metrics: (data.feedback as unknown)?.custom_metrics || undefined,
+          feedback: (data.feedback as unknown) || {
             strengths: [],
             improvements: [],
           },

@@ -53,12 +53,12 @@ const CompanyIcon: React.FC<CompanyIconProps> = ({
 
   const getCompanyIcon = (companyName: string) => {
     const normalizedName = companyName.toLowerCase().replace(/\s+/g, '');
-    
-    const iconMap: Record<string, { 
-      icon: React.ComponentType<any>; 
+
+    const iconMap: Record<string, {
+      icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
       color: string;
       darkColor?: string; // Optional dark mode color
-      name: string; 
+      name: string;
     }> = {
       'google': { 
         icon: SiGoogle, 

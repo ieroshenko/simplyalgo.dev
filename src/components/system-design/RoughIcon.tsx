@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import rough from "roughjs";
 
 interface RoughIconProps {
-  Icon: any;
+  Icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   size?: number;
   colorClass?: string; // Tailwind classes with dark variants, e.g., "text-muted-foreground"
   roughness?: number;

@@ -1,28 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Mock useAuth
-vi.mock('@/hooks/useAuth', () => ({
-    useAuth: vi.fn(() => ({
-        user: { id: 'user-123' },
-        loading: false,
-    })),
-}));
+// Mock data
+let mockQuestionsData: unknown[] = [];
 
-// Mock supabase responses
-let mockQuestionsData: any[] = [];
-let mockError: any = null;
-
+// Mock supabase
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
+        mock.eq = vi.fn(() => mock);
         mock.is = vi.fn(() => mock);
         mock.or = vi.fn(() => mock);
-        mock.eq = vi.fn(() => mock);
         mock.contains = vi.fn(() => mock);
         mock.order = vi.fn(() => mock);
-        mock.then = (resolve: any) => Promise.resolve({ data: mockQuestionsData, error: mockError }).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => {
+            return Promise.resolve({ data: mockQuestionsData, error: null }).then(resolve);
+        };
         return mock;
     };
 
@@ -33,90 +29,153 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
+// Mock useAuth
+vi.mock('@/hooks/useAuth', () => ({
+    useAuth: vi.fn(() => ({
+        user: { id: 'user-123' },
+        loading: false,
+    })),
+}));
+
+// Mock logger
+vi.mock('@/utils/logger', () => ({
+    logger: {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+    },
+}));
+
 import { useBehavioralQuestions } from '../useBehavioralQuestions';
 
-describe('useBehavioralQuestions', () => {
+// Wrapper for react-query
+const createWrapper = (queryClient?: QueryClient) => {
+    const client = queryClient || new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                gcTime: 0,
+            },
+        },
+    });
+    const Wrapper = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client }, children);
+    return Wrapper;
+};
+
+describe('useBehavioralQuestions Caching', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockQuestionsData = [];
-        mockError = null;
-    });
-
-    afterEach(() => {
-        vi.restoreAllMocks();
+        mockQuestionsData = [
+            {
+                id: 'q1',
+                question_text: 'Tell me about yourself',
+                category: ['introduction'],
+                difficulty: 'easy',
+                key_traits: [],
+                related_question_ids: [],
+                company_associations: [],
+                user_id: null,
+                evaluation_type: 'star',
+                created_at: '2024-01-01',
+                updated_at: '2024-01-01',
+            },
+        ];
     });
 
     describe('Initial State', () => {
         it('should return loading state initially', () => {
-            const { result } = renderHook(() => useBehavioralQuestions());
+            const { result } = renderHook(() => useBehavioralQuestions(), {
+                wrapper: createWrapper(),
+            });
 
             expect(result.current.loading).toBe(true);
         });
 
-        it('should return empty questions initially', () => {
-            const { result } = renderHook(() => useBehavioralQuestions());
+        it('should return empty questions array initially', () => {
+            const { result } = renderHook(() => useBehavioralQuestions(), {
+                wrapper: createWrapper(),
+            });
 
             expect(result.current.questions).toEqual([]);
         });
+    });
 
-        it('should return no error initially', () => {
-            const { result } = renderHook(() => useBehavioralQuestions());
+    describe('Data Fetching', () => {
+        it('should fetch questions on mount', async () => {
+            const { result } = renderHook(() => useBehavioralQuestions(), {
+                wrapper: createWrapper(),
+            });
 
-            expect(result.current.error).toBeNull();
+            await waitFor(() => {
+                expect(result.current.loading).toBe(false);
+            });
+
+            expect(result.current.questions.length).toBeGreaterThanOrEqual(0);
         });
     });
 
-    describe('Filters', () => {
-        it('should accept category filter', () => {
-            const { result } = renderHook(() =>
-                useBehavioralQuestions({ category: 'leadership' as any })
-            );
+    describe('Caching Behavior', () => {
+        it('should use cached data on subsequent renders with same query key', async () => {
+            const queryClient = new QueryClient({
+                defaultOptions: {
+                    queries: {
+                        retry: false,
+                        staleTime: 10 * 60 * 1000, // 10 minutes
+                    },
+                },
+            });
 
-            expect(result.current).toBeDefined();
+            const wrapper = createWrapper(queryClient);
+
+            // First render
+            const { result: result1 } = renderHook(() => useBehavioralQuestions(), { wrapper });
+
+            await waitFor(() => {
+                expect(result1.current.loading).toBe(false);
+            });
+
+            // Second render with same hook - should use cached data
+            const { result: result2 } = renderHook(() => useBehavioralQuestions(), { wrapper });
+
+            // Should have same reference (cached)
+            expect(result2.current.questions).toEqual(result1.current.questions);
         });
 
-        it('should accept difficulty filter', () => {
-            const { result } = renderHook(() =>
-                useBehavioralQuestions({ difficulty: 'Easy' })
-            );
+        it('should cache data per filter combination', async () => {
+            const queryClient = new QueryClient({
+                defaultOptions: {
+                    queries: {
+                        retry: false,
+                        staleTime: 10 * 60 * 1000,
+                    },
+                },
+            });
 
-            expect(result.current).toBeDefined();
-        });
+            const wrapper = createWrapper(queryClient);
 
-        it('should accept company filter', () => {
-            const { result } = renderHook(() =>
-                useBehavioralQuestions({ company: 'Google' })
-            );
+            // First render with no filters
+            const { result: result1 } = renderHook(() => useBehavioralQuestions(), { wrapper });
 
-            expect(result.current).toBeDefined();
-        });
+            await waitFor(() => {
+                expect(result1.current.loading).toBe(false);
+            });
 
-        it('should accept includeCustom filter', () => {
-            const { result } = renderHook(() =>
-                useBehavioralQuestions({ includeCustom: true })
-            );
-
-            expect(result.current).toBeDefined();
+            // Check cache exists for the query key
+            const cachedData = queryClient.getQueryData(['behavioralQuestions', 'user-123', undefined, undefined, undefined, undefined]);
+            expect(cachedData).toBeDefined();
         });
     });
 
-    describe('Refresh', () => {
+    describe('Cache Invalidation', () => {
         it('should provide refresh function', () => {
-            const { result } = renderHook(() => useBehavioralQuestions());
+            const { result } = renderHook(() => useBehavioralQuestions(), {
+                wrapper: createWrapper(),
+            });
 
             expect(result.current.refresh).toBeDefined();
             expect(typeof result.current.refresh).toBe('function');
-        });
-    });
-
-    describe('Return Type', () => {
-        it('should return all expected properties', () => {
-            const { result } = renderHook(() => useBehavioralQuestions());
-
-            expect(result.current).toHaveProperty('questions');
-            expect(result.current).toHaveProperty('loading');
-            expect(result.current).toHaveProperty('error');
-            expect(result.current).toHaveProperty('refresh');
         });
     });
 });

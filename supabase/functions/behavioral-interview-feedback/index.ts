@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - Deno URL import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-expect-error - Deno URL import
@@ -259,7 +260,7 @@ serve(async (req) => {
       story
     );
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [
         { role: "system", content: systemPrompt },
@@ -288,7 +289,7 @@ serve(async (req) => {
 
     // Validate and ensure all required fields
     const evalType = evaluationType || 'star';
-    const validatedFeedback: any = {
+    const validatedFeedback: unknown = {
       content_score: Math.max(0, Math.min(100, feedback.content_score || 0)),
       delivery_score: Math.max(0, Math.min(100, feedback.delivery_score || 0)),
       overall_score: Math.max(0, Math.min(100, feedback.overall_score || 0)),

@@ -40,8 +40,8 @@ const BehavioralQuestions = () => {
   const [editingQuestion, setEditingQuestion] = useState<{ id: string; question: any } | null>(null);
   
   const { questions, loading, refresh: refreshQuestions } = useBehavioralQuestions({
-    category: selectedCategory as any,
-    difficulty: selectedDifficulty as any,
+    category: selectedCategory as unknown,
+    difficulty: selectedDifficulty as unknown,
     includeCustom: true, // Include user's custom questions
   });
 

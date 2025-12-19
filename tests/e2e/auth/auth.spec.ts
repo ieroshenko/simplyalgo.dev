@@ -34,9 +34,13 @@ test.describe('Authentication', () => {
       // Should show branding - use first() to avoid strict mode violations
       await expect(page.getByText('simplyalgo').first()).toBeVisible();
 
-      // Check for feature content
-      const hasFeatures = await page.getByText(/AI|Progress|Interview|DSA/i).first().count() > 0;
-      expect(hasFeatures).toBeTruthy();
+      // Check for the new headline and feature content
+      const hasHeadline = await page.getByText(/Stop memorizing|Start thinking/i).first().count() > 0;
+      expect(hasHeadline).toBeTruthy();
+
+      // Check for the new subheadline about patterns
+      const hasSubtext = await page.getByText(/patterns|data structures|algorithms/i).first().count() > 0;
+      expect(hasSubtext).toBeTruthy();
     });
 
     test('should redirect authenticated users away from auth page', async ({ page }) => {

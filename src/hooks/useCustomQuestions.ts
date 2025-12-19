@@ -39,7 +39,7 @@ export const useCustomQuestions = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: insertError } = await (supabase as any)
+      const { data, error: insertError } = await (supabase as unknown)
         .from("behavioral_questions")
         .insert({
           user_id: user.id,
@@ -122,7 +122,7 @@ export const useCustomQuestions = () => {
         updateData.custom_evaluation_prompt = null;
       }
 
-      const { error: updateError } = await (supabase as any)
+      const { error: updateError } = await (supabase as unknown)
         .from("behavioral_questions")
         .update(updateData)
         .eq("id", questionId)
@@ -155,7 +155,7 @@ export const useCustomQuestions = () => {
       setLoading(true);
       setError(null);
 
-      const { error: deleteError } = await (supabase as any)
+      const { error: deleteError } = await (supabase as unknown)
         .from("behavioral_questions")
         .delete()
         .eq("id", questionId)

@@ -26,6 +26,13 @@
     "test:all": "npm run test && npm run test:e2e && npm run test:edge",
     "validate": "npm run lint && npm run typecheck && npm run build",
     "validate:ci": "bun run lint && bun run typecheck && bun run build",
+    "ci": "npm run ci:test && npm run ci:lint && npm run ci:typecheck && npm run ci:build",
+    "ci:test": "vitest run --reporter=verbose",
+    "ci:e2e": "playwright test --project=chromium",
+    "ci:lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "ci:typecheck": "tsc --noEmit",
+    "ci:build": "npm run build",
+    "ci:full": "npm run ci:test && npm run ci:e2e && npm run ci:lint && npm run ci:typecheck && npm run ci:build",
     "prepare": "husky"
   },
   "dependencies": {

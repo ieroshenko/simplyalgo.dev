@@ -1,120 +1,128 @@
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import type { BehavioralQuestion, BehavioralQuestionCategory, QuestionDifficulty } from "@/types";
-import type { BehavioralQuestionRow } from "@/types/supabase";
 
-export const useBehavioralQuestions = (
+// Cache configuration
+const STALE_TIME = 10 * 60 * 1000; // 10 minutes - questions rarely change
+const GC_TIME = 30 * 60 * 1000; // 30 minutes
+
+// Fetch behavioral questions from database
+async function fetchBehavioralQuestions(
+  userId: string | undefined,
   filters?: {
     category?: BehavioralQuestionCategory;
     difficulty?: QuestionDifficulty;
     company?: string;
-    includeCustom?: boolean; // Include user's custom questions
+    includeCustom?: boolean;
   }
-) => {
+): Promise<BehavioralQuestion[]> {
+  let query = supabase.from("behavioral_questions").select("*");
+
+  // Show curated questions (user_id IS NULL) and optionally user's custom questions
+  if (filters?.includeCustom && userId) {
+    query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+    logger.debug("Fetching questions with user_id", {
+      component: "useBehavioralQuestions",
+      userId,
+    });
+  } else {
+    query = query.is("user_id", null);
+    logger.debug("Fetching only curated questions", {
+      component: "useBehavioralQuestions",
+    });
+  }
+
+  query = query.order("created_at", { ascending: false });
+
+  // Apply filters
+  if (filters?.category) {
+    query = query.contains("category", [filters.category]);
+  }
+
+  if (filters?.difficulty) {
+    query = query.eq("difficulty", filters.difficulty);
+  }
+
+  if (filters?.company) {
+    query = query.contains("company_associations", [filters.company]);
+  }
+
+  const { data, error: fetchError } = await query;
+
+  if (fetchError) {
+    logger.error("Error fetching questions", fetchError, {
+      component: "useBehavioralQuestions",
+    });
+    throw fetchError;
+  }
+
+  logger.debug("Fetched questions", {
+    component: "useBehavioralQuestions",
+    count: data?.length,
+    userId,
+  });
+
+  // Transform database format to TypeScript interface
+  const transformedQuestions: BehavioralQuestion[] = (data || []).map((q) => ({
+    id: q.id,
+    question_text: q.question_text,
+    category: q.category as BehavioralQuestionCategory[],
+    difficulty: q.difficulty as QuestionDifficulty,
+    follow_up_questions: q.follow_up_questions as string[] | undefined,
+    key_traits: q.key_traits || [],
+    related_question_ids: q.related_question_ids || [],
+    company_associations: q.company_associations || [],
+    user_id: q.user_id || undefined,
+    evaluation_type: (q.evaluation_type || "star") as "star" | "none" | "custom",
+    custom_evaluation_prompt: q.custom_evaluation_prompt || undefined,
+    created_at: q.created_at || "",
+    updated_at: q.updated_at || "",
+  }));
+
+  return transformedQuestions;
+}
+
+export const useBehavioralQuestions = (filters?: {
+  category?: BehavioralQuestionCategory;
+  difficulty?: QuestionDifficulty;
+  company?: string;
+  includeCustom?: boolean;
+}) => {
   const { user, loading: authLoading } = useAuth();
-  const [questions, setQuestions] = useState<BehavioralQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      // If includeCustom is true, wait for auth to finish loading
-      // Only proceed if auth is loaded (user could be null or a user object, but not undefined)
-      if (filters?.includeCustom && authLoading) {
-        setLoading(true);
-        return; // Wait for auth to load
-      }
-      
-      // If includeCustom is true but user is undefined (not loaded yet), wait
-      if (filters?.includeCustom && user === undefined) {
-        setLoading(true);
-        return; // Wait for user to load (user is undefined, not yet loaded)
-      }
+  // Build query key based on filters
+  const queryKey = [
+    "behavioralQuestions",
+    user?.id,
+    filters?.category,
+    filters?.difficulty,
+    filters?.company,
+    filters?.includeCustom,
+  ];
 
-      try {
-        setLoading(true);
-        let query = supabase
-          .from("behavioral_questions")
-          .select("*");
-
-        // Show curated questions (user_id IS NULL) and optionally user's custom questions
-        if (filters?.includeCustom && user?.id) {
-          // Fetch both curated and user's custom questions using OR condition
-          // Format: user_id.is.null,user_id.eq.{user_id}
-          query = query.or(`user_id.is.null,user_id.eq.${user.id}`);
-          logger.debug("Fetching questions with user_id", { component: "useBehavioralQuestions", userId: user.id });
-        } else {
-          // Only show curated questions (user_id IS NULL)
-          query = query.is("user_id", null);
-          logger.debug("Fetching only curated questions", { component: "useBehavioralQuestions", user, includeCustom: filters?.includeCustom });
-        }
-
-        query = query.order("created_at", { ascending: false });
-
-        // Apply filters
-        if (filters?.category) {
-          query = query.contains("category", [filters.category]);
-        }
-
-        if (filters?.difficulty) {
-          query = query.eq("difficulty", filters.difficulty);
-        }
-
-        if (filters?.company) {
-          query = query.contains("company_associations", [filters.company]);
-        }
-
-        const { data, error: fetchError } = await query;
-
-        if (fetchError) {
-          logger.error("Error fetching questions", fetchError, { component: "useBehavioralQuestions" });
-          throw fetchError;
-        }
-
-        logger.debug("Fetched questions", { component: "useBehavioralQuestions", count: data?.length, userId: user?.id });
-        if (filters?.includeCustom && user?.id) {
-          const customCount = data?.filter((q) => q.user_id === user.id).length || 0;
-          const curatedCount = data?.filter((q) => !q.user_id).length || 0;
-          logger.debug("Question counts", { component: "useBehavioralQuestions", customCount, curatedCount });
-        }
-
-        // Transform database format to TypeScript interface
-        const transformedQuestions: BehavioralQuestion[] = (data || []).map((q) => ({
-          id: q.id,
-          question_text: q.question_text,
-          category: q.category as BehavioralQuestionCategory[],
-          difficulty: q.difficulty as QuestionDifficulty,
-          follow_up_questions: q.follow_up_questions as string[] | undefined,
-          key_traits: q.key_traits || [],
-          related_question_ids: q.related_question_ids || [],
-          company_associations: q.company_associations || [],
-          user_id: q.user_id || undefined,
-          evaluation_type: (q.evaluation_type || 'star') as 'star' | 'none' | 'custom',
-          custom_evaluation_prompt: q.custom_evaluation_prompt || undefined,
-          created_at: q.created_at || '',
-          updated_at: q.updated_at || '',
-        }));
-
-        setQuestions(transformedQuestions);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch questions");
-        console.error("Error fetching behavioral questions:", err);
-        setQuestions([]); // Set empty array on error to avoid stale data
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchQuestions();
-  }, [filters?.category, filters?.difficulty, filters?.company, filters?.includeCustom, user, refreshKey, authLoading]);
+  const {
+    data: questions = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey,
+    queryFn: () => fetchBehavioralQuestions(user?.id, filters),
+    enabled: !authLoading && !(filters?.includeCustom && user === undefined),
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
 
   const refresh = () => {
-    setRefreshKey((prev) => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ["behavioralQuestions"] });
   };
 
-  return { questions, loading, error, refresh };
+  return {
+    questions,
+    loading: isLoading || authLoading,
+    error: error ? (error as Error).message : null,
+    refresh,
+  };
 };
-

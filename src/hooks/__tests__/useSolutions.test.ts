@@ -7,11 +7,11 @@ let mockSelectResponse: any = { data: [], error: null };
 
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
         mock.eq = vi.fn(() => mock);
         mock.order = vi.fn(() => mock);
-        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve(mockSelectResponse).then(resolve);
         return mock;
     };
 

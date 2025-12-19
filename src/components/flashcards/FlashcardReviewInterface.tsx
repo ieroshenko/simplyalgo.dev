@@ -42,7 +42,19 @@ interface ReviewSession {
   startTime: Date;
   currentQuestionIndex: number;
   totalQuestions: number;
-  cardData: any; // Store the complete card data to avoid sync issues
+  cardData: FlashcardDeck; // Store the complete card data to avoid sync issues
+}
+
+interface ProblemData {
+  id: string;
+  title: string;
+  description: string;
+  examples?: Array<{
+    input: string;
+    output: string;
+    explanation?: string;
+  }>;
+  function_signature?: string;
 }
 
 const REVIEW_QUESTIONS = [
@@ -88,7 +100,7 @@ export const FlashcardReviewInterface = ({
   const [showRatingOptions, setShowRatingOptions] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [completedCards, setCompletedCards] = useState(0);
-  const [currentProblemData, setCurrentProblemData] = useState<any>(null);
+  const [currentProblemData, setCurrentProblemData] = useState<ProblemData | null>(null);
   const [showSolution, setShowSolution] = useState(false);
 
   const startTimeRef = useRef<Date>(new Date());
@@ -98,7 +110,8 @@ export const FlashcardReviewInterface = ({
     if (isOpen && dueCards.length > 0 && !currentSession) {
       startNewCard();
     }
-  }, [isOpen, dueCards]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, dueCards, currentSession]);
 
   // Start new card when currentCardIndex changes (for navigation/skip)
   useEffect(() => {
@@ -109,7 +122,8 @@ export const FlashcardReviewInterface = ({
         startNewCard();
       }, 50);
     }
-  }, [currentCardIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCardIndex, isOpen, dueCards.length, currentSession]);
 
   // Cleanup when modal closes
   useEffect(() => {
@@ -401,7 +415,7 @@ export const FlashcardReviewInterface = ({
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                       components={{
-                        code({ inline, className, children }: any) {
+                        code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
                           const match = /language-(\w+)/.exec(className || "");
                           const codeString = String(children).replace(/\n$/, "");
                           return !inline && match ? (
@@ -421,7 +435,7 @@ export const FlashcardReviewInterface = ({
                             <code className={className}>{children}</code>
                           );
                         },
-                        img({ src, alt }: any) {
+                        img({ src, alt }: { src?: string; alt?: string }) {
                           return (
                             <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
                               <img
@@ -448,7 +462,7 @@ export const FlashcardReviewInterface = ({
                     <div>
                       <h4 className="font-medium text-sm mb-2">Examples:</h4>
                       <div className="space-y-2">
-                        {currentProblemData.examples.slice(0, 2).map((example: any, idx: number) => (
+                        {currentProblemData.examples.slice(0, 2).map((example, idx: number) => (
                           <div key={idx} className="bg-muted/50 p-3 rounded text-sm font-mono">
                             <div><strong>Input:</strong> {example.input}</div>
                             <div><strong>Output:</strong> {example.output}</div>

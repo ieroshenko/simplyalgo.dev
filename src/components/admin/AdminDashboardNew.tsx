@@ -47,6 +47,15 @@ interface UserAIRestriction {
     cooldown_reason: string | null;
 }
 
+interface SubscriptionWithProfile {
+    user_id: string;
+    plan: string;
+    status: string;
+    user_profiles?: {
+        email: string;
+    };
+}
+
 interface UserAIUsage {
     tokens_today: number;
     tokens_month: number;
@@ -354,7 +363,7 @@ export function AdminDashboardNew() {
         const monthlyPrice = 9.99; // Your monthly plan price
         const yearlyPrice = 99.99; // Your yearly plan price
 
-        (subscriptions || []).forEach((sub: any) => {
+        (subscriptions || []).forEach((sub: SubscriptionWithProfile) => {
             const userEmail = sub.user_profiles?.email;
 
             // Skip admin users

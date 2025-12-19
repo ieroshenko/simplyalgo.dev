@@ -3,6 +3,41 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
+// Type definitions for mocked components
+interface CardProps {
+    children: React.ReactNode;
+    className?: string;
+}
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    children: React.ReactNode;
+}
+
+interface ScrollAreaProps {
+    children: React.ReactNode;
+    className?: string;
+}
+
+interface MermaidProps {
+    chart: string;
+}
+
+interface ContainerProps {
+    children: React.ReactNode;
+}
+
+interface MarkdownProps {
+    children: React.ReactNode;
+}
+
+interface SyntaxHighlighterProps {
+    children: React.ReactNode;
+}
+
+interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+    value?: string;
+}
+
 // Mock data
 const mockSession = {
     id: 'session-123',
@@ -57,18 +92,15 @@ vi.mock('@/hooks/useSpeechToText', () => ({
 
 // Mock UI components
 vi.mock('@/components/ui/card', () => ({
-    Card: ({ children, className }: any) => (
+    Card: ({ children, className }: CardProps) => (
         <div data-testid="card" className={className}>{children}</div>
     ),
 }));
 
 vi.mock('@/components/ui/button', () => ({
-    Button: ({ children, onClick, disabled, className, ...props }: any) => (
+    Button: ({ children, ...props }: ButtonProps) => (
         <button
             data-testid="button"
-            onClick={onClick}
-            disabled={disabled}
-            className={className}
             {...props}
         >
             {children}
@@ -77,14 +109,14 @@ vi.mock('@/components/ui/button', () => ({
 }));
 
 vi.mock('@/components/ui/scroll-area', () => ({
-    ScrollArea: React.forwardRef(({ children, className }: any, ref: any) => (
+    ScrollArea: React.forwardRef<HTMLDivElement, ScrollAreaProps>(({ children, className }, ref) => (
         <div data-testid="scroll-area" className={className} ref={ref}>{children}</div>
     )),
 }));
 
 // Mock diagram components
 vi.mock('@/components/diagram/Mermaid', () => ({
-    default: ({ chart }: any) => <div data-testid="mermaid-diagram">{chart}</div>,
+    default: ({ chart }: MermaidProps) => <div data-testid="mermaid-diagram">{chart}</div>,
 }));
 
 vi.mock('@/components/diagram/FlowCanvas', () => ({
@@ -93,7 +125,7 @@ vi.mock('@/components/diagram/FlowCanvas', () => ({
 
 // Mock canvas components
 vi.mock('@/components/canvas', () => ({
-    CanvasContainer: ({ children }: any) => <div data-testid="canvas-container">{children}</div>,
+    CanvasContainer: ({ children }: ContainerProps) => <div data-testid="canvas-container">{children}</div>,
 }));
 
 // Mock visualization registry
@@ -103,12 +135,12 @@ vi.mock('@/components/visualizations/registry', () => ({
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
-    default: ({ children }: any) => <div data-testid="markdown">{children}</div>,
+    default: ({ children }: MarkdownProps) => <div data-testid="markdown">{children}</div>,
 }));
 
 // Mock syntax highlighter
 vi.mock('react-syntax-highlighter', () => ({
-    Prism: ({ children }: any) => <pre data-testid="syntax-highlighter">{children}</pre>,
+    Prism: ({ children }: SyntaxHighlighterProps) => <pre data-testid="syntax-highlighter">{children}</pre>,
 }));
 
 vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({
@@ -117,14 +149,11 @@ vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({
 
 // Mock textarea autosize
 vi.mock('react-textarea-autosize', () => ({
-    default: React.forwardRef((props: any, ref: any) => (
+    default: React.forwardRef<HTMLTextAreaElement, TextAreaProps>((props, ref) => (
         <textarea
             data-testid="input-textarea"
             ref={ref}
-            value={props.value}
-            onChange={props.onChange}
-            onKeyDown={props.onKeyDown}
-            placeholder={props.placeholder}
+            {...props}
         />
     )),
 }));

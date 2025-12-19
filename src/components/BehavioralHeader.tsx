@@ -46,4 +46,3 @@ const BehavioralHeader = () => {
 };
 
 export default BehavioralHeader;
-
