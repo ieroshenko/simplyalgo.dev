@@ -224,7 +224,7 @@ describe('useSubmissions', () => {
             const { result } = renderHook(() => useSubmissions('test-user-id', 'two-sum'));
 
             await waitFor(() => {
-                expect(result.current.error).toBe('Database connection failed');
+                expect(result.current.error?.message).toBe('Database connection failed');
             });
         });
 
@@ -248,7 +248,7 @@ describe('useSubmissions', () => {
             const { result } = renderHook(() => useSubmissions('test-user-id', 'two-sum'));
 
             await waitFor(() => {
-                expect(result.current.error).toBe('Failed to fetch submissions');
+                expect(result.current.error?.message).toBe('Failed to fetch submissions');
             });
         });
     });

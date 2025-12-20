@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for Stripe-related subscription eligibility
  * These tests verify the trial eligibility logic without making real API calls

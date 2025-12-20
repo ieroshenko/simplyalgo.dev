@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +33,7 @@ import {
     Settings,
     Zap
 } from "lucide-react";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import { useNavigate } from "react-router-dom";
 import { logger } from "@/utils/logger";
 import { AdminDashboardSkeleton } from "./AdminDashboardSkeleton";
@@ -106,11 +106,7 @@ export function AdminDashboardNew() {
     const [cooldownHoursInput, setCooldownHoursInput] = useState("24");
     const [cooldownReasonInput, setCooldownReasonInput] = useState("Admin action");
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         setLoading(true);
         try {
             await Promise.all([
@@ -120,11 +116,15 @@ export function AdminDashboardNew() {
             ]);
         } catch (error) {
             logger.error("[AdminDashboard] Error fetching dashboard data", { error });
-            toast.error("Failed to load dashboard data");
+            notifications.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
         }
-    };
+    }, []); // Empty deps - this function doesn't depend on external values, only calls other functions
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
     const fetchUserStats = async () => {
         // Fetch user profiles
@@ -429,16 +429,16 @@ export function AdminDashboardNew() {
                     userId,
                     email
                 });
-                toast.error(`Failed to grant premium: ${error.message}`);
+                notifications.error(`Failed to grant premium: ${error.message}`);
                 return;
             }
 
-            toast.success(`Premium access granted to ${email}`);
+            notifications.success(`Premium access granted to ${email}`);
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
             logger.error("[AdminDashboard] Unexpected error granting premium", { error, userId, email });
-            toast.error("Failed to grant premium access");
+            notifications.error("Failed to grant premium access");
         }
     };
 
@@ -451,12 +451,12 @@ export function AdminDashboardNew() {
 
             if (error) throw error;
 
-            toast.success(`Premium access revoked from ${email}`);
+            notifications.success(`Premium access revoked from ${email}`);
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
             logger.error("[AdminDashboard] Error revoking premium", { error });
-            toast.error("Failed to revoke premium access");
+            notifications.error("Failed to revoke premium access");
         }
     };
 
@@ -474,12 +474,12 @@ export function AdminDashboardNew() {
 
             if (error) throw error;
 
-            toast.success(`User ${email} deleted successfully`);
+            notifications.success(`User ${email} deleted successfully`);
             fetchUserStats();
             fetchOverviewStats();
         } catch (error) {
             logger.error("[AdminDashboard] Error deleting user", { error });
-            toast.error("Failed to delete user");
+            notifications.error("Failed to delete user");
         }
     };
 
@@ -521,16 +521,16 @@ export function AdminDashboardNew() {
 
             if (error) {
                 logger.error("[AdminDashboard] Error toggling AI access", { error, userId, feature, enabled });
-                toast.error(`Failed to update AI access: ${error.message}`);
+                notifications.error(`Failed to update AI access: ${error.message}`);
                 return;
             }
 
             const featureName = feature === 'ai_coach' ? 'AI Coach' : 'AI Chat';
-            toast.success(`${featureName} ${enabled ? 'enabled' : 'disabled'} for ${email}`);
+            notifications.success(`${featureName} ${enabled ? 'enabled' : 'disabled'} for ${email}`);
             fetchUserStats();
         } catch (error) {
             logger.error("[AdminDashboard] Unexpected error toggling AI access", { error, userId, feature });
-            toast.error("Failed to update AI access");
+            notifications.error("Failed to update AI access");
         }
     };
 
@@ -576,15 +576,15 @@ export function AdminDashboardNew() {
 
             if (error) {
                 logger.error("[AdminDashboard] Error setting cooldown", { error, userId, hours });
-                toast.error(`Failed to set cooldown: ${error.message}`);
+                notifications.error(`Failed to set cooldown: ${error.message}`);
                 return;
             }
 
-            toast.success(`Cooldown set for ${email}: ${hours} hours - ${reason}`);
+            notifications.success(`Cooldown set for ${email}: ${hours} hours - ${reason}`);
             fetchUserStats();
         } catch (error) {
             logger.error("[AdminDashboard] Unexpected error setting cooldown", { error, userId });
-            toast.error("Failed to set cooldown");
+            notifications.error("Failed to set cooldown");
         }
     };
 
@@ -601,15 +601,15 @@ export function AdminDashboardNew() {
 
             if (error) {
                 logger.error("[AdminDashboard] Error removing cooldown", { error, userId });
-                toast.error(`Failed to remove cooldown: ${error.message}`);
+                notifications.error(`Failed to remove cooldown: ${error.message}`);
                 return;
             }
 
-            toast.success(`Cooldown removed for ${email}`);
+            notifications.success(`Cooldown removed for ${email}`);
             fetchUserStats();
         } catch (error) {
             logger.error("[AdminDashboard] Unexpected error removing cooldown", { error, userId });
-            toast.error("Failed to remove cooldown");
+            notifications.error("Failed to remove cooldown");
         }
     };
 
@@ -650,15 +650,15 @@ export function AdminDashboardNew() {
 
             if (error) {
                 logger.error("[AdminDashboard] Error updating limits", { error, userId });
-                toast.error(`Failed to update limits: ${error.message}`);
+                notifications.error(`Failed to update limits: ${error.message}`);
                 return;
             }
 
-            toast.success(`Limits updated for ${email}: Daily ${(dailyLimit / 1000).toFixed(0)}k, Monthly ${(monthlyLimit / 1000000).toFixed(1)}M tokens`);
+            notifications.success(`Limits updated for ${email}: Daily ${(dailyLimit / 1000).toFixed(0)}k, Monthly ${(monthlyLimit / 1000000).toFixed(1)}M tokens`);
             fetchUserStats();
         } catch (error) {
             logger.error("[AdminDashboard] Unexpected error updating limits", { error, userId });
-            toast.error("Failed to update limits");
+            notifications.error("Failed to update limits");
         }
     };
 
@@ -702,17 +702,17 @@ export function AdminDashboardNew() {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
+            {/* Back Navigation */}
+            <button
+                onClick={() => navigate("/dashboard")}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+                <ArrowLeft className="w-3 h-3" />
+                <span>Back</span>
+            </button>
+
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button
-                        onClick={() => navigate("/dashboard")}
-                        variant="outline"
-                        size="icon"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                </div>
+                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
                 <Button onClick={fetchDashboardData} variant="outline">
                     <Activity className="h-4 w-4 mr-2" />
                     Refresh Data

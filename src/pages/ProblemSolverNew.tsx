@@ -33,7 +33,7 @@ import { UserAttemptsService } from "@/services/userAttempts";
 import { TestRunnerService } from "@/services/testRunner";
 import { TestResult, CodeSnippet } from "@/types";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import Timer from "@/components/Timer";
 import FeedbackButton from "@/components/FeedbackButton";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,8 @@ import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
 import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
+import { useFeatureTracking, Features } from "@/hooks/useFeatureTracking";
+import { trackEvent, trackCodeRun, AnalyticsEvents } from "@/services/analytics";
 import {
   Dialog,
   DialogContent,
@@ -85,10 +87,10 @@ const ProblemSolverNew = () => {
     focus: () => void;
     deltaDecorations: (
       oldDecorations: string[],
-      newDecorations: unknown[],
+      newDecorations: Array<{ range: unknown; options: unknown }>,
     ) => string[];
     getScrollTop: () => number;
-    getVisibleRanges: () => unknown[];
+    getVisibleRanges: () => Array<{ startLineNumber: number; endLineNumber: number }>;
   } | null>(null);
 
   // Initialize OverlayPositionManager for coaching overlay positioning
@@ -118,7 +120,14 @@ const ProblemSolverNew = () => {
   });
 
   // Complexity analysis state
-  const [complexityResults, setComplexityResults] = useState<Record<string, any>>({});
+  interface ComplexityAnalysis {
+    time_complexity: string;
+    time_explanation: string;
+    space_complexity: string;
+    space_explanation: string;
+    analysis: string;
+  }
+  const [complexityResults, setComplexityResults] = useState<Record<string, ComplexityAnalysis>>({});
   const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
 
   // Panel toggle functions
@@ -205,13 +214,13 @@ const ProblemSolverNew = () => {
   useEffect(() => {
     logger.debug('[ProblemSolverNew] Loading analysis from submissions', { count: submissions?.length || 0 });
     if (submissions && submissions.length > 0) {
-      const results: Record<string, any> = {};
+      const results: Record<string, ComplexityAnalysis> = {};
       submissions.forEach(submission => {
         logger.debug('[ProblemSolverNew] Submission analysis presence', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
         if (submission.complexity_analysis) {
           // Avoid logging full analysis payload to keep logs concise
           logger.debug('[ProblemSolverNew] Loading analysis for submission', { submissionId: submission.id });
-          results[submission.id] = submission.complexity_analysis;
+          results[submission.id] = submission.complexity_analysis as ComplexityAnalysis;
         }
       });
       logger.debug('[ProblemSolverNew] Total loaded analysis', { total: Object.keys(results).length });
@@ -241,14 +250,14 @@ const ProblemSolverNew = () => {
     userId: user?.id || "anonymous",
     problemDescription: problem?.description || "",
     editorRef: codeEditorRef,
-    onCodeInsert: async (code: string, cursorPosition?: any, insertionType?: string, context?: any) => {
+    onCodeInsert: async (code: string, cursorPosition?: { line: number; column: number }, insertionType?: string, context?: { isCoachingCorrection?: boolean; feedback?: string }) => {
       // Wrap the code string in a CodeSnippet for the existing handler
       const snippet: CodeSnippet = {
         id: `coaching-${Date.now()}`,
         code,
         language: "python",
         isValidated: true,
-        insertionType: (insertionType as unknown) || "smart",
+        insertionType: (insertionType as "smart" | "cursor" | "append" | "prepend" | "replace") || "smart",
         insertionHint: {
           type: "statement",
           scope: "function",
@@ -295,7 +304,7 @@ const ProblemSolverNew = () => {
         currentLength: currentCode.length,
         newLength: newCodeFromBackend.length,
       });
-      toast.success("Code is already correct — no changes made.");
+      notifications.success("Code is already correct — no changes made.");
     } else {
       logger.info('[ProblemSolverNew] Updating editor with new code', {
         oldLength: currentCode.length,
@@ -316,7 +325,7 @@ const ProblemSolverNew = () => {
   const handleCancelReplacement = () => {
     setShowReplacementDialog(false);
     setPendingReplacementCode(null);
-    toast.error("Insertion canceled. No changes applied.");
+    notifications.error("Insertion canceled. No changes applied.");
   };
 
   if (loading) {
@@ -362,15 +371,15 @@ const ProblemSolverNew = () => {
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
+      notifications.success("Copied to clipboard");
     } catch {
-      toast.error("Failed to copy");
+      notifications.error("Failed to copy");
     }
   };
 
   const handleAnalyzeComplexity = async (code: string, submissionId: string) => {
     if (!problem || !user) {
-      toast.error("Unable to analyze complexity - missing context");
+      notifications.error("Unable to analyze complexity - missing context");
       return;
     }
 
@@ -424,10 +433,10 @@ const ProblemSolverNew = () => {
         logger.error('[ProblemSolverNew] Failed to save analysis to database', { submissionId, analysisData });
       }
 
-      toast.success("Complexity analysis complete!");
+      notifications.success("Complexity analysis complete!");
     } catch (error) {
       logger.error('[ProblemSolverNew] Complexity analysis error', { submissionId, error });
-      toast.error("Failed to analyze complexity. Please try again.");
+      notifications.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);
     }
@@ -481,7 +490,7 @@ const ProblemSolverNew = () => {
 
     if (!codeEditorRef.current) {
       logger.error('[ProblemSolverNew] Code editor ref is not available');
-      toast.error("Code editor not ready");
+      notifications.error("Code editor not ready");
       return;
     }
 
@@ -578,7 +587,7 @@ const ProblemSolverNew = () => {
       }
 
       if (!newCodeFromBackend) {
-        toast.error("Code insertion failed. Please try again.");
+        notifications.error("Code insertion failed. Please try again.");
         return;
       }
 
@@ -592,7 +601,7 @@ const ProblemSolverNew = () => {
           newLength: newCodeFromBackend.length,
           rationale: backendRationale,
         });
-        toast.success("Code is already correct — no changes made.");
+        notifications.success("Code is already correct — no changes made.");
         return;
       }
 
@@ -624,15 +633,15 @@ const ProblemSolverNew = () => {
 
       // Provide feedback about what was inserted
       if (insertedAtLine !== undefined) {
-        toast.success(`Code inserted at line ${insertedAtLine}`);
+        notifications.success(`Code inserted at line ${insertedAtLine}`);
       } else if (backendRationale) {
-        toast.success("Code updated successfully");
+        notifications.success("Code updated successfully");
       } else {
-        toast.success("Code inserted");
+        notifications.success("Code inserted");
       }
     } catch (error) {
       logger.error('[ProblemSolverNew] Failed to insert code snippet', { error });
-      toast.error("Failed to insert code snippet");
+      notifications.error("Failed to insert code snippet");
     }
   };
 
@@ -662,7 +671,7 @@ const ProblemSolverNew = () => {
       const totalCount = response.results.length;
 
       if (passedCount === totalCount) {
-        toast.success("All tests passed! 🎉");
+        notifications.success("All tests passed! 🎉");
         const saved = await UserAttemptsService.markProblemSolved(
           user.id,
           problem.id,
@@ -679,10 +688,10 @@ const ProblemSolverNew = () => {
           problem.difficulty as "Easy" | "Medium" | "Hard",
         );
       } else {
-        toast.error(`${passedCount}/${totalCount} test cases passed`);
+        notifications.error(`${passedCount}/${totalCount} test cases passed`);
       }
     } catch (error) {
-      toast.error("Failed to run code");
+      notifications.error("Failed to run code");
     } finally {
       setIsRunning(false);
     }
@@ -693,11 +702,11 @@ const ProblemSolverNew = () => {
 
     try {
       await UserAttemptsService.submitCode(user.id, problem.id, code);
-      toast.success("Solution submitted successfully!");
+      notifications.success("Solution submitted successfully!");
       // Start watching for the asynchronous grader to mark as accepted
       watchForAcceptance(60_000, 2_000);
     } catch (error) {
-      toast.error("Failed to submit solution");
+      notifications.error("Failed to submit solution");
     }
   };
 
@@ -706,11 +715,11 @@ const ProblemSolverNew = () => {
 
     try {
       await toggleStar(problem.id);
-      toast.success(
+      notifications.success(
         problem.isStarred ? "Removed from favorites" : "Added to favorites",
       );
     } catch (error) {
-      toast.error("Failed to update favorites");
+      notifications.error("Failed to update favorites");
     }
   };
 
@@ -1102,8 +1111,8 @@ const ProblemSolverNew = () => {
                 feedback: coachingState.lastValidation.feedback,
                 codeToAdd: coachingState.lastValidation.codeToAdd,
                 nextStep: coachingState.lastValidation.nextStep,
-                nextAction: coachingState.lastValidation.nextAction, // ← Add this
-                isOptimizable: coachingState.lastValidation.isOptimizable, // ← Add this
+                isOptimizable: coachingState.lastValidation.isOptimizable,
+                hasAlternative: coachingState.lastValidation.hasAlternative,
               } : null}
               onInsertCorrectCode={insertCorrectCode}
               onPositionChange={(pos) => {
@@ -1121,6 +1130,7 @@ const ProblemSolverNew = () => {
                       user.id,
                       problem.id,
                       code,
+                      [], // No test results available for coaching completion
                     );
                     if (saved) {
                       optimisticAdd(saved);
@@ -1129,16 +1139,15 @@ const ProblemSolverNew = () => {
                     await handleProblemSolved(
                       problem.difficulty as "Easy" | "Medium" | "Hard",
                     );
-                    toast.success("Solution saved to submissions! 🎉");
+                    notifications.success("Solution saved to submissions! 🎉");
                   } catch (error) {
                     logger.error('[ProblemSolverNew] Failed to save coaching completion', { error });
-                    toast.error("Failed to save submission");
+                    notifications.error("Failed to save submission");
                   }
                 }
                 stopCoaching();
               }}
               isOptimizable={coachingState.isOptimizable || coachingState.lastValidation?.isOptimizable}
-              hasAlternative={coachingState.lastValidation?.hasAlternative} // New prop
               hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
               onExitCoach={() => {
                 logger.debug('[ProblemSolverNew] Exiting coach mode due to AI service error');

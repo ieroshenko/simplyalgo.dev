@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
 
 export interface Solution {
   id: string;
@@ -21,13 +22,12 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const cacheTimestamps = new Map<string, number>();
 
 export const useSolutions = (problemId?: string) => {
-  const [solutions, setSolutions] = useState<Solution[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: solutions, loading, error, setData, setLoading, setError } =
+    useAsyncState<Solution[]>({ initialData: [] });
 
   useEffect(() => {
     if (!problemId) {
-      setSolutions([]);
+      setData([]);
       return;
     }
 
@@ -43,8 +43,7 @@ export const useSolutions = (problemId?: string) => {
 
         if (cached && cacheTime && (now - cacheTime) < CACHE_DURATION) {
           logger.debug('[useSolutions] Loading from cache', { problemId });
-          setSolutions(cached);
-          setLoading(false);
+          setData(cached);
           return;
         }
 
@@ -70,18 +69,16 @@ export const useSolutions = (problemId?: string) => {
         solutionCache.set(problemId, solutionsData);
         cacheTimestamps.set(problemId, now);
 
-        setSolutions(solutionsData);
+        setData(solutionsData);
       } catch (err) {
         logger.error('[useSolutions] Error loading solutions', { error: err, problemId });
-        setError(err instanceof Error ? err.message : "Failed to load solutions");
-        setSolutions([]);
-      } finally {
-        setLoading(false);
+        const errorMessage = err instanceof Error ? err.message : "Failed to load solutions";
+        setError(new Error(errorMessage));
       }
     };
 
     loadSolutions();
-  }, [problemId]);
+  }, [problemId, setData, setLoading, setError]);
 
   // Function to clear cache (useful for admin updates)
   const clearCache = (targetProblemId?: string) => {
@@ -96,21 +93,22 @@ export const useSolutions = (problemId?: string) => {
 
   // Function to get preferred solution
   const getPreferredSolution = () => {
-    return solutions.find(s => s.is_preferred) || solutions[0];
+    const solutionsList = solutions || [];
+    return solutionsList.find(s => s.is_preferred) || solutionsList[0];
   };
 
   // Function to get solutions by approach type
   const getSolutionsByApproach = (approachType: string) => {
-    return solutions.filter(s => s.approach_type === approachType);
+    return (solutions || []).filter(s => s.approach_type === approachType);
   };
 
   return {
-    solutions,
+    solutions: solutions || [],
     loading,
-    error,
+    error: error?.message || null,
     clearCache,
     getPreferredSolution,
     getSolutionsByApproach,
-    hasSolutions: solutions.length > 0,
+    hasSolutions: (solutions || []).length > 0,
   };
 };

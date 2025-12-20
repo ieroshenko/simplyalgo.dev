@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ const BehavioralInterview = () => {
     }
   };
 
-  const handleStopInterview = async () => {
+  const handleStopInterview = useCallback(async () => {
     setIsInterviewActive(false);
     stopInterview();
 
@@ -75,14 +75,14 @@ const BehavioralInterview = () => {
       // Show feedback after interview ends
       setShowFeedback(true);
     }
-  };
+  }, [stopInterview, endSession]);
 
   // Auto-stop if error occurs
   useEffect(() => {
     if ((error || sessionError) && isInterviewActive) {
       handleStopInterview();
     }
-  }, [error, sessionError, isInterviewActive]);
+  }, [error, sessionError, isInterviewActive, handleStopInterview]);
 
   // Show feedback view if interview ended
   if (showFeedback && sessionId) {

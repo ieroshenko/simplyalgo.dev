@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * E2E Tests for Stripe Subscription Management
- * 
+ *
  * Uses an ADMIN test user to revoke/grant premium.
  * For testing the full checkout flow with the paywall, see:
  * tests/e2e/survey/survey.spec.ts
- * 
+ *
  * SETUP REQUIRED:
  * 1. Run the SQL in fix-rls-admin-only.sql to create admin policies
  * 2. Create admin test user in Supabase:

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { UserAttemptsService, UserAttempt } from "@/services/userAttempts";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeCode } from "@/utils/code";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
 import { logger } from "@/utils/logger";
 
 // Use shared normalizeCode from utils
@@ -10,14 +11,15 @@ export const useSubmissions = (
   userId: string | undefined,
   problemId: string | undefined,
 ) => {
+  // Keep submissions as separate state since it needs special update handling
   const [submissions, setSubmissions] = useState<UserAttempt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use useAsyncState for loading/error management
+  const { loading, setLoading, error, setError } = useAsyncState();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollDeadlineRef = useRef<number>(0);
 
-  const addOrUpdateIfPassed = (attempt: UserAttempt | null | undefined) => {
+  const addOrUpdateIfPassed = useCallback((attempt: UserAttempt | null | undefined) => {
     if (!attempt || attempt.status !== "passed") {
       return;
     }
@@ -39,7 +41,7 @@ export const useSubmissions = (
       );
       return next;
     });
-  };
+  }, []);
 
   // Helper: remove submissions that have the same normalized code as newAttempt
   const removeDuplicatesByCode = (
@@ -75,9 +77,8 @@ export const useSubmissions = (
         );
         setSubmissions(data);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch submissions",
-        );
+        const error = err instanceof Error ? err : new Error("Failed to fetch submissions");
+        setError(error);
         setSubmissions([]);
       } finally {
         setLoading(false);
@@ -85,15 +86,15 @@ export const useSubmissions = (
     };
 
     fetchSubmissions();
-  }, [userId, problemId]);
+  }, [userId, problemId, setLoading, setError]);
 
   // Realtime subscription for new/updated attempts
   useEffect(() => {
     if (!userId || !problemId) return;
 
-    logger.info("Setting up realtime subscription", { 
-      component: "useSubmissions", 
-      userId, 
+    logger.info("Setting up realtime subscription", {
+      component: "useSubmissions",
+      userId,
       problemId,
       supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
       isProduction: !import.meta.env.DEV
@@ -120,9 +121,9 @@ export const useSubmissions = (
         table: 'user_problem_attempts',
         filter: `user_id=eq.${userId}`,
       },
-      (payload: any) => {
+      (payload: { new: UserAttempt; old: UserAttempt | null; eventType: string }) => {
         logger.debug("INSERT event received", { component: "useSubmissions", payload });
-        const attempt = payload.new as UserAttempt;
+        const attempt = payload.new;
         if (!attempt) {
           logger.debug("INSERT: No attempt data", { component: "useSubmissions" });
           return;
@@ -145,8 +146,8 @@ export const useSubmissions = (
         table: 'user_problem_attempts',
         filter: `user_id=eq.${userId}`,
       },
-      (payload: any) => {
-        const attempt = payload.new as UserAttempt;
+      (payload: { new: UserAttempt; old: UserAttempt | null; eventType: string }) => {
+        const attempt = payload.new;
         if (!attempt || attempt.problem_id !== problemId) return;
 
         // For updates, check if this is an existing submission or a new one
@@ -178,9 +179,9 @@ export const useSubmissions = (
         logger.debug("Successfully subscribed to realtime", { component: "useSubmissions", userId, problemId });
       }
       if (status === 'CHANNEL_ERROR') {
-        logger.error("Supabase realtime channel error for submissions", { 
-          error: err, 
-          component: "useSubmissions", 
+        logger.error("Supabase realtime channel error for submissions", {
+          error: err,
+          component: "useSubmissions",
           status,
           supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
           userId: userId?.substring(0, 8) + '...', // Partial ID for privacy
@@ -206,7 +207,7 @@ export const useSubmissions = (
         pollTimerRef.current = null;
       }
     };
-  }, [userId, problemId]);
+  }, [userId, problemId, addOrUpdateIfPassed]);
 
   const refetch = async () => {
     if (!userId || !problemId) return;
@@ -220,9 +221,8 @@ export const useSubmissions = (
       );
       setSubmissions(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch submissions",
-      );
+      const error = err instanceof Error ? err : new Error("Failed to fetch submissions");
+      setError(error);
     } finally {
       setLoading(false);
     }

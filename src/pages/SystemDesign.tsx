@@ -60,7 +60,7 @@ const SystemDesign = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  const categories = ["All", ...dbCategories.map((c) => c.name)];
+  const categories = useMemo(() => ["All", ...dbCategories.map((c) => c.name)], [dbCategories]);
   
   // Extract unique companies from specs with memoization
   const companies = useMemo(() => {
@@ -73,7 +73,7 @@ const SystemDesign = () => {
   }, [specs]);
   
   // Define difficulty options
-  const difficulties = ["All", "Easy", "Medium", "Hard"];
+  const difficulties = useMemo(() => ["All", "Easy", "Medium", "Hard"], []);
 
   // Generic filter handler
   const createFilterHandler = (
@@ -113,7 +113,7 @@ const SystemDesign = () => {
       setSelectedCategory(undefined);
       localStorage.removeItem("system-design-selected-category");
     }
-  }, [dbCategories, selectedCategory, specsLoading]);
+  }, [dbCategories, selectedCategory, specsLoading, categories]);
 
   // Validate saved company exists in available companies
   useEffect(() => {
@@ -137,7 +137,7 @@ const SystemDesign = () => {
       setSelectedDifficulty(undefined);
       localStorage.removeItem("system-design-selected-difficulty");
     }
-  }, [selectedDifficulty]);
+  }, [selectedDifficulty, difficulties]);
 
   useEffect(() => {
     if (!authLoading && !user) {

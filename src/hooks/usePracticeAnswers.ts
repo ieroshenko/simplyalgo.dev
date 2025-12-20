@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
 import { logger } from "@/utils/logger";
 import type { PracticeAnswer } from "@/types";
 
 export const usePracticeAnswers = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { loading, setLoading, error, setError } = useAsyncState();
 
   // Get the last answer for a specific question
   const getLastAnswer = useCallback(
@@ -77,13 +77,14 @@ export const usePracticeAnswers = () => {
           component: "usePracticeAnswers",
           userId: user?.id,
         });
-        setError(err instanceof Error ? err.message : "Failed to fetch last answer");
+        const error = err instanceof Error ? err : new Error("Failed to fetch last answer");
+        setError(error);
         return null;
       } finally {
         setLoading(false);
       }
     },
-    [user?.id]
+    [user?.id, setLoading, setError]
   );
 
   // Get all answers with scores for questions (for displaying scores in question list)
@@ -133,12 +134,13 @@ export const usePracticeAnswers = () => {
         component: "usePracticeAnswers",
         userId: user?.id,
       });
-      setError(err instanceof Error ? err.message : "Failed to fetch question scores");
+      const error = err instanceof Error ? err : new Error("Failed to fetch question scores");
+      setError(error);
       return {};
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, setLoading, setError]);
 
   // Get user progress stats
   const getProgress = useCallback(async (): Promise<{
@@ -152,7 +154,7 @@ export const usePracticeAnswers = () => {
 
     try {
       setLoading(true);
-      
+
       // Get session IDs for this user
       const { data: sessions, error: sessionsError } = await supabase
         .from("practice_sessions")
@@ -208,12 +210,13 @@ export const usePracticeAnswers = () => {
         component: "usePracticeAnswers",
         userId: user?.id,
       });
-      setError(err instanceof Error ? err.message : "Failed to fetch progress");
+      const error = err instanceof Error ? err : new Error("Failed to fetch progress");
+      setError(error);
       return { totalPracticed: 0, totalQuestions: 0, averageScore: 0 };
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, setLoading, setError]);
 
   return {
     getLastAnswer,

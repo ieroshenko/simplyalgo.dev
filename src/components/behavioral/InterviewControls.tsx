@@ -10,6 +10,8 @@ interface InterviewControlsProps {
   resumeUploaded: boolean;
 }
 
+const MAX_DURATION = 30 * 60; // 30 minutes in seconds
+
 const InterviewControls = ({
   isInterviewActive,
   onStart,
@@ -17,7 +19,6 @@ const InterviewControls = ({
   resumeUploaded,
 }: InterviewControlsProps) => {
   const [elapsedTime, setElapsedTime] = useState(0);
-  const MAX_DURATION = 30 * 60; // 30 minutes in seconds
 
   useEffect(() => {
     if (!isInterviewActive) {

@@ -32,6 +32,8 @@ import { CanvasContainer } from "@/components/canvas";
 import { hasInteractiveDemo } from "@/components/visualizations/registry";
 import "katex/dist/katex.min.css";
 import { logger } from "@/utils/logger";
+import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
+import { trackEvent, AnalyticsEvents } from "@/services/analytics";
 
 interface AIChatProps {
   problemId: string;
@@ -70,6 +72,9 @@ const AIChat = ({
   // Coaching mode state
   // Single coaching mode: Socratic (toggle removed)
   const coachingMode: CoachingMode = 'socratic';
+
+  // Track AI Chat feature usage
+  useTrackFeatureTime(Features.AI_CHAT, { problemId });
 
 
 
@@ -112,6 +117,11 @@ const AIChat = ({
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    // Track message sent
+    trackEvent(AnalyticsEvents.AI_CHAT_MESSAGE_SENT, {
+      problemId,
+      messageLength: input.length,
+    });
     await sendMessage(input);
     setInput("");
   };
@@ -476,7 +486,14 @@ const AIChat = ({
                         style={vscDarkPlus}
                         language={lang}
                         PreTag="div"
-                        className="rounded-md !mt-2 !mb-2"
+                        className="rounded-xl !mt-3 !mb-2 !text-sm"
+                        customStyle={{
+                          padding: "1rem",
+                          borderRadius: "0.75rem",
+                          backgroundColor: "#1e1e1e",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                        }}
                       >
                         {String(children).replace(/\n$/, "")}
                       </SyntaxHighlighter>
@@ -524,10 +541,15 @@ const AIChat = ({
             style={vscDarkPlus}
             language={lang || "python"}
             PreTag="div"
-            className="rounded-md !mt-2 !mb-2"
+            className="rounded-xl !mt-3 !mb-2 !text-sm"
             customStyle={{
               whiteSpace: "pre",
-              overflowX: "auto"
+              overflowX: "auto",
+              padding: "1rem",
+              borderRadius: "0.75rem",
+              backgroundColor: "#1e1e1e",
+              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
             }}
           >
             {code.replace(/\n$/, "")}
@@ -550,11 +572,11 @@ const AIChat = ({
               };
               onInsert(snippet);
             }}
-            className={`absolute top-2 right-2 z-20 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded shadow pointer-events-auto transition-opacity duration-150 ${visible ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute top-3 right-3 z-20 bg-white/90 hover:bg-white text-stone-700 text-xs px-2.5 py-1.5 rounded-lg shadow-md border border-stone-200/50 backdrop-blur-sm pointer-events-auto transition-all duration-150 flex items-center gap-1.5 font-medium ${visible ? 'opacity-100' : 'opacity-0'}`}
             title="Add to Editor"
           >
             <svg
-              className="w-3 h-3"
+              className="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -649,8 +671,8 @@ const AIChat = ({
                       <div className="max-w-[80%] min-w-0">
                         <div
                           className={`rounded-lg p-3 ${message.role === "user"
-                              ? "border-l-4 border-primary/60 bg-card pl-4"
-                              : "border-l-4 border-chat-accent/60 bg-chat-accent/10 dark:bg-chat-accent/15 pl-4"
+                            ? "border-l-4 border-primary/60 bg-card pl-4"
+                            : "border-l-4 border-chat-accent/60 bg-chat-accent/10 dark:bg-chat-accent/15 pl-4"
                             }`}
                           onMouseEnter={() => {
                             if (message.role === 'assistant') setHoveredMessageId(message.id);

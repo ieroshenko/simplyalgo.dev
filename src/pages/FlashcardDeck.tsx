@@ -3,10 +3,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { FlashcardDeckManager } from "@/components/flashcards/FlashcardDeckManager";
 import { isFeatureEnabled } from "@/config/features";
+import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
 
 const FlashcardDeck = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  // Track flashcard feature usage
+  useTrackFeatureTime(Features.FLASHCARDS);
 
   useEffect(() => {
     // Redirect if feature is disabled

@@ -28,7 +28,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft, Plus, Edit, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import type { BehavioralQuestionCategory, QuestionDifficulty, EvaluationType } from "@/types";
+import type { BehavioralQuestionCategory, QuestionDifficulty, EvaluationType, BehavioralQuestion } from "@/types";
 
 const BehavioralQuestions = () => {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ const BehavioralQuestions = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | undefined>();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<{ id: string; question: any } | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<{ id: string; question: BehavioralQuestion } | null>(null);
   
   const { questions, loading, refresh: refreshQuestions } = useBehavioralQuestions({
     category: selectedCategory as unknown,
@@ -89,7 +89,7 @@ const BehavioralQuestions = () => {
     setIsCreateDialogOpen(true);
   };
 
-  const handleOpenEditDialog = (question: any) => {
+  const handleOpenEditDialog = (question: BehavioralQuestion) => {
     if (!question.user_id) return; // Can't edit curated questions
     setQuestionText(question.question_text);
     setSelectedCategories(question.category);

@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Integration tests for Stripe webhook handling
- * 
+ *
  * These tests verify that the subscription status is correctly updated
  * when Stripe sends webhook events.
- * 
+ *
  * For local testing with Stripe CLI:
  * 1. Install Stripe CLI: brew install stripe/stripe-cli/stripe
  * 2. Login: stripe login

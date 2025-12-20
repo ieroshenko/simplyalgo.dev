@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,9 +43,9 @@ export const SubscriptionManagement: React.FC = () => {
     });
   };
 
-  const fetchStripeSubscriptionDetails = async () => {
+  const fetchStripeSubscriptionDetails = useCallback(async () => {
     if (!subscription?.stripe_subscription_id) return;
-    
+
     setIsLoadingDetails(true);
     try {
       const { data, error } = await supabase.functions.invoke('stripe-get-subscription-details', {
@@ -65,13 +65,13 @@ export const SubscriptionManagement: React.FC = () => {
     } finally {
       setIsLoadingDetails(false);
     }
-  };
+  }, [subscription?.stripe_subscription_id]);
 
   useEffect(() => {
     if (subscription?.stripe_subscription_id) {
       fetchStripeSubscriptionDetails();
     }
-  }, [subscription?.stripe_subscription_id]);
+  }, [subscription?.stripe_subscription_id, fetchStripeSubscriptionDetails]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -687,15 +687,19 @@ export const useSystemDesignSession = ({
 
   // Cleanup timeouts on unmount
   useEffect(() => {
+    const boardUpdateTimeout = boardUpdateTimeoutRef.current;
+    const evaluationTimeout = evaluationTimeoutRef.current;
+    const reactionTimeout = reactionTimeoutRef.current;
+
     return () => {
-      if (boardUpdateTimeoutRef.current) {
-        clearTimeout(boardUpdateTimeoutRef.current);
+      if (boardUpdateTimeout) {
+        clearTimeout(boardUpdateTimeout);
       }
-      if (evaluationTimeoutRef.current) {
-        clearTimeout(evaluationTimeoutRef.current);
+      if (evaluationTimeout) {
+        clearTimeout(evaluationTimeout);
       }
-      if (reactionTimeoutRef.current) {
-        clearTimeout(reactionTimeoutRef.current);
+      if (reactionTimeout) {
+        clearTimeout(reactionTimeout);
       }
     };
   }, []);

@@ -15,12 +15,32 @@ import { FeedbackViews } from "@/components/behavioral/FeedbackViews";
 import { Badge } from "@/components/ui/badge";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { logger } from "@/utils/logger";
+import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
+import { trackEvent, AnalyticsEvents } from "@/services/analytics";
 
 interface GeneratedQuestion {
   question_text: string;
   category: string[];
   difficulty: string;
   rationale: string;
+}
+
+interface FeedbackData {
+  star_score?: {
+    situation: number;
+    task: number;
+    action: number;
+    result: number;
+  };
+  content_score: number;
+  delivery_score: number;
+  overall_score: number;
+  feedback: {
+    strengths: string[];
+    improvements: string[];
+    specific_examples?: string[];
+    next_steps?: string[];
+  };
 }
 
 interface InterviewState {
@@ -31,7 +51,7 @@ interface InterviewState {
   questions: GeneratedQuestion[];
   currentQuestionIndex: number;
   answers: Record<number, string>;
-  feedbacks: Record<number, any>;
+  feedbacks: Record<number, FeedbackData>;
   mockInterviewId: string | null;
 }
 
@@ -39,6 +59,9 @@ const BehavioralMockInterview = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Track mock interview feature usage
+  useTrackFeatureTime(Features.MOCK_INTERVIEW);
 
   const [state, setState] = useState<InterviewState>({
     step: 'resume',
@@ -126,6 +149,12 @@ const BehavioralMockInterview = () => {
 
     setIsGeneratingQuestions(true);
     try {
+      // Track interview started
+      trackEvent(AnalyticsEvents.MOCK_INTERVIEW_STARTED, {
+        role: state.role,
+        company: state.company || 'not specified',
+      });
+
       // Generate questions based on resume, role, and company
       const { data, error } = await supabase.functions.invoke("generate-interview-questions", {
         body: {
@@ -463,10 +492,10 @@ const BehavioralMockInterview = () => {
                             onClick={toggleMicrophone}
                             disabled={isSubmittingAnswer}
                             className={`absolute right-2 top-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${isListening
-                                ? "text-red-500 animate-pulse"
-                                : isProcessing
-                                  ? "text-blue-500"
-                                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                              ? "text-red-500 animate-pulse"
+                              : isProcessing
+                                ? "text-blue-500"
+                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                               }`}
                             title={
                               isListening
@@ -546,8 +575,8 @@ const BehavioralMockInterview = () => {
                   <div
                     key={idx}
                     className={`flex-1 h-2 rounded ${idx === state.currentQuestionIndex || state.answers[idx]?.trim()
-                        ? "bg-primary"
-                        : "bg-muted"
+                      ? "bg-primary"
+                      : "bg-muted"
                       }`}
                   />
                 ))}

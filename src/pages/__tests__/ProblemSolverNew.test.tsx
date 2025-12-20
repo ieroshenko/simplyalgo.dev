@@ -260,11 +260,15 @@ vi.mock('@monaco-editor/react', () => ({
     default: ({ value }: any) => <div data-testid="monaco-viewer">{value}</div>,
 }));
 
-// Mock sonner
-vi.mock('sonner', () => ({
-    toast: {
+// Mock notifications service
+vi.mock('@/shared/services/notificationService', () => ({
+    notifications: {
         success: vi.fn(),
         error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn(),
+        loading: vi.fn(),
+        dismiss: vi.fn(),
     },
 }));
 
@@ -298,7 +302,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 import ProblemSolverNew from '../ProblemSolverNew';
 import { TestRunnerService } from '@/services/testRunner';
-import { toast } from 'sonner';
+import { notifications } from '@/shared/services/notificationService';
 
 const renderWithRouter = (component: React.ReactElement) => {
     return render(
@@ -411,7 +415,7 @@ describe('ProblemSolverNew', () => {
             await userEvent.click(runButton);
 
             await waitFor(() => {
-                expect(toast.success).toHaveBeenCalledWith('All tests passed! 🎉');
+                expect(notifications.success).toHaveBeenCalledWith('All tests passed! 🎉');
             });
         });
 
@@ -428,7 +432,7 @@ describe('ProblemSolverNew', () => {
             await userEvent.click(runButton);
 
             await waitFor(() => {
-                expect(toast.error).toHaveBeenCalledWith('0/1 test cases passed');
+                expect(notifications.error).toHaveBeenCalledWith('0/1 test cases passed');
             });
         });
     });

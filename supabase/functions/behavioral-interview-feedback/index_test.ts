@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tests for behavioral-interview-feedback Edge Function
- * 
+ *
  * Run with: deno test --allow-net --allow-env behavioral-interview-feedback/
  */
 

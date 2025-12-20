@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useFlashcards } from "@/hooks/useFlashcards";
 import type { FlashcardDeck } from "@/types/api";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { supabase } from "@/integrations/supabase/client";
@@ -261,7 +261,7 @@ export const FlashcardReviewInterface = ({
 
     } catch (error) {
       logger.error('Error submitting review', error, { component: 'FlashcardReview' });
-      toast.error('Failed to submit review. Please try again.');
+      notifications.error('Failed to submit review. Please try again.');
     }
   };
 
@@ -272,7 +272,7 @@ export const FlashcardReviewInterface = ({
     setCurrentSession(null);
     setCompletedCards(0);
     onClose();
-    toast.success(`Review session complete! Reviewed ${completedCards} cards.`);
+    notifications.success(`Review session complete! Reviewed ${completedCards} cards.`);
   };
 
   if (!isOpen) return null;

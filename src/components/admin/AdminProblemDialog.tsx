@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -117,6 +117,37 @@ export function AdminProblemDialog({
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
 
+  const loadRelatedData = useCallback(async (problemId: string) => {
+    setLoading(true);
+    try {
+      const { data: tcs, error: tcError } = await supabase
+        .from("test_cases")
+        .select("*")
+        .eq("problem_id", problemId)
+        .order("created_at");
+
+      if (tcError) throw tcError;
+
+      const { data: sols, error: solError } = await supabase
+        .from("problem_solutions")
+        .select("*")
+        .eq("problem_id", problemId);
+
+      if (solError) throw solError;
+
+      setTestCases((tcs as TestCase[]) || []);
+      setSolutions((sols as Solution[]) || []);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error loading related data",
+        description: error instanceof Error ? error.message : "An error occurred",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (open) {
       if (problem) {
@@ -157,38 +188,7 @@ export function AdminProblemDialog({
         setActiveTab("details");
       }
     }
-  }, [open, problem]);
-
-  const loadRelatedData = async (problemId: string) => {
-    setLoading(true);
-    try {
-      const { data: tcs, error: tcError } = await supabase
-        .from("test_cases")
-        .select("*")
-        .eq("problem_id", problemId)
-        .order("created_at");
-
-      if (tcError) throw tcError;
-
-      const { data: sols, error: solError } = await supabase
-        .from("problem_solutions")
-        .select("*")
-        .eq("problem_id", problemId);
-
-      if (solError) throw solError;
-
-      setTestCases((tcs as TestCase[]) || []);
-      setSolutions((sols as Solution[]) || []);
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Error loading related data",
-        description: error instanceof Error ? error.message : "An error occurred",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [open, problem, categories, loadRelatedData]);
 
   const handleSaveProblem = async () => {
     try {

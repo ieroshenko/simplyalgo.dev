@@ -1,6 +1,8 @@
+import type { User } from '@supabase/supabase-js';
+
 export type MinimalProfile = { name?: string; email?: string; avatarUrl?: string | null };
 
-export const getUserName = (user?: any, profile?: MinimalProfile): string => {
+export const getUserName = (user?: User | null, profile?: MinimalProfile): string => {
   return (
     user?.user_metadata?.full_name ||
     profile?.name ||
@@ -18,7 +20,7 @@ export const getUserInitials = (name: string): string => {
 };
 
 export const getUserAvatarUrl = (
-  user?: any,
+  user?: User | null,
   profile?: MinimalProfile,
   size: number = 80,
 ): string => {

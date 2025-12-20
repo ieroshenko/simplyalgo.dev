@@ -92,7 +92,7 @@ const Profile = () => {
         </div>
 
         {/* Performance Summary */}
-        <section className="bg-neutral-50/50 rounded-lg p-8 border border-neutral-100">
+        <section className="bg-card rounded-lg p-8 border shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-6">
             Performance
           </h2>
@@ -119,7 +119,7 @@ const Profile = () => {
         </section>
 
         {/* Problem Distribution */}
-        <section className="bg-white/50 rounded-lg p-8 border border-neutral-100">
+        <section className="bg-card rounded-lg p-8 border shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-6">
             Problem Distribution
           </h2>
@@ -170,7 +170,7 @@ const Profile = () => {
         </section>
 
         {/* Flashcards Section */}
-        <section className="bg-neutral-50/50 rounded-lg p-8 border border-neutral-100">
+        <section className="bg-card rounded-lg p-8 border shadow-sm">
           <div className="mb-6">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
               Flashcards

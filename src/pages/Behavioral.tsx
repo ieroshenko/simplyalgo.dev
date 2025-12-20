@@ -16,12 +16,16 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { logger } from "@/utils/logger";
+import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
 
 const Behavioral = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { getProgress } = usePracticeAnswers();
   const { stories, loading: storiesLoading } = useUserStories();
+
+  // Track behavioral interview feature usage
+  useTrackFeatureTime(Features.BEHAVIORAL);
 
   const [stats, setStats] = useState<{
     totalQuestionsPracticed: number;

@@ -9,6 +9,8 @@ import {
   Mic,
   MicOff,
   ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useChatSession } from "@/hooks/useChatSession";
@@ -20,13 +22,41 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/hooks/useTheme";
 import Mermaid from "@/components/diagram/Mermaid";
 import FlowCanvas from "@/components/diagram/FlowCanvas";
 import type { FlowGraph } from "@/types";
 import { CanvasContainer } from "@/components/canvas";
 import { hasInteractiveDemo } from "@/components/visualizations/registry";
 import "katex/dist/katex.min.css";
+
+// Custom syntax theme with softer stone-themed background
+const customDarkTheme = {
+  ...vscDarkPlus,
+  'pre[class*="language-"]': {
+    ...vscDarkPlus['pre[class*="language-"]'],
+    background: 'transparent',
+    textShadow: 'none',
+  },
+  'code[class*="language-"]': {
+    ...vscDarkPlus['code[class*="language-"]'],
+    background: 'transparent',
+    textShadow: 'none',
+  },
+};
+
+const customLightTheme = {
+  ...oneLight,
+  'pre[class*="language-"]': {
+    ...oneLight['pre[class*="language-"]'],
+    background: 'transparent',
+  },
+  'code[class*="language-"]': {
+    ...oneLight['code[class*="language-"]'],
+    background: 'transparent',
+  },
+};
 
 interface ChatBubblesProps {
   problemId: string;
@@ -48,6 +78,9 @@ const ChatBubbles = ({
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+  const { resolvedTheme } = useTheme();
+  const isDarkMode = resolvedTheme === 'dark';
 
   // Diagram state
   type ActiveDiagram =
@@ -319,7 +352,7 @@ const ChatBubbles = ({
                           : "border border-chat-accent/40 bg-chat-accent/10 text-foreground dark:border-chat-accent/30 dark:bg-chat-accent/15"
                           }`}
                       >
-                        <div className={`prose prose-sm max-w-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
+                        <div className={`prose prose-sm max-w-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0 prose-code:bg-transparent prose-code:before:content-none prose-code:after:content-none ${message.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
                           {message.role === "user" ? (
                             <p className="text-foreground font-medium">{message.content}</p>
                           ) : (
@@ -331,12 +364,12 @@ const ChatBubbles = ({
                                     remarkPlugins={[remarkMath]}
                                     rehypePlugins={[rehypeKatex]}
                                     components={{
-                                      em({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
+                                      em({ children }: React.HTMLAttributes<HTMLElement>) {
                                         // Convert italics to bold for better emphasis
-                                        return <strong {...props}>{children}</strong>;
+                                        return <strong className="text-foreground font-semibold">{children}</strong>;
                                       },
-                                      strong({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
-                                        return <strong {...props}>{children}</strong>;
+                                      strong({ children }: React.HTMLAttributes<HTMLElement>) {
+                                        return <strong className="text-foreground font-semibold">{children}</strong>;
                                       },
                                       code({ className, children }) {
                                         const match = /language-(\w+)/.exec(className || "");
@@ -348,53 +381,95 @@ const ChatBubbles = ({
                                         logger.debug('Code snippet detected:', { children, lang, isBlock });
 
                                         if (isBlock) {
+                                          const codeText = fixPythonCode(String(children).replace(/\n$/, ""));
+                                          const snippetId = `snippet-${message.id}-${codeText.slice(0, 20)}`;
+                                          const isCopied = copiedSnippetId === snippetId;
+
+                                          const handleCopy = async () => {
+                                            try {
+                                              await navigator.clipboard.writeText(codeText);
+                                              setCopiedSnippetId(snippetId);
+                                              setTimeout(() => setCopiedSnippetId(null), 2000);
+                                            } catch (err) {
+                                              logger.error('Failed to copy code:', { error: err });
+                                            }
+                                          };
+
                                           return (
                                             <div className="relative group">
-                                              <SyntaxHighlighter
-                                                style={vscDarkPlus}
-                                                language={lang}
-                                                PreTag="div"
-                                                className="rounded-md !mt-2 !mb-2"
-                                                customStyle={{
-                                                  whiteSpace: "pre",
-                                                  overflowX: "auto"
-                                                }}
+                                              <div
+                                                className={`rounded-xl overflow-hidden my-3 ${isDarkMode
+                                                  ? 'bg-stone-800/80 border border-stone-700/30'
+                                                  : 'bg-stone-50 border border-stone-200/60'
+                                                  }`}
                                               >
-                                                {fixPythonCode(String(children).replace(/\n$/, ""))}
-                                              </SyntaxHighlighter>
-                                              {onInsertCodeSnippet && (
-                                                <button
-                                                  onClick={() => {
-                                                    const rawCode = String(children).replace(/\n$/, "");
-                                                    const codeToInsert = fixPythonCode(rawCode);
-                                                    logger.debug('Inserting code snippet:', {
-                                                      originalChildren: String(children),
-                                                      rawCode,
-                                                      fixedCode: codeToInsert,
-                                                      hasNewlines: codeToInsert.includes('\n'),
-                                                      hasSemicolons: codeToInsert.includes(';')
-                                                    });
-
-                                                    const snippet: CodeSnippet = {
-                                                      id: `direct-${Date.now()}`,
-                                                      code: codeToInsert,
-                                                      language: "python",
-                                                      isValidated: true,
-                                                      insertionType: "smart",
-                                                      insertionHint: {
-                                                        type: "statement",
-                                                        scope: "function",
-                                                        description: "Code snippet from AI response",
-                                                      },
-                                                    };
-                                                    onInsertCodeSnippet(snippet);
+                                                <SyntaxHighlighter
+                                                  style={isDarkMode ? customDarkTheme : customLightTheme}
+                                                  language={lang}
+                                                  PreTag="div"
+                                                  customStyle={{
+                                                    margin: 0,
+                                                    padding: '1rem 1.25rem',
+                                                    background: 'transparent',
+                                                    fontSize: '13px',
+                                                    lineHeight: '1.6',
                                                   }}
-                                                  className="absolute top-2 right-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                                                  title="Add to Editor"
+                                                  codeTagProps={{
+                                                    style: {
+                                                      background: 'transparent',
+                                                      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                                                    }
+                                                  }}
                                                 >
-                                                  Add
+                                                  {codeText}
+                                                </SyntaxHighlighter>
+                                              </div>
+                                              {/* Action buttons */}
+                                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                                {/* Copy button */}
+                                                <button
+                                                  onClick={handleCopy}
+                                                  className={`p-1.5 rounded shadow text-xs ${isCopied
+                                                    ? 'bg-green-500 text-white'
+                                                    : isDarkMode
+                                                      ? 'bg-stone-700 hover:bg-stone-600 text-stone-200'
+                                                      : 'bg-stone-200 hover:bg-stone-300 text-stone-700'
+                                                    }`}
+                                                  title={isCopied ? "Copied!" : "Copy code"}
+                                                >
+                                                  {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                                 </button>
-                                              )}
+                                                {/* Add to Editor button */}
+                                                {onInsertCodeSnippet && (
+                                                  <button
+                                                    onClick={() => {
+                                                      logger.debug('Inserting code snippet:', {
+                                                        codeText,
+                                                        hasNewlines: codeText.includes('\n'),
+                                                        hasSemicolons: codeText.includes(';')
+                                                      });
+
+                                                      const snippet: CodeSnippet = {
+                                                        id: `direct-${Date.now()}`,
+                                                        code: codeText,
+                                                        language: "python",
+                                                        isValidated: true,
+                                                        insertionType: "smart",
+                                                        insertionHint: {
+                                                          type: "statement",
+                                                          scope: "function",
+                                                          description: "Code snippet from AI response",
+                                                        },
+                                                      };
+                                                      onInsertCodeSnippet(snippet);
+                                                    }}
+                                                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded shadow"
+                                                    title="Add to Editor"
+                                                  >
+                                                    Add
+                                                  </button>
+                                                )}
+                                              </div>
                                             </div>
                                           );
                                         }

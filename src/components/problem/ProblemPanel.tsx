@@ -7,7 +7,7 @@ import { useSolutions } from "@/hooks/useSolutions";
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -47,7 +47,7 @@ interface ProblemPanelProps {
   onFullscreenCode?: (code: string, lang: string, title: string) => void;
   submissions: Submission[];
   submissionsLoading: boolean;
-  submissionsError: string | null;
+  submissionsError: Error | null;
 }
 
 const ProblemPanel = ({
@@ -105,9 +105,9 @@ const ProblemPanel = ({
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
+      notifications.success("Copied to clipboard");
     } catch {
-      toast.error("Failed to copy");
+      notifications.error("Failed to copy");
     }
   };
 
@@ -128,7 +128,7 @@ const ProblemPanel = ({
 
   const handleAnalyzeComplexity = async (code: string, submissionId: string) => {
     if (!problem || !userId) {
-      toast.error("Unable to analyze complexity - missing context");
+      notifications.error("Unable to analyze complexity - missing context");
       return;
     }
 
@@ -184,10 +184,10 @@ const ProblemPanel = ({
         logger.error('[ProblemPanel] Failed to save analysis to database');
       }
 
-      toast.success("Complexity analysis complete!");
+      notifications.success("Complexity analysis complete!");
     } catch (error) {
       logger.error("[ProblemPanel] Complexity analysis error", { error });
-      toast.error("Failed to analyze complexity. Please try again.");
+      notifications.error("Failed to analyze complexity. Please try again.");
     } finally {
       setAnalyzingSubmissionId(null);
     }
@@ -464,7 +464,7 @@ const ProblemPanel = ({
             </div>
           )}
           {!subsLoading && subsError && (
-            <div className="text-sm text-red-600">{subsError}</div>
+            <div className="text-sm text-red-600">{subsError.message}</div>
           )}
           {!subsLoading &&
             !subsError &&

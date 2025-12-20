@@ -6,6 +6,14 @@ import { logger } from "@/utils/logger";
 // Type for database row
 type TechnicalInterviewFeedbackRow = Database['public']['Tables']['technical_interview_feedback']['Row'];
 
+// Type for problem with joined categories
+interface ProblemWithCategory {
+  id: string;
+  categories?: {
+    name?: string;
+  } | null;
+}
+
 export interface TechnicalInterviewSession {
   id: string;
   user_id: string;
@@ -110,7 +118,7 @@ export const TechnicalInterviewService = {
     }
 
     // Filter out System Design and Data Structure Implementation problems client-side
-    const eligibleProblems = problems.filter((problem: any) => {
+    const eligibleProblems = problems.filter((problem: ProblemWithCategory) => {
       const categoryName = problem.categories?.name || '';
       return categoryName !== 'System Design' &&
         categoryName !== 'Data Structure Implementations' &&
@@ -161,7 +169,7 @@ export const TechnicalInterviewService = {
     logger.info(`[TechnicalInterviewService] Fetched ${problems?.length || 0} total problems from DB`);
 
     // Filter out System Design and Data Structure Implementation problems
-    const eligibleProblems = problems?.filter((problem: any) => {
+    const eligibleProblems = problems?.filter((problem: ProblemWithCategory) => {
       const categoryName = problem.categories?.name || '';
       const isEligible = categoryName !== 'System Design' &&
         categoryName !== 'Data Structure Implementations' &&

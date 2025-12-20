@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import type { FlashcardDeck, FlashcardReview, FlashcardStats } from "@/types/api";
 import type { FlashcardDeckRow, FlashcardReviewRow, FlashcardDeckWithRelations } from "@/types/supabase";
 
@@ -178,7 +178,7 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcards", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcards-due", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
-      toast.success("Added to flashcards! Ready for review.");
+      notifications.success("Added to flashcards! Ready for review.");
     },
     onError: (error: { message?: string; code?: string } | unknown) => {
       console.error("Error adding to flashcards:", error);
@@ -186,9 +186,9 @@ export const useFlashcards = (userId?: string) => {
       const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
       
       if (errorCode === "23505") {
-        toast.error("This problem is already in your flashcards.");
+        notifications.error("This problem is already in your flashcards.");
       } else {
-        toast.error("Failed to add to flashcards. Please try again.");
+        notifications.error("Failed to add to flashcards. Please try again.");
       }
     },
   });
@@ -209,12 +209,12 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcards", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcards-due", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
-      toast.success("Removed from flashcards.");
+      notifications.success("Removed from flashcards.");
     },
     onError: (error: { message?: string } | unknown) => {
       console.error("Error removing from flashcards:", error);
       const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
-      toast.error("Failed to remove from flashcards. Please try again.");
+      notifications.error("Failed to remove from flashcards. Please try again.");
     },
   });
 
@@ -267,12 +267,12 @@ export const useFlashcards = (userId?: string) => {
       queryClient.invalidateQueries({ queryKey: ["flashcards", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcards-due", userId] });
       queryClient.invalidateQueries({ queryKey: ["flashcard-stats", userId] });
-      toast.success("Review submitted successfully!");
+      notifications.success("Review submitted successfully!");
     },
     onError: (error: { message?: string } | unknown) => {
       console.error("Error submitting review:", error);
       const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
-      toast.error("Failed to submit review. Please try again.");
+      notifications.error("Failed to submit review. Please try again.");
     },
   });
 

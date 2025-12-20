@@ -64,12 +64,12 @@ const Problems = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter out Data Structure Implementations and System Design categories (shown in separate sections)
-  const categories = ["All", ...dbCategories
+  const categories = useMemo(() => ["All", ...dbCategories
     .filter((c) =>
       c.name !== "Data Structure Implementations" &&
       c.name !== "System Design"
     )
-    .map((c) => c.name)];
+    .map((c) => c.name)], [dbCategories]);
   
   // Extract unique companies from problems with memoization
   const companies = useMemo(() => {
@@ -82,7 +82,7 @@ const Problems = () => {
   }, [problems]);
   
   // Define difficulty options
-  const difficulties = ["All", "Easy", "Medium", "Hard"];
+  const difficulties = useMemo(() => ["All", "Easy", "Medium", "Hard"], []);
 
   // Function to handle category selection with persistence
   const handleCategorySelect = (category: string) => {
@@ -136,7 +136,7 @@ const Problems = () => {
       setSelectedCategory(undefined);
       localStorage.removeItem("selected-category");
     }
-  }, [dbCategories, selectedCategory, problemsLoading]);
+  }, [dbCategories, selectedCategory, problemsLoading, categories]);
 
   // Validate saved company exists in available companies
   useEffect(() => {
@@ -160,7 +160,7 @@ const Problems = () => {
       setSelectedDifficulty(undefined);
       localStorage.removeItem("selected-difficulty");
     }
-  }, [selectedDifficulty]);
+  }, [selectedDifficulty, difficulties]);
 
   useEffect(() => {
     if (!authLoading && !user) {

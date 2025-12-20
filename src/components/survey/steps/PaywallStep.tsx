@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SurveyStepProps } from '@/types/survey';
 import { Button } from '@/components/ui/button';
 import { Check, ArrowLeft } from 'lucide-react';
@@ -27,12 +27,12 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const { isEligibleForTrial, isLoading: trialLoading } = useTrialEligibility();
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = useCallback(() => {
     onAnswer('payment_completed');
     onPaymentSuccess?.();
     // Redirect to dashboard after successful payment
     window.location.href = '/dashboard';
-  };
+  }, [onAnswer, onPaymentSuccess]);
 
   const handlePaymentError = (error: string) => {
     onPaymentError?.(error);
@@ -43,12 +43,12 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
     const paymentStatus = urlParams.get('payment');
-    
+
     if (sessionId && paymentStatus === 'success') {
       // Payment was successful, redirect to dashboard
       handlePaymentSuccess();
     }
-  }, []);
+  }, [handlePaymentSuccess]);
 
   const createCheckoutSession = async () => {
     setIsLoading(true);

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Stripe Test Utilities
- * 
+ *
  * This file provides utilities for testing Stripe integration without making real API calls.
  * Use these mocks and helpers in unit and integration tests.
  */

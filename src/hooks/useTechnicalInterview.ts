@@ -226,6 +226,7 @@ export const useTechnicalInterview = ({
   }, [onConnectionStatusChange]);
 
   // Debounced code update sender
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const sendCodeUpdate = useCallback(
     debounce((code: string) => {
       if (dataChannelRef.current?.readyState === 'open') {
@@ -710,7 +711,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
       setError(err instanceof Error ? err.message : "Failed to start interview");
       cleanup();
     }
-  }, [problemTitle, problemDescription, problemId, testCases, voice, onConnectionStatusChange, onTranscript, onTimeUp, cleanup]);
+  }, [problemTitle, problemDescription, testCases, voice, onConnectionStatusChange, onTranscript, onTimeUp, cleanup, onFeedbackReceived]);
 
   // Stop interview
   const stopInterview = useCallback(() => {

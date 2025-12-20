@@ -46,7 +46,7 @@ import { TestResult } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { logger } from "@/utils/logger";
 
@@ -56,15 +56,34 @@ const TechnicalInterview = () => {
   const { theme, setTheme, isDark } = useTheme();
   const { currentTheme } = useEditorTheme();
   
+  interface TechnicalProblem {
+    id: string;
+    title: string;
+    difficulty: string;
+    category: string;
+    description: string;
+    examples?: Array<{
+      input: string;
+      output: string;
+      explanation?: string;
+    }>;
+    constraints?: string[];
+    testCases: TestResult[];
+    functionSignature?: string;
+    categories?: {
+      name: string;
+    };
+  }
+
   const [selectedVoice, setSelectedVoice] = useState<string>("sage");
   const [selectedProblemId, setSelectedProblemId] = useState<string>("random");
-  const [availableProblems, setAvailableProblems] = useState<any[]>([]);
+  const [availableProblems, setAvailableProblems] = useState<TechnicalProblem[]>([]);
   const [loadingProblems, setLoadingProblems] = useState(false);
   const [problemSelectorOpen, setProblemSelectorOpen] = useState(false);
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [showFeedback, setShowFeedback] = useState(false);
-  const [problem, setProblem] = useState<unknown>(null);
+  const [problem, setProblem] = useState<TechnicalProblem | null>(null);
   const [code, setCode] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -103,7 +122,7 @@ const TechnicalInterview = () => {
     },
     onTimeUp: () => {
       logger.debug("Time is up, preparing to end interview", { component: 'TechnicalInterview' });
-      toast.info("Time's up! The interviewer is providing feedback...");
+      notifications.info("Time's up! The interviewer is providing feedback...");
       // Wait a bit for AI to finish feedback, then auto-stop
       setTimeout(() => {
         handleStopInterview();
@@ -130,11 +149,11 @@ const TechnicalInterview = () => {
           );
           await endSession(duration, feedback.passed, feedback.overall_score);
           
-          toast.success("Feedback saved!");
+          notifications.success("Feedback saved!");
         }
       } catch (err) {
         logger.error("Failed to save feedback", err, { component: 'TechnicalInterview' });
-        toast.error("Failed to save feedback");
+        notifications.error("Failed to save feedback");
       }
     },
   });
@@ -175,7 +194,7 @@ const TechnicalInterview = () => {
         setAvailableProblems(problems);
       } catch (err) {
         logger.error("Failed to load problems", err, { component: 'TechnicalInterview' });
-        toast.error("Failed to load problems");
+        notifications.error("Failed to load problems");
       } finally {
         setLoadingProblems(false);
       }
@@ -185,13 +204,13 @@ const TechnicalInterview = () => {
 
   const handleStartInterview = async () => {
     if (!user) {
-      toast.error("Please log in to start interview");
+      notifications.error("Please log in to start interview");
       return;
     }
 
     try {
       const isRandom = selectedProblemId === "random";
-      toast.info(isRandom ? "Selecting a random problem..." : "Loading selected problem...");
+      notifications.info(isRandom ? "Selecting a random problem..." : "Loading selected problem...");
       
       // Get problem (random or specific)
       const selectedProblem = await TechnicalInterviewService.getProblem(selectedProblemId);
@@ -214,7 +233,7 @@ const TechnicalInterview = () => {
       await createSession(user.id, selectedProblem.id, selectedVoice);
       interviewStartTimeRef.current = new Date();
 
-      toast.success(`Interview started: ${selectedProblem.title}`);
+      notifications.success(`Interview started: ${selectedProblem.title}`);
       
       // CRITICAL: Set problem and code state synchronously before starting interview
       // This ensures the useTechnicalInterview hook gets the correct values
@@ -235,12 +254,12 @@ const TechnicalInterview = () => {
       await startInterview();
     } catch (err) {
       logger.error("Failed to start interview", err, { component: 'TechnicalInterview' });
-      toast.error("Failed to start interview. Please try again.");
+      notifications.error("Failed to start interview. Please try again.");
       setIsInterviewActive(false);
     }
   };
 
-  const handleStopInterview = async () => {
+  const handleStopInterview = useCallback(async () => {
     setIsInterviewActive(false);
     stopInterview();
 
@@ -249,12 +268,12 @@ const TechnicalInterview = () => {
       const duration = Math.floor(
         (new Date().getTime() - interviewStartTimeRef.current.getTime()) / 1000
       );
-      
+
       // Save final code snapshot
       if (code) {
         await saveCodeSnapshot(code);
       }
-      
+
       // End session (scores will be updated when AI feedback is parsed)
       await endSession(duration);
       interviewStartTimeRef.current = null;
@@ -262,7 +281,7 @@ const TechnicalInterview = () => {
       // Show feedback after interview ends
       setShowFeedback(true);
     }
-  };
+  }, [stopInterview, sessionId, code, saveCodeSnapshot, endSession]);
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
@@ -294,13 +313,13 @@ const TechnicalInterview = () => {
       const totalCount = response.results.length;
 
       if (passedCount === totalCount) {
-        toast.success(`All ${totalCount} tests passed! 🎉`);
+        notifications.success(`All ${totalCount} tests passed! 🎉`);
       } else {
-        toast.error(`${passedCount}/${totalCount} test cases passed`);
+        notifications.error(`${passedCount}/${totalCount} test cases passed`);
       }
     } catch (error) {
       logger.error("Failed to run code", error, { component: 'TechnicalInterview' });
-      toast.error("Failed to run code");
+      notifications.error("Failed to run code");
     } finally {
       setIsRunning(false);
     }
@@ -341,10 +360,10 @@ const TechnicalInterview = () => {
   // Auto-stop if error occurs
   useEffect(() => {
     if ((error || sessionError) && isInterviewActive) {
-      toast.error(error || sessionError || "An error occurred");
+      notifications.error(error || sessionError || "An error occurred");
       handleStopInterview();
     }
-  }, [error, sessionError, isInterviewActive]);
+  }, [error, sessionError, isInterviewActive, handleStopInterview]);
 
   // Show feedback view if interview ended
   if (showFeedback && sessionId) {
@@ -624,7 +643,7 @@ const TechnicalInterview = () => {
                     {problem.examples && problem.examples.length > 0 && (
                       <div>
                         <h3 className="font-semibold mb-2">Examples:</h3>
-                        {problem.examples.map((example: any, idx: number) => (
+                        {problem.examples.map((example, idx: number) => (
                           <div key={idx} className="bg-muted p-3 rounded-md mb-2">
                             <div className="font-mono text-sm space-y-1">
                               <div><strong>Input:</strong> {example.input}</div>

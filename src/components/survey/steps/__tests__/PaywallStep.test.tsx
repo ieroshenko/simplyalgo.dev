@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for PaywallStep component
  * Tests the UI behavior and checkout session creation logic

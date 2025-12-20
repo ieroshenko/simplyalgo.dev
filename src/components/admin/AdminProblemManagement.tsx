@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +40,7 @@ const AdminProblemManagement = () => {
 
     const { toast } = useToast();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const { data: problemsData, error: problemsError } = await supabase
@@ -73,7 +69,11 @@ const AdminProblemManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const handleAddProblem = () => {
         setSelectedProblemId(null);

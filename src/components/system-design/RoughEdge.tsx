@@ -81,7 +81,7 @@ export const RoughEdge = ({
     );
 
     svg.appendChild(arrowPath);
-  }, [sourceX, sourceY, lineEndX, lineEndY, arrowTipX, arrowTipY, angle, strokeColor, strokeWidth]);
+  }, [sourceX, sourceY, lineEndX, lineEndY, arrowTipX, arrowTipY, angle, strokeColor, strokeWidth, arrowSize]);
 
   // Create a straight line path string for the clickable area (matches the visible line)
   const straightLinePath = `M ${sourceX},${sourceY} L ${arrowTipX},${arrowTipY}`;

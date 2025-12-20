@@ -9,9 +9,31 @@ import type { UserStory } from "@/types";
 const STALE_TIME = 5 * 60 * 1000; // 5 minutes
 const GC_TIME = 30 * 60 * 1000; // 30 minutes
 
+// Database row type for user_stories table
+interface UserStoryRow {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  situation: string | null;
+  task: string | null;
+  action: string | null;
+  result: string | null;
+  tags: string[] | null;
+  technical_skills: string[] | null;
+  technologies: string[] | null;
+  metrics: string | null;
+  related_problem_ids: string[] | null;
+  versatility_score: number | null;
+  last_used_at: string | null;
+  practice_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Fetch user stories from database
 async function fetchUserStories(userId: string): Promise<UserStory[]> {
-  const { data, error: fetchError } = await (supabase as unknown as any)
+  const { data, error: fetchError } = await supabase
     .from("user_stories")
     .select("*")
     .eq("user_id", userId)
@@ -19,7 +41,7 @@ async function fetchUserStories(userId: string): Promise<UserStory[]> {
 
   if (fetchError) throw fetchError;
 
-  return ((data as unknown) || []).map((s: any) => ({
+  return (data || []).map((s: UserStoryRow) => ({
     id: s.id,
     user_id: s.user_id,
     title: s.title,
@@ -66,7 +88,7 @@ export const useUserStories = () => {
     ) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { data, error: insertError } = await (supabase as unknown as any)
+      const { data, error: insertError } = await supabase
         .from("user_stories")
         .insert({
           user_id: user.id,
@@ -109,7 +131,7 @@ export const useUserStories = () => {
     }) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { error: updateError } = await (supabase as unknown as any)
+      const { error: updateError } = await supabase
         .from("user_stories")
         .update(updates)
         .eq("id", storyId)
@@ -130,7 +152,7 @@ export const useUserStories = () => {
     mutationFn: async (storyId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { error: deleteError } = await (supabase as unknown as any)
+      const { error: deleteError } = await supabase
         .from("user_stories")
         .delete()
         .eq("id", storyId)

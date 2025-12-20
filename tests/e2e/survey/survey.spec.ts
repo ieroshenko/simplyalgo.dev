@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from '../../utils/test-fixtures';
 import { AuthHelper } from '../../utils/test-helpers';
 
@@ -45,12 +46,18 @@ test.describe('Survey Flow', () => {
       await expect(page.getByRole('button', { name: /Continue/i })).toBeVisible();
     });
 
-    test('should have enabled Continue button', async ({ page }) => {
+    test('should have enabled Continue button after selecting an option', async ({ page }) => {
       await page.goto('/survey/1');
 
-      // Continue button should be visible and enabled
+      // Continue button should be visible but disabled initially (no selection)
       const continueButton = page.getByRole('button', { name: /Continue/i });
       await expect(continueButton).toBeVisible();
+      await expect(continueButton).toBeDisabled();
+
+      // Select an option
+      await page.getByRole('button', { name: /Student/i }).click();
+
+      // Now Continue should be enabled
       await expect(continueButton).toBeEnabled();
     });
 

@@ -90,7 +90,7 @@ export const useSurveyData = () => {
     },
   });
 
-  const surveyData = data?.surveyData ?? {};
+  const surveyData = useMemo(() => data?.surveyData ?? {}, [data?.surveyData]);
   const completedSteps = useMemo(
     () => new Set(data?.completedSteps ?? []),
     [data?.completedSteps]
@@ -137,7 +137,7 @@ export const useSurveyData = () => {
     },
   });
 
-  // Update survey data
+  // Update survey data - with optimistic update
   const updateSurveyData = useCallback(
     async (step: number, answer: string, markCompleted: boolean = false) => {
       const newSurveyData = {
@@ -150,9 +150,19 @@ export const useSurveyData = () => {
         newCompletedSteps.add(step);
       }
 
+      // Optimistic update: immediately update the cache so navigation works
+      queryClient.setQueryData(['surveyData', user?.id], {
+        surveyData: newSurveyData,
+        completedSteps: Array.from(newCompletedSteps),
+      });
+
+      // Save to localStorage immediately
+      saveToLocalStorage(newSurveyData, newCompletedSteps);
+
+      // Then trigger the async database save
       saveMutation.mutate({ newSurveyData, newCompletedSteps });
     },
-    [surveyData, completedSteps, saveMutation]
+    [surveyData, completedSteps, saveMutation, queryClient, user?.id]
   );
 
   // Load data function (for manual refresh)

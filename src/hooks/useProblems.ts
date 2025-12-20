@@ -107,7 +107,7 @@ async function fetchProblemsData(userId?: string): Promise<Problem[]> {
 
   logger.debug('[useProblems] Fetched problems', {
     count: problemsData?.length,
-    hasLinkedList: !!problemsData?.find((p: any) => p.id === 'implement-linked-list')
+    hasLinkedList: !!problemsData?.find((p: { id: string }) => p.id === 'implement-linked-list')
   });
 
   if (problemsError) throw problemsError;

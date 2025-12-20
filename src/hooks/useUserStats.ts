@@ -39,7 +39,7 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 // Helper: Validate current streak
-const validateCurrentStreak = (statsData: any): number => {
+const validateCurrentStreak = (statsData: { last_activity_date?: string; current_streak?: number }): number => {
   const today = new Date().toISOString().split("T")[0];
   const lastActivityDate = statsData?.last_activity_date?.split("T")[0];
   const currentStreak = statsData?.current_streak || 0;

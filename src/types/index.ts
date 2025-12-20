@@ -323,10 +323,10 @@ export interface SystemDesignSession {
 }
 
 export interface SystemDesignBoardState {
-  // Excalidraw format (new default)
-  elements?: any[];
-  appState?: any;
-  files?: any;
+  // Excalidraw format (new default) - using unknown for external library types
+  elements?: unknown[];
+  appState?: unknown;
+  files?: unknown;
   // ReactFlow format (legacy, kept for backwards compatibility)
   nodes?: FlowNode[];
   edges?: FlowEdge[];

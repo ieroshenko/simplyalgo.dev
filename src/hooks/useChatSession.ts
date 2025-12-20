@@ -248,7 +248,7 @@ export const useChatSession = ({
     } finally {
       setLoading(false);
     }
-  }, [user?.id, problemId, toast]);
+  }, [user?.id, problemId, toast, currentCode, session?.id]);
 
   // Save message to database
   const saveMessage = useCallback(
@@ -278,7 +278,7 @@ export const useChatSession = ({
         });
       }
     },
-    [session, toast],
+    [session, toast, user?.id],
   );
 
   // Send message to AI and save both user and AI messages
@@ -439,6 +439,7 @@ export const useChatSession = ({
       contextState.sessionId,
       contextState.responseId,
       coachingMode,
+      user?.id,
     ],
   );
 
@@ -566,7 +567,7 @@ export const useChatSession = ({
         setIsTyping(false);
       }
     },
-    [session, isTyping, messages, problemDescription, saveMessage, toast, coachingMode],
+    [session, isTyping, messages, problemDescription, saveMessage, toast, coachingMode, user?.id],
   );
 
   return {

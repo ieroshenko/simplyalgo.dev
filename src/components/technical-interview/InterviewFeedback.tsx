@@ -18,7 +18,7 @@ const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<unknown>(null);
   const [feedback, setFeedback] = useState<unknown>(null);
-  const [testResults, setTestResults] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<Array<{ id: string; passed: boolean; test_case_number: number }>>([]);
 
   useEffect(() => {
     const fetchFeedback = async () => {
