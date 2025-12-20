@@ -42,26 +42,18 @@ import { useCoachingNew } from "@/hooks/useCoachingNew";
 import { useTheme } from "@/hooks/useTheme";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import CoachBubble from "@/components/coaching/CoachBubble";
-import HighlightOverlay from "@/components/coaching/HighlightOverlay";
-import SimpleOverlay from "@/components/coaching/SimpleOverlay";
-import FeedbackOverlay from "@/components/coaching/FeedbackOverlay";
-import CoachProgress from "@/components/coaching/CoachProgress";
-import LoadingSpinner from "@/components/LoadingSpinner";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import Editor from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import { useFeatureTracking, Features } from "@/hooks/useFeatureTracking";
 import { trackEvent, trackCodeRun, AnalyticsEvents } from "@/services/analytics";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
-import { CodeDiffDialog } from "@/components/CodeDiffDialog";
+import { ProblemSolverDialogs } from "@/pages/ProblemSolverDialogs";
+import { ProblemSolverCoachingLayer } from "@/pages/ProblemSolverCoachingLayer";
+import { ProblemSolverTestResultsPanel } from "@/pages/ProblemSolverTestResultsPanel";
 
 
 const ProblemSolverNew = () => {
@@ -79,19 +71,7 @@ const ProblemSolverNew = () => {
   const [activeTestCase, setActiveTestCase] = useState(0);
   const [testPanelSize, setTestPanelSize] = useState(100);
   const notesRef = useRef<NotesHandle>(null);
-  const codeEditorRef = useRef<{
-    getValue: () => string;
-    setValue: (value: string) => void;
-    getPosition: () => { lineNumber: number; column: number } | null;
-    setPosition: (pos: { lineNumber: number; column: number }) => void;
-    focus: () => void;
-    deltaDecorations: (
-      oldDecorations: string[],
-      newDecorations: Array<{ range: unknown; options: unknown }>,
-    ) => string[];
-    getScrollTop: () => number;
-    getVisibleRanges: () => Array<{ startLineNumber: number; endLineNumber: number }>;
-  } | null>(null);
+  const codeEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Initialize OverlayPositionManager for coaching overlay positioning
   const overlayPositionManager = useRef<OverlayPositionManager | null>(null);
@@ -235,6 +215,16 @@ const ProblemSolverNew = () => {
     }
   }, [problem?.functionSignature, code]);
 
+  const [largeInsertConfirmState, setLargeInsertConfirmState] = useState<{
+    open: boolean;
+    lineCount: number;
+    resolve: ((value: boolean) => void) | null;
+  }>({
+    open: false,
+    lineCount: 0,
+    resolve: null,
+  });
+
   // Coaching system integration
   const {
     coachingState,
@@ -250,6 +240,15 @@ const ProblemSolverNew = () => {
     userId: user?.id || "anonymous",
     problemDescription: problem?.description || "",
     editorRef: codeEditorRef,
+    confirmLargeInsert: ({ lineCount }) => {
+      return new Promise<boolean>((resolve) => {
+        setLargeInsertConfirmState({
+          open: true,
+          lineCount,
+          resolve,
+        });
+      });
+    },
     onCodeInsert: async (code: string, cursorPosition?: { line: number; column: number }, insertionType?: string, context?: { isCoachingCorrection?: boolean; feedback?: string }) => {
       // Wrap the code string in a CodeSnippet for the existing handler
       const snippet: CodeSnippet = {
@@ -880,138 +879,12 @@ const ProblemSolverNew = () => {
                           </div>
                         </div>
                       )}
-                      {testResults.length === 0 ? (
-                        <div className="p-4">
-                          <div className="text-sm font-medium text-foreground mb-3">
-                            Test Results
-                          </div>
-                          <div className="font-mono text-sm text-muted-foreground">
-                            Click "Run" to test your code...
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-full flex flex-col">
-                          <div className="px-4 pt-4 pb-2">
-                            <div className="text-sm font-medium text-foreground mb-3">
-                              Test Results
-                            </div>
-                            <div className="flex gap-2 mb-3">
-                              {testResults.map((result, index) => {
-                                let buttonClass = "flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ";
-                                if (activeTestCase === index) {
-                                  buttonClass += result.passed
-                                    ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
-                                    : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600";
-                                } else {
-                                  buttonClass += result.passed
-                                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20"
-                                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20";
-                                }
-                                return (
-                                  <button
-                                    key={index}
-                                    onClick={() => setActiveTestCase(index)}
-                                    className={buttonClass}
-                                  >
-                                    {result.passed ? (
-                                      <Check className="w-3 h-3" />
-                                    ) : (
-                                      <X className="w-3 h-3" />
-                                    )}
-                                    <span>Case {index + 1}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          <div className="flex-1 px-4 pb-4 overflow-y-auto">
-                            {testResults[activeTestCase] && (
-                              <div
-                                className={`p-4 rounded-lg border-2 ${testResults[activeTestCase].passed
-                                  ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
-                                  : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
-                                  }`}
-                              >
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center space-x-3">
-                                    {testResults[activeTestCase].passed ? (
-                                      <Check className="w-5 h-5 text-green-700 dark:text-green-400" />
-                                    ) : (
-                                      <X className="w-5 h-5 text-red-600 dark:text-red-400" />
-                                    )}
-                                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                      Test Case {activeTestCase + 1}
-                                    </span>
-                                    <Badge
-                                      className={`text-xs font-semibold px-3 py-1 ${testResults[activeTestCase].passed
-                                        ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
-                                        : "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
-                                        }`}
-                                    >
-                                      {testResults[activeTestCase].passed ? "✅ PASSED" : "❌ FAILED"}
-                                    </Badge>
-                                  </div>
-                                  {testResults[activeTestCase].time && (
-                                    <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                                      <Clock className="w-4 h-4" />
-                                      <span>{testResults[activeTestCase].time}</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="space-y-4">
-                                  <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                      Input:
-                                    </div>
-                                    <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
-                                      {renderValue(testResults[activeTestCase].input)}
-                                    </pre>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                        Expected Output:
-                                      </div>
-                                      <pre className="text-sm font-mono text-gray-900 dark:text-gray-100 whitespace-pre overflow-x-auto">
-                                        {renderValue(testResults[activeTestCase].expected)}
-                                      </pre>
-                                    </div>
-
-                                    <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-md">
-                                      <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                                        Your Output:
-                                      </div>
-                                      <pre
-                                        className={`text-sm font-mono whitespace-pre overflow-x-auto ${testResults[activeTestCase].passed
-                                          ? "text-green-700 dark:text-green-300"
-                                          : "text-red-700 dark:text-red-300"
-                                          }`}
-                                      >
-                                        {renderValue(testResults[activeTestCase].actual) ||
-                                          "No output"}
-                                      </pre>
-                                    </div>
-                                  </div>
-
-                                  {testResults[activeTestCase].stderr && (
-                                    <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-800">
-                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
-                                        Error:
-                                      </div>
-                                      <pre className="text-sm font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
-                                        {testResults[activeTestCase].stderr}
-                                      </pre>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <ProblemSolverTestResultsPanel
+                        testResults={testResults}
+                        activeTestCase={activeTestCase}
+                        setActiveTestCase={setActiveTestCase}
+                        renderValue={renderValue}
+                      />
                     </div>
                   </ResizablePanel>
                 </>
@@ -1044,151 +917,61 @@ const ProblemSolverNew = () => {
         </ResizablePanelGroup>
       </div>
 
-      {/* Full-screen code viewer */}
-      <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
-        <DialogContent className="max-w-[90vw] p-0">
-          <DialogHeader className="px-4 pt-4 pb-2">
-            <DialogTitle className="text-base">{fullscreenTitle}</DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-4">
-            <div className="border rounded">
-              <Editor
-                height="80vh"
-                defaultLanguage={fullscreenLang}
-                value={fullscreenCode}
-                theme={currentTheme}
-                onMount={(editor, monaco) => {
-                  defineCustomThemes(monaco);
-                }}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: true },
-                  lineNumbers: "on",
-                  folding: true,
-                  scrollBeyondLastLine: false,
-                  renderLineHighlight: "none",
-                  fontSize: 15,
-                  wordWrap: "off",
-                }}
-              />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ProblemSolverDialogs
+        fullscreenOpen={fullscreenOpen}
+        setFullscreenOpen={setFullscreenOpen}
+        fullscreenTitle={fullscreenTitle}
+        fullscreenCode={fullscreenCode}
+        fullscreenLang={fullscreenLang}
+        currentTheme={currentTheme}
+        defineCustomThemes={defineCustomThemes}
+        showReplacementDialog={showReplacementDialog}
+        setShowReplacementDialog={setShowReplacementDialog}
+        currentCodeForDiff={currentCodeForDiff}
+        pendingReplacementCode={pendingReplacementCode}
+        onConfirmReplacement={handleConfirmReplacement}
+        onCancelReplacement={handleCancelReplacement}
+        largeInsertConfirmState={largeInsertConfirmState}
+        setLargeInsertConfirmState={setLargeInsertConfirmState}
+      />
 
-      {/* Coaching Overlays */}
-      {coachingState.isCoachModeActive && coachingState.session && (
-        <>
-          {/* Progress and question now integrated into SimpleOverlay below */}
-
-          {/* Enhanced Coaching Overlay */}
-          {coachingState.showInputOverlay && coachingState.inputPosition && coachingState.session && (
-            <SimpleOverlay
-              isVisible={true}
-              position={coachingState.inputPosition}
-              onValidateCode={(explanation) => {
-                // Get code from the highlighted area in the main editor
-                const editor = codeEditorRef.current;
-                if (!editor) {
-                  logger.error('[ProblemSolverNew] Editor not available for code validation');
-                  return;
-                }
-
-                // Get the current code from the editor
-                const currentCode = editor.getValue();
-                logger.debug('[ProblemSolverNew] Validating code from editor', { codeLength: currentCode.length });
-
-                // Submit the current editor code for validation with optional explanation
-                submitCoachingCode(currentCode, explanation || "Code validation from highlighted area");
-              }}
-              onCancel={cancelInput}
-              isValidating={coachingState.isValidating}
-              question={coachingState.session?.currentQuestion || ""} // ← This should be empty when completed
-              hint={coachingState.session?.currentHint}
-              isSessionCompleted={coachingState.session?.isCompleted || false}
-              validationResult={coachingState.lastValidation ? {
-                isCorrect: coachingState.lastValidation.isCorrect,
-                feedback: coachingState.lastValidation.feedback,
-                codeToAdd: coachingState.lastValidation.codeToAdd,
-                nextStep: coachingState.lastValidation.nextStep,
-                isOptimizable: coachingState.lastValidation.isOptimizable,
-                hasAlternative: coachingState.lastValidation.hasAlternative,
-              } : null}
-              onInsertCorrectCode={insertCorrectCode}
-              onPositionChange={(pos) => {
-                // Use the coaching hook's stored position via a dedicated setter in future;
-                // for now, rely on showInteractiveQuestion preserving this prop value.
-                coachingState.inputPosition = pos as { x: number; y: number } | null;
-              }}
-              onStartOptimization={(type) => startOptimization(type)} // Pass the type parameter
-              onFinishCoaching={async () => {
-                // When coaching completes successfully, save as submission
-                if (user?.id && problem?.id && code) {
-                  logger.debug('[ProblemSolverNew] Coaching completed - saving submission');
-                  try {
-                    const saved = await UserAttemptsService.markProblemSolved(
-                      user.id,
-                      problem.id,
-                      code,
-                      [], // No test results available for coaching completion
-                    );
-                    if (saved) {
-                      optimisticAdd(saved);
-                    }
-                    watchForAcceptance(30_000, 2_000);
-                    await handleProblemSolved(
-                      problem.difficulty as "Easy" | "Medium" | "Hard",
-                    );
-                    notifications.success("Solution saved to submissions! 🎉");
-                  } catch (error) {
-                    logger.error('[ProblemSolverNew] Failed to save coaching completion', { error });
-                    notifications.error("Failed to save submission");
-                  }
-                }
-                stopCoaching();
-              }}
-              isOptimizable={coachingState.isOptimizable || coachingState.lastValidation?.isOptimizable}
-              hasError={coachingState.feedback?.type === "error" && coachingState.feedback?.message?.includes("AI Coach is temporarily unavailable")}
-              onExitCoach={() => {
-                logger.debug('[ProblemSolverNew] Exiting coach mode due to AI service error');
-                stopCoaching();
-              }}
-              highlightedLine={coachingState.session.highlightArea?.startLine}
-              editorHeight={600}
-              editorRef={codeEditorRef}
-              // New positioning system props
-              positionManager={overlayPositionManager.current}
-              problemId={problemId}
-            />
-          )}
-        </>
-      )}
-
-      {/* Loading Spinner for AI Coaching */}
-      {coachingState.isWaitingForResponse && (
-        <LoadingSpinner
-          message={coachingState.isValidating ? "Validating your code..." : "AI Coach is thinking..."}
-        />
-      )}
-
-      {/* Feedback Overlay for coaching errors/success */}
-      {coachingState.feedback.show && (
-        <FeedbackOverlay
-          isVisible={coachingState.feedback.show}
-          type={coachingState.feedback.type || "hint"}
-          message={coachingState.feedback.message}
-          onClose={closeFeedback}
-          showConfetti={coachingState.feedback.showConfetti}
-        />
-      )}
-
-      <CodeDiffDialog
-        isOpen={showReplacementDialog}
-        onOpenChange={setShowReplacementDialog}
-        originalCode={currentCodeForDiff}
-        modifiedCode={pendingReplacementCode || ""}
-        onAccept={handleConfirmReplacement}
-        onReject={handleCancelReplacement}
+      <ProblemSolverCoachingLayer
+        coachingState={coachingState}
+        codeEditorRef={codeEditorRef}
+        submitCoachingCode={submitCoachingCode}
+        cancelInput={cancelInput}
+        insertCorrectCode={insertCorrectCode}
+        startOptimization={startOptimization}
+        stopCoaching={stopCoaching}
+        closeFeedback={closeFeedback}
+        onFinishCoaching={async () => {
+          // When coaching completes successfully, save as submission
+          if (user?.id && problem?.id && code) {
+            logger.debug('[ProblemSolverNew] Coaching completed - saving submission');
+            try {
+              const saved = await UserAttemptsService.markProblemSolved(
+                user.id,
+                problem.id,
+                code,
+                [], // No test results available for coaching completion
+              );
+              if (saved) {
+                optimisticAdd(saved);
+              }
+              watchForAcceptance(30_000, 2_000);
+              await handleProblemSolved(
+                problem.difficulty as "Easy" | "Medium" | "Hard",
+              );
+              notifications.success("Solution saved to submissions! 🎉");
+            } catch (error) {
+              logger.error('[ProblemSolverNew] Failed to save coaching completion', { error });
+              notifications.error("Failed to save submission");
+            }
+          }
+          stopCoaching();
+        }}
+        overlayPositionManager={overlayPositionManager.current}
+        problemId={problemId}
       />
     </div>
   );

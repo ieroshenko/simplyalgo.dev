@@ -19,9 +19,10 @@ interface UseCoachingProps {
     getScrolledVisiblePosition?: (position: { lineNumber: number; column: number }) => { left: number; top: number; height: number } | null;
   } | null>;
   onCodeInsert?: (code: string) => Promise<void>;
+  confirmLargeInsert?: (options: { code: string; lineCount: number }) => Promise<boolean>;
 }
 
-interface CoachingState {
+export interface CoachingState {
   session: InteractiveCoachSession | null;
   isCoachModeActive: boolean;
   currentHighlight: CoachHighlightArea | null;
@@ -65,7 +66,7 @@ interface CoachingState {
   positionManager?: OverlayPositionManager;
 }
 
-export const useCoachingNew = ({ problemId, userId, problemDescription, editorRef, onCodeInsert }: UseCoachingProps) => {
+export const useCoachingNew = ({ problemId, userId, problemDescription, editorRef, onCodeInsert, confirmLargeInsert }: UseCoachingProps) => {
   // Initialize position manager for centralized overlay positioning
   const positionManager = useMemo(() => {
     if (problemId) {
@@ -821,7 +822,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         const insertionType: 'smart' | 'replace' = 'replace';
 
         if (looksLarge) {
-          const ok = window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
+          const ok = confirmLargeInsert
+            ? await confirmLargeInsert({ code: codeToInsert, lineCount: lines.length })
+            : window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
           if (!ok) {
             setCoachingState(prev => ({
               ...prev,
@@ -895,7 +898,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       }));
     }
-  }, [coachingState.lastValidation, onCodeInsert, editorRef, codeContainsSnippet]);
+  }, [coachingState.lastValidation, onCodeInsert, editorRef, codeContainsSnippet, confirmLargeInsert]);
 
   // Stop coaching session (removed duplicate later)
 
