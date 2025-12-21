@@ -1,11 +1,12 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Code, Grid3x3, Share2, MessageCircle, Webhook, Blocks, UsersRound } from "lucide-react";
+import React from "react";
+import { Code, Share2, MessageCircle, Webhook, Blocks, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { isFeatureEnabled, isFeatureEnabledBooleal } from "@/config/features";
+import { isFeatureEnabled, isFeatureEnabledBoolean, type FeatureFlag } from "@/config/features";
 
 const CoreBattleCards = () => {
   const navigate = useNavigate();
+  const [showUpcomingAssessments, setShowUpcomingAssessments] = React.useState(false);
+  const [showUpcomingInterviews, setShowUpcomingInterviews] = React.useState(false);
 
   const assessments = [
     {
@@ -16,6 +17,7 @@ const CoreBattleCards = () => {
       iconColor: "text-primary",
       path: "/problems",
       featureFlag: true,
+      status: "ACTIVE"
     },
     {
       title: "System Design",
@@ -25,6 +27,7 @@ const CoreBattleCards = () => {
       iconColor: "text-primary",
       path: "/system-design",
       featureFlag: false, // Disabled for launch
+      status: "COMING SOON"
     },
     {
       title: "Implement Script/API",
@@ -33,6 +36,7 @@ const CoreBattleCards = () => {
       color: "bg-primary/10",
       iconColor: "text-primary",
       featureFlag: false,
+      status: "COMING SOON"
     },
   ];
 
@@ -45,6 +49,7 @@ const CoreBattleCards = () => {
       iconColor: "text-primary",
       path: "/technical-interview",
       featureFlag: "TECHNICAL_INTERVIEW" as const,
+      status: "COMING SOON"
     },
     {
       title: "System-Design",
@@ -53,16 +58,19 @@ const CoreBattleCards = () => {
       color: "bg-success/20",
       iconColor: "text-primary",
       featureFlag: false,
+      status: "COMING SOON"
     },
     {
       title: "Behavioral Interviews",
       description: "Soft skills & behavioral interviews",
       icon: MessageCircle,
-      color: "bg-success/20",
-      iconColor: "text-primary",
+      color: "bg-amber/20",
+      iconColor: "text-amber-600",
       featureFlag: true,
       path: "/behavioral",
-    },  
+      status: "AVAILABLE",
+      isYellow: true, // Flag to render with yellow styling
+    },
     {
       title: "Script/API Follow-up",
       description: "Follow-up questions on 'build a script or API' assessment",
@@ -70,100 +78,147 @@ const CoreBattleCards = () => {
       color: "bg-success/20",
       iconColor: "text-primary",
       featureFlag: false,
-    }, 
+      status: "COMING SOON"
+    },
   ];
 
-  // Get all assessments and interviews (don't filter by feature flags)
-  const allAssessments = assessments;
-  const allInterviews = interviews;
+  const availableAssessments = assessments.filter(a => isFeatureEnabledBoolean(a.featureFlag));
+  const upcomingAssessments = assessments.filter(a => !isFeatureEnabledBoolean(a.featureFlag));
+
+  const availableInterviews = interviews.filter(i => {
+    return typeof i.featureFlag === 'string'
+      ? isFeatureEnabled(i.featureFlag as FeatureFlag)
+      : isFeatureEnabledBoolean(i.featureFlag);
+  });
+  const upcomingInterviews = interviews.filter(i => {
+    return typeof i.featureFlag === 'string'
+      ? !isFeatureEnabled(i.featureFlag as FeatureFlag)
+      : !isFeatureEnabledBoolean(i.featureFlag);
+  });
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold text-foreground mb-6">Assessment prep</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {allAssessments.map((battle) => {
-          const Icon = battle.icon;
-          const isEnabled = isFeatureEnabledBooleal(battle.featureFlag);
-          return (
-            <Card
+    <div className="space-y-8 px-6">
+      <section className="space-y-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">Assessment Prep</h2>
+
+        {/* Available items */}
+        <div className="space-y-2">
+          {availableAssessments.map((battle) => (
+            <button
               key={battle.title}
-              className={`hover:shadow-md transition-shadow group relative ${
-                isEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-75"
-              }`}
-              onClick={() => isEnabled && navigate(battle.path)}
+              onClick={() => navigate(battle.path)}
+              className="w-full flex items-center justify-between p-4 rounded-lg border border-green-300/70 dark:border-green-700/50 bg-green-100/50 dark:bg-green-950/30 hover:bg-green-100/70 dark:hover:bg-green-950/40 hover:border-green-400/70 dark:hover:border-green-600/50 transition-all text-left shadow-sm"
             >
-              <CardContent className="p-6">
-                <div
-                  className={`w-12 h-12 ${battle.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}
-                >
-                  <Icon className={`w-6 h-6 ${battle.iconColor}`} />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full" />
+                  <h3 className="font-semibold text-base text-foreground">{battle.title}</h3>
                 </div>
+                <p className="text-sm text-muted-foreground">{battle.description}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            </button>
+          ))}
+        </div>
 
-                <h3 className="font-bold text-lg text-foreground mb-2">
-                  {battle.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {battle.description}
-                </p>
-                
-                {!isEnabled && (
-                  <div className="absolute top-2 right-2">
-                    <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full">
-                      Coming soon
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      <h2 className="text-2xl font-bold text-foreground mt-6">Interview prep</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        {allInterviews.map((interview) => {
-          const Icon = interview.icon;
-          // Check if featureFlag is a string (feature flag name) or boolean
-          const isEnabled = typeof interview.featureFlag === 'string' 
-            ? isFeatureEnabled(interview.featureFlag)
-            : isFeatureEnabledBooleal(interview.featureFlag);
-          return (
-            <Card
-              key={interview.title}
-              className={`hover:shadow-md transition-shadow group relative ${
-                isEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-75"
-              }`}
-              onClick={() => {
-                if (isEnabled && interview.path) {
-                  navigate(interview.path);
-                }
-              }}
+        {/* Upcoming modules - collapsible */}
+        {upcomingAssessments.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowUpcomingAssessments(!showUpcomingAssessments)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <CardContent className="p-6">
-                <div
-                  className={`w-12 h-12 ${interview.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}
-                >
-                  <Icon className={`w-6 h-6 ${interview.iconColor}`} />
-                </div>
+              <ChevronRight className={`w-3 h-3 transition-transform ${showUpcomingAssessments ? 'rotate-90' : ''}`} />
+              <span>Upcoming modules ({upcomingAssessments.length})</span>
+            </button>
 
-                <h3 className="font-bold text-lg text-foreground mb-2">
-                  {interview.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {interview.description}
-                </p>
-                
-                {!isEnabled && (
-                  <div className="absolute top-2 right-2">
-                    <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full">
-                      Coming soon
-                    </span>
+            {showUpcomingAssessments && (
+              <div className="space-y-2 pl-5">
+                {upcomingAssessments.map((battle) => (
+                  <div
+                    key={battle.title}
+                    className="w-full flex items-center justify-between p-4 rounded-lg border border-border/30 bg-background/50 opacity-60"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="font-medium text-sm text-foreground">{battle.title}</h3>
+                        <span className="text-[10px] font-medium text-amber-700 px-2 py-0.5 rounded bg-amber-50 border border-amber-200/50">
+                          coming soon
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{battle.description}</p>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">Interview Prep</h2>
+
+        {/* Available items */}
+        <div className="space-y-2">
+          {availableInterviews.map((interview) => {
+            const isYellow = 'isYellow' in interview && interview.isYellow;
+            return (
+              <button
+                key={interview.title}
+                onClick={() => interview.path && navigate(interview.path)}
+                className={`w-full flex items-center justify-between p-4 rounded-lg border transition-all text-left shadow-sm ${isYellow
+                    ? 'border-amber-300/70 dark:border-amber-700/50 bg-amber-100/50 dark:bg-amber-950/30 hover:bg-amber-100/70 dark:hover:bg-amber-950/40 hover:border-amber-400/70 dark:hover:border-amber-600/50'
+                    : 'border-green-300/70 dark:border-green-700/50 bg-green-100/50 dark:bg-green-950/30 hover:bg-green-100/70 dark:hover:bg-green-950/40 hover:border-green-400/70 dark:hover:border-green-600/50'
+                  }`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${isYellow ? 'bg-amber-600 dark:bg-amber-400' : 'bg-green-600 dark:bg-green-400'}`} />
+                    <h3 className="font-semibold text-base text-foreground">{interview.title}</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{interview.description}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Upcoming modules - collapsible */}
+        {upcomingInterviews.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowUpcomingInterviews(!showUpcomingInterviews)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform ${showUpcomingInterviews ? 'rotate-90' : ''}`} />
+              <span>Upcoming modules ({upcomingInterviews.length})</span>
+            </button>
+
+            {showUpcomingInterviews && (
+              <div className="space-y-2 pl-5">
+                {upcomingInterviews.map((interview) => (
+                  <div
+                    key={interview.title}
+                    className="w-full flex items-center justify-between p-4 rounded-lg border border-border/30 bg-background/50 opacity-60"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="font-medium text-sm text-foreground">{interview.title}</h3>
+                        <span className="text-[10px] font-medium text-amber-700 px-2 py-0.5 rounded bg-amber-50 border border-amber-200/50">
+                          coming soon
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{interview.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

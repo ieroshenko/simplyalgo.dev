@@ -11,6 +11,9 @@ declare module "mermaid" {
     id: string,
     definition: string,
   ): Promise<{ svg: string; bindFunctions?: (element: Element) => void }>;
-  const _default: any;
+  const _default: {
+    initialize: typeof initialize;
+    render: typeof render;
+  };
   export default _default;
 }

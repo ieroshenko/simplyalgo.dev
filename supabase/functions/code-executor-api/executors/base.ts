@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Base interface for language executors
  */
@@ -10,7 +11,7 @@ export interface LanguageExecutor {
     /**
      * Process code before execution (add test harness, etc.)
      */
-    processCode(code: string, testCases: any[], functionName: string): string;
+    processCode(code: string, testCases: unknown[], functionName: string): string;
 
     /**
      * Parse output from execution
@@ -29,7 +30,7 @@ export interface LanguageExecutor {
 export abstract class BaseLanguageExecutor implements LanguageExecutor {
     abstract getLanguageId(): number;
     abstract getLanguageName(): string;
-    abstract processCode(code: string, testCases: any[], functionName: string): string;
+    abstract processCode(code: string, testCases: unknown[], functionName: string): string;
 
     parseOutput(stdout: string): any {
         try {

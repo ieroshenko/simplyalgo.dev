@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import OpenAI from "https://esm.sh/openai@4";
@@ -25,7 +26,7 @@ const supabaseAdmin = supabaseServiceKey
 // LLM Provider Configuration
 // Supports both OpenRouter (preferred) and OpenAI (fallback)
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
-const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash";
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
 const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
 export const configuredModel = useOpenRouter ? openrouterModel : openaiModel;
@@ -493,7 +494,7 @@ Generate a welcoming first message that:
 
 Keep it warm, professional, and engaging. Format it clearly with the two questions. Do NOT start asking technical design questions yet - wait for the user to confirm understanding or ask clarifying questions first.`;
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [{ role: "user", content: initialPrompt }],
       max_completion_tokens: 800, // Increased from 400 to handle longer welcome messages
@@ -506,7 +507,7 @@ Keep it warm, professional, and engaging. Format it clearly with the two questio
 
     console.log(`[startDesignSession] Generating initial message: model=${configuredModel}, promptLength=${initialPrompt.length}, maxTokens=${completionParams.max_completion_tokens}`);
 
-    let response = await openai.chat.completions.create(completionParams);
+    const response = await openai.chat.completions.create(completionParams);
 
     console.log(`[startDesignSession] OpenAI completion result:`, {
       choices: response.choices?.length || 0,
@@ -647,7 +648,7 @@ The student just made changes to their diagram. Comment briefly on what they add
 
 Keep it conversational and brief—1-2 sentences max.`;
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [{ role: "user", content: reactionPrompt }],
       max_completion_tokens: 200,
@@ -658,7 +659,7 @@ Keep it conversational and brief—1-2 sentences max.`;
       completionParams.temperature = 0.7;
     }
 
-    let response = await openai.chat.completions.create(completionParams);
+    const response = await openai.chat.completions.create(completionParams);
 
     console.log(`[reactToBoardChanges] OpenAI completion result:`, {
       choices: response.choices?.length || 0,
@@ -831,7 +832,7 @@ async function coachMessage(
     const boardDescription = describeBoardState(boardState);
 
     let enhancedSystemPrompt = systemPrompt;
-    let conversationHistory = (messages || []).slice(-10).map((m: any) => ({
+    const conversationHistory = (messages || []).slice(-10).map((m: any) => ({
       role: m.message_role,
       content: m.content,
     }));
@@ -939,7 +940,7 @@ Student: "What happens if the cache goes down?"
 You: "Traffic hits the database directly. How will you prevent it from being overwhelmed?"`;
     }
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [
         { role: "system", content: enhancedSystemPrompt },
@@ -988,7 +989,7 @@ You: "Traffic hits the database directly. How will you prevent it from being ove
 
     if ((!aiResponse || aiResponse.trim().length === 0) && finishReason === "length") {
       console.warn(`[coachMessage] Empty AI response due to finish_reason=length. Retrying with fallback model.`);
-      const fallbackParams: any = {
+      const fallbackParams: unknown = {
         ...completionParams,
         model: resolveFallbackModel(completionParams.model || configuredModel),
         max_completion_tokens: Math.max(
@@ -1154,7 +1155,7 @@ Evaluate this system design and provide a structured JSON response:
 
 Be thorough but fair. Consider scalability, reliability, availability, and the rubric criteria.`;
 
-    const completionParams: any = {
+    const completionParams: unknown = {
       model: configuredModel,
       messages: [{ role: "user", content: evaluationPrompt }],
       response_format: { type: "json_object" },
@@ -1271,6 +1272,9 @@ serve(async (req) => {
 
     const body: SystemDesignRequest = await req.json();
     const { action } = body;
+
+    // NOTE: AI access control is now handled on the frontend for zero latency.
+    // The frontend uses useAIAccessStatus hook to check restrictions before making requests.
 
     console.log(`[system-design-chat] Received request: action=${action}, timestamp=${new Date().toISOString()}`);
 

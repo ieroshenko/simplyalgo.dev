@@ -342,9 +342,9 @@ export class OverlayPositionManager {
       const positionKeys = allKeys.filter(key => key.startsWith('overlay_position_'));
 
       let cleanedCount = 0;
-      positionKeys.forEach(key => {
+      positionKeys?.forEach(key => {
         try {
-          const data = this.storageService.load(key);
+          const data = this.storageService.load(key) as OverlayPosition | null;
           if (!data || this.isExpired(data)) {
             this.storageService.remove(key);
             cleanedCount++;

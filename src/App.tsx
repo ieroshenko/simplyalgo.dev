@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import Problems from "./pages/Problems";
 import SystemDesign from "./pages/SystemDesign";
 import SystemDesignSolver from "./pages/SystemDesignSolver";
-import ExcalidrawDesign from "./pages/ExcalidrawDesign";
 import ProblemSolverNew from "./pages/ProblemSolverNew";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -26,11 +25,24 @@ import TechnicalInterview from "./pages/TechnicalInterview";
 import DataStructureRedirect from "./components/DataStructureRedirect";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 import { AdminRoute } from "./components/route/AdminRoute";
+import { AnalyticsProvider } from "./components/analytics/AnalyticsProvider";
 import { Analytics } from '@vercel/analytics/react';
 
-const queryClient = new QueryClient();
+// Configure React Query with sensible cache defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000, // 2 minutes - data is fresh for 2 mins
+      gcTime: 30 * 60 * 1000, // 30 minutes - cache kept in memory
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -44,58 +56,61 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Auth />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/problems"
-              element={
-                <ProtectedRoute>
-                  <Problems />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/arena"
-              element={
-                <ProtectedRoute>
-                  <Problems />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/problem/:problemId"
-              element={
-                <ProtectedRoute>
-                  <ProblemSolverNew />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/problems/:problemId"
-              element={
-                <ProtectedRoute>
-                  <ProblemSolverNew />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/problems/data-structures/:slug"
-              element={
-                <ProtectedRoute>
-                  <DataStructureRedirect />
-                </ProtectedRoute>
-              }
-            />
-            {/* System Design - Disabled for launch */}
-            {/* <Route
+          <AnalyticsProvider>
+            <Routes>
+              <Route path="/" element={<Auth />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/problems"
+                element={
+                  <ProtectedRoute>
+                    <Problems />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/arena"
+                element={
+                  <ProtectedRoute>
+                    <Problems />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/problem/:problemId"
+                element={
+                  <ProtectedRoute>
+                    <ProblemSolverNew />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/problems/:problemId"
+                element={
+                  <ProtectedRoute>
+                    <ProblemSolverNew />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/problems/data-structures/:slug"
+                element={
+                  <ProtectedRoute>
+                    <DataStructureRedirect />
+                  </ProtectedRoute>
+                }
+              />
+              {/* System Design - Disabled for launch */}
+              {/* <Route
               path="/system-design"
               element={
                 <ProtectedRoute>
@@ -119,129 +134,130 @@ const App = () => (
                 </ProtectedRoute>
               }
             /> */}
-            <Route
-              path="/progress"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/tutor"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/survey/:stepNumber"
-              element={
-                <ProtectedRoute>
-                  <Survey />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/flashcards"
-              element={
-                <ProtectedRoute>
-                  <FlashcardDeck />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral"
-              element={
-                <ProtectedRoute>
-                  <Behavioral />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral-interview"
-              element={
-                <ProtectedRoute>
-                  <BehavioralInterview />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technical-interview"
-              element={
-                <ProtectedRoute>
-                  <TechnicalInterview />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral/questions"
-              element={
-                <ProtectedRoute>
-                  <BehavioralQuestions />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral/stories"
-              element={
-                <ProtectedRoute>
-                  <BehavioralStories />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral/stories/new"
-              element={
-                <ProtectedRoute>
-                  <BehavioralStoryNew />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral/practice"
-              element={
-                <ProtectedRoute>
-                  <BehavioralPractice />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/behavioral/mock-interview"
-              element={
-                <ProtectedRoute>
-                  <BehavioralMockInterview />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              }
-            />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route
+                path="/progress"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tutor"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/survey/:stepNumber"
+                element={
+                  <ProtectedRoute>
+                    <Survey />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/flashcards"
+                element={
+                  <ProtectedRoute>
+                    <FlashcardDeck />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral"
+                element={
+                  <ProtectedRoute>
+                    <Behavioral />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral-interview"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralInterview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/technical-interview"
+                element={
+                  <ProtectedRoute>
+                    <TechnicalInterview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral/questions"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralQuestions />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral/stories"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralStories />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral/stories/new"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralStoryNew />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral/practice"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralPractice />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/behavioral/mock-interview"
+                element={
+                  <ProtectedRoute>
+                    <BehavioralMockInterview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>
+                }
+              />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AnalyticsProvider>
         </BrowserRouter>
         <Analytics />
       </TooltipProvider>

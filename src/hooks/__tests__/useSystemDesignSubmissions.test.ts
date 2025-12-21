@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -7,13 +8,13 @@ let mockSelectResponse: any = { data: [], error: null };
 
 vi.mock('@/integrations/supabase/client', () => {
     const createChainableMock = () => {
-        const mock: any = {};
+        const mock = {} as Record<string, unknown>;
         mock.select = vi.fn(() => mock);
         mock.eq = vi.fn(() => mock);
         mock.not = vi.fn(() => mock);
         mock.in = vi.fn(() => mock);
         mock.order = vi.fn(() => mock);
-        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve(mockSelectResponse).then(resolve);
         return mock;
     };
 
@@ -24,7 +25,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { useSystemDesignSubmissions } from '../useSystemDesignSubmissions';
+import { useSystemDesignSubmissions } from '@/features/system-design/hooks/useSystemDesignSubmissions';
 
 describe('useSystemDesignSubmissions', () => {
     beforeEach(() => {

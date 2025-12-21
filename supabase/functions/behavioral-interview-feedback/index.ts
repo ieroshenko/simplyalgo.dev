@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - Deno URL import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-expect-error - Deno URL import
@@ -22,19 +23,52 @@ const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : supabase;
 
-// OpenAI client instance
-let openaiInstance: OpenAI | null = null;
+// LLM Provider Configuration
+const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
+const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
 
-function initializeOpenAI(): OpenAI {
-  if (openaiInstance) return openaiInstance;
-  
+// Model selection via env var
+const configuredModel = (useOpenRouter ? openrouterModel : openaiModel).trim();
+
+// LLM client instance (OpenRouter or OpenAI)
+let llmInstance: OpenAI | null = null;
+
+function initializeLLM(): OpenAI {
+  if (llmInstance) return llmInstance;
+
+  // Try OpenRouter first
+  if (useOpenRouter) {
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (openrouterKey) {
+      const siteUrl = Deno.env.get("OPENROUTER_SITE_URL") || "https://simplyalgo.dev";
+      const appName = Deno.env.get("OPENROUTER_APP_NAME") || "SimplyAlgo";
+
+      console.log(`[behavioral-interview-feedback] Using OpenRouter: model=${configuredModel}`);
+
+      llmInstance = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
+        },
+      });
+      return llmInstance;
+    }
+  }
+
+  // Fallback to OpenAI
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    throw new Error(useOpenRouter
+      ? "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set"
+      : "OPENAI_API_KEY environment variable is not set");
   }
-  
-  openaiInstance = new OpenAI({ apiKey: openaiKey });
-  return openaiInstance;
+
+  console.log(`[behavioral-interview-feedback] Using OpenAI (fallback): model=${configuredModel}`);
+  llmInstance = new OpenAI({ apiKey: openaiKey });
+  return llmInstance;
 }
 
 const corsHeaders = {
@@ -201,8 +235,8 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize OpenAI
-    const openai = initializeOpenAI();
+    // Initialize LLM client
+    const llm = initializeLLM();
 
     // Parse request body
     const body = await req.json();
@@ -218,16 +252,16 @@ serve(async (req) => {
       );
     }
 
-    // Generate feedback using OpenAI
+    // Generate feedback using LLM
     const systemPrompt = generateFeedbackPrompt(
       question,
       evaluationType || 'star',
       customEvaluationPrompt,
       story
     );
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Using mini for cost efficiency
+
+    const completionParams: unknown = {
+      model: configuredModel,
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -236,12 +270,18 @@ serve(async (req) => {
         },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3, // Lower temperature for more consistent scoring
-    });
+    };
+
+    // Only add temperature for non-GPT-5 models
+    if (!configuredModel.startsWith("gpt-5")) {
+      completionParams.temperature = 0.3; // Lower temperature for more consistent scoring
+    }
+
+    const completion = await llm.chat.completions.create(completionParams);
 
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
-      throw new Error("No response from OpenAI");
+      throw new Error("No response from LLM");
     }
 
     // Parse JSON response
@@ -249,7 +289,7 @@ serve(async (req) => {
 
     // Validate and ensure all required fields
     const evalType = evaluationType || 'star';
-    const validatedFeedback: any = {
+    const validatedFeedback: unknown = {
       content_score: Math.max(0, Math.min(100, feedback.content_score || 0)),
       delivery_score: Math.max(0, Math.min(100, feedback.delivery_score || 0)),
       overall_score: Math.max(0, Math.min(100, feedback.overall_score || 0)),

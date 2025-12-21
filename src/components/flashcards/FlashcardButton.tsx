@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle } from "lucide-react";
 import { useFlashcards } from "@/hooks/useFlashcards";
-import { useSolutions } from "@/hooks/useSolutions";
+import { useSolutions } from "@/features/problems/hooks/useSolutions";
 import { SolutionSelectorModal } from "./SolutionSelectorModal";
 import { isFeatureEnabled } from "@/config/features";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 
 interface FlashcardButtonProps {
   problemId: string;
@@ -50,7 +50,7 @@ export const FlashcardButton = ({
 
   const handleAddToFlashcards = () => {
     if (isAlreadyInFlashcards) {
-      toast.error("This problem is already in your flashcard deck. Remove the existing card first to add a different solution.");
+      notifications.error("This problem is already in your flashcard deck. Remove the existing card first to add a different solution.");
       return;
     }
 
@@ -68,12 +68,12 @@ export const FlashcardButton = ({
 
     // Default behavior - use curated solutions
     if (!solutions || solutions.length === 0) {
-      toast.error("No solutions available for this problem.");
+      notifications.error("No solutions available for this problem.");
       return;
     }
 
     // If only one solution, add it directly
-    if (solutions.length === 1) {
+    if (solutions.length === 1 && solutions[0]) {
       addToFlashcards({
         problemId,
         solutionId: solutions[0].id,

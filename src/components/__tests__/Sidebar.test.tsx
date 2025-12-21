@@ -41,7 +41,7 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 // Mock useProblems
-vi.mock('@/hooks/useProblems', () => ({
+vi.mock('@/features/problems/hooks/useProblems', () => ({
     useProblems: () => ({
         categories: mockCategories,
     }),

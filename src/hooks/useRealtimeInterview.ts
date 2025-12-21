@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface UseRealtimeInterviewProps {
   resumeText: string;
@@ -335,7 +336,7 @@ ${resumeText.slice(0, 20000)}`,
       logger.debug("WebRTC connection established", { component: "Realtime" });
     } catch (err) {
       logger.error("Failed to start interview", err, { component: "Realtime" });
-      setError(err instanceof Error ? err.message : "Failed to start interview");
+      setError(getErrorMessage(err, "Failed to start interview"));
       cleanup();
     }
   }, [resumeText, voice, onConnectionStatusChange, cleanup]);

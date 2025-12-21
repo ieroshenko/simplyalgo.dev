@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Example: Using OpenRouter with Different Models
- * 
+ *
  * This file demonstrates how to use different models for different use cases
  * when using OpenRouter in your Supabase Edge Functions.
  */

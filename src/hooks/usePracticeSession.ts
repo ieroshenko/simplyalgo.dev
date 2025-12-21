@@ -1,13 +1,19 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { PracticeSession, PracticeAnswer, SessionType } from "@/types";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
+import type { PracticeSession, SessionType } from "@/types";
 
 export const usePracticeSession = () => {
   const { user } = useAuth();
-  const [currentSession, setCurrentSession] = useState<PracticeSession | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: currentSession,
+    setData: setCurrentSession,
+    loading,
+    setLoading,
+    error,
+    setError
+  } = useAsyncState<PracticeSession>();
 
   const createSession = useCallback(
     async (sessionType: SessionType, companyId?: string) => {
@@ -42,14 +48,14 @@ export const usePracticeSession = () => {
         setCurrentSession(session);
         return session;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to create session";
-        setError(errorMessage);
+        const error = err instanceof Error ? err : new Error("Failed to create session");
+        setError(error);
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [user?.id]
+    [user?.id, setLoading, setCurrentSession, setError]
   );
 
   const submitAnswer = useCallback(
@@ -112,14 +118,14 @@ export const usePracticeSession = () => {
 
         return data;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to submit answer";
-        setError(errorMessage);
+        const error = err instanceof Error ? err : new Error("Failed to submit answer");
+        setError(error);
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [user?.id, currentSession]
+    [user?.id, currentSession, setLoading, setError]
   );
 
   const updateAnswerFeedback = useCallback(
@@ -141,7 +147,7 @@ export const usePracticeSession = () => {
     ) => {
       try {
         setLoading(true);
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
           content_score: feedback.content_score,
           delivery_score: feedback.delivery_score,
           overall_score: feedback.overall_score,
@@ -169,14 +175,14 @@ export const usePracticeSession = () => {
 
         if (updateError) throw updateError;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to update answer feedback";
-        setError(errorMessage);
+        const error = err instanceof Error ? err : new Error("Failed to update answer feedback");
+        setError(error);
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    []
+    [setLoading, setError]
   );
 
   const completeSession = useCallback(async () => {
@@ -197,9 +203,9 @@ export const usePracticeSession = () => {
           ? answers.reduce((sum, a) => sum + (a.overall_score || 0), 0) / answers.length
           : null;
 
-        const { error: updateError } = await supabase
-          .from("practice_sessions")
-          .update({
+      const { error: updateError } = await supabase
+        .from("practice_sessions")
+        .update({
           completed_at: new Date().toISOString(),
           average_score: averageScore,
         })
@@ -209,18 +215,18 @@ export const usePracticeSession = () => {
 
       setCurrentSession(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to complete session";
-      setError(errorMessage);
+      const error = err instanceof Error ? err : new Error("Failed to complete session");
+      setError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [currentSession]);
+  }, [currentSession, setLoading, setCurrentSession, setError]);
 
   const resetSession = useCallback(() => {
     setCurrentSession(null);
     setError(null);
-  }, []);
+  }, [setCurrentSession, setError]);
 
   return {
     currentSession,

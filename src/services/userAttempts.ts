@@ -254,14 +254,18 @@ export class UserAttemptsService {
     });
 
     // Group by problem_id and get the latest status for each
-    const latestAttempts: Record<string, { problem_id: string; status: string; updated_at: string }> = {};
+    const latestAttempts: Record<string, Pick<UserAttempt, 'problem_id' | 'status' | 'updated_at'>> = {};
     data?.forEach((attempt) => {
       if (
         !latestAttempts[attempt.problem_id] ||
-        new Date(attempt.updated_at) >
-        new Date(latestAttempts[attempt.problem_id].updated_at)
+        (attempt.updated_at && latestAttempts[attempt.problem_id]?.updated_at && 
+         new Date(attempt.updated_at) > new Date(latestAttempts[attempt.problem_id]!.updated_at))
       ) {
-        latestAttempts[attempt.problem_id] = attempt;
+        latestAttempts[attempt.problem_id] = {
+          problem_id: attempt.problem_id,
+          status: attempt.status,
+          updated_at: attempt.updated_at,
+        }; // Now properly typed
       }
     });
 

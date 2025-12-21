@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import dataStructures from "@/data/dataStructures.json";
+import { getDifficultyColor } from "@/utils/uiUtils";
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 
@@ -39,19 +40,6 @@ const DataStructureVault = () => {
     selectedDifficulty === "All"
       ? dataStructures
       : dataStructures.filter((ds) => ds.difficulty === selectedDifficulty);
-
-  const getDifficultyColor = (difficulty: Difficulty) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-primary text-primary-foreground";
-      case "Medium":
-        return "bg-amber-500 text-white";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-secondary text-secondary-foreground";
-    }
-  };
 
   const handleCardClick = (slug: string) => {
     // Directly navigate to the implementation problem for the selected data structure

@@ -2,21 +2,67 @@
  * Snapshot tests for core components
  * These tests ensure UI consistency across changes
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Import components (only those that work well in isolation)
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Timer from '@/components/Timer';
-import BehavioralHeader from '@/components/BehavioralHeader';
+import BehavioralHeader from '@/features/behavioral/components/BehavioralHeader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import MissionStrip from '@/components/MissionStrip';
 import ShortcutsHelp from '@/components/ShortcutsHelp';
 
+// Mock useAuth hook
+vi.mock('@/hooks/useAuth', () => ({
+    useAuth: () => ({
+        user: { id: 'test-user-id' },
+        session: { user: { id: 'test-user-id' } },
+        isLoading: false,
+    }),
+}));
+
+// Mock supabase
+vi.mock('@/integrations/supabase/client', () => ({
+    supabase: {
+        from: () => ({
+            select: () => ({
+                eq: () => ({
+                    single: () => Promise.resolve({ data: null, error: null }),
+                    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+                }),
+                order: () => ({
+                    limit: () => Promise.resolve({ data: [], error: null }),
+                }),
+            }),
+        }),
+    },
+}));
+
+// Create a test QueryClient
+const createTestQueryClient = () =>
+    new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                gcTime: 0,
+                staleTime: 0,
+            },
+        },
+    });
+
 // Wrapper for components that need router context
 const RouterWrapper = ({ children }: { children: React.ReactNode }) => (
     <BrowserRouter>{children}</BrowserRouter>
+);
+
+// Wrapper for components that need both router and query client
+const FullWrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={createTestQueryClient()}>
+        <BrowserRouter>{children}</BrowserRouter>
+    </QueryClientProvider>
 );
 
 describe('Core Components Snapshot Tests', () => {
@@ -66,9 +112,9 @@ describe('Core Components Snapshot Tests', () => {
     describe('BehavioralHeader', () => {
         it('should match snapshot', () => {
             const { container } = render(
-                <RouterWrapper>
+                <FullWrapper>
                     <BehavioralHeader />
-                </RouterWrapper>
+                </FullWrapper>
             );
             expect(container).toMatchSnapshot();
         });
@@ -117,7 +163,11 @@ describe('Core Components Snapshot Tests', () => {
 
     describe('MissionStrip', () => {
         it('should match snapshot', () => {
-            const { container } = render(<MissionStrip />);
+            const { container } = render(
+                <FullWrapper>
+                    <MissionStrip />
+                </FullWrapper>
+            );
             expect(container).toMatchSnapshot();
         });
     });

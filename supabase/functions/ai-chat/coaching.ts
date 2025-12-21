@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - Deno URL import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { llmText, llmJson, getOpenAI, llmWithSessionContext, clearSessionContext } from "./openai-utils.ts";
@@ -1030,7 +1031,7 @@ ${firstFailed?.error || "Review your logic and try again."}`;
     }
 
     // Update session state and context information
-    const sessionUpdateData: any = {
+    const sessionUpdateData: unknown = {
       response_id: contextualResponse.responseId, // Always update with latest response ID
       last_code_snapshot: currentEditorCode,
       context_initialized: true,

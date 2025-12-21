@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 // Mock TechnicalInterviewService
-vi.mock('@/services/technicalInterviewService', () => ({
+vi.mock('@/features/technical-interview/services/technicalInterviewService', () => ({
     TechnicalInterviewService: {
         createSession: vi.fn().mockResolvedValue({ id: 'session-1' }),
         addTranscript: vi.fn().mockResolvedValue({}),
@@ -20,7 +20,7 @@ vi.mock('@/hooks/useAuth', () => ({
     })),
 }));
 
-import { useTechnicalInterview } from '../useTechnicalInterview';
+import { useTechnicalInterview } from '@/features/technical-interview/hooks/useTechnicalInterview';
 
 describe('useTechnicalInterview', () => {
     const defaultProps = {

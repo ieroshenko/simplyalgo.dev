@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CreditCard, Calendar, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/uiUtils';
 
 interface StripeSubscriptionDetails {
   current_period_end: number;
@@ -43,9 +44,9 @@ export const SubscriptionManagement: React.FC = () => {
     });
   };
 
-  const fetchStripeSubscriptionDetails = async () => {
+  const fetchStripeSubscriptionDetails = useCallback(async () => {
     if (!subscription?.stripe_subscription_id) return;
-    
+
     setIsLoadingDetails(true);
     try {
       const { data, error } = await supabase.functions.invoke('stripe-get-subscription-details', {
@@ -65,13 +66,13 @@ export const SubscriptionManagement: React.FC = () => {
     } finally {
       setIsLoadingDetails(false);
     }
-  };
+  }, [subscription?.stripe_subscription_id]);
 
   useEffect(() => {
     if (subscription?.stripe_subscription_id) {
       fetchStripeSubscriptionDetails();
     }
-  }, [subscription?.stripe_subscription_id]);
+  }, [subscription?.stripe_subscription_id, fetchStripeSubscriptionDetails]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -105,7 +106,7 @@ export const SubscriptionManagement: React.FC = () => {
 
   const handleManageSubscription = async () => {
     if (!user) return;
-    
+
     setIsLoadingAction(true);
     setError(null);
     setSuccess(null);
@@ -135,11 +136,12 @@ export const SubscriptionManagement: React.FC = () => {
       } else {
         setError('Failed to get customer portal URL. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('[SubscriptionManagement] Error creating customer portal session', { error: err });
-      if (err.message?.includes('No active subscription found')) {
+      const errorMessage = getErrorMessage(err, '');
+      if (errorMessage.includes('No active subscription found')) {
         setError('No active subscription found. Please contact support if you believe this is an error.');
-      } else if (err.message?.includes('Customer portal not configured')) {
+      } else if (errorMessage.includes('Customer portal not configured')) {
         setError('Subscription management is temporarily unavailable. Please contact support for assistance.');
       } else {
         setError('Failed to open subscription management. Please try again.');
@@ -151,7 +153,7 @@ export const SubscriptionManagement: React.FC = () => {
 
   const handleCancelSubscription = async () => {
     if (!user || !subscription) return;
-    
+
     setIsLoadingAction(true);
     setError(null);
     setSuccess(null);
@@ -243,7 +245,7 @@ export const SubscriptionManagement: React.FC = () => {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         {success && (
           <Alert>
             <CheckCircle className="h-4 w-4" />
@@ -290,7 +292,7 @@ export const SubscriptionManagement: React.FC = () => {
                   <Clock className="w-4 h-4 text-orange-500 mt-0.5" />
                   <div>
                     <p className="font-medium text-orange-700 dark:text-orange-300">
-                      {stripeDetails.trial_end && new Date(stripeDetails.trial_end * 1000) > new Date() 
+                      {stripeDetails.trial_end && new Date(stripeDetails.trial_end * 1000) > new Date()
                         ? `Trial will end on ${formatTimestamp(stripeDetails.current_period_end)}`
                         : `Subscription will end on ${formatTimestamp(stripeDetails.current_period_end)}`
                       }
@@ -336,14 +338,14 @@ export const SubscriptionManagement: React.FC = () => {
           )}
 
           <div className="flex space-x-3">
-            <Button 
+            <Button
               onClick={handleManageSubscription}
               disabled={isLoadingAction}
               variant="outline"
             >
               {isLoadingAction ? 'Loading...' : 'Manage Billing'}
             </Button>
-            
+
             {/* {subscription?.status === 'active' && (
               <Button 
                 onClick={handleCancelSubscription}

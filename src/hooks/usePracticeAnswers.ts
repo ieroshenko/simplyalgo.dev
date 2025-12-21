@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
+import { logger } from "@/utils/logger";
 import type { PracticeAnswer } from "@/types";
 
 export const usePracticeAnswers = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { loading, setLoading, error, setError } = useAsyncState();
 
   // Get the last answer for a specific question
   const getLastAnswer = useCallback(
@@ -56,12 +57,12 @@ export const usePracticeAnswers = () => {
           answer_audio_url: data.answer_audio_url || undefined,
           transcript: data.transcript || undefined,
           time_spent_seconds: data.time_spent_seconds || undefined,
-          star_score: data.star_score as any || undefined,
+          star_score: data.star_score as unknown || undefined,
           content_score: data.content_score || 0,
           delivery_score: data.delivery_score || 0,
           overall_score: data.overall_score || 0,
-          custom_metrics: (data.feedback as any)?.custom_metrics || undefined,
-          feedback: (data.feedback as any) || {
+          custom_metrics: (data.feedback as unknown)?.custom_metrics || undefined,
+          feedback: (data.feedback as unknown) || {
             strengths: [],
             improvements: [],
           },
@@ -72,14 +73,18 @@ export const usePracticeAnswers = () => {
 
         return answer;
       } catch (err) {
-        console.error("Error fetching last answer:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch last answer");
+        logger.error("Error fetching last answer", err, {
+          component: "usePracticeAnswers",
+          userId: user?.id,
+        });
+        const error = err instanceof Error ? err : new Error("Failed to fetch last answer");
+        setError(error);
         return null;
       } finally {
         setLoading(false);
       }
     },
-    [user?.id]
+    [user?.id, setLoading, setError]
   );
 
   // Get all answers with scores for questions (for displaying scores in question list)
@@ -125,13 +130,17 @@ export const usePracticeAnswers = () => {
 
       return scores;
     } catch (err) {
-      console.error("Error fetching question scores:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch question scores");
+      logger.error("Error fetching question scores", err, {
+        component: "usePracticeAnswers",
+        userId: user?.id,
+      });
+      const error = err instanceof Error ? err : new Error("Failed to fetch question scores");
+      setError(error);
       return {};
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, setLoading, setError]);
 
   // Get user progress stats
   const getProgress = useCallback(async (): Promise<{
@@ -145,7 +154,7 @@ export const usePracticeAnswers = () => {
 
     try {
       setLoading(true);
-      
+
       // Get session IDs for this user
       const { data: sessions, error: sessionsError } = await supabase
         .from("practice_sessions")
@@ -197,13 +206,17 @@ export const usePracticeAnswers = () => {
 
       return { totalPracticed, totalQuestions, averageScore };
     } catch (err) {
-      console.error("Error fetching progress:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch progress");
+      logger.error("Error fetching progress", err, {
+        component: "usePracticeAnswers",
+        userId: user?.id,
+      });
+      const error = err instanceof Error ? err : new Error("Failed to fetch progress");
+      setError(error);
       return { totalPracticed: 0, totalQuestions: 0, averageScore: 0 };
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, setLoading, setError]);
 
   return {
     getLastAnswer,

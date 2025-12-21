@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - Deno URL import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-expect-error - Deno URL import
@@ -64,7 +65,7 @@ const SMART_COMPARISON_PROBLEMS = new Set([
 ]);
 
 // Smart comparison function for order-independent arrays
-function smartCompare(actual: any, expected: any): boolean {
+function smartCompare(actual: unknown, expected: unknown): boolean {
   // First try exact comparison
   if (JSON.stringify(actual) === JSON.stringify(expected)) {
     return true;
@@ -79,9 +80,9 @@ function smartCompare(actual: any, expected: any): boolean {
     // For array of arrays (like group-anagrams), normalize both
     if (actual.length > 0 && Array.isArray(actual[0])) {
       // Sort each inner array and then sort the outer array
-      const normalizeArrayOfArrays = (arr: any[]) => {
+      const normalizeArrayOfArrays = (arr: unknown[]) => {
         return arr
-          .map((innerArr) => [...innerArr].sort())
+          .map((innerArr) => Array.isArray(innerArr) ? [...innerArr].sort() : innerArr)
           .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
       };
 
@@ -289,7 +290,7 @@ function parseTestCaseInput(inputString: string, functionSignature: string) {
           } catch {
             // Remove quotes if it's a quoted string
             let cleanValue = cleanParamValue;
-            cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+            cleanValue = cleanValue.replace(/^\\"(.*)\\"$/, "$1");
             cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
             inputParams[cleanParamName] = cleanValue;
           }
@@ -307,7 +308,7 @@ function parseTestCaseInput(inputString: string, functionSignature: string) {
           } catch {
             // Remove quotes
             let cleanValue = paramValue;
-            cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+            cleanValue = cleanValue.replace(/^\\"(.*)\\"$/, "$1");
             cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
             inputParams[cleanParamName] = cleanValue;
           }
@@ -325,7 +326,7 @@ function parseTestCaseInput(inputString: string, functionSignature: string) {
       } catch (e) {
         // If JSON parsing fails, treat as string (remove quotes if present)
         let cleanValue = paramValue;
-        cleanValue = cleanValue.replace(/^\\"(.*)\\\"$/, "$1");
+        cleanValue = cleanValue.replace(/^\\"(.*)\\"$/, "$1");
         cleanValue = cleanValue.replace(/^"(.*)"$/, "$1");
         inputParams[paramName] = cleanValue;
       }
@@ -347,7 +348,7 @@ function parseTestCaseInput(inputString: string, functionSignature: string) {
 // Process Python code to add imports and test case execution
 function processPythonCode(
   userCode: string,
-  testCases: any[],
+  testCases: unknown[],
   problemId: string,
 ): string {
   let processedCode = userCode;
@@ -398,7 +399,7 @@ class ListNode:
   }
 
   // Add TreeNode definition if needed
-  const needsTreeNode = /\bTreeNode\b|['\"]TreeNode['\"]/.test(processedCode);
+  const needsTreeNode = /\bTreeNode\b|['"]TreeNode['"]/.test(processedCode);
   if (needsTreeNode && !processedCode.includes("class TreeNode")) {
     const treeNodeDef = `# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
     processedCode = treeNodeDef + processedCode;
@@ -738,7 +739,7 @@ function extractFunctionSignature(code: string, funcName: string): string {
 function generateTestExecutionCode(
   functionName: string,
   signature: string,
-  testCases: any[],
+  testCases: unknown[],
   options: {
     encodeDecode?: boolean;
     serializeDeserialize?: boolean;
@@ -760,7 +761,7 @@ function generateTestExecutionCode(
       expectedOutput = tc.expected.expected_outputs;
     }
 
-    let normalizedInput = { ...tc.input };
+    const normalizedInput = { ...tc.input };
     if (isClassBasedProblem) {
       if (
         normalizedInput.operations &&
@@ -769,7 +770,7 @@ function generateTestExecutionCode(
       ) {
         const ops = normalizedInput.operations;
         const parsedOps: string[] = [];
-        const parsedValues: any[] = [];
+        const parsedValues: unknown[] = [];
 
         parsedOps.push(ops[0]);
         parsedValues.push([]);
@@ -824,15 +825,15 @@ function generateTestExecutionCode(
 
   const hasSelfParam = signature.includes("self");
   const isListNodeProblem = /\bListNode\b/.test(signature);
-  const isTreeNodeProblem = /\bTreeNode\b|['\"]TreeNode['\"]/.test(signature);
+  const isTreeNodeProblem = /\bTreeNode\b|['"]TreeNode['"]/.test(signature);
   const isGraphProblem =
-    /\bNode\b|['\"]Node['\"]/.test(signature) &&
+    /\bNode\b|['"]Node['"]/.test(signature) &&
     !isListNodeProblem &&
     !isTreeNodeProblem;
   const returnsListNode = /->\s*[^\n#]*ListNode/.test(signature);
   const returnsTreeNode = /->\s*[^\n#]*TreeNode/.test(signature);
   const returnsNode =
-    /->\s*[^\n#]*['\"]?Node['\"]?/.test(signature) &&
+    /->\s*[^\n#]*['"]?Node['"]?/.test(signature) &&
     !returnsListNode &&
     !returnsTreeNode;
   const returnsNone = /->\s*None\s*:/.test(signature);
@@ -1526,8 +1527,8 @@ serve(async (req) => {
           .join("\n");
 
         // Format expected and actual outputs
-        let formattedExpected: any = testCase.expected;
-        let formattedActual: any = actualOutput;
+        let formattedExpected: unknown = testCase.expected;
+        let formattedActual: unknown = actualOutput;
 
         // Convert expected to compact format if it's an array/object
         if (

@@ -8,7 +8,7 @@ declare const Deno: { env: { get(name: string): string | undefined } };
 
 // LLM Provider Configuration
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
-const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-2.5-flash-preview-09-2025";
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
 const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
 
 // Model configuration
@@ -86,7 +86,7 @@ export function buildResponsesRequest(
   prompt: string,
   opts: { maxTokens?: number; responseFormat?: "json_object" | undefined },
 ): ResponsesApiRequest {
-  const req: any = {
+  const req: unknown = {
     model,
     input: prompt,
     max_output_tokens:
@@ -199,7 +199,7 @@ export async function llmText(
     `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? "yes" : "no"})`,
   );
 
-  const chatRequestParams: any = {
+  const chatRequestParams: unknown = {
     model: chatModel,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: opts.maxTokens ?? 500,
@@ -564,7 +564,7 @@ export async function llmJsonFast(
     console.log(
       "[ai-chat] llmJsonFast using Responses API with model=gpt-5-mini",
     );
-    const req: any = {
+    const req: unknown = {
       model: "gpt-5-mini",
       input: prompt,
       max_output_tokens:

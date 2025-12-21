@@ -4,38 +4,14 @@ import { Progress } from "@/components/ui/progress";
 import FeedbackModal from "@/components/FeedbackModal";
 import {
   Home,
-  BarChart3,
   Settings,
-  List,
-  Database,
-  Layers,
-  Brain,
-  Hash,
-  Type,
-  ArrowLeftRight,
-  SlidersHorizontal,
-  Search,
-  TreePine,
-  FolderTree,
-  Mountain,
-  RotateCcw,
-  Sparkles,
-  Code2,
-  TrendingUp,
-  Zap,
-  Network,
-  Grid3X3,
-  DollarSign,
-  Calendar,
-  Calculator,
-  Binary,
-  User,
-  MessageSquare,
   Shield,
+  MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useProblems } from "@/hooks/useProblems";
+import { useProblems } from "@/features/problems/hooks/useProblems";
 
 const ADMIN_EMAILS = [
   "tazigrigolia@gmail.com",
@@ -45,7 +21,7 @@ const ADMIN_EMAILS = [
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { categories } = useProblems(user?.id);
 
   const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
@@ -55,8 +31,7 @@ const Sidebar = () => {
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 
-  // No per-category icons in progress list (simplified UI)
-
+  // Default Sidebar
   return (
     <div className="w-64 bg-background border-r border-border h-screen flex flex-col sticky top-0 z-10">
       {/* Logo */}
@@ -82,8 +57,8 @@ const Sidebar = () => {
               key={item.path}
               variant={isActive ? "default" : "ghost"}
               className={`w-full justify-start ${isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-secondary text-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-secondary text-foreground"
                 }`}
               onClick={() => navigate(item.path)}
             >
@@ -93,13 +68,12 @@ const Sidebar = () => {
           );
         })}
 
-        {/* Admin Button - Only show for admin users */}
         {isAdmin && (
           <Button
             variant={location.pathname === "/admin" ? "default" : "ghost"}
             className={`w-full justify-start ${location.pathname === "/admin"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-secondary text-foreground"
+              ? "bg-primary text-primary-foreground"
+              : "hover:bg-secondary text-foreground"
               }`}
             onClick={() => navigate("/admin")}
           >

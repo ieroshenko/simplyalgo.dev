@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { logger } from "@/utils/logger";
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface UseChatSpeechRecognitionOptions {
@@ -27,7 +28,9 @@ export const useChatSpeechRecognition = (options: UseChatSpeechRecognitionOption
       onTranscriptReceived(transcript);
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error("Speech recognition error", error, {
+        component: "useChatSpeechRecognition",
+      });
     },
   });
 

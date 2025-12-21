@@ -1,0 +1,35 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    /* Strict Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/hooks/useFlashcards.ts",
+    "src/hooks/useBehavioralQuestions.ts",
+    "src/hooks/useUserStories.ts",
+    "src/hooks/useCustomQuestions.ts",
+    "src/hooks/useSolutions.ts",
+    "src/components/flashcards/**/*.tsx",
+    "src/pages/Profile.tsx",
+    "src/services/**/*.ts",
+    "src/lib/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**/*",
+    "node_modules",
+    "dist"
+  ]
+}

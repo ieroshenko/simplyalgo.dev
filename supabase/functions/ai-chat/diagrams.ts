@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { llmText, llmJson } from "./openai-utils.ts";
 import { ChatMessage, FlowGraph, FlowNode, FlowEdge } from "./types.ts";
 
