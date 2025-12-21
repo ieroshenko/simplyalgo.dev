@@ -27,7 +27,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { TechnicalInterviewService } from '../technicalInterviewService';
+import { TechnicalInterviewService } from '@/features/technical-interview/services/technicalInterviewService';
 import { supabase } from '@/integrations/supabase/client';
 
 describe('TechnicalInterviewService', () => {

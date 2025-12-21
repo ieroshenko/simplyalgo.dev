@@ -28,7 +28,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { useSystemDesignSession } from '../useSystemDesignSession';
+import { useSystemDesignSession } from '@/features/system-design/hooks/useSystemDesignSession';
 
 describe('useSystemDesignSession', () => {
     const defaultProps = {

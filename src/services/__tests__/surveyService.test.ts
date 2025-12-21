@@ -17,7 +17,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
 }));
 
-import { SurveyService } from '../surveyService';
+import { SurveyService } from '@/features/survey/services/surveyService';
 import { supabase } from '@/integrations/supabase/client';
 import { SurveyData } from '@/types/survey';
 

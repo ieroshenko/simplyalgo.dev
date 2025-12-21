@@ -3,7 +3,7 @@ import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Problem } from "@/types";
 import Notes, { NotesHandle } from "@/components/Notes";
-import { useSolutions } from "@/hooks/useSolutions";
+import { useSolutions } from "@/features/problems/hooks/useSolutions";
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";

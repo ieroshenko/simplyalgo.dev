@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { formatTimeAgo } from "@/lib/date";
-import { useProblems } from "@/hooks/useProblems";
+import { useProblems } from "@/features/problems/hooks/useProblems";
 
 type LastActivity = {
   problemTitle: string;

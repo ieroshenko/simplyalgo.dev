@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { TechnicalInterviewService, TechnicalInterviewSession } from "@/services/technicalInterviewService";
+import { TechnicalInterviewService, TechnicalInterviewSession } from "@/features/technical-interview/services/technicalInterviewService";
 import { TestResult } from "@/types";
 import { logger } from "@/utils/logger";
 

@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Trophy, TrendingUp, MessageSquare, Code, AlertCircle } from "lucide-react";
-import { TechnicalInterviewService } from "@/services/technicalInterviewService";
+import { TechnicalInterviewService } from "@/features/technical-interview/services/technicalInterviewService";
+import type { TechnicalInterviewFeedback, TechnicalInterviewSession } from "@/features/technical-interview/services/technicalInterviewService";
 import { logger } from "@/utils/logger";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -16,8 +17,8 @@ interface InterviewFeedbackProps {
 const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<unknown>(null);
-  const [feedback, setFeedback] = useState<unknown>(null);
+  const [session, setSession] = useState<TechnicalInterviewSession | null>(null);
+  const [feedback, setFeedback] = useState<TechnicalInterviewFeedback | null>(null);
   const [testResults, setTestResults] = useState<Array<{ id: string; passed: boolean; test_case_number: number }>>([]);
 
   useEffect(() => {
@@ -73,8 +74,8 @@ const InterviewFeedback = ({ sessionId, onClose }: InterviewFeedbackProps) => {
     );
   }
 
-  const passed = session.passed;
-  const overallScore = session.overall_score || 0;
+  const passed = session.passed ?? false;
+  const overallScore = session.overall_score ?? 0;
   const problemSolvingScore = feedback?.problem_solving_score || 0;
   const codeQualityScore = feedback?.code_quality_score || 0;
   const communicationScore = feedback?.communication_score || 0;

@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Import components (only those that work well in isolation)
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Timer from '@/components/Timer';
-import BehavioralHeader from '@/components/BehavioralHeader';
+import BehavioralHeader from '@/features/behavioral/components/BehavioralHeader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import MissionStrip from '@/components/MissionStrip';
 import ShortcutsHelp from '@/components/ShortcutsHelp';

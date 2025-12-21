@@ -47,7 +47,7 @@ vi.mock('@/utils/logger', () => ({
     },
 }));
 
-import { useBehavioralQuestions } from '../useBehavioralQuestions';
+import { useBehavioralQuestions } from '@/features/behavioral/hooks/useBehavioralQuestions';
 
 // Wrapper for react-query
 const createWrapper = (queryClient?: QueryClient) => {

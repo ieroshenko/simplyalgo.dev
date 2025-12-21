@@ -15,18 +15,21 @@ vi.mock('@/hooks/useAuth', () => ({
     }),
 }));
 
-vi.mock('@/hooks/useProblems', () => ({
+vi.mock('@/features/problems/hooks/useProblems', () => ({
     useProblems: () => ({
         problems: [],
         loading: false,
         error: null,
+        refetch: vi.fn(),
     }),
 }));
 
-vi.mock('@/hooks/useBehavioralStats', () => ({
+vi.mock('@/features/behavioral/hooks/useBehavioralStats', () => ({
     useBehavioralStats: () => ({
         stats: { storiesCount: 0, practiceCount: 0, mockInterviewCount: 0 },
         loading: false,
+        error: null,
+        refetch: vi.fn(),
     }),
 }));
 

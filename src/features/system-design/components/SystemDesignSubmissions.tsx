@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Eye, Calendar, Award } from "lucide-react";
-import type { SystemDesignSubmission } from "@/hooks/useSystemDesignSubmissions";
+import type { SystemDesignSubmission } from "@/features/system-design/hooks/useSystemDesignSubmissions";
 import ReactMarkdown from "react-markdown";
 import { useTheme } from "@/hooks/useTheme";
 

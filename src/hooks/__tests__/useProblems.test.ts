@@ -53,7 +53,7 @@ vi.mock('@/utils/logger', () => ({
     },
 }));
 
-import { useProblems, Problem, Category } from '../useProblems';
+import { useProblems, Problem, Category } from '@/features/problems/hooks/useProblems';
 
 // Wrapper for react-query
 const createWrapper = () => {

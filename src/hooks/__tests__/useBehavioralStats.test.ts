@@ -41,7 +41,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { useBehavioralStats } from '../useBehavioralStats';
+import { useBehavioralStats } from '@/features/behavioral/hooks/useBehavioralStats';
 
 // Create wrapper with QueryClientProvider
 const createWrapper = () => {

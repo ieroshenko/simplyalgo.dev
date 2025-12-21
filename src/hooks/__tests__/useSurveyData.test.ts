@@ -25,21 +25,21 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 // Mock useAuth
-vi.mock('../useAuth', () => ({
+vi.mock('@/hooks/useAuth', () => ({
     useAuth: vi.fn(() => ({
         user: { id: 'user-123' },
     })),
 }));
 
 // Mock SurveyService
-vi.mock('@/services/surveyService', () => ({
+vi.mock('@/features/survey/services/surveyService', () => ({
     SurveyService: {
         getSurveyData: vi.fn().mockResolvedValue(null),
         saveSurveyData: vi.fn().mockResolvedValue({ success: true }),
     },
 }));
 
-import { useSurveyData } from '../useSurveyData';
+import { useSurveyData } from '@/features/survey/hooks/useSurveyData';
 
 // Wrapper for react-query
 const createWrapper = () => {

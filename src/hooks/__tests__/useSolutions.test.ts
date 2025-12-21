@@ -23,7 +23,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { useSolutions } from '../useSolutions';
+import { useSolutions } from '@/features/problems/hooks/useSolutions';
 
 describe('useSolutions', () => {
     beforeEach(() => {

@@ -19,7 +19,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { RoughIcon } from "./RoughIcon";
 import { RoughShape } from "./RoughShapes";
 import { RoughEdge } from "./RoughEdge";
-import type { SystemDesignSubmission } from "@/hooks/useSystemDesignSubmissions";
+import type { SystemDesignSubmission } from "@/features/system-design/hooks/useSystemDesignSubmissions";
 import {
   TbDeviceDesktop,
   TbServer,

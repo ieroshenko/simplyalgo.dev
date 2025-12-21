@@ -55,7 +55,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
 }));
 
-import { PaywallStep } from '@/components/survey/steps/PaywallStep';
+import { PaywallStep } from '@/features/survey/components/steps/PaywallStep';
 
 describe('PaywallStep - Stripe Checkout', () => {
     const defaultProps = {

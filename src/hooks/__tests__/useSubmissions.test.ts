@@ -54,7 +54,7 @@ vi.mock('@/utils/code', () => ({
     normalizeCode: vi.fn((code: string) => code?.replace(/\s+/g, '').toLowerCase() || ''),
 }));
 
-import { useSubmissions } from '../useSubmissions';
+import { useSubmissions } from '@/features/problems/hooks/useSubmissions';
 import { UserAttemptsService } from '@/services/userAttempts';
 import { supabase } from '@/integrations/supabase/client';
 

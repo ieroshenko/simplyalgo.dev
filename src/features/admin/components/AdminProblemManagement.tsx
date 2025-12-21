@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Pencil, Search } from "lucide-react";
-import { AdminProblemDialog, type Problem } from "@/components/admin/AdminProblemDialog";
+import { AdminProblemDialog, type Problem } from "@/features/admin/components/AdminProblemDialog";
 
 interface Category {
     id: string;

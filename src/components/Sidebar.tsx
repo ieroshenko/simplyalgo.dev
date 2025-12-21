@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useProblems } from "@/hooks/useProblems";
+import { useProblems } from "@/features/problems/hooks/useProblems";
 
 const ADMIN_EMAILS = [
   "tazigrigolia@gmail.com",

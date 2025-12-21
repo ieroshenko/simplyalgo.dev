@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from './useAuth';
-import { SurveyService } from '@/services/surveyService';
+import { useAuth } from '@/hooks/useAuth';
+import { SurveyService } from '@/features/survey/services/surveyService';
 import { SurveyData } from '@/types/survey';
 
 // Cache configuration

@@ -25,7 +25,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { useSystemDesignSubmissions } from '../useSystemDesignSubmissions';
+import { useSystemDesignSubmissions } from '@/features/system-design/hooks/useSystemDesignSubmissions';
 
 describe('useSystemDesignSubmissions', () => {
     beforeEach(() => {

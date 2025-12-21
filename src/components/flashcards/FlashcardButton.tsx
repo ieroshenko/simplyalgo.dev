@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle } from "lucide-react";
 import { useFlashcards } from "@/hooks/useFlashcards";
-import { useSolutions } from "@/hooks/useSolutions";
+import { useSolutions } from "@/features/problems/hooks/useSolutions";
 import { SolutionSelectorModal } from "./SolutionSelectorModal";
 import { isFeatureEnabled } from "@/config/features";
 import { notifications } from "@/shared/services/notificationService";

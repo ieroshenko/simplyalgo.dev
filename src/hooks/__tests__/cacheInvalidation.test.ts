@@ -65,7 +65,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 import { useUserStats } from '../useUserStats';
-import { useProblems } from '../useProblems';
+import { useProblems } from '@/features/problems/hooks/useProblems';
 
 // Wrapper factory
 const createWrapper = (queryClient?: QueryClient) => {
