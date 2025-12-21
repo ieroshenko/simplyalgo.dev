@@ -8,6 +8,13 @@ import type {
   DesignEvaluation,
   CompletenessAnalysis,
 } from "@/types";
+import type { Json } from "@/integrations/supabase/types";
+
+// Type for draft-related database queries (columns not in generated types yet)
+interface DraftQueryResult {
+  draft_board_state: Json | null;
+  draft_hash: string | null;
+}
 
 interface UseSystemDesignSessionProps {
   problemId: string;
@@ -570,7 +577,7 @@ export const useSystemDesignSession = ({
       logger.debug("Saving current work as draft...", { component: "SystemDesignChat" });
       const { error: updateError } = await supabase
         .from("system_design_sessions")
-        .update({ draft_board_state: boardState, draft_hash: draftHash })
+        .update({ draft_board_state: boardState as unknown as Json, draft_hash: draftHash })
         .eq("id", session.id);
 
       if (updateError) throw updateError;
@@ -602,8 +609,9 @@ export const useSystemDesignSession = ({
 
       if (fetchError) throw fetchError;
 
-      if (data?.draft_board_state) {
-        const draftState = data.draft_board_state as SystemDesignBoardState;
+      const draftData = data as unknown as DraftQueryResult;
+      if (draftData?.draft_board_state) {
+        const draftState = draftData.draft_board_state as SystemDesignBoardState;
         logger.debug("Captured backup of current board state before restore", {
           component: "SystemDesignChat",
           hasElements: !!backupState?.elements?.length,
@@ -611,7 +619,7 @@ export const useSystemDesignSession = ({
         });
         setBoardState(draftState);
         lastBoardStateRef.current = draftState;
-        setLastSavedDraftHash(data.draft_hash ?? null);
+        setLastSavedDraftHash(draftData.draft_hash ?? null);
 
         // Clear the draft after restoring
         await supabase
@@ -657,9 +665,10 @@ export const useSystemDesignSession = ({
 
         if (!mounted) return;
 
-        if (data?.draft_board_state) {
+        const draftCheckData = data as unknown as DraftQueryResult;
+        if (draftCheckData?.draft_board_state) {
           setHasDraft(true);
-          setLastSavedDraftHash(data.draft_hash ?? JSON.stringify(data.draft_board_state));
+          setLastSavedDraftHash(draftCheckData.draft_hash ?? JSON.stringify(draftCheckData.draft_board_state));
         }
       } catch (err) {
         logger.error("Failed to check draft", err, { component: "SystemDesignChat" });

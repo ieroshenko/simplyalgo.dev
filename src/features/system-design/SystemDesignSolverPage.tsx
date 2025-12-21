@@ -27,8 +27,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { getDifficultyColor } from "@/utils/uiUtils";
 import type { SystemDesignBoardState } from "@/types";
 import type { SystemDesignSubmission } from "@/features/system-design/hooks/useSystemDesignSubmissions";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 const SystemDesignSolver = () => {
+  useTrackFeatureTime(Features.SYSTEM_DESIGN);
+
   const { problemId } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();

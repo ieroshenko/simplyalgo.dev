@@ -11,8 +11,11 @@ import PrimaryFocusCard from "@/components/PrimaryFocusCard";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useSurveyData } from "@/features/survey/hooks/useSurveyData";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 const Dashboard = () => {
+  useTrackFeatureTime(Features.DASHBOARD);
+
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { surveyData } = useSurveyData();

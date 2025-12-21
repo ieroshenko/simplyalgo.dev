@@ -28,8 +28,11 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/features/problems/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 const Problems = () => {
+  useTrackFeatureTime(Features.PROBLEMS_LIST);
+
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const {
@@ -70,7 +73,7 @@ const Problems = () => {
       c.name !== "System Design"
     )
     .map((c) => c.name)], [dbCategories]);
-  
+
   // Extract unique companies from problems with memoization
   const companies = useMemo(() => {
     const allCompanies = Array.from(
@@ -80,7 +83,7 @@ const Problems = () => {
     ).sort();
     return ["All", ...allCompanies];
   }, [problems]);
-  
+
   // Define difficulty options
   const difficulties = useMemo(() => ["All", "Easy", "Medium", "Hard"], []);
 
@@ -278,149 +281,147 @@ const Problems = () => {
 
         {/* Main Content - Data Structures tab hidden for launch */}
         <div className="space-y-6">
-            {/* Filters */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                Filters
-              </h2>
-              <div className="flex flex-wrap gap-4">
-                {/* Category Filter */}
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Category</label>
-                  <Select
-                    value={selectedCategory || "All"}
-                    onValueChange={(value) => handleCategorySelect(value)}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue>
-                        {selectedCategory || "All Categories"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Filters */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              Filters
+            </h2>
+            <div className="flex flex-wrap gap-4">
+              {/* Category Filter */}
+              <div className="flex flex-col space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Category</label>
+                <Select
+                  value={selectedCategory || "All"}
+                  onValueChange={(value) => handleCategorySelect(value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue>
+                      {selectedCategory || "All Categories"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Company Filter */}
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Company</label>
-                  <Select
-                    value={selectedCompany || "All"}
-                    onValueChange={(value) => handleCompanySelect(value)}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue>
+              {/* Company Filter */}
+              <div className="flex flex-col space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Company</label>
+                <Select
+                  value={selectedCompany || "All"}
+                  onValueChange={(value) => handleCompanySelect(value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        {selectedCompany && selectedCompany !== "All" && (
+                          <CompanyIcon company={selectedCompany} size={16} className="p-0" />
+                        )}
+                        {selectedCompany || "All Companies"}
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company} value={company}>
                         <div className="flex items-center gap-2">
-                          {selectedCompany && selectedCompany !== "All" && (
-                            <CompanyIcon company={selectedCompany} size={16} className="p-0" />
+                          {company !== "All" && (
+                            <CompanyIcon company={company} size={16} className="p-0" />
                           )}
-                          {selectedCompany || "All Companies"}
+                          {company}
                         </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company} value={company}>
-                          <div className="flex items-center gap-2">
-                            {company !== "All" && (
-                              <CompanyIcon company={company} size={16} className="p-0" />
-                            )}
-                            {company}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Difficulty Filter */}
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Difficulty</label>
-                  <Select
-                    value={selectedDifficulty || "All"}
-                    onValueChange={(value) => handleDifficultySelect(value)}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue>
-                        <div className="flex items-center gap-2">
-                          {selectedDifficulty && selectedDifficulty !== "All" && (
-                            <div 
-                              className={`w-3 h-3 rounded-full ${
-                                selectedDifficulty === "Easy" ? "bg-green-500" :
+              {/* Difficulty Filter */}
+              <div className="flex flex-col space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Difficulty</label>
+                <Select
+                  value={selectedDifficulty || "All"}
+                  onValueChange={(value) => handleDifficultySelect(value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        {selectedDifficulty && selectedDifficulty !== "All" && (
+                          <div
+                            className={`w-3 h-3 rounded-full ${selectedDifficulty === "Easy" ? "bg-green-500" :
                                 selectedDifficulty === "Medium" ? "bg-amber-500" :
-                                selectedDifficulty === "Hard" ? "bg-red-500" : ""
+                                  selectedDifficulty === "Hard" ? "bg-red-500" : ""
                               }`}
+                          />
+                        )}
+                        {selectedDifficulty || "All Difficulties"}
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {difficulties.map((difficulty) => (
+                      <SelectItem key={difficulty} value={difficulty}>
+                        <div className="flex items-center gap-2">
+                          {difficulty !== "All" && (
+                            <div
+                              className={`w-3 h-3 rounded-full ${difficulty === "Easy" ? "bg-green-500" :
+                                  difficulty === "Medium" ? "bg-amber-500" :
+                                    difficulty === "Hard" ? "bg-red-500" : ""
+                                }`}
                             />
                           )}
-                          {selectedDifficulty || "All Difficulties"}
+                          {difficulty}
                         </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {difficulties.map((difficulty) => (
-                        <SelectItem key={difficulty} value={difficulty}>
-                          <div className="flex items-center gap-2">
-                            {difficulty !== "All" && (
-                              <div 
-                                className={`w-3 h-3 rounded-full ${
-                                  difficulty === "Easy" ? "bg-green-500" :
-                                  difficulty === "Medium" ? "bg-amber-500" :
-                                  difficulty === "Hard" ? "bg-red-500" : ""
-                                }`}
-                              />
-                            )}
-                            {difficulty}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+          </div>
 
-            {/* Search */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                Search
-              </h2>
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Search problems..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Problems Table */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                {selectedCategory || selectedCompany || selectedDifficulty
-                  ? [
-                      selectedCategory && `${selectedCategory}`,
-                      selectedCompany && `${selectedCompany}`,
-                      selectedDifficulty && `${selectedDifficulty}`
-                    ].filter(Boolean).join(" ") + " Problems"
-                  : "All Problems"}
-              </h2>
-              <ProblemTable
-                problems={problems}
-                filteredCategory={selectedCategory}
-                filteredCompany={selectedCompany}
-                filteredDifficulty={selectedDifficulty}
-                searchQuery={searchQuery}
-                onToggleStar={toggleStar}
+          {/* Search */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              Search
+            </h2>
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search problems..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
               />
             </div>
+          </div>
+
+          {/* Problems Table */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              {selectedCategory || selectedCompany || selectedDifficulty
+                ? [
+                  selectedCategory && `${selectedCategory}`,
+                  selectedCompany && `${selectedCompany}`,
+                  selectedDifficulty && `${selectedDifficulty}`
+                ].filter(Boolean).join(" ") + " Problems"
+                : "All Problems"}
+            </h2>
+            <ProblemTable
+              problems={problems}
+              filteredCategory={selectedCategory}
+              filteredCompany={selectedCompany}
+              filteredDifficulty={selectedDifficulty}
+              searchQuery={searchQuery}
+              onToggleStar={toggleStar}
+            />
+          </div>
         </div>
       </div>
     </div>

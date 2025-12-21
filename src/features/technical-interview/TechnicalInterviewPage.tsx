@@ -52,8 +52,11 @@ import { notifications } from "@/shared/services/notificationService";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { logger } from "@/utils/logger";
 import { getDifficultyColor } from "@/utils/uiUtils";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 const TechnicalInterview = () => {
+  useTrackFeatureTime(Features.TECHNICAL_INTERVIEW);
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
@@ -449,8 +452,8 @@ const TechnicalInterview = () => {
             {isInterviewActive && (
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${connectionStatus === "connected" ? "bg-green-500" :
-                    connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
-                      "bg-gray-400"
+                  connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
+                    "bg-gray-400"
                   }`} />
                 <span className="text-sm text-muted-foreground">
                   {connectionStatus === "connected" ? "Connected" :
@@ -704,12 +707,12 @@ const TechnicalInterview = () => {
                               key={index}
                               onClick={() => setActiveTestCase(index)}
                               className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ${activeTestCase === index
-                                  ? result.passed
-                                    ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
-                                    : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
-                                  : result.passed
-                                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800"
-                                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800"
+                                ? result.passed
+                                  ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
+                                  : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
+                                : result.passed
+                                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800"
+                                  : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800"
                                 }`}
                             >
                               <span>Case {index + 1}</span>
@@ -719,8 +722,8 @@ const TechnicalInterview = () => {
 
                         {testResults[activeTestCase] && (
                           <div className={`p-4 rounded-lg border-2 ${testResults[activeTestCase].passed
-                              ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
-                              : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                            ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                            : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
                             }`}>
                             <div className="space-y-4">
                               <div className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-md">
@@ -747,8 +750,8 @@ const TechnicalInterview = () => {
                                     Your Output:
                                   </div>
                                   <pre className={`text-sm font-mono ${testResults[activeTestCase].passed
-                                      ? "text-green-700 dark:text-green-300"
-                                      : "text-red-700 dark:text-red-300"
+                                    ? "text-green-700 dark:text-green-300"
+                                    : "text-red-700 dark:text-red-300"
                                     }`}>
                                     {renderValue(testResults[activeTestCase].actual) || "No output"}
                                   </pre>

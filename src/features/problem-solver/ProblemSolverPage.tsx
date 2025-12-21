@@ -30,6 +30,7 @@ import { useEditorTheme } from "@/hooks/useEditorTheme";
 import type { editor } from "monaco-editor";
 import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 // Feature-local imports
 import { ProblemSolverDialogs } from "./components/ProblemSolverDialogs";
@@ -44,6 +45,8 @@ import type { ComplexityAnalysis } from "./types";
 import { LEFT_PANEL_TABS } from "./types";
 
 const ProblemSolverNew = () => {
+  useTrackFeatureTime(Features.PROBLEM_SOLVER);
+
   const { problemId } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();

@@ -69,7 +69,7 @@ export class TestRunnerService {
         expected: testCase.expected,
         actual: "",
         stdout: "",
-        stderr: `API Error: ${error.message || 'Unknown error'}`,
+        stderr: `API Error: ${errorMessage}`,
         time: "0ms",
       }));
 

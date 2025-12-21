@@ -158,6 +158,13 @@ export const AnalyticsEvents = {
     HINT_REQUESTED: 'hint_requested',
     SOLUTION_VIEWED: 'solution_viewed',
 
+    // ===== Problems List events =====
+    PROBLEMS_LIST_VIEWED: 'problems_list_viewed',
+    PROBLEM_FILTERED: 'problem_filtered',
+    PROBLEM_SORTED: 'problem_sorted',
+    PROBLEM_SEARCHED: 'problem_searched',
+    PROBLEM_CLICKED: 'problem_clicked',
+
     // ===== AI Coach events =====
     AI_CHAT_OPENED: 'ai_chat_opened',
     AI_CHAT_STARTED: 'ai_chat_started',
@@ -171,9 +178,27 @@ export const AnalyticsEvents = {
     BEHAVIORAL_PRACTICE_STARTED: 'behavioral_practice_started',
     BEHAVIORAL_STORY_CREATED: 'behavioral_story_created',
     BEHAVIORAL_STORY_EDITED: 'behavioral_story_edited',
+    BEHAVIORAL_STORY_DELETED: 'behavioral_story_deleted',
     BEHAVIORAL_QUESTION_ANSWERED: 'behavioral_question_answered',
     MOCK_INTERVIEW_STARTED: 'mock_interview_started',
     MOCK_INTERVIEW_COMPLETED: 'mock_interview_completed',
+    STORY_CREATION_STARTED: 'story_creation_started',
+    STORY_CREATION_ABANDONED: 'story_creation_abandoned',
+
+    // ===== Technical Interview events =====
+    TECHNICAL_INTERVIEW_STARTED: 'technical_interview_started',
+    TECHNICAL_INTERVIEW_QUESTION_ANSWERED: 'technical_interview_question_answered',
+    TECHNICAL_INTERVIEW_COMPLETED: 'technical_interview_completed',
+
+    // ===== Dashboard events =====
+    DASHBOARD_VIEWED: 'dashboard_viewed',
+    STREAK_VIEWED: 'streak_viewed',
+    PROGRESS_CHECKED: 'progress_checked',
+
+    // ===== Settings events =====
+    SETTINGS_VIEWED: 'settings_viewed',
+    THEME_CHANGED: 'theme_changed',
+    NOTIFICATION_SETTINGS_CHANGED: 'notification_settings_changed',
 
     // ===== Survey events =====
     SURVEY_STARTED: 'survey_started',
@@ -303,6 +328,7 @@ export const Features = {
     BEHAVIORAL_STORIES: 'behavioral_stories',
     BEHAVIORAL_PRACTICE: 'behavioral_practice',
     MOCK_INTERVIEW: 'mock_interview',
+    TECHNICAL_INTERVIEW: 'technical_interview',
     SYSTEM_DESIGN: 'system_design',
     SETTINGS: 'settings',
     SURVEY: 'survey',

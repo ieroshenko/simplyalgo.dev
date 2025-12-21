@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -9,6 +10,7 @@ import ReactFlow, {
   MarkerType,
   Handle,
   Position,
+  ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { X, Calendar, Award, Layers } from "lucide-react";
@@ -100,7 +102,7 @@ const ReadOnlyNode = ({
         strokeWidth={2}
       >
         <div className="flex items-center gap-2">
-          {Icon && <RoughIcon Icon={Icon} size={20} color={color} roughness={1.8} bowing={1.0} />}
+          {Icon && <RoughIcon Icon={Icon} size={20} colorClass="text-current" roughness={1.8} bowing={1.0} />}
           <div className="font-semibold text-sm" style={{ color }}>
             {children}
           </div>
@@ -148,7 +150,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
   const { isDark } = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState<unknown>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const nodeColors = useMemo(() => getNodeColors(isDark), [isDark]);
 
   const nodeTypes: NodeTypes = useMemo(
@@ -229,8 +231,8 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
       // Ensure nodes have required properties
       const processedNodes = loadedNodes.map(node => ({
         ...node,
-        width: node.width || node.style?.width || 180,
-        height: node.height || node.style?.height || 80,
+        width: (node as { width?: number }).width || ((node as { style?: { width?: number } }).style?.width) || 180,
+        height: (node as { height?: number }).height || ((node as { style?: { height?: number } }).style?.height) || 80,
         dragging: false,
         selected: false,
       }));
@@ -371,7 +373,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
                 }}
               >
                 <Background
-                  variant="dots"
+                  variant={BackgroundVariant.Dots}
                   gap={15}
                   size={1}
                   color="hsl(var(--muted-foreground))"

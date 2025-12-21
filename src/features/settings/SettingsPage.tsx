@@ -13,8 +13,11 @@ import { notifications } from "@/shared/services/notificationService";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 const Settings = () => {
+  useTrackFeatureTime(Features.SETTINGS);
+
   const { theme, setTheme } = useTheme();
   const { signOut, user } = useAuth();
   const { subscription, hasActiveSubscription, isLoading } = useSubscription();

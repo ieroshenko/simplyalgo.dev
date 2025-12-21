@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FeedbackViews } from "@/features/behavioral/components/FeedbackViews";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { logger } from "@/utils/logger";
+import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
 
 // Feature-local imports
 import { QuestionSelectionCard } from "./components/QuestionSelectionCard";
@@ -28,6 +29,8 @@ import { INITIAL_PROGRESS_STATE } from "./types";
 import type { BehavioralQuestion, PracticeAnswer } from "@/types";
 
 const BehavioralPractice = () => {
+  useTrackFeatureTime(Features.BEHAVIORAL_PRACTICE);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const questionId = searchParams.get("questionId");
