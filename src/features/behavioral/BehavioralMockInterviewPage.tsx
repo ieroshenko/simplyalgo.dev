@@ -17,6 +17,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { logger } from "@/utils/logger";
 import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
 import { trackEvent, AnalyticsEvents } from "@/services/analytics";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface GeneratedQuestion {
   question_text: string;
@@ -197,7 +198,7 @@ const BehavioralMockInterview = () => {
       logger.error('[BehavioralMockInterview] Error starting interview', { error: err });
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to start interview",
+        description: getErrorMessage(err, "Failed to start interview"),
         variant: "destructive",
       });
     } finally {
@@ -305,7 +306,7 @@ const BehavioralMockInterview = () => {
       logger.error('[BehavioralMockInterview] Error submitting answer', { error: err });
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to submit answer",
+        description: getErrorMessage(err, "Failed to submit answer"),
         variant: "destructive",
       });
     } finally {

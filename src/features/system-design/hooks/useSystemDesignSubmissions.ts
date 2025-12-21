@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { SystemDesignBoardState } from "@/types";
+import { getErrorMessage } from "@/utils/uiUtils";
+import { logger } from "@/utils/logger";
 
 export interface SystemDesignSubmission {
   id: string;
@@ -115,7 +117,7 @@ export const useSystemDesignSubmissions = (
             const isValidBoardState = isSystemDesignBoardState(rawBoardState);
 
             if (!isValidBoardState) {
-              console.warn(
+              logger.warn(
                 "[useSystemDesignSubmissions] Invalid board state for session, using default:",
                 {
                   sessionId: session.id,
@@ -142,10 +144,10 @@ export const useSystemDesignSubmissions = (
         if (cancelled) return;
         setSubmissions(submissionsData);
       } catch (err) {
-        console.error("[useSystemDesignSubmissions] Error:", err);
+        logger.error("[useSystemDesignSubmissions] Error:", err);
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to fetch submissions",
+            getErrorMessage(err, "Failed to fetch submissions"),
           );
           setSubmissions([]);
         }

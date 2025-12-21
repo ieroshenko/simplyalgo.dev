@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notifications } from "@/shared/services/notificationService";
 import type { FlashcardDeck, FlashcardReview, FlashcardStats } from "@/types/api";
 import type { FlashcardDeckRow, FlashcardReviewRow, FlashcardDeckWithRelations } from "@/types/supabase";
+import { logger } from "@/utils/logger";
 
 
 export const useFlashcards = (userId?: string) => {
@@ -144,7 +145,7 @@ export const useFlashcards = (userId?: string) => {
       // Determine if this is a curated solution or custom solution
       const nextReviewDate = new Date().toISOString().split("T")[0];
       if (!nextReviewDate) throw new Error("Unable to generate review date");
-      
+
       const insertData: Omit<FlashcardDeckRow, 'id' | 'created_at' | 'last_reviewed_at' | 'mastery_level' | 'review_count' | 'ease_factor' | 'interval_days' | 'ai_code_skeleton' | 'ai_hints' | 'ai_key_insights' | 'ai_summary' | 'notes_highlight'> = {
         user_id: userId,
         problem_id: problemId,
@@ -181,10 +182,10 @@ export const useFlashcards = (userId?: string) => {
       notifications.success("Added to flashcards! Ready for review.");
     },
     onError: (error: { message?: string; code?: string } | unknown) => {
-      console.error("Error adding to flashcards:", error);
+      logger.error("[useFlashcards] Error adding to flashcards:", error);
       const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
       const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-      
+
       if (errorCode === "23505") {
         notifications.error("This problem is already in your flashcards.");
       } else {
@@ -212,7 +213,7 @@ export const useFlashcards = (userId?: string) => {
       notifications.success("Removed from flashcards.");
     },
     onError: (error: { message?: string } | unknown) => {
-      console.error("Error removing from flashcards:", error);
+      logger.error("[useFlashcards] Error removing from flashcards:", error);
       const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
       notifications.error("Failed to remove from flashcards. Please try again.");
     },
@@ -270,7 +271,7 @@ export const useFlashcards = (userId?: string) => {
       notifications.success("Review submitted successfully!");
     },
     onError: (error: { message?: string } | unknown) => {
-      console.error("Error submitting review:", error);
+      logger.error("[useFlashcards] Error submitting review:", error);
       const errorMessage = error && typeof error === 'object' && 'message' in error ? error.message : 'Unknown error';
       notifications.error("Failed to submit review. Please try again.");
     },
@@ -281,19 +282,19 @@ export const useFlashcards = (userId?: string) => {
     flashcards,
     dueCards,
     stats,
-    
+
     // Loading states
     isLoading,
     error,
-    
+
     // Helper functions
     isInFlashcards,
-    
+
     // Mutations
     addToFlashcards: addToFlashcards.mutate,
     removeFromFlashcards: removeFromFlashcards.mutate,
     submitReview: submitReview.mutate,
-    
+
     // Loading states for mutations
     isAddingToFlashcards: addToFlashcards.isPending,
     isRemovingFromFlashcards: removeFromFlashcards.isPending,

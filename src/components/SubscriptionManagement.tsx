@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CreditCard, Calendar, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/uiUtils';
 
 interface StripeSubscriptionDetails {
   current_period_end: number;
@@ -105,7 +106,7 @@ export const SubscriptionManagement: React.FC = () => {
 
   const handleManageSubscription = async () => {
     if (!user) return;
-    
+
     setIsLoadingAction(true);
     setError(null);
     setSuccess(null);
@@ -137,7 +138,7 @@ export const SubscriptionManagement: React.FC = () => {
       }
     } catch (err: unknown) {
       logger.error('[SubscriptionManagement] Error creating customer portal session', { error: err });
-      const errorMessage = err instanceof Error ? err.message : '';
+      const errorMessage = getErrorMessage(err, '');
       if (errorMessage.includes('No active subscription found')) {
         setError('No active subscription found. Please contact support if you believe this is an error.');
       } else if (errorMessage.includes('Customer portal not configured')) {
@@ -152,7 +153,7 @@ export const SubscriptionManagement: React.FC = () => {
 
   const handleCancelSubscription = async () => {
     if (!user || !subscription) return;
-    
+
     setIsLoadingAction(true);
     setError(null);
     setSuccess(null);
@@ -244,7 +245,7 @@ export const SubscriptionManagement: React.FC = () => {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         {success && (
           <Alert>
             <CheckCircle className="h-4 w-4" />
@@ -291,7 +292,7 @@ export const SubscriptionManagement: React.FC = () => {
                   <Clock className="w-4 h-4 text-orange-500 mt-0.5" />
                   <div>
                     <p className="font-medium text-orange-700 dark:text-orange-300">
-                      {stripeDetails.trial_end && new Date(stripeDetails.trial_end * 1000) > new Date() 
+                      {stripeDetails.trial_end && new Date(stripeDetails.trial_end * 1000) > new Date()
                         ? `Trial will end on ${formatTimestamp(stripeDetails.current_period_end)}`
                         : `Subscription will end on ${formatTimestamp(stripeDetails.current_period_end)}`
                       }
@@ -337,14 +338,14 @@ export const SubscriptionManagement: React.FC = () => {
           )}
 
           <div className="flex space-x-3">
-            <Button 
+            <Button
               onClick={handleManageSubscription}
               disabled={isLoadingAction}
               variant="outline"
             >
               {isLoadingAction ? 'Loading...' : 'Manage Billing'}
             </Button>
-            
+
             {/* {subscription?.status === 'active' && (
               <Button 
                 onClick={handleCancelSubscription}

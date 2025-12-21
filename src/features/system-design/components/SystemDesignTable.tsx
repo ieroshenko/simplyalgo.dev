@@ -5,6 +5,7 @@ import { Circle, Star, Play, Trophy, Zap } from "lucide-react";
 import { SystemDesignSpec } from "@/types";
 import { useNavigate } from "react-router-dom";
 import CompanyIcons from "@/components/CompanyIcons";
+import { getDifficultyColor } from "@/utils/uiUtils";
 
 interface SystemDesignTableProps {
   specs: SystemDesignSpec[];
@@ -25,19 +26,6 @@ const SystemDesignTable = ({
 }: SystemDesignTableProps) => {
   const navigate = useNavigate();
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-success text-success-foreground";
-      case "Medium":
-        return "bg-amber-500 text-amber-foreground";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "solved":
@@ -56,7 +44,7 @@ const SystemDesignTable = ({
       const matchesCategory =
         !filteredCategory || spec.category === filteredCategory;
       const matchesCompany =
-        !filteredCompany || 
+        !filteredCompany ||
         (spec.companies && spec.companies.includes(filteredCompany));
       const matchesDifficulty =
         !filteredDifficulty || spec.difficulty === filteredDifficulty;
@@ -110,16 +98,15 @@ const SystemDesignTable = ({
                 >
                   <td className="px-4 py-3">{getStatusIcon(spec.status)}</td>
                   <td className="px-4 py-3">
-                    <button 
+                    <button
                       className="hover:scale-110 transition-transform"
                       onClick={() => onToggleStar?.(spec.id)}
                     >
                       <Star
-                        className={`w-4 h-4 transition-colors ${
-                          spec.isStarred
+                        className={`w-4 h-4 transition-colors ${spec.isStarred
                             ? "text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400"
                             : "text-muted-foreground hover:text-amber-500 dark:hover:text-amber-400"
-                        }`}
+                          }`}
                       />
                     </button>
                   </td>
@@ -139,7 +126,7 @@ const SystemDesignTable = ({
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <CompanyIcons 
+                    <CompanyIcons
                       companies={spec.companies || []}
                       maxVisible={4}
                       size={18}

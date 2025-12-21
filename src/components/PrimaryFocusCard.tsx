@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { formatTimeAgo } from "@/lib/date";
 import { useProblems } from "@/features/problems/hooks/useProblems";
+import { logger } from "@/utils/logger";
 
 type LastActivity = {
   problemTitle: string;
@@ -49,7 +50,7 @@ const PrimaryFocusCard = () => {
           setLastActivity(null);
         }
       } catch (error) {
-        console.error("Error loading last activity:", error);
+        logger.error("[PrimaryFocusCard] Error loading last activity:", error);
         setLastActivity(null);
       } finally {
         if (mounted) setLoading(false);

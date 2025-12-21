@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
+import { logger } from "@/utils/logger";
 // Dynamically import mermaid to avoid bundler MIME/type issues and reduce initial bundle size
 
 type MermaidProps = {
@@ -76,7 +77,7 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
         }
       } catch (e) {
         if (!cancelled && containerRef.current) {
-          console.error("Mermaid rendering error:", e);
+          logger.error("Mermaid rendering error:", e);
           containerRef.current.innerHTML =
             '<div class="text-destructive text-xs">Failed to render diagram</div>';
         }

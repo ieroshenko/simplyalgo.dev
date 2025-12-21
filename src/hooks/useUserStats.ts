@@ -44,23 +44,45 @@ const validateCurrentStreak = (statsData: { last_activity_date?: string; current
   const lastActivityDate = statsData?.last_activity_date?.split("T")[0];
   const currentStreak = statsData?.current_streak || 0;
 
-  if (!lastActivityDate) return 0;
+  logger.debug("[validateCurrentStreak] Input data", {
+    component: "UserStats",
+    lastActivityDate,
+    currentStreak,
+    today,
+  });
+
+  if (!lastActivityDate) {
+    logger.debug("[validateCurrentStreak] No last activity date, returning 0", { component: "UserStats" });
+    return 0;
+  }
 
   const lastDate = new Date(lastActivityDate);
   const todayDate = new Date(today || "");
   const diffTime = todayDate.getTime() - lastDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  logger.debug("[validateCurrentStreak] Date calculation", {
+    component: "UserStats",
+    lastDate: lastDate.toISOString(),
+    todayDate: todayDate.toISOString(),
+    diffTime,
+    diffDays,
+  });
 
   // Streak is broken if more than 1 day gap
   if (diffDays > 1) {
+    logger.debug("[validateCurrentStreak] Streak broken (>1 day gap), returning 0", { component: "UserStats" });
     return 0;
   }
 
+  logger.debug("[validateCurrentStreak] Streak valid, returning", { component: "UserStats", streak: currentStreak });
   return currentStreak;
 };
 
 // Fetch user stats from database
 async function fetchUserStats(userId: string): Promise<UserStats> {
+  logger.debug("[fetchUserStats] Fetching stats from database", { component: "UserStats", userId });
+  
   const { data: statsData, error } = await supabase
     .from("user_statistics")
     .select("*")
@@ -70,11 +92,32 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
   if (error && error.code !== "PGRST116") throw error;
 
   if (statsData) {
+    logger.debug("[fetchUserStats] Raw data from database", {
+      component: "UserStats",
+      total_solved: statsData.total_solved,
+      current_streak: statsData.current_streak,
+      last_activity_date: statsData.last_activity_date,
+      easy_solved: statsData.easy_solved,
+      medium_solved: statsData.medium_solved,
+      hard_solved: statsData.hard_solved,
+      max_streak: statsData.max_streak,
+    });
+
     // Validate streak
     const validatedStreak = validateCurrentStreak(statsData);
 
+    logger.debug("[fetchUserStats] After validation", {
+      component: "UserStats",
+      originalStreak: statsData.current_streak,
+      validatedStreak,
+    });
+
     // Update database if streak was broken
     if (validatedStreak !== (statsData.current_streak || 0)) {
+      logger.debug("[fetchUserStats] Updating database with new streak", {
+        component: "UserStats",
+        newStreak: validatedStreak,
+      });
       await supabase
         .from("user_statistics")
         .update({
@@ -84,7 +127,7 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
         .eq("user_id", userId);
     }
 
-    return {
+    const result = {
       totalSolved: statsData.total_solved || 0,
       streak: validatedStreak,
       easySolved: statsData.easy_solved || 0,
@@ -92,8 +135,12 @@ async function fetchUserStats(userId: string): Promise<UserStats> {
       hardSolved: statsData.hard_solved || 0,
       maxStreak: statsData.max_streak || 0,
     };
+
+    logger.debug("[fetchUserStats] Returning stats", { component: "UserStats", result });
+    return result;
   }
 
+  logger.debug("[fetchUserStats] No stats found, returning defaults", { component: "UserStats" });
   return DEFAULT_STATS;
 }
 
@@ -163,7 +210,7 @@ export const useUserStats = (userId?: string) => {
         problemId,
       });
 
-      // First check if user has already solved this problem before
+      // Check if user has already solved this problem before
       const { data: previousSolves, error: solvesError } = await supabase
         .from("user_problem_attempts")
         .select("id, created_at")
@@ -181,14 +228,6 @@ export const useUserStats = (userId?: string) => {
         previousSolvesCount: previousSolves?.length || 0,
         isFirstTimeSolving,
       });
-
-      if (!isFirstTimeSolving) {
-        logger.debug(
-          "User has already solved this problem before, skipping stats update",
-          { component: "UserStats" }
-        );
-        return stats;
-      }
 
       // Get current stats
       const { data: currentStats, error: fetchError } = await supabase
@@ -209,22 +248,25 @@ export const useUserStats = (userId?: string) => {
         const lastDate = new Date(lastActivityDate);
         const todayDate = new Date(today || "");
         const diffTime = todayDate.getTime() - lastDate.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays === 0) {
-          newStreak = currentStreak;
+          // Same day: maintain current streak, but ensure minimum of 1
+          newStreak = Math.max(currentStreak, 1);
         } else if (diffDays === 1) {
+          // Consecutive day: increment streak
           newStreak = currentStreak + 1;
         }
+        // diffDays > 1: streak broken, newStreak stays 1 (reset)
       }
 
-      // Calculate new totals
+      // Calculate new totals - only increment for first-time solves
       const newEasySolved =
-        (currentStats?.easy_solved || 0) + (difficulty === "Easy" ? 1 : 0);
+        (currentStats?.easy_solved || 0) + (isFirstTimeSolving && difficulty === "Easy" ? 1 : 0);
       const newMediumSolved =
-        (currentStats?.medium_solved || 0) + (difficulty === "Medium" ? 1 : 0);
+        (currentStats?.medium_solved || 0) + (isFirstTimeSolving && difficulty === "Medium" ? 1 : 0);
       const newHardSolved =
-        (currentStats?.hard_solved || 0) + (difficulty === "Hard" ? 1 : 0);
+        (currentStats?.hard_solved || 0) + (isFirstTimeSolving && difficulty === "Hard" ? 1 : 0);
       const newTotalSolved = newEasySolved + newMediumSolved + newHardSolved;
       const newMaxStreak = Math.max(currentStats?.max_streak || 0, newStreak);
 

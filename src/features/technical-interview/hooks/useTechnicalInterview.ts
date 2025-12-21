@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface TestCase {
   input: unknown;
@@ -56,25 +57,25 @@ function debounce<T extends (...args: any[]) => any>(
 // Extract feedback from AI transcript using structured keywords
 function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFeedback | null {
   const upperTranscript = transcript.toUpperCase();
-  
+
   // Check if this contains the structured feedback format
-  const hasStructuredFeedback = 
+  const hasStructuredFeedback =
     upperTranscript.includes('OVERALL_RESULT') ||
     upperTranscript.includes('OVERALL_SCORE') ||
     (upperTranscript.includes('PROBLEM_CORRECTNESS') && upperTranscript.includes('CODE_QUALITY'));
-  
+
   if (!hasStructuredFeedback) return null;
-  
+
   logger.debug("Detected structured feedback, parsing...", { component: "TechnicalInterview" });
-  
+
   // Extract OVERALL_RESULT (PASS or FAIL)
   const resultMatch = transcript.match(/OVERALL_RESULT:\s*(PASS|FAIL)/i);
   const passed = resultMatch ? resultMatch[1].toUpperCase() === 'PASS' : false;
-  
+
   // Extract OVERALL_SCORE
   const overallScoreMatch = transcript.match(/OVERALL_SCORE:\s*(\d+)/i);
   const overall_score = overallScoreMatch ? parseInt(overallScoreMatch[1]) : 0;
-  
+
   // Extract detailed scores
   const problemCorrectnessMatch = transcript.match(/PROBLEM_CORRECTNESS:\s*(\d+)/i);
   const codeQualityMatch = transcript.match(/CODE_QUALITY:\s*(\d+)/i);
@@ -82,19 +83,19 @@ function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFe
   const communicationMatch = transcript.match(/COMMUNICATION:\s*(\d+)/i);
   const thinkingProcessMatch = transcript.match(/THINKING_PROCESS:\s*(\d+)/i);
   const engagementMatch = transcript.match(/ENGAGEMENT:\s*(\d+)/i);
-  
+
   const problem_correctness = problemCorrectnessMatch ? parseInt(problemCorrectnessMatch[1]) : 0;
   const code_quality = codeQualityMatch ? parseInt(codeQualityMatch[1]) : 0;
   const algorithm_knowledge = algorithmKnowledgeMatch ? parseInt(algorithmKnowledgeMatch[1]) : 0;
   const communication = communicationMatch ? parseInt(communicationMatch[1]) : 0;
   const thinking_process = thinkingProcessMatch ? parseInt(thinkingProcessMatch[1]) : 0;
   const engagement = engagementMatch ? parseInt(engagementMatch[1]) : 0;
-  
+
   // Calculate average scores for the 3 main categories
   const problem_solving_score = Math.round((problem_correctness + algorithm_knowledge + thinking_process) / 3);
   const code_quality_score = code_quality;
   const communication_score = Math.round((communication + engagement) / 2);
-  
+
   // Extract STRENGTHS
   const strengthsMatch = transcript.match(/STRENGTHS:\s*((?:[-•*]\s*.+?\n?)+)/i);
   const strengths: string[] = [];
@@ -107,7 +108,7 @@ function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFe
       }
     });
   }
-  
+
   // Extract IMPROVEMENTS
   const improvementsMatch = transcript.match(/IMPROVEMENTS:\s*((?:[-•*]\s*.+?\n?)+)/i);
   const improvements: string[] = [];
@@ -120,19 +121,19 @@ function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFe
       }
     });
   }
-  
+
   // Extract DETAILED_FEEDBACK
   const detailedFeedbackMatch = transcript.match(/DETAILED_FEEDBACK:\s*([\s\S]+?)(?=INTERVIEWER_NOTES:|$)/i);
-  const detailed_feedback = detailedFeedbackMatch 
-    ? detailedFeedbackMatch[1].trim() 
+  const detailed_feedback = detailedFeedbackMatch
+    ? detailedFeedbackMatch[1].trim()
     : transcript.substring(0, 500);
-  
+
   // Extract INTERVIEWER_NOTES
   const interviewerNotesMatch = transcript.match(/INTERVIEWER_NOTES:\s*([\s\S]+?)$/i);
-  const interviewer_notes = interviewerNotesMatch 
-    ? interviewerNotesMatch[1].trim() 
+  const interviewer_notes = interviewerNotesMatch
+    ? interviewerNotesMatch[1].trim()
     : 'Candidate performed interview';
-  
+
   logger.debug("Successfully parsed feedback", {
     component: "TechnicalInterview",
     passed,
@@ -143,7 +144,7 @@ function extractFeedbackFromTranscript(transcript: string): TechnicalInterviewFe
     strengthsCount: strengths.length,
     improvementsCount: improvements.length
   });
-  
+
   return {
     passed,
     overall_score,
@@ -602,7 +603,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
             logger.debug("Assistant transcript received", { component: "TechnicalInterview", transcript: event.transcript });
             if (event.transcript) {
               accumulatedTranscriptRef.current += event.transcript + " ";
-              
+
               // Try to extract feedback from accumulated transcript
               if (onFeedbackReceived) {
                 const feedback = extractFeedbackFromTranscript(accumulatedTranscriptRef.current);
@@ -611,7 +612,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
                   onFeedbackReceived(feedback);
                 }
               }
-              
+
               if (onTranscript) {
                 onTranscript("assistant", event.transcript);
               }
@@ -708,7 +709,7 @@ Begin by greeting the candidate and introducing the problem "${problemTitle}".`,
       logger.debug("WebRTC connection established", { component: "TechnicalInterview" });
     } catch (err) {
       logger.error("Failed to start interview", err, { component: "TechnicalInterview" });
-      setError(err instanceof Error ? err.message : "Failed to start interview");
+      setError(getErrorMessage(err, "Failed to start interview"));
       cleanup();
     }
   }, [problemTitle, problemDescription, testCases, voice, onConnectionStatusChange, onTranscript, onTimeUp, cleanup, onFeedbackReceived]);

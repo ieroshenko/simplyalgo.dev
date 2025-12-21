@@ -17,6 +17,7 @@ import {
   TbClockPlay,
   TbNetwork,
 } from "react-icons/tb";
+import { logger } from "@/utils/logger";
 
 // Consolidated NodePaletteProps is defined below with onAddNode
 
@@ -58,13 +59,13 @@ const NodePalette = ({ isOpen, onClose, onAddNode }: NodePaletteProps) => {
   ) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
-    console.log("[NodePalette] Drag started for:", nodeType);
+    logger.debug("[NodePalette] Drag started for:", { nodeType });
     // Close palette on drag start so it doesn't block the drop
     onClose();
   };
 
   const handleNodeClick = (nodeType: string) => {
-    console.log("[NodePalette] Node clicked:", nodeType);
+    logger.debug("[NodePalette] Node clicked:", { nodeType });
     if (onAddNode) {
       onAddNode(nodeType);
       onClose();

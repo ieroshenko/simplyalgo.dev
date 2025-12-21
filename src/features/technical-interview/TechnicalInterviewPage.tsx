@@ -51,13 +51,14 @@ import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { notifications } from "@/shared/services/notificationService";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { logger } from "@/utils/logger";
+import { getDifficultyColor } from "@/utils/uiUtils";
 
 const TechnicalInterview = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
   const { currentTheme } = useEditorTheme();
-  
+
   interface TechnicalProblem {
     id: string;
     title: string;
@@ -99,11 +100,11 @@ const TechnicalInterview = () => {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [activeTestCase, setActiveTestCase] = useState(0);
-  
+
   const interviewStartTimeRef = useRef<Date | null>(null);
   const lastCodeSnapshotRef = useRef<string>("");
   const codeSnapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const codeEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const {
@@ -150,13 +151,13 @@ const TechnicalInterview = () => {
             detailed_feedback: feedback.detailed_feedback,
             interviewer_notes: feedback.interviewer_notes,
           });
-          
+
           // Update session with pass/fail and overall score
           const duration = Math.floor(
             (new Date().getTime() - (interviewStartTimeRef.current?.getTime() || 0)) / 1000
           );
           await endSession(duration, feedback.passed, feedback.overall_score);
-          
+
           notifications.success("Feedback saved!");
         }
       } catch (err) {
@@ -219,19 +220,19 @@ const TechnicalInterview = () => {
     try {
       const isRandom = selectedProblemId === "random";
       notifications.info(isRandom ? "Selecting a random problem..." : "Loading selected problem...");
-      
+
       // Get problem (random or specific)
       const selectedProblem = await TechnicalInterviewService.getProblem(selectedProblemId);
-      
+
       logger.debug('Selected problem', {
         component: 'TechnicalInterview',
         id: selectedProblem.id,
         title: selectedProblem.title
       });
-      
+
       // Clear any previously saved code - start fresh with function signature
       const freshCode = selectedProblem.functionSignature || "";
-      
+
       // Clear the code editor immediately
       if (codeEditorRef.current?.setValue) {
         codeEditorRef.current.setValue(freshCode);
@@ -242,23 +243,23 @@ const TechnicalInterview = () => {
       interviewStartTimeRef.current = new Date();
 
       notifications.success(`Interview started: ${selectedProblem.title}`);
-      
+
       // CRITICAL: Set problem and code state synchronously before starting interview
       // This ensures the useTechnicalInterview hook gets the correct values
       setProblem(selectedProblem);
       setCode(freshCode);
       setIsInterviewActive(true);
-      
+
       // Wait for React to process state updates (2 render cycles)
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       logger.debug('Starting interview', {
         component: 'TechnicalInterview',
         problemTitle: selectedProblem.title,
         problemId: selectedProblem.id,
         testCaseCount: selectedProblem.testCases?.length || 0
       });
-      
+
       await startInterview();
     } catch (err) {
       logger.error("Failed to start interview", err, { component: 'TechnicalInterview' });
@@ -297,7 +298,7 @@ const TechnicalInterview = () => {
 
   const handleRun = async () => {
     if (!problem || !user?.id) return;
-    
+
     setIsRunning(true);
     setTestResults([]);
     setActiveTestCase(0);
@@ -309,9 +310,9 @@ const TechnicalInterview = () => {
         testCases: problem.testCases,
         problemId: problem.id,
       });
-      
+
       setTestResults(response.results);
-      
+
       // Save test results to database
       if (sessionId) {
         await saveTestResults(response.results);
@@ -333,18 +334,7 @@ const TechnicalInterview = () => {
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-success text-success-foreground";
-      case "Medium":
-        return "bg-amber-500 text-white";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
+
 
   const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) return "null";
@@ -454,23 +444,22 @@ const TechnicalInterview = () => {
           <div className="flex items-center space-x-4">
             {/* Timer */}
             <InterviewTimer timeRemaining={timeRemaining} isActive={isInterviewActive} />
-            
+
             {/* Connection Status */}
             {isInterviewActive && (
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  connectionStatus === "connected" ? "bg-green-500" :
-                  connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
-                  "bg-gray-400"
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${connectionStatus === "connected" ? "bg-green-500" :
+                    connectionStatus === "connecting" ? "bg-yellow-500 animate-pulse" :
+                      "bg-gray-400"
+                  }`} />
                 <span className="text-sm text-muted-foreground">
                   {connectionStatus === "connected" ? "Connected" :
-                   connectionStatus === "connecting" ? "Connecting..." :
-                   "Not Connected"}
+                    connectionStatus === "connecting" ? "Connecting..." :
+                      "Not Connected"}
                 </span>
               </div>
             )}
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -545,9 +534,8 @@ const TechnicalInterview = () => {
                                 }}
                               >
                                 <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    selectedProblemId === "random" ? "opacity-100" : "opacity-0"
-                                  }`}
+                                  className={`mr-2 h-4 w-4 ${selectedProblemId === "random" ? "opacity-100" : "opacity-0"
+                                    }`}
                                 />
                                 <div className="flex flex-col">
                                   <span className="font-medium">🎲 Random Problem</span>
@@ -569,9 +557,8 @@ const TechnicalInterview = () => {
                                   }}
                                 >
                                   <Check
-                                    className={`mr-2 h-4 w-4 ${
-                                      selectedProblemId === p.id ? "opacity-100" : "opacity-0"
-                                    }`}
+                                    className={`mr-2 h-4 w-4 ${selectedProblemId === p.id ? "opacity-100" : "opacity-0"
+                                      }`}
                                   />
                                   <div className="flex flex-col flex-1">
                                     <span className="font-medium">{p.title}</span>
@@ -716,15 +703,14 @@ const TechnicalInterview = () => {
                             <button
                               key={index}
                               onClick={() => setActiveTestCase(index)}
-                              className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ${
-                                activeTestCase === index
+                              className={`flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ${activeTestCase === index
                                   ? result.passed
                                     ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600"
                                     : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
                                   : result.passed
-                                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800"
-                                  : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800"
-                              }`}
+                                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800"
+                                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800"
+                                }`}
                             >
                               <span>Case {index + 1}</span>
                             </button>
@@ -732,11 +718,10 @@ const TechnicalInterview = () => {
                         </div>
 
                         {testResults[activeTestCase] && (
-                          <div className={`p-4 rounded-lg border-2 ${
-                            testResults[activeTestCase].passed
+                          <div className={`p-4 rounded-lg border-2 ${testResults[activeTestCase].passed
                               ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
                               : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
-                          }`}>
+                            }`}>
                             <div className="space-y-4">
                               <div className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-md">
                                 <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
@@ -761,11 +746,10 @@ const TechnicalInterview = () => {
                                   <div className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">
                                     Your Output:
                                   </div>
-                                  <pre className={`text-sm font-mono ${
-                                    testResults[activeTestCase].passed
+                                  <pre className={`text-sm font-mono ${testResults[activeTestCase].passed
                                       ? "text-green-700 dark:text-green-300"
                                       : "text-red-700 dark:text-red-300"
-                                  }`}>
+                                    }`}>
                                     {renderValue(testResults[activeTestCase].actual) || "No output"}
                                   </pre>
                                 </div>

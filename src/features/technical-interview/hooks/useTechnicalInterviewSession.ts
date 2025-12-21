@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { TechnicalInterviewService, TechnicalInterviewSession } from "@/features/technical-interview/services/technicalInterviewService";
 import { TestResult } from "@/types";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface UseTechnicalInterviewSessionReturn {
   sessionId: string | null;
@@ -37,7 +38,7 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
       setError(null);
       logger.debug("Session created", { component: "TechnicalInterviewSession", sessionId: newSession.id });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create session";
+      const errorMessage = getErrorMessage(err, "Failed to create session");
       logger.error("Create session error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;
@@ -55,7 +56,7 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
       await TechnicalInterviewService.endSession(sessionId, duration, passed, score);
       setError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to end session";
+      const errorMessage = getErrorMessage(err, "Failed to end session");
       logger.error("End session error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;
@@ -126,7 +127,7 @@ export const useTechnicalInterviewSession = (): UseTechnicalInterviewSessionRetu
       await TechnicalInterviewService.saveFeedback(sessionId, feedback);
       setError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save feedback";
+      const errorMessage = getErrorMessage(err, "Failed to save feedback");
       logger.error("Save feedback error", err, { component: "TechnicalInterviewSession" });
       setError(errorMessage);
       throw err;

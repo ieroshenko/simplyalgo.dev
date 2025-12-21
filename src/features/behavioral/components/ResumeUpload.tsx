@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface ResumeUploadProps {
   onResumeExtracted: (text: string) => void;
@@ -49,7 +50,7 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
       const text = await parseResumeViaBackend(file);
       onResumeExtracted(text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to extract text from file");
+      setError(getErrorMessage(err, "Failed to extract text from file"));
       logger.error('[ResumeUpload] Error extracting text', { error: err });
     } finally {
       setIsLoading(false);
@@ -130,8 +131,8 @@ const ResumeUpload = ({ onResumeExtracted, disabled }: ResumeUploadProps) => {
         <Card
           onClick={handleClick}
           className={`border-2 border-dashed p-8 text-center transition-all ${disabled
-              ? "opacity-50 cursor-not-allowed"
-              : "cursor-pointer hover:border-primary hover:bg-accent"
+            ? "opacity-50 cursor-not-allowed"
+            : "cursor-pointer hover:border-primary hover:bg-accent"
             }`}
         >
           <div className="flex flex-col items-center gap-3">

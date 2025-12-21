@@ -186,7 +186,7 @@ describe('useUserStats', () => {
     });
 
     describe('Streak Validation', () => {
-        it('should validate and return current streak when activity is recent', async () => {
+        it('should validate and return current streak when activity is today', async () => {
             const today = new Date().toISOString();
             mockStatsData = {
                 total_solved: 5,
@@ -207,6 +207,107 @@ describe('useUserStats', () => {
             });
 
             expect(result.current.stats.streak).toBe(5);
+        });
+
+        it('should maintain streak when last activity was earlier today', async () => {
+            // Simulate activity from 6 hours ago (same day)
+            const sixHoursAgo = new Date();
+            sixHoursAgo.setHours(sixHoursAgo.getHours() - 6);
+            
+            mockStatsData = {
+                total_solved: 3,
+                current_streak: 3,
+                easy_solved: 2,
+                medium_solved: 1,
+                hard_solved: 0,
+                max_streak: 5,
+                last_activity_date: sixHoursAgo.toISOString(),
+            };
+
+            const { result } = renderHook(() => useUserStats('user-123'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => {
+                expect(result.current.loading).toBe(false);
+            });
+
+            // Streak should be maintained (not reset to 0)
+            expect(result.current.stats.streak).toBe(3);
+        });
+
+        it('should maintain streak when last activity was yesterday', async () => {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            mockStatsData = {
+                total_solved: 7,
+                current_streak: 7,
+                easy_solved: 3,
+                medium_solved: 3,
+                hard_solved: 1,
+                max_streak: 10,
+                last_activity_date: yesterday.toISOString(),
+            };
+
+            const { result } = renderHook(() => useUserStats('user-123'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => {
+                expect(result.current.loading).toBe(false);
+            });
+
+            // Streak should be maintained for yesterday's activity
+            expect(result.current.stats.streak).toBe(7);
+        });
+
+        it('should reset streak to 0 when last activity was more than 1 day ago', async () => {
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            
+            mockStatsData = {
+                total_solved: 10,
+                current_streak: 10,
+                easy_solved: 5,
+                medium_solved: 3,
+                hard_solved: 2,
+                max_streak: 15,
+                last_activity_date: threeDaysAgo.toISOString(),
+            };
+
+            const { result } = renderHook(() => useUserStats('user-123'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => {
+                expect(result.current.loading).toBe(false);
+            });
+
+            // Streak should be broken (reset to 0)
+            expect(result.current.stats.streak).toBe(0);
+        });
+
+        it('should return 0 streak when no last_activity_date exists', async () => {
+            mockStatsData = {
+                total_solved: 0,
+                current_streak: 0,
+                easy_solved: 0,
+                medium_solved: 0,
+                hard_solved: 0,
+                max_streak: 0,
+                last_activity_date: null,
+            };
+
+            const { result } = renderHook(() => useUserStats('user-123'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => {
+                expect(result.current.loading).toBe(false);
+            });
+
+            expect(result.current.stats.streak).toBe(0);
         });
     });
 

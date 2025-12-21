@@ -26,19 +26,6 @@ const ProblemContextSidebar = ({ spec }: ProblemContextSidebarProps) => {
   // Select syntax highlighting theme based on current color scheme
   const syntaxTheme = isDark ? vscDarkPlus : vs;
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-success text-success-foreground";
-      case "Medium":
-        return "bg-amber-500 text-white";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
   return (
     <div className="space-y-6 p-6">
       {/* Summary - Main Description */}

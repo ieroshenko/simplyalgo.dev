@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
 import { useAsyncState } from "@/shared/hooks/useAsyncState";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 export interface Solution {
   id: string;
@@ -72,8 +73,7 @@ export const useSolutions = (problemId?: string) => {
         setData(solutionsData);
       } catch (err) {
         logger.error('[useSolutions] Error loading solutions', { error: err, problemId });
-        const errorMessage = err instanceof Error ? err.message : "Failed to load solutions";
-        setError(new Error(errorMessage));
+        setError(new Error(getErrorMessage(err, "Failed to load solutions")));
       }
     };
 

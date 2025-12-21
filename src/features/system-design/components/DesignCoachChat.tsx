@@ -14,6 +14,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { Badge } from "@/components/ui/badge";
 import type { CompletenessAnalysis } from "@/types";
+import { logger } from "@/utils/logger";
 import "katex/dist/katex.min.css";
 
 interface DesignCoachChatProps {
@@ -67,7 +68,7 @@ const DesignCoachChat = ({
       });
     },
     onError: (error) => {
-      console.error("Speech recognition error:", error);
+      logger.error("[DesignCoachChat] Speech recognition error", error);
     },
   });
 
@@ -150,7 +151,7 @@ const DesignCoachChat = ({
               onClick={async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log("[DesignCoachChat] Delete clicked, calling clearConversation");
+                logger.debug("[DesignCoachChat] Delete clicked, calling clearConversation");
                 setIsClearing(true);
                 await onClearConversation();
                 // isClearing will be reset when new messages appear

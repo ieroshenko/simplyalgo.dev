@@ -32,6 +32,7 @@ import {
   TbClockPlay,
   TbNetwork,
 } from "react-icons/tb";
+import { logger } from "@/utils/logger";
 
 interface SubmissionPreviewModalProps {
   submission: SystemDesignSubmission | null;
@@ -218,7 +219,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
       const loadedNodes = submission.board_state.nodes || [];
       const loadedEdges = submission.board_state.edges || [];
 
-      console.log("[SubmissionPreview] Loading board state:", {
+      logger.debug("[SubmissionPreview] Loading board state:", {
         nodes: loadedNodes.length,
         edges: loadedEdges.length,
         firstNode: loadedNodes[0],
@@ -234,7 +235,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
         selected: false,
       }));
 
-      console.log("[SubmissionPreview] Processed nodes:", processedNodes.length);
+      logger.debug("[SubmissionPreview] Processed nodes:", { count: processedNodes.length });
 
       setNodes(processedNodes);
       setEdges(loadedEdges);
@@ -244,7 +245,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
   // Fit view after React Flow instance is ready
   useEffect(() => {
     if (reactFlowInstance && nodes.length > 0) {
-      console.log("[SubmissionPreview] Fitting view with", nodes.length, "nodes");
+      logger.debug("[SubmissionPreview] Fitting view with nodes", { count: nodes.length });
       setTimeout(() => {
         reactFlowInstance.fitView({ padding: 0.2 });
       }, 50);
@@ -284,7 +285,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
     return null;
   }
 
-  console.log("[SubmissionPreview] Rendering with submission:", {
+  logger.debug("[SubmissionPreview] Rendering with submission:", {
     id: submission.id,
     score: submission.score,
     hasNodes: !!submission.board_state?.nodes,
@@ -347,7 +348,7 @@ const SubmissionPreviewModal = ({ submission, isOpen, onClose }: SubmissionPrevi
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onInit={(instance) => {
-                  console.log("[SubmissionPreview] ReactFlow initialized");
+                  logger.debug("[SubmissionPreview] ReactFlow initialized");
                   setReactFlowInstance(instance);
                 }}
                 nodeTypes={nodeTypes}

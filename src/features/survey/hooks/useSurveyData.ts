@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { SurveyService } from '@/features/survey/services/surveyService';
 import { SurveyData } from '@/types/survey';
+import { logger } from '@/utils/logger';
 
 // Cache configuration
 const STALE_TIME = 10 * 60 * 1000; // 10 minutes - survey data rarely changes
@@ -58,7 +59,7 @@ async function fetchSurveyData(userId: string | undefined): Promise<{
       return { surveyData, completedSteps };
     }
   } catch (dbError) {
-    console.warn('Database not available, using localStorage data:', dbError);
+    logger.warn('[useSurveyData] Database not available, using localStorage data:', dbError);
   }
 
   return {
@@ -132,7 +133,7 @@ export const useSurveyData = () => {
       queryClient.setQueryData(['surveyData', user?.id], newData);
     },
     onError: (error) => {
-      console.warn('Database save error:', error);
+      logger.warn('[useSurveyData] Database save error:', { error });
       // Data is still in localStorage, so we continue
     },
   });
@@ -181,7 +182,7 @@ export const useSurveyData = () => {
   // Save to database
   const saveToDatabase = useCallback(async () => {
     if (!user) {
-      console.warn('No user available for database save');
+      logger.warn('[useSurveyData] No user available for database save');
       return;
     }
 

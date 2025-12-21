@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SystemDesignSpec, Category } from "@/types";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 // Minimal DB row types for stronger typing within this hook
 type AttemptRow = {
@@ -128,8 +129,8 @@ export const useSystemDesignSpecs = (userId?: string) => {
         const isStarred = userStars.some((s) => s.problem_id === spec.id);
 
         // system_design_specs is returned as an array with one element due to Supabase join
-        const sds = Array.isArray(spec.system_design_specs) 
-          ? spec.system_design_specs[0] 
+        const sds = Array.isArray(spec.system_design_specs)
+          ? spec.system_design_specs[0]
           : spec.system_design_specs;
 
         if (!sds) {
@@ -170,7 +171,7 @@ export const useSystemDesignSpecs = (userId?: string) => {
 
       setSpecs(formattedSpecs);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = getErrorMessage(err);
       setError(message);
     } finally {
       setLoading(false);
@@ -281,7 +282,7 @@ export const useSystemDesignSpecs = (userId?: string) => {
 
       setCategories(formattedCategories);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = getErrorMessage(err);
       setError(message);
     } finally {
       setLoading(false);
@@ -341,7 +342,7 @@ export const useSystemDesignSpecs = (userId?: string) => {
         ),
       );
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = getErrorMessage(err);
       throw new Error(message);
     }
   };

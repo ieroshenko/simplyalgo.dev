@@ -1,279 +1,63 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { CoachStep, CoachHighlightArea, InteractiveCoachSession } from "@/types";
+/**
+ * Main coaching hook - composes sub-hooks for a complete coaching experience
+ */
+import { useCallback, useRef } from "react";
+import { CoachHighlightArea, InteractiveCoachSession } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
-import { OverlayPositionManager } from "../services/overlayPositionManager";
 
-interface UseCoachingProps {
-  problemId: string;
-  userId: string;
-  problemDescription?: string;
-  editorRef: React.RefObject<{
-    getValue: () => string;
-    setValue: (value: string) => void;
-    deltaDecorations: (oldDecorations: string[], newDecorations: unknown[]) => string[];
-    getScrollTop: () => number;
-    getVisibleRanges: () => unknown[];
-    getPosition: () => { lineNumber: number; column: number } | null;
-    getDomNode?: () => HTMLElement | null;
-    getScrolledVisiblePosition?: (position: { lineNumber: number; column: number }) => { left: number; top: number; height: number } | null;
-  } | null>;
-  onCodeInsert?: (code: string) => Promise<void>;
-  confirmLargeInsert?: (options: { code: string; lineCount: number }) => Promise<boolean>;
-}
+// Import from coaching module
+import {
+  UseCoachingProps,
+  CoachingState,
+  codeContainsSnippet,
+  stripCodeFences,
+  isLargeInsertion,
+} from "./coaching";
+import { useCoachingEditor } from "./coaching/useCoachingEditor";
+import { useCoachingPosition } from "./coaching/useCoachingPosition";
+import { useCoachingState } from "./coaching/useCoachingState";
 
-export interface CoachingState {
-  session: InteractiveCoachSession | null;
-  isCoachModeActive: boolean;
-  currentHighlight: CoachHighlightArea | null;
-  showInputOverlay: boolean;
-  inputPosition: { x: number; y: number } | null;
-  isWaitingForResponse: boolean;
-  isValidating: boolean;
-  lastValidation: {
-    isCorrect: boolean;
-    feedback: string;
-    isOptimizable?: boolean;
-    hasAlternative?: boolean;
-    codeToAdd?: string;
-    nextStep?: {
-      question: string;
-      hint: string;
-    };
-    optimizationAnalysis?: {
-      optimizationType?: 'time' | 'space' | 'both' | 'alternative';
-      currentComplexity?: { time: string; space: string };
-      targetComplexity?: { time: string; space: string };
-      reason?: string;
-    };
-  } | null | undefined;
-  feedback: {
-    show: boolean;
-    type: 'hint' | 'error' | 'success' | null;
-    message: string;
-    showConfetti: boolean;
-  };
-  isOptimizable?: boolean;
-  isOptimizationMode?: boolean;
-  optimizationSessionType?: 'optimization' | 'alternative'; // Track current session type
-  lastOptimizationStep?: {
-    question: string;
-    hint?: string;
-    sessionType?: 'optimization' | 'alternative';
-    highlightArea?: CoachHighlightArea;
-  };
-  // Enhanced positioning system
-  positionManager?: OverlayPositionManager;
-}
+// Re-export for backwards compatibility
+export type { CoachingState } from "./coaching";
 
-export const useCoachingNew = ({ problemId, userId, problemDescription, editorRef, onCodeInsert, confirmLargeInsert }: UseCoachingProps) => {
-  // Initialize position manager for centralized overlay positioning
-  const positionManager = useMemo(() => {
-    if (problemId) {
-      return new OverlayPositionManager(problemId);
-    }
-    return undefined;
-  }, [problemId]);
+export const useCoachingNew = ({
+  problemId,
+  userId,
+  problemDescription,
+  editorRef,
+  onCodeInsert,
+  confirmLargeInsert,
+}: UseCoachingProps) => {
+  // Compose sub-hooks
+  const { positionManager, getPositionBelowLastLine, handlePositionChange } = useCoachingPosition(problemId, editorRef);
+  const { applyHighlight, getScreenPosition, highlightDecorationsRef } = useCoachingEditor(editorRef);
+  const {
+    coachingState,
+    contextState,
+    startTimeRef,
+    setCoachingState,
+    setContextState,
+    showInteractiveQuestion: showInteractiveQuestionBase,
+    resetCoachingState,
+    cancelInput,
+    closeFeedback,
+    getElapsedTime,
+  } = useCoachingState(positionManager);
 
-  const [coachingState, setCoachingState] = useState<CoachingState>({
-    session: null,
-    isCoachModeActive: false,
-    currentHighlight: null,
-    showInputOverlay: false,
-    inputPosition: null,
-    isWaitingForResponse: false,
-    isValidating: false,
-    lastValidation: undefined,
-    feedback: {
-      show: false,
-      type: null,
-      message: "",
-      showConfetti: false,
-    },
-    positionManager,
-  });
-
-  // Context tracking for Responses API optimization
-  const [contextState, setContextState] = useState<{
-    responseId: string | null;
-    contextInitialized: boolean;
-    lastCodeSnapshot: string;
-  }>({
-    responseId: null,
-    contextInitialized: false,
-    lastCodeSnapshot: '',
-  });
-
-  // Update position manager in coaching state when it changes
-  useEffect(() => {
-    setCoachingState(prev => ({
-      ...prev,
-      positionManager,
-    }));
-  }, [positionManager]);
-
-  const highlightDecorationsRef = useRef<string[]>([]);
-  const startTimeRef = useRef<Date | null>(null);
-
-  // Helper: detect whether a code snippet is already present (normalized)
-  const codeContainsSnippet = useCallback((full: string, snippet: string) => {
-    const normalize = (s: string) =>
-      s
-        .replace(/#.*$/gm, "") // strip inline comments
-        .replace(/\s+/g, " ") // collapse whitespace
-        .trim();
-    const f = normalize(full);
-    const sn = normalize(snippet);
-    return f.includes(sn);
-  }, []);
-
-  // Apply highlight to editor
-  const applyHighlight = useCallback((highlightArea: CoachHighlightArea | null) => {
-    if (!editorRef.current) return;
-
-    try {
-      if (highlightArea) {
-        const newDecorations = [{
-          range: {
-            startLineNumber: highlightArea.startLine,
-            startColumn: 1,
-            endLineNumber: highlightArea.startLine, // Only highlight single line, not range
-            endColumn: 1000
-          },
-          options: {
-            className: 'coach-highlight-area',
-            isWholeLine: true
-          }
-        }];
-
-        highlightDecorationsRef.current = editorRef.current.deltaDecorations(
-          highlightDecorationsRef.current,
-          newDecorations
-        );
-      } else {
-        // Clear highlights
-        highlightDecorationsRef.current = editorRef.current.deltaDecorations(
-          highlightDecorationsRef.current,
-          []
-        );
-      }
-    } catch (error) {
-      logger.error("Error applying highlight", error, { component: "Coaching" });
-    }
-  }, [editorRef]);
-
-  // Calculate position for overlay
-  const getScreenPosition = useCallback((lineNumber: number) => {
-    try {
-      if (!editorRef.current) {
-        return { x: 100, y: 150 };
-      }
-
-      const position = { lineNumber, column: 1 };
-      const screenPos = editorRef.current.getScrolledVisiblePosition?.(position);
-
-      if (screenPos) {
-        const belowY = (screenPos.top || 0) + (screenPos.height || 20) + 12;
-        return {
-          x: Math.max(50, Math.min(window.innerWidth - 400, (screenPos.left || 0) + 50)),
-          y: Math.max(30, Math.min(window.innerHeight - 300, belowY))
-        };
-      }
-
-      // Fallback positioning
-      const estimatedY = 150 + (lineNumber * 20);
-      return {
-        x: Math.max(50, Math.min(window.innerWidth - 400, 100)),
-        y: Math.max(30, Math.min(window.innerHeight - 300, estimatedY))
-      };
-    } catch (error) {
-      logger.warn("Error calculating position", { component: "Coaching", error });
-      return { x: 100, y: 150 };
-    }
-  }, [editorRef]);
-
-  // Calculate position for overlay using the new positioning system
-  const getPositionBelowLastLine = useCallback(() => {
-    try {
-      if (!editorRef.current || !positionManager) {
-        return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
-      }
-
-      // Get editor bounds
-      const editorNode = editorRef.current.getDomNode?.();
-      const editorRect = editorNode?.getBoundingClientRect();
-
-      if (!editorRect) {
-        // Use fallback positioning when editor bounds unavailable
-        const fallbackPosition = positionManager.getPositionWithFallback();
-        return { x: fallbackPosition.x, y: fallbackPosition.y };
-      }
-
-      const editorBounds = {
-        left: editorRect.left,
-        top: editorRect.top,
-        right: editorRect.right,
-        bottom: editorRect.bottom,
-        width: editorRect.width,
-        height: editorRect.height,
-      };
-
-      // Get the last line number for positioning
-      const code = editorRef.current.getValue();
-      const totalLines = Math.max(1, (code || "").split('\n').length);
-
-      // Use OverlayPositionManager for smart positioning
-      const position = positionManager.getPositionWithFallback(editorBounds, totalLines);
-      return { x: position.x, y: position.y };
-    } catch (error) {
-      logger.warn("Error calculating position using OverlayPositionManager", { component: "Coaching", error });
-      // Fallback to basic positioning
-      return { x: 100, y: Math.min(window.innerHeight - 220, 180) };
-    }
-  }, [editorRef, positionManager]);
-
-  // Show interactive question overlay
+  // Wrap showInteractiveQuestion with required dependencies
   const showInteractiveQuestion = useCallback(({ question, hint, highlightArea }: {
     question: string;
     hint?: string;
     highlightArea?: CoachHighlightArea;
   }) => {
-    logger.debug("Showing interactive question", { component: "Coaching", question, hint, highlightArea });
+    showInteractiveQuestionBase({ question, hint, highlightArea }, applyHighlight, getPositionBelowLastLine);
+  }, [showInteractiveQuestionBase, applyHighlight, getPositionBelowLastLine]);
 
-    // Use the highlight area provided by the AI backend - it already calculates the correct insertion point
-    const finalHighlight = highlightArea || null;
-
-    // Apply highlight if provided
-    if (finalHighlight) {
-      applyHighlight(finalHighlight);
-    }
-
-    // Calculate position for the overlay: always below the last line to avoid covering code
-    const screenPosition = getPositionBelowLastLine();
-
-    setCoachingState(prev => ({
-      ...prev,
-      showInputOverlay: true,
-      isWaitingForResponse: false, // Now that overlay is showing, stop loading
-      // Preserve previous overlay position if already set
-      inputPosition: prev.inputPosition || screenPosition,
-      currentHighlight: finalHighlight || null,
-      session: prev.session ? {
-        ...prev.session,
-        isCompleted: false, // Showing a question implies active session
-        currentQuestion: question,
-        currentHint: hint,
-        highlightArea: finalHighlight ? {
-          startLine: finalHighlight.startLine,
-          endLine: finalHighlight.endLine,
-          startColumn: 1,
-          endColumn: 1,
-        } : prev.session.highlightArea,
-      } : prev.session,
-    }));
-
-    logger.debug("Overlay now showing", { component: "Coaching", showInputOverlay: true, isWaitingForResponse: false, currentQuestion: question });
-  }, [applyHighlight, getPositionBelowLastLine]);
+  // Stop coaching session
+  const stopCoaching = useCallback(() => {
+    resetCoachingState(applyHighlight);
+  }, [resetCoachingState, applyHighlight]);
 
   // Start coaching session
   const startCoaching = useCallback(async () => {
@@ -318,7 +102,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       if (data.isCompleted) {
         logger.debug("Solution already complete at session start", { component: "Coaching", isOptimizable: data.isOptimizable });
 
-        // Initialize session state as completed - show the congratulations message in overlay
         setCoachingState(prev => ({
           ...prev,
           session: {
@@ -330,7 +113,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             highlightArea: null,
           } as InteractiveCoachSession,
           isCoachModeActive: true,
-          isOptimizable: data.isOptimizable, // ← Use backend's optimization check
+          isOptimizable: data.isOptimizable,
           showInputOverlay: true,
           inputPosition: getPositionBelowLastLine(),
           isWaitingForResponse: false,
@@ -358,11 +141,10 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           highlightArea: data.highlightArea,
         } as InteractiveCoachSession,
         isCoachModeActive: true,
-        // Keep isWaitingForResponse: true until overlay is ready to show
         currentHighlight: data.highlightArea || null,
       }));
 
-      // Immediately validate current code so we don't show a question if the user already solved it
+      // Immediately validate current code
       try {
         const { data: validation, error: vErr } = await supabase.functions.invoke('ai-chat', {
           body: {
@@ -378,7 +160,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         if (vErr) throw vErr;
 
         if (validation?.nextAction === 'complete_session' || (validation?.isCorrect && validation?.nextAction === 'insert_and_continue' && validation?.codeToAdd === '')) {
-          // Consider it solved — backend validation now includes optimization check
           applyHighlight(null);
           const pos = getPositionBelowLastLine();
 
@@ -386,14 +167,14 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
           setCoachingState(prev => ({
             ...prev,
-            isOptimizable: validation.isOptimizable, // ← Use backend's optimization check from validation
+            isOptimizable: validation.isOptimizable,
             session: prev.session ? {
               ...prev.session,
               isCompleted: true,
-              currentQuestion: '', // ← Ensure question is cleared
+              currentQuestion: '',
               currentHint: undefined
             } : prev.session,
-            lastValidation: null, // ← Clear validation to prevent showing nextStep
+            lastValidation: null,
             showInputOverlay: true,
             inputPosition: pos,
             isWaitingForResponse: false,
@@ -401,7 +182,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             feedback: { ...prev.feedback, show: false },
           }));
         } else {
-          // Not solved yet — show first interactive step
           showInteractiveQuestion({
             question: data.question,
             hint: data.hint,
@@ -431,41 +211,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       }));
     }
-  }, [problemId, userId, editorRef, problemDescription, showInteractiveQuestion, applyHighlight, getPositionBelowLastLine]);
-
-  // Stop coaching session (moved up to avoid forward-reference lint)
-  const stopCoaching = useCallback(() => {
-    if (applyHighlight) {
-      applyHighlight(null);
-    }
-    if (startTimeRef.current) {
-      startTimeRef.current = null;
-    }
-
-    // Reset context state for clean start
-    setContextState({
-      responseId: null,
-      contextInitialized: false,
-      lastCodeSnapshot: '',
-    });
-
-    setCoachingState({
-      session: null,
-      isCoachModeActive: false,
-      currentHighlight: null,
-      showInputOverlay: false,
-      inputPosition: null,
-      isWaitingForResponse: false,
-      isValidating: false,
-      lastValidation: undefined,
-      feedback: {
-        show: false,
-        type: null,
-        message: "",
-        showConfetti: false,
-      },
-    });
-  }, [applyHighlight]);
+  }, [problemId, userId, editorRef, problemDescription, showInteractiveQuestion, applyHighlight, getPositionBelowLastLine, setCoachingState, setContextState, startTimeRef]);
 
   // Submit coaching code for validation
   const submitCoachingCode = useCallback(async (userCode: string, userInput: string = "") => {
@@ -487,7 +233,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
       const currentCode = editorRef.current?.getValue() || "";
 
       if (coachingState.isOptimizationMode) {
-        // Validate optimization step instead of correctness
+        // Validate optimization step
         logger.debug("validate_optimization_step payload", { component: "Coaching", codeLen: currentCode.length });
         const { data, error } = await supabase.functions.invoke('ai-chat', {
           body: {
@@ -505,16 +251,14 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
         setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
 
-        // Require explicit success to complete optimization; upstream may omit isCorrect
         if (data?.nextAction === 'complete_optimization' && data?.isCorrect === true) {
-          // Only complete optimization when the step is actually correct
           applyHighlight(null);
           const pos = getPositionBelowLastLine();
           setCoachingState(prev => ({
             ...prev,
             isOptimizationMode: false,
             session: prev.session ? { ...prev.session, isCompleted: true, currentQuestion: '', currentHint: undefined } : prev.session,
-            lastValidation: null, // Clear validation result to prevent showing nextStep questions
+            lastValidation: null,
             showInputOverlay: true,
             inputPosition: pos,
             feedback: { show: true, type: 'success', message: data?.feedback || 'Optimization complete!', showConfetti: true },
@@ -522,14 +266,12 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           return;
         }
 
-        // If incorrect, show feedback and offer insertion when provided
         if (data && data.isCorrect === false) {
           setCoachingState(prev => ({
             ...prev,
             lastValidation: {
               isCorrect: false,
               feedback: data.feedback || 'Not quite. Adjust your code based on the hint.',
-              nextAction: data.nextAction || 'retry',
               codeToAdd: data.codeToAdd || '',
             },
             showInputOverlay: true,
@@ -540,7 +282,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           return;
         }
 
-        // Expect a nextStep payload (string JSON or object). Show next optimization question
         const step = typeof data?.nextStep === 'string' ? (() => { try { return JSON.parse(data.nextStep); } catch { return null; } })() : data?.nextStep || null;
         if (step && step.question) {
           showInteractiveQuestion({ question: step.question, hint: step.hint, highlightArea: step.highlightArea });
@@ -548,7 +289,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           return;
         }
 
-        // Fallback: gentle guidance
         setCoachingState(prev => ({
           ...prev,
           showInputOverlay: true,
@@ -567,7 +307,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           studentResponse: userInput,
           currentEditorCode: currentCode,
           code: currentCode,
-          // Context tracking for token optimization
           previousResponseId: contextState.responseId,
         },
       });
@@ -576,7 +315,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
       logger.debug("Validation response", { component: "Coaching", data });
 
-      // Update context state with new response ID
       if (data.responseId) {
         setContextState(prev => ({
           ...prev,
@@ -597,7 +335,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             const editor = editorRef.current;
             const before = editor?.getValue() || "";
 
-            // Use same smart insertion as chat snippets
             if (!codeContainsSnippet(before, codeToInsert)) {
               logger.debug("Using smart insertion for coaching code", { component: "Coaching" });
 
@@ -610,7 +347,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               const snippet = {
                 id: `coaching-${Date.now()}`,
                 code: codeToInsert,
-                language: "python", // TODO: detect from problem
+                language: "python",
                 isValidated: true,
                 insertionType: "smart" as const,
                 insertionHint: {
@@ -645,13 +382,12 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
                 }
               } catch (error) {
                 logger.error("Smart insertion error", error, { component: "Coaching" });
-                throw error; // Re-throw to be caught by outer try-catch
+                throw error;
               }
             } else {
               logger.debug("Suggested code already present; skipping insertion", { component: "Coaching" });
             }
 
-            // After insertion, show next question if available
             if (data.nextStep?.question) {
               logger.debug("Showing next question after code insertion", { component: "Coaching" });
               showInteractiveQuestion({
@@ -660,7 +396,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
                 highlightArea: data.nextStep.highlightArea,
               });
             } else {
-              // No next question - just show success message
               setCoachingState(prev => ({
                 ...prev,
                 isWaitingForResponse: false,
@@ -685,10 +420,8 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             }));
           }
         } else {
-          // No code to add, student's answer was correct
           logger.debug("Answer correct, no code to add", { component: "Coaching" });
 
-          // Store validation result to show feedback
           setCoachingState(prev => ({
             ...prev,
             lastValidation: data,
@@ -696,20 +429,17 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             isWaitingForResponse: false,
           }));
 
-          // Check if solution is complete or if there's a next step
           const isComplete = data.nextAction === "complete_session" || !data.nextStep?.question;
 
           if (!isComplete && data.nextStep?.question) {
-            // Show next question after a brief moment to let user see success feedback
             setTimeout(() => {
               showInteractiveQuestion({
                 question: data.nextStep.question,
                 hint: data.nextStep.hint,
                 highlightArea: data.nextStep.highlightArea,
               });
-            }, 2000); // 2 second delay to show success feedback
+            }, 2000);
           } else {
-            // Step completed without next step - finish session
             logger.debug("Solution complete, ending session", { component: "Coaching" });
 
             setCoachingState(prev => ({
@@ -717,11 +447,10 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
               session: prev.session ? {
                 ...prev.session,
                 isCompleted: true,
-                currentQuestion: "", // Clear the question
-                currentHint: undefined, // Clear the hint
+                currentQuestion: "",
+                currentHint: undefined,
               } : null,
-              lastValidation: null, // Clear validation result to prevent showing nextStep questions
-              // Hide overlay to prevent showing question + success together
+              lastValidation: null,
               showInputOverlay: false,
               inputPosition: null,
               currentHighlight: null,
@@ -735,32 +464,26 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
 
             logger.debug("Solution completed - state updated", { component: "Coaching", isCompleted: true, showInputOverlay: false });
 
-            // Clear highlights
-            if (applyHighlight) {
-              applyHighlight(null);
-            }
-
+            applyHighlight(null);
             setTimeout(stopCoaching, 1500);
           }
         }
-        // Require explicit success to complete session; avoids completing on undefined/null
       } else if (data.isCorrect === true && data.nextAction === "complete_session") {
         logger.debug("Session completed", { component: "Coaching" });
 
-        // CRITICAL: Clear all overlay state when completing
         setCoachingState(prev => ({
           ...prev,
           session: prev.session ? {
             ...prev.session,
             isCompleted: true,
-            currentQuestion: "", // ← Clear the stale question
-            currentHint: undefined, // ← Clear the hint
+            currentQuestion: "",
+            currentHint: undefined,
           } : null,
-          lastValidation: data, // ← Store the validation result for optimization logic
-          showInputOverlay: true, // ← Keep overlay open for completion actions
+          lastValidation: data,
+          showInputOverlay: true,
           inputPosition: prev.inputPosition,
           currentHighlight: null,
-          isOptimizable: data.isOptimizable, // ← Set optimization flag
+          isOptimizable: data.isOptimizable,
           feedback: {
             show: true,
             type: "success",
@@ -769,18 +492,14 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           },
         }));
 
-        // Clear any editor highlights
-        if (applyHighlight) {
-          applyHighlight(null);
-        }
+        applyHighlight(null);
       } else {
         logger.debug("Code needs correction - showing feedback", { component: "Coaching" });
 
-        // Store the validation result for retry
         setCoachingState(prev => ({
           ...prev,
           lastValidation: data,
-          showInputOverlay: true, // Keep overlay open for retry
+          showInputOverlay: true,
           inputPosition: prev.inputPosition,
         }));
       }
@@ -800,28 +519,21 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       }));
     }
-  }, [coachingState.session, editorRef, showInteractiveQuestion, codeContainsSnippet, stopCoaching, problemDescription, applyHighlight, getPositionBelowLastLine, contextState.responseId, problemId, coachingState.isOptimizationMode, coachingState.lastOptimizationStep]);
+  }, [coachingState.session, editorRef, showInteractiveQuestion, stopCoaching, problemDescription, applyHighlight, getPositionBelowLastLine, contextState.responseId, problemId, coachingState.isOptimizationMode, coachingState.lastOptimizationStep, setCoachingState, setContextState]);
 
   // Insert correct code from AI validation
   const insertCorrectCode = useCallback(async () => {
     if (!coachingState.lastValidation?.codeToAdd) return;
 
-    // Strip markdown code fences if present (e.g. ```python ... ```)
-    const rawCode = coachingState.lastValidation.codeToAdd;
-    const codeToInsert = rawCode.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
+    const codeToInsert = stripCodeFences(coachingState.lastValidation.codeToAdd);
 
     try {
       const editor = editorRef.current;
       const before = editor?.getValue() || "";
 
       if (!codeContainsSnippet(before, codeToInsert)) {
-        const lines = codeToInsert.split('\n').filter(l => l.trim().length > 0);
-        const looksLarge = lines.length > 8 || /\b(def\s+\w+\s*\(|class\s+\w+|if\s+__name__\s*==)/.test(codeToInsert);
-
-        // For coaching corrections, default to 'replace' mode to fix incorrect code
-        const insertionType: 'smart' | 'replace' = 'replace';
-
-        if (looksLarge) {
+        if (isLargeInsertion(codeToInsert)) {
+          const lines = codeToInsert.split('\n').filter(l => l.trim().length > 0);
           const ok = confirmLargeInsert
             ? await confirmLargeInsert({ code: codeToInsert, lineCount: lines.length })
             : window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
@@ -833,52 +545,25 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
             return;
           }
         } else {
-          // For smaller corrections, use smart replacement without confirmation
           logger.debug("Using smart replacement for code correction", { component: "Coaching" });
         }
-        logger.debug("Using smart insertion for correct code", { component: "Coaching" });
 
-        const position = editor?.getPosition();
-        const cursorPosition = {
-          line: position?.lineNumber ? position.lineNumber - 1 : 0,
-          column: position?.column || 0,
-        };
+        logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
 
-        const snippet = {
-          id: `coaching-${Date.now()}`,
-          code: codeToInsert,
-          language: "python", // TODO: detect from problem
-          isValidated: true,
-          insertionType: 'smart',
-          insertionHint: {
-            type: "statement",
-            scope: "function",
-            description: "AI coaching generated code"
-          }
-        };
-
-        try {
-          logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
-
-          // Use the shared onCodeInsert callback for coaching
+        if (onCodeInsert) {
           await onCodeInsert(codeToInsert);
-
-          logger.debug("Shared insertion completed successfully", { component: "Coaching" });
-        } catch (error) {
-          logger.error("Shared insertion error", error, { component: "Coaching" });
-          throw error; // Re-throw to be caught by outer try-catch
         }
+
+        logger.debug("Shared insertion completed successfully", { component: "Coaching" });
       } else {
         logger.debug("Suggested code already present; skipping insertion", { component: "Coaching" });
       }
 
-      // After insertion, keep overlay open but change to "next step" mode
       setCoachingState(prev => ({
         ...prev,
         showInputOverlay: true,
         lastValidation: undefined,
         isWaitingForResponse: false,
-        inputMode: "next_step", // New mode to track post-insertion state
         feedback: {
           show: true,
           type: "success",
@@ -898,34 +583,9 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       }));
     }
-  }, [coachingState.lastValidation, onCodeInsert, editorRef, codeContainsSnippet, confirmLargeInsert]);
+  }, [coachingState.lastValidation, onCodeInsert, editorRef, confirmLargeInsert, setCoachingState]);
 
-  // Stop coaching session (removed duplicate later)
-
-  // Cancel current input
-  const cancelInput = useCallback(() => {
-    setCoachingState(prev => ({
-      ...prev,
-      showInputOverlay: false,
-      inputPosition: null,
-    }));
-  }, []);
-
-  // Close feedback overlay
-  const closeFeedback = useCallback(() => {
-    setCoachingState(prev => ({
-      ...prev,
-      feedback: { ...prev.feedback, show: false },
-    }));
-  }, []);
-
-  // Get elapsed time
-  const getElapsedTime = useCallback(() => {
-    if (!startTimeRef.current) return 0;
-    return Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000);
-  }, []);
-
-  // Legacy submit response function - simplified for compatibility
+  // Legacy submit response function
   const submitResponse = useCallback(async (response: string) => {
     logger.debug("submitResponse called - redirecting to submitCoachingCode", { component: "Coaching" });
     await submitCoachingCode(response, response);
@@ -940,7 +600,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
   // Start optimization flow
   const startOptimization = useCallback(async (type: 'optimization' | 'alternative' = 'optimization') => {
     try {
-      // Show global loading spinner (same as coach mode)
       setCoachingState(prev => ({ ...prev, isWaitingForResponse: true, isValidating: false, isOptimizationMode: true }));
       const editor = editorRef.current;
       const currentCode = editor?.getValue() || "";
@@ -955,7 +614,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         },
       });
       if (error) throw error;
-      // Reuse overlay to show first optimization step (question/hint/highlight if returned)
+
       const step = typeof data?.step === 'string' ? (() => { try { return JSON.parse(data.step); } catch { return null; } })() : null;
       if (data?.nextAction === 'complete_optimization') {
         setCoachingState(prev => ({
@@ -972,7 +631,6 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
           hint: step.hint,
           highlightArea: step.highlightArea,
         });
-        // Ensure overlay shows the new step (hide validation panel)
         setCoachingState(prev => ({
           ...prev,
           lastValidation: undefined,
@@ -991,45 +649,7 @@ export const useCoachingNew = ({ problemId, userId, problemDescription, editorRe
         isOptimizationMode: false,
       }));
     }
-  }, [editorRef, problemId, userId, problemDescription, showInteractiveQuestion]);
-
-  // Handle position changes for persistence
-  const handlePositionChange = useCallback((position: { x: number; y: number }) => {
-    if (positionManager) {
-      try {
-        // Get editor bounds for validation
-        const editorNode = editorRef.current?.getDomNode?.();
-        const editorRect = editorNode?.getBoundingClientRect();
-
-        if (editorRect) {
-          const editorBounds = {
-            left: editorRect.left,
-            top: editorRect.top,
-            right: editorRect.right,
-            bottom: editorRect.bottom,
-            width: editorRect.width,
-            height: editorRect.height,
-          };
-
-          const overlayPosition = {
-            x: position.x,
-            y: position.y,
-            timestamp: Date.now(),
-            screenSize: {
-              width: window.innerWidth,
-              height: window.innerHeight,
-            },
-          };
-
-          // Validate and save position
-          const validatedPosition = positionManager.validatePosition(overlayPosition, editorBounds);
-          positionManager.savePosition(validatedPosition);
-        }
-      } catch (error) {
-        logger.warn("Failed to save position", { component: "Coaching", error });
-      }
-    }
-  }, [positionManager, editorRef]);
+  }, [editorRef, problemId, userId, problemDescription, showInteractiveQuestion, setCoachingState]);
 
   return {
     coachingState,

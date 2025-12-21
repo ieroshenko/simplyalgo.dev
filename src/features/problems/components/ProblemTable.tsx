@@ -5,6 +5,7 @@ import { Circle, Star, Play, Trophy, Zap } from "lucide-react";
 import { Problem } from "@/types";
 import { useNavigate } from "react-router-dom";
 import CompanyIcons from "@/components/CompanyIcons";
+import { getDifficultyColor } from "@/utils/uiUtils";
 
 interface ProblemTableProps {
   problems: Problem[];
@@ -27,20 +28,6 @@ const ProblemTable = ({
 
   // Category icons removed for a cleaner table UI
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-success text-success-foreground";
-      case "Medium":
-        // Use yellow/amber for Medium to differentiate from Easy (green)
-        return "bg-amber-500 text-white";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "solved":
@@ -56,7 +43,7 @@ const ProblemTable = ({
     .filter((problem) => {
       // Exclude Data Structure Implementations and System Design (they're in separate sections)
       if (problem.category === "Data Structure Implementations" ||
-          problem.category === "System Design") {
+        problem.category === "System Design") {
         return false;
       }
 
@@ -117,16 +104,15 @@ const ProblemTable = ({
                 >
                   <td className="px-4 py-3">{getStatusIcon(problem.status)}</td>
                   <td className="px-4 py-3">
-                    <button 
+                    <button
                       className="hover:scale-110 transition-transform"
                       onClick={() => onToggleStar?.(problem.id)}
                     >
-                      <Star 
-                        className={`w-4 h-4 transition-colors ${
-                          problem.isStarred 
-                            ? "text-amber-500 fill-amber-500" 
+                      <Star
+                        className={`w-4 h-4 transition-colors ${problem.isStarred
+                            ? "text-amber-500 fill-amber-500"
                             : "text-muted-foreground hover:text-amber-500"
-                        }`} 
+                          }`}
                       />
                     </button>
                   </td>
@@ -146,7 +132,7 @@ const ProblemTable = ({
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <CompanyIcons 
+                    <CompanyIcons
                       companies={problem.companies || []}
                       maxVisible={4}
                       size={18}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 import type {
   SystemDesignSession,
   SystemDesignBoardState,
@@ -183,7 +184,7 @@ export const useSystemDesignSession = ({
       }
     } catch (err) {
       logger.error("Error initializing session", err, { component: "SystemDesignChat" });
-      setError(err instanceof Error ? err.message : "Failed to initialize session");
+      setError(getErrorMessage(err, "Failed to initialize session"));
     } finally {
       setLoading(false);
     }
@@ -377,7 +378,7 @@ export const useSystemDesignSession = ({
         }
       } catch (err) {
         logger.error("Error sending message", err, { component: "SystemDesignChat" });
-        setError(err instanceof Error ? err.message : "Failed to send message");
+        setError(getErrorMessage(err, "Failed to send message"));
         // Remove user message on error
         setMessages((prev) => prev.slice(0, -1));
       } finally {
@@ -498,7 +499,7 @@ export const useSystemDesignSession = ({
       logger.debug("========== CLEAR CONVERSATION SUCCESS ==========", { component: "SystemDesignChat" });
     } catch (err) {
       logger.error("========== CLEAR CONVERSATION ERROR ==========", err, { component: "SystemDesignChat" });
-      setError(err instanceof Error ? err.message : "Failed to clear conversation");
+      setError(getErrorMessage(err, "Failed to clear conversation"));
       setIsTyping(false);
     }
   }, [session, problemId, userId]);
@@ -543,7 +544,7 @@ export const useSystemDesignSession = ({
           );
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to evaluate design");
+        setError(getErrorMessage(err, "Failed to evaluate design"));
       } finally {
         setIsEvaluating(false);
       }
@@ -558,7 +559,7 @@ export const useSystemDesignSession = ({
 
     // Only save if there's actual work (elements or nodes on the board)
     const hasContent = (boardState.elements && boardState.elements.length > 0) ||
-                       (boardState.nodes && boardState.nodes.length > 0);
+      (boardState.nodes && boardState.nodes.length > 0);
     if (!hasContent) {
       logger.debug("saveDraft: No elements/nodes, skipping", { component: "SystemDesignChat" });
       return;
@@ -579,7 +580,7 @@ export const useSystemDesignSession = ({
       logger.debug("Draft saved successfully", { component: "SystemDesignChat" });
     } catch (err) {
       logger.error("Failed to save draft", err, { component: "SystemDesignChat" });
-      setError(err instanceof Error ? err.message : "Failed to save draft");
+      setError(getErrorMessage(err, "Failed to save draft"));
     }
   }, [session, boardState]);
 
@@ -627,7 +628,7 @@ export const useSystemDesignSession = ({
       }
     } catch (err) {
       logger.error("Failed to restore draft", err, { component: "SystemDesignChat" });
-      setError(err instanceof Error ? err.message : "Failed to restore draft");
+      setError(getErrorMessage(err, "Failed to restore draft"));
       return false;
     }
   }, [session, boardState]);
@@ -663,7 +664,7 @@ export const useSystemDesignSession = ({
       } catch (err) {
         logger.error("Failed to check draft", err, { component: "SystemDesignChat" });
         if (mounted) {
-          setError(err instanceof Error ? err.message : "Failed to check draft");
+          setError(getErrorMessage(err, "Failed to check draft"));
         }
       }
     };

@@ -24,6 +24,7 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getDifficultyColor } from "@/utils/uiUtils";
 import type { SystemDesignBoardState } from "@/types";
 import type { SystemDesignSubmission } from "@/features/system-design/hooks/useSystemDesignSubmissions";
 
@@ -75,7 +76,7 @@ const SystemDesignSolver = () => {
     isOpen: false,
     title: "",
     message: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
   const [showLeftPanel, setShowLeftPanel] = useState(() => {
     const saved = localStorage.getItem("system-design-showLeftPanel");
@@ -112,7 +113,7 @@ const SystemDesignSolver = () => {
         title: "Clear Diagram?",
         message: "Are you sure you want to start a new attempt? This will clear your current diagram and cannot be undone.",
         onConfirm: async () => {
-          setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+          setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => { } });
           await clearConversation();
           toast.success("Started new attempt");
         },
@@ -146,7 +147,7 @@ const SystemDesignSolver = () => {
       title: "Restore Draft?",
       message: "This will replace your current work with the previously saved draft. Continue?",
       onConfirm: async () => {
-        setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => { } });
         const restored = await restoreDraft();
         if (restored) {
           toast.success("Draft restored successfully");
@@ -230,18 +231,7 @@ const SystemDesignSolver = () => {
     }
   }, [evaluation]);
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-success text-success-foreground";
-      case "Medium":
-        return "bg-amber-500 text-white";
-      case "Hard":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
+
 
   if (authLoading || specsLoading || sessionLoading) {
     return (
@@ -440,7 +430,7 @@ const SystemDesignSolver = () => {
         confirmLabel="Continue"
         cancelLabel="Cancel"
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => { } })}
       />
     </div>
   );

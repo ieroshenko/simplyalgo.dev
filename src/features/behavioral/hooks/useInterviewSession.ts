@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import { getErrorMessage } from "@/utils/uiUtils";
 
 interface InterviewSession {
   id: string;
@@ -55,7 +56,7 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
       } catch (err) {
         logger.error('[useInterviewSession] Failed to create session', { error: err });
         setError(
-          err instanceof Error ? err.message : "Failed to create session"
+          getErrorMessage(err, "Failed to create session")
         );
         throw err;
       }
@@ -82,7 +83,7 @@ export const useInterviewSession = (): UseInterviewSessionReturn => {
         logger.debug('[useInterviewSession] Ended session', { sessionId });
       } catch (err) {
         logger.error('[useInterviewSession] Failed to end session', { error: err, sessionId });
-        setError(err instanceof Error ? err.message : "Failed to end session");
+        setError(getErrorMessage(err, "Failed to end session"));
       }
     },
     [sessionId]

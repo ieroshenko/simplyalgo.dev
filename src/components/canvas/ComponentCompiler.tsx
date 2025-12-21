@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logger } from "@/utils/logger";
 
 // Error Boundary Component
 class ComponentErrorBoundary extends React.Component<
@@ -234,21 +235,21 @@ export default function ComponentCompiler({
           error instanceof Error ? error.message : "Unknown compilation error";
         setCompileError(errorMessage);
         onError?.(errorMessage);
-        console.error("Component compilation error:", error);
+        logger.error("[ComponentCompiler] Component compilation error:", error);
         // Debug preview of the source code to help fix issues like unterminated strings
         try {
           const previewStart = sourceCode.slice(0, 500);
           const previewEnd = sourceCode.slice(-300);
-          console.debug("[ComponentCompiler] Source code preview:", {
+          logger.debug("[ComponentCompiler] Source code preview:", {
             length: sourceCode.length,
             previewStart,
             previewEnd,
           });
         } catch (previewErr) {
           // Avoid throwing from logging path; capture minimal context
-          console.debug(
+          logger.debug(
             "[ComponentCompiler] Failed to log source preview:",
-            previewErr,
+            { previewErr },
           );
         }
       } finally {
@@ -272,7 +273,7 @@ export default function ComponentCompiler({
     const errorMessage = `Runtime Error: ${error.message}`;
     setCompileError(errorMessage);
     onError?.(errorMessage);
-    console.error("Component runtime error:", error, errorInfo);
+    logger.error("[ComponentCompiler] Component runtime error:", error, { errorInfo });
   };
 
   if (isCompiling) {

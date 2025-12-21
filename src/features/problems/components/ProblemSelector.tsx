@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, Check, Circle } from "lucide-react";
 import { Problem } from "@/types";
 import { cn } from "@/lib/utils";
+import { getDifficultyColor } from "@/utils/uiUtils";
 
 interface ProblemSelectorProps {
   problems: Problem[];
@@ -51,19 +52,6 @@ export const ProblemSelector = ({
     problem.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
     problem.difficulty.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case "easy":
-        return "bg-green-500/10 text-green-500 hover:bg-green-500/20";
-      case "medium":
-        return "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20";
-      case "hard":
-        return "bg-red-500/10 text-red-500 hover:bg-red-500/20";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
 
   const getStatusIcon = (status?: string) => {
     if (status === "solved") {
