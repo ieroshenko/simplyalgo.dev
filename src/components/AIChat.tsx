@@ -28,6 +28,7 @@ import { ChatInput } from "./chat/ChatInput";
 import { BlurredHint } from "./chat/BlurredHint";
 import { BlurredSection } from "./chat/BlurredSection";
 import { CodeBlockWithInsert } from "./chat/CodeBlockWithInsert";
+import { createChatMarkdownComponents } from "./chat/ChatMarkdownComponents";
 import { splitContentAndHint, formatTime } from "./chat/utils/chatUtils";
 import type { AIChatProps, ActiveDiagram } from "./chat/types";
 
@@ -241,9 +242,8 @@ const AIChat = ({
                 {messages.map((message) => (
                   <div key={message.id} className="mb-6 min-w-0">
                     <div
-                      className={`flex gap-3 ${
-                        message.role === "user" ? "justify-end" : "justify-start"
-                      }`}
+                      className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"
+                        }`}
                     >
                       {/* Avatar for assistant */}
                       {message.role === "assistant" && (
@@ -255,11 +255,10 @@ const AIChat = ({
                       {/* Message Content */}
                       <div className="max-w-[80%] min-w-0">
                         <div
-                          className={`rounded-lg p-3 ${
-                            message.role === "user"
-                              ? "border-l-4 border-primary/60 bg-card pl-4"
-                              : "border-l-4 border-chat-accent/60 bg-chat-accent/10 dark:bg-chat-accent/15 pl-4"
-                          }`}
+                          className={`rounded-lg p-3 ${message.role === "user"
+                            ? "border-l-4 border-primary/60 bg-card pl-4"
+                            : "border-l-4 border-chat-accent/60 bg-chat-accent/10 dark:bg-chat-accent/15 pl-4"
+                            }`}
                           onMouseEnter={() => {
                             if (message.role === "assistant")
                               setHoveredMessageId(message.id);
@@ -282,56 +281,11 @@ const AIChat = ({
                                   <ReactMarkdown
                                     remarkPlugins={[remarkMath]}
                                     rehypePlugins={[rehypeKatex]}
-                                    components={{
-                                      em({ children, ...props }) {
-                                        return <strong {...props}>{children}</strong>;
-                                      },
-                                      strong({ children, ...props }) {
-                                        return <strong {...props}>{children}</strong>;
-                                      },
-                                      code({ className, children, ...props }) {
-                                        const match = /language-(\w+)/.exec(
-                                          className || ""
-                                        );
-                                        const lang = match?.[1] || "python";
-                                        const isBlock = !!match;
-
-                                        if (isBlock) {
-                                          const hovered =
-                                            hoveredMessageId === message.id;
-                                          return (
-                                            <CodeBlockWithInsert
-                                              code={String(children)}
-                                              lang={lang}
-                                              onInsert={onInsertCodeSnippet}
-                                              showOverride={hovered}
-                                            />
-                                          );
-                                        }
-                                        return (
-                                          <em
-                                            className="text-blue-600 dark:text-blue-400 font-medium"
-                                            {...props}
-                                          >
-                                            {children}
-                                          </em>
-                                        );
-                                      },
-                                      p: ({ children }) => <p>{children}</p>,
-                                      ul: ({ children }) => (
-                                        <ul className="list-disc list-outside pl-5 mb-2">
-                                          {children}
-                                        </ul>
-                                      ),
-                                      ol: ({ children }) => (
-                                        <ol className="list-decimal list-outside pl-5 mb-2">
-                                          {children}
-                                        </ol>
-                                      ),
-                                      li: ({ children }) => (
-                                        <li className="mb-1">{children}</li>
-                                      ),
-                                    }}
+                                    components={createChatMarkdownComponents({
+                                      onInsertCodeSnippet,
+                                      hoveredMessageId,
+                                      messageId: message.id,
+                                    })}
                                   >
                                     {body}
                                   </ReactMarkdown>
@@ -364,8 +318,8 @@ const AIChat = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag =
@@ -410,16 +364,16 @@ const AIChat = ({
                             const attached = (
                               message as unknown as {
                                 diagram?:
-                                  | { engine: "mermaid"; code: string }
-                                  | { engine: "reactflow"; graph: FlowGraph };
+                                | { engine: "mermaid"; code: string }
+                                | { engine: "reactflow"; graph: FlowGraph };
                               }
                             ).diagram;
                             const diag =
                               attached && attached.engine === "reactflow"
                                 ? (attached as {
-                                    engine: "reactflow";
-                                    graph: FlowGraph;
-                                  })
+                                  engine: "reactflow";
+                                  graph: FlowGraph;
+                                })
                                 : null;
                             if (!diag) return null;
                             return (

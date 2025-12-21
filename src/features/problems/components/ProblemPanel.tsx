@@ -1,40 +1,20 @@
-import { Button } from "@/components/ui/button";
 import { SimpleTabs, TabPanel } from "@/components/ui/simple-tabs";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Problem } from "@/types";
 import Notes, { NotesHandle } from "@/components/Notes";
 import { useSolutions } from "@/features/problems/hooks/useSolutions";
-import React, { useState } from "react";
+import React from "react";
 import Editor from "@monaco-editor/react";
 import { useEditorTheme } from "@/hooks/useEditorTheme";
 import { notifications } from "@/shared/services/notificationService";
-import { FlashcardButton } from "@/components/flashcards/FlashcardButton";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { vs } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { useTheme } from "@/hooks/useTheme";
-import "katex/dist/katex.min.css";
-import { logger } from "@/utils/logger";
 
-interface Submission {
-  id: string;
-  code: string;
-  status: string;
-  language?: string;
-  created_at: string;
-  complexity_analysis?: ComplexityAnalysis;
-}
+// Tab components
+import { DescriptionTab } from "./problem-tabs/DescriptionTab";
+import { SubmissionsTab } from "./problem-tabs/SubmissionsTab";
+import { NotesTab } from "./problem-tabs/NotesTab";
 
-interface ComplexityAnalysis {
-  time_complexity?: string;
-  time_explanation?: string;
-  space_complexity?: string;
-  space_explanation?: string;
-  analysis?: string;
-}
+// Types
+import type { Submission } from "./problem-tabs/types";
 
 interface ProblemPanelProps {
   problem: Problem;
@@ -60,47 +40,14 @@ const ProblemPanel = ({
   notesRef,
   onFullscreenCode,
   submissions,
-  submissionsLoading: subsLoading,
-  submissionsError: subsError,
+  submissionsLoading,
+  submissionsError,
 }: ProblemPanelProps) => {
-  // Submissions are now passed as props from parent (ProblemSolverNew)
-  // This ensures realtime subscription stays active regardless of tab
   const {
     solutions,
     loading: solutionsLoading,
   } = useSolutions(problemId);
   const { currentTheme, defineCustomThemes } = useEditorTheme();
-  const { isDark } = useTheme();
-
-  const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
-  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
-  const [complexityResults, setComplexityResults] = useState<Record<string, ComplexityAnalysis>>({});
-  const [analyzingSubmissionId, setAnalyzingSubmissionId] = useState<string | null>(null);
-
-  // Select syntax highlighting theme based on current color scheme
-  const syntaxTheme = isDark ? vscDarkPlus : vs;
-
-  // Load existing complexity analysis from submissions
-  React.useEffect(() => {
-    logger.debug('[ProblemPanel] Loading analysis from submissions', { count: submissions?.length || 0 });
-    if (submissions && submissions.length > 0) {
-      const results: Record<string, ComplexityAnalysis> = {};
-      submissions.forEach(submission => {
-        logger.debug('[ProblemPanel] Processing submission for analysis', { submissionId: submission.id, hasAnalysis: !!submission.complexity_analysis });
-        if (submission.complexity_analysis) {
-          logger.debug('📊 [ProblemPanel] Submission has analysis', { id: submission.id });
-          logger.debug('[ProblemPanel] Loading analysis data', { analysis: submission.complexity_analysis });
-          results[submission.id] = submission.complexity_analysis;
-        }
-      });
-      logger.debug('✅ [ProblemPanel] Total loaded analysis', { count: Object.keys(results).length });
-      setComplexityResults(results);
-    }
-  }, [submissions]);
-
-  const toggleSubmission = (id: string) => {
-    setExpandedSubmissionId((prev) => (prev === id ? null : id));
-  };
 
   const handleCopy = async (text: string) => {
     try {
@@ -111,136 +58,9 @@ const ProblemPanel = ({
     }
   };
 
-  const formatRelativeTime = (isoDate: string) => {
-    const now = new Date();
-    const then = new Date(isoDate);
-    const diffMs = now.getTime() - then.getTime();
-    const sec = Math.floor(diffMs / 1000);
-    if (sec < 60) return `${sec}s ago`;
-    const min = Math.floor(sec / 60);
-    if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
-    const day = Math.floor(hr / 24);
-    if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
-    return then.toLocaleDateString();
-  };
-
-  const handleAnalyzeComplexity = async (code: string, submissionId: string) => {
-    if (!problem || !userId) {
-      notifications.error("Unable to analyze complexity - missing context");
-      return;
-    }
-
-    setAnalyzingSubmissionId(submissionId);
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          action: "analyze_complexity",
-          code,
-          problem_id: problem.id,
-          problem_description: problem.description,
-          user_id: userId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      // Handle the response structure from the backend
-      const analysis = result.complexityAnalysis || result;
-
-      const analysisData = {
-        time_complexity: analysis.timeComplexity,
-        time_explanation: analysis.timeExplanation,
-        space_complexity: analysis.spaceComplexity,
-        space_explanation: analysis.spaceExplanation,
-        analysis: analysis.overallAnalysis
-      };
-
-      // Save to state for immediate display
-      setComplexityResults(prev => ({
-        ...prev,
-        [submissionId]: analysisData
-      }));
-
-      // Save to database for persistence
-      logger.info('[ProblemPanel] Saving analysis for submission', { submissionId });
-      logger.debug('[ProblemPanel] Analysis data', analysisData);
-      const { UserAttemptsService } = await import("@/services/userAttempts");
-      const saved = await UserAttemptsService.saveComplexityAnalysis(submissionId, analysisData);
-      logger.info('[ProblemPanel] Save result', { success: saved });
-
-      if (!saved) {
-        logger.error('[ProblemPanel] Failed to save analysis to database');
-      }
-
-      notifications.success("Complexity analysis complete!");
-    } catch (error) {
-      logger.error("[ProblemPanel] Complexity analysis error", { error });
-      notifications.error("Failed to analyze complexity. Please try again.");
-    } finally {
-      setAnalyzingSubmissionId(null);
-    }
-  };
-
-  const renderValue = (value: unknown): string => {
-    if (value === null || value === undefined) return "null";
-    if (typeof value === "number" || typeof value === "boolean")
-      return String(value);
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (
-        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-        (trimmed.startsWith("[") && trimmed.endsWith("]"))
-      ) {
-        try {
-          return JSON.stringify(JSON.parse(trimmed));
-        } catch {
-          return value;
-        }
-      }
-      return value;
-    }
-    if (typeof value === "object") {
-      try {
-        return JSON.stringify(value as Record<string, unknown>);
-      } catch {
-        return String(value);
-      }
-    }
-    return String(value);
-  };
-
   const openFullscreen = (code: string, lang: string, title: string) => {
     if (onFullscreenCode) {
       onFullscreenCode(code, lang, title);
-    }
-  };
-
-  const formatSubmissionTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "text-green-600";
-      case "wrong_answer":
-        return "text-red-600";
-      case "time_limit_exceeded":
-        return "text-orange-600";
-      default:
-        return "text-muted-foreground";
     }
   };
 
@@ -252,113 +72,7 @@ const ProblemPanel = ({
     >
       {/* Question Tab */}
       <TabPanel value="question" activeTab={activeTab}>
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Problem Description
-            </h2>
-            <div className="prose prose-sm max-w-none text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-foreground prose-code:bg-transparent prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-img:rounded-lg prose-img:border prose-img:border-border prose-strong:text-foreground prose-strong:font-semibold prose-headings:text-foreground">
-              <ReactMarkdown
-                remarkPlugins={[remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  code({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
-                    const match = /language-(\w+)/.exec(className || "");
-                    const codeString = String(children).replace(/\n$/, "");
-                    return !inline && match ? (
-                      <SyntaxHighlighter
-                        style={syntaxTheme}
-                        language={match[1]}
-                        PreTag="div"
-                        customStyle={{
-                          margin: 0,
-                          borderRadius: "0.375rem",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {codeString}
-                      </SyntaxHighlighter>
-                    ) : (
-                      <code className={className}>{children}</code>
-                    );
-                  },
-                  // Enhanced image rendering with responsive sizing and dark mode support
-                  img({ src, alt }: { src?: string; alt?: string }) {
-                    return (
-                      <div className="my-4 p-3 bg-white dark:bg-gray-100 rounded-lg border border-border">
-                        <img
-                          src={src}
-                          alt={alt || "Problem illustration"}
-                          className="max-w-full h-auto rounded shadow-sm mx-auto"
-                          style={{
-                            maxHeight: "400px",
-                            objectFit: "contain",
-                          }}
-                          loading="lazy"
-                        />
-                      </div>
-                    );
-                  },
-                }}
-              >
-                {problem.description}
-              </ReactMarkdown>
-            </div>
-          </div>
-          {problem.examples && problem.examples.length > 0 && (
-            <div>
-              <h3 className="text-md font-semibold text-foreground mb-3">
-                Examples
-              </h3>
-              <div className="space-y-4">
-                {problem.examples.map((example, index) => (
-                  <div
-                    key={index}
-                    className="bg-muted/50 p-4 rounded-lg"
-                  >
-                    <div className="space-y-2 font-mono text-sm">
-                      <div>
-                        <span className="font-semibold">Input:</span>
-                        <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-                          {renderValue(example.input)}
-                        </pre>
-                      </div>
-                      <div>
-                        <span className="font-semibold">Output:</span>
-                        <pre className="mt-1 text-xs md:text-sm font-mono whitespace-pre overflow-x-auto bg-background p-2 rounded border">
-                          {renderValue(example.output)}
-                        </pre>
-                      </div>
-                      {example.explanation && (
-                        <div>
-                          <span className="font-semibold">Explanation:</span>
-                          <div className="prose prose-sm max-w-none text-muted-foreground mt-1">
-                            <p>{example.explanation}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recommended Complexity */}
-          <div>
-            <h3 className="text-md font-semibold text-foreground mb-3">
-              Recommended Time & Space Complexity
-            </h3>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>
-                • Time: {problem.recommendedTimeComplexity || "—"}
-              </li>
-              <li>
-                • Space: {problem.recommendedSpaceComplexity || "—"}
-              </li>
-            </ul>
-          </div>
-        </div>
+        <DescriptionTab problem={problem} />
       </TabPanel>
 
       {/* Solution Tab */}
@@ -454,203 +168,20 @@ const ProblemPanel = ({
 
       {/* Submissions Tab */}
       <TabPanel value="submissions" activeTab={activeTab}>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Submissions
-          </h2>
-          {subsLoading && (
-            <div className="text-sm text-muted-foreground">
-              Loading submissions...
-            </div>
-          )}
-          {!subsLoading && subsError && (
-            <div className="text-sm text-red-600">{subsError.message}</div>
-          )}
-          {!subsLoading &&
-            !subsError &&
-            submissions.length === 0 && (
-              <div className="text-sm text-muted-foreground">
-                No submissions yet.
-              </div>
-            )}
-          {!subsLoading &&
-            !subsError &&
-            submissions.length > 0 && (
-              <div className="space-y-3">
-                {submissions.map((s) => (
-                  <div
-                    key={s.id}
-                    className="bg-muted/50 rounded-lg border border-border"
-                  >
-                    <button
-                      onClick={() => toggleSubmission(s.id)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-muted/70 transition-colors"
-                    >
-                      <div className="flex items-center space-x-3 text-left">
-                        <span
-                          className="text-sm font-medium"
-                          style={{
-                            color:
-                              s.status === "passed"
-                                ? "#388e3c"
-                                : s.status === "failed"
-                                  ? "#d32f2f"
-                                  : "#555",
-                          }}
-                        >
-                          {s.status === "passed"
-                            ? "Accepted"
-                            : s.status.charAt(0).toUpperCase() +
-                            s.status.slice(1)}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>{s.language || "Python"}</span>
-                        <span>
-                          {formatRelativeTime(s.created_at)}
-                        </span>
-                      </div>
-                    </button>
-                    {expandedSubmissionId === s.id && (
-                      <div className="px-3 pb-3">
-                        <div className="bg-background border rounded">
-                          <div className="flex flex-col gap-2 px-3 py-2 border-b sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-xs text-muted-foreground">
-                              {s.language || "Python"}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto sm:justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  openFullscreen(
-                                    s.code,
-                                    s.language || "python",
-                                    `${problem.title} — Submission`,
-                                  )
-                                }
-                                className="h-7 px-2 text-xs min-w-0"
-                              >
-                                Maximize
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopy(s.code)}
-                                className="h-7 px-2 text-xs min-w-0"
-                              >
-                                Copy
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleAnalyzeComplexity(s.code, s.id)}
-                                disabled={analyzingSubmissionId === s.id}
-                                className="h-7 px-2 text-xs min-w-0"
-                              >
-                                {analyzingSubmissionId === s.id ? (
-                                  "Analyzing..."
-                                ) : (
-                                  "Analyze"
-                                )}
-                              </Button>
-                              <FlashcardButton
-                                problemId={problemId}
-                                problemStatus="solved"
-                                userId={userId}
-                                submissionCode={s.code}
-                                submissionId={s.id}
-                                variant="submission"
-                                className="h-7 px-2 text-xs min-w-0 whitespace-normal"
-                              />
-                            </div>
-                          </div>
-                          <Editor
-                            height={`${Math.max(s.code.split('\n').length * 20 + 40, 100)}px`}
-                            defaultLanguage={(
-                              s.language || "python"
-                            ).toLowerCase()}
-                            value={s.code}
-                            theme={currentTheme}
-                            onMount={(editor, monaco) => {
-                              defineCustomThemes(monaco);
-                            }}
-                            options={{
-                              readOnly: true,
-                              minimap: { enabled: false },
-                              lineNumbers: "off",
-                              folding: false,
-                              scrollBeyondLastLine: false,
-                              renderLineHighlight: "none",
-                              fontSize: 15,
-                              wordWrap: "on",
-                            }}
-                          />
-
-                          {/* Complexity Analysis Results */}
-                          {complexityResults[s.id] && (
-                            <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
-                              <h4 className="font-medium text-sm text-foreground mb-3">
-                                Complexity Analysis
-                              </h4>
-                              <div className="space-y-3">
-                                {/* Time Complexity */}
-                                <div>
-                                  <div className="text-sm font-medium text-foreground mb-1">
-                                    Time Complexity:
-                                    <Badge variant="outline" className="ml-2 text-xs">
-                                      {complexityResults[s.id].time_complexity || "N/A"}
-                                    </Badge>
-                                  </div>
-                                  {complexityResults[s.id].time_explanation && (
-                                    <p className="text-sm text-foreground/80">
-                                      {complexityResults[s.id].time_explanation}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Space Complexity */}
-                                <div>
-                                  <div className="text-sm font-medium text-foreground mb-1">
-                                    Space Complexity:
-                                    <Badge variant="outline" className="ml-2 text-xs">
-                                      {complexityResults[s.id].space_complexity || "N/A"}
-                                    </Badge>
-                                  </div>
-                                  {complexityResults[s.id].space_explanation && (
-                                    <p className="text-sm text-foreground/80">
-                                      {complexityResults[s.id].space_explanation}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Overall Analysis */}
-                                {complexityResults[s.id].analysis && (
-                                  <div>
-                                    <div className="text-sm font-medium text-foreground mb-1">
-                                      Analysis:
-                                    </div>
-                                    <p className="text-sm text-foreground/80">
-                                      {complexityResults[s.id].analysis}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-        </div>
+        <SubmissionsTab
+          problem={problem}
+          problemId={problemId}
+          userId={userId}
+          submissions={submissions}
+          submissionsLoading={submissionsLoading}
+          submissionsError={submissionsError}
+          onFullscreenCode={onFullscreenCode}
+        />
       </TabPanel>
 
       {/* Notes Tab */}
       <TabPanel value="notes" activeTab={activeTab}>
-        <Notes problemId={problemId} ref={notesRef} />
+        <NotesTab problemId={problemId} notesRef={notesRef} />
       </TabPanel>
     </SimpleTabs>
   );
