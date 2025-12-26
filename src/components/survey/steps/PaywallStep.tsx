@@ -210,7 +210,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
           <div className="flex justify-between items-start mb-2">
             <div>
               <h3 className="font-medium text-foreground">Monthly</h3>
-              <p className="text-2xl font-bold text-foreground">$49</p>
+              <p className="text-2xl font-bold text-foreground">$20.00</p>
               <p className="text-sm text-muted-foreground">/mo</p>
             </div>
             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -248,7 +248,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
           <div className="flex justify-between items-start mb-2 mt-2">
             <div>
               <h3 className="font-medium text-foreground">Yearly</h3>
-              <p className="text-2xl font-bold text-foreground">$15.99</p>
+              <p className="text-2xl font-bold text-foreground">$10.00</p>
               <p className="text-sm text-muted-foreground">/mo</p>
             </div>
             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -282,8 +282,8 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
       <div className="text-center mt-4">
         <p className="text-sm text-muted-foreground">
           {selectedPlan === 'monthly' 
-            ? 'Just $49 per month' 
-            : 'Just $15.99 per month, billed annually'
+            ? 'Just $20.00 per month' 
+            : 'Just $10.00 per month, billed annually'
           }
         </p>
       </div>
