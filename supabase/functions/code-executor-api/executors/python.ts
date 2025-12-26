@@ -12,7 +12,7 @@ export class PythonExecutor extends BaseLanguageExecutor {
         return "python3";
     }
 
-    processCode(code: string, testCases: any[], functionName: string): string {
+    processCode(code: string, testCases: unknown[], functionName: string): string {
         // Convert test cases to Python format
         let testCasesJson = JSON.stringify(testCases, null, 2);
         testCasesJson = this.convertBooleans(testCasesJson, "python");

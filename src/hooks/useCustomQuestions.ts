@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
+import { useAsyncState } from "@/shared/hooks/useAsyncState";
+import { supabase } from "@/integrations/supabase/client";
 import type { BehavioralQuestion, BehavioralQuestionCategory, QuestionDifficulty, EvaluationType } from "@/types";
 
 export const useCustomQuestions = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { loading, error, setLoading, setError } = useAsyncState();
 
   const createQuestion = async (
     questionText: string,
@@ -16,12 +16,12 @@ export const useCustomQuestions = () => {
     customEvaluationPrompt?: string
   ): Promise<BehavioralQuestion | null> => {
     if (!user?.id) {
-      setError("You must be logged in to create custom questions");
+      setError(new Error("You must be logged in to create custom questions"));
       return null;
     }
 
     if (evaluationType === 'custom' && (!customEvaluationPrompt || customEvaluationPrompt.trim().length === 0)) {
-      setError("Custom evaluation prompt is required when evaluation type is 'custom'");
+      setError(new Error("Custom evaluation prompt is required when evaluation type is 'custom'"));
       return null;
     }
 
@@ -29,7 +29,7 @@ export const useCustomQuestions = () => {
     if (customEvaluationPrompt) {
       const wordCount = customEvaluationPrompt.trim().split(/\s+/).length;
       if (wordCount > 500) {
-        setError(`Custom evaluation prompt exceeds 500 words (${wordCount} words)`);
+        setError(new Error(`Custom evaluation prompt exceeds 500 words (${wordCount} words)`));
         return null;
       }
     }
@@ -38,7 +38,7 @@ export const useCustomQuestions = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: insertError } = await (supabase as any)
+      const { data, error: insertError } = await (supabase as unknown)
         .from("behavioral_questions")
         .insert({
           user_id: user.id,
@@ -65,9 +65,12 @@ export const useCustomQuestions = () => {
         updated_at: data.updated_at,
       } as BehavioralQuestion;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
-      setError(errorMessage);
-      console.error("Error creating custom question:", err);
+      const error = err instanceof Error ? err : new Error("Failed to create question");
+      setError(error);
+      logger.error("Error creating custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+      });
       return null;
     } finally {
       setLoading(false);
@@ -85,12 +88,12 @@ export const useCustomQuestions = () => {
     }
   ): Promise<boolean> => {
     if (!user?.id) {
-      setError("You must be logged in to update questions");
+      setError(new Error("You must be logged in to update questions"));
       return false;
     }
 
     if (updates.evaluation_type === 'custom' && (!updates.custom_evaluation_prompt || updates.custom_evaluation_prompt.trim().length === 0)) {
-      setError("Custom evaluation prompt is required when evaluation type is 'custom'");
+      setError(new Error("Custom evaluation prompt is required when evaluation type is 'custom'"));
       return false;
     }
 
@@ -98,7 +101,7 @@ export const useCustomQuestions = () => {
     if (updates.custom_evaluation_prompt) {
       const wordCount = updates.custom_evaluation_prompt.trim().split(/\s+/).length;
       if (wordCount > 500) {
-        setError(`Custom evaluation prompt exceeds 500 words (${wordCount} words)`);
+        setError(new Error(`Custom evaluation prompt exceeds 500 words (${wordCount} words)`));
         return false;
       }
     }
@@ -107,7 +110,7 @@ export const useCustomQuestions = () => {
       setLoading(true);
       setError(null);
 
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (updates.question_text !== undefined) updateData.question_text = updates.question_text;
       if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.difficulty !== undefined) updateData.difficulty = updates.difficulty;
@@ -118,7 +121,7 @@ export const useCustomQuestions = () => {
         updateData.custom_evaluation_prompt = null;
       }
 
-      const { error: updateError } = await (supabase as any)
+      const { error: updateError } = await (supabase as unknown)
         .from("behavioral_questions")
         .update(updateData)
         .eq("id", questionId)
@@ -128,9 +131,13 @@ export const useCustomQuestions = () => {
 
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to update question";
-      setError(errorMessage);
-      console.error("Error updating custom question:", err);
+      const error = err instanceof Error ? err : new Error("Failed to update question");
+      setError(error);
+      logger.error("Error updating custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+        questionId,
+      });
       return false;
     } finally {
       setLoading(false);
@@ -139,7 +146,7 @@ export const useCustomQuestions = () => {
 
   const deleteQuestion = async (questionId: string): Promise<boolean> => {
     if (!user?.id) {
-      setError("You must be logged in to delete questions");
+      setError(new Error("You must be logged in to delete questions"));
       return false;
     }
 
@@ -147,7 +154,7 @@ export const useCustomQuestions = () => {
       setLoading(true);
       setError(null);
 
-      const { error: deleteError } = await (supabase as any)
+      const { error: deleteError } = await (supabase as unknown)
         .from("behavioral_questions")
         .delete()
         .eq("id", questionId)
@@ -157,9 +164,13 @@ export const useCustomQuestions = () => {
 
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete question";
-      setError(errorMessage);
-      console.error("Error deleting custom question:", err);
+      const error = err instanceof Error ? err : new Error("Failed to delete question");
+      setError(error);
+      logger.error("Error deleting custom question", err, {
+        component: "useCustomQuestions",
+        userId: user?.id,
+        questionId,
+      });
       return false;
     } finally {
       setLoading(false);
@@ -171,7 +182,7 @@ export const useCustomQuestions = () => {
     updateQuestion,
     deleteQuestion,
     loading,
-    error,
+    error: error?.message || null,
   };
 };
 

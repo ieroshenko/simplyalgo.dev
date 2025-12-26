@@ -19,7 +19,7 @@ export async function executeCodeWithStrategy(
     language: string,
     code: string,
     problemId: string,
-    testCases: any[],
+    testCases: unknown[],
     functionSignature?: string
 ) {
     console.log(`[NEW EXECUTOR] Processing ${language} code for problem ${problemId}`);

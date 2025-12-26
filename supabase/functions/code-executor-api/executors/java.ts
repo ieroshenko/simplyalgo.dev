@@ -12,7 +12,7 @@ export class JavaExecutor extends BaseLanguageExecutor {
         return "java";
     }
 
-    processCode(code: string, testCases: any[], functionName: string): string {
+    processCode(code: string, testCases: unknown[], functionName: string): string {
         const testCasesJson = JSON.stringify(testCases, null, 2);
 
         return `

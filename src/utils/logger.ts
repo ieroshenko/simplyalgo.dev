@@ -13,10 +13,10 @@ interface LogContext {
 declare global {
   interface Window {
     newrelic?: {
-      log: (message: string, attributes?: Record<string, any>) => void;
-      noticeError: (error: Error, attributes?: Record<string, any>) => void;
-      addPageAction: (name: string, attributes?: Record<string, any>) => void;
-      setCustomAttribute: (name: string, value: any) => void;
+      log: (message: string, attributes?: Record<string, unknown>) => void;
+      noticeError: (error: Error, attributes?: Record<string, unknown>) => void;
+      addPageAction: (name: string, attributes?: Record<string, unknown>) => void;
+      setCustomAttribute: (name: string, value: unknown) => void;
       setUserId: (userId: string) => void;
       interaction: (name?: string) => void;
       finished: (startTime?: number) => void;
@@ -82,14 +82,9 @@ class Logger {
     if (this.isDevelopment) {
       console.debug(this.formatMessage('debug', message, context), ...args);
     } else {
-      // In production, send to New Relic if available
-      if (window.newrelic) {
-        try {
-          window.newrelic.log(message, { ...context, level: 'debug' });
-        } catch (nrError) {
-          console.error('Failed to send log to New Relic:', nrError);
-        }
-      }
+      // In production, only send debug logs to console, not New Relic
+      // to reduce noise and costs. Use info() for production debugging.
+      console.debug(this.formatMessage('debug', message, context), ...args);
     }
   }
 

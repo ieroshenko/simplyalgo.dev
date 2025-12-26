@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, ChatSession, CodeSnippet, FlowGraph, CoachingMode } from "@/types";
 import { validateCoachingModeWithRecovery, logCoachingModeError } from "@/services/coachingModeErrorRecovery";
-import { useAuth } from "./useAuth";
-import { useToast } from "./use-toast";
 import { logger } from "@/utils/logger";
+import { useToast } from "./use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 // --- Diagram payload helper & types ---
 type DiagramPayload =
@@ -222,7 +222,7 @@ export const useChatSession = ({
         suggest_diagram?: boolean | null;
       };
       const formattedMessages: ChatMessage[] = (
-        sessionMessages as any[]
+        sessionMessages as unknown[]
       ).map((msg) => ({
         id: msg.id,
         role: msg.role as "user" | "assistant",
@@ -248,7 +248,7 @@ export const useChatSession = ({
     } finally {
       setLoading(false);
     }
-  }, [user?.id, problemId, toast]);
+  }, [user?.id, problemId, toast, currentCode, session?.id]);
 
   // Save message to database
   const saveMessage = useCallback(
@@ -278,7 +278,7 @@ export const useChatSession = ({
         });
       }
     },
-    [session, toast],
+    [session, toast, user?.id],
   );
 
   // Send message to AI and save both user and AI messages
@@ -322,10 +322,13 @@ export const useChatSession = ({
           });
         }
 
-
-
         // Debug: Log what mode is being sent
-        console.log('🎯 Coaching mode being sent:', validatedCoachingMode);
+        logger.debug("Coaching mode being sent", {
+          component: "useChatSession",
+          coachingMode: validatedCoachingMode,
+          sessionId: session?.id,
+          userId: user?.id,
+        });
 
         // Call AI function with context tracking
         const { data, error } = await supabase.functions.invoke("ai-coach-chat", {
@@ -436,6 +439,7 @@ export const useChatSession = ({
       contextState.sessionId,
       contextState.responseId,
       coachingMode,
+      user?.id,
     ],
   );
 
@@ -563,7 +567,7 @@ export const useChatSession = ({
         setIsTyping(false);
       }
     },
-    [session, isTyping, messages, problemDescription, saveMessage, toast, coachingMode],
+    [session, isTyping, messages, problemDescription, saveMessage, toast, coachingMode, user?.id],
   );
 
   return {

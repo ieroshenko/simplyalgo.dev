@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Shared mock responses
@@ -15,7 +16,7 @@ vi.mock('@/integrations/supabase/client', () => {
         mock.order = vi.fn(() => mock);
         mock.single = vi.fn(() => Promise.resolve(mockSingleResponse));
         // Also make it thenable for queries that don't end with single/order
-        mock.then = (resolve: any) => Promise.resolve(mockSelectResponse).then(resolve);
+        mock.then = (resolve: (value: unknown) => unknown) => Promise.resolve(mockSelectResponse).then(resolve);
         return mock;
     };
 
@@ -26,7 +27,7 @@ vi.mock('@/integrations/supabase/client', () => {
     };
 });
 
-import { TechnicalInterviewService } from '../technicalInterviewService';
+import { TechnicalInterviewService } from '@/features/technical-interview/services/technicalInterviewService';
 import { supabase } from '@/integrations/supabase/client';
 
 describe('TechnicalInterviewService', () => {

@@ -58,8 +58,9 @@ export class TestRunnerService {
       });
 
       return { results: data.results };
-    } catch (error: any) {
-      logger.error('[TestRunner] Code Executor API execution failed', { error, language: payload.language });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('[TestRunner] Code Executor API execution failed', { error: errorMessage, language: payload.language });
 
       // Return error results instead of fallback
       const errorResults: TestResult[] = payload.testCases.map((testCase) => ({
@@ -68,7 +69,7 @@ export class TestRunnerService {
         expected: testCase.expected,
         actual: "",
         stdout: "",
-        stderr: `API Error: ${error.message || 'Unknown error'}`,
+        stderr: `API Error: ${errorMessage}`,
         time: "0ms",
       }));
 

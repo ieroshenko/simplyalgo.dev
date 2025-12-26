@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { CodeSnippet } from "@/types";
 import { Code, Plus } from "lucide-react";
 import { useState } from "react";
+import { logger } from "@/utils/logger";
 
 interface CodeSnippetButtonProps {
   snippet: CodeSnippet;
@@ -23,7 +24,7 @@ const CodeSnippetButton = ({
     try {
       await onInsert(snippet);
     } catch (error) {
-      console.error("Failed to insert code snippet:", error);
+      logger.error("[CodeSnippetButton] Failed to insert code snippet:", error);
     } finally {
       setTimeout(() => {
         setIsInserting(false);

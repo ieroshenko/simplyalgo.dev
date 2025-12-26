@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for LocalStorageService
  * Tests all storage operations, error scenarios, and edge cases
@@ -413,7 +414,7 @@ describe('LocalStorageService', () => {
 
     test('should handle empty objects and arrays', () => {
       const emptyObject = {};
-      const emptyArray: any[] = [];
+      const emptyArray: unknown[] = [];
 
       expect(service.save('empty-object', emptyObject)).toBe(true);
       expect(service.save('empty-array', emptyArray)).toBe(true);

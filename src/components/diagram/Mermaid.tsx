@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
+import { logger } from "@/utils/logger";
 // Dynamically import mermaid to avoid bundler MIME/type issues and reduce initial bundle size
 
 type MermaidProps = {
@@ -7,8 +8,28 @@ type MermaidProps = {
   caption?: string;
 };
 
+interface MermaidConfig {
+  startOnLoad: boolean;
+  securityLevel: string;
+  theme: string;
+  themeVariables: {
+    primaryColor: string;
+    primaryTextColor: string;
+    primaryBorderColor: string;
+    lineColor: string;
+    textColor: string;
+    noteBkgColor: string;
+    noteTextColor: string;
+  };
+}
+
+interface MermaidAPI {
+  initialize: (config: MermaidConfig) => void;
+  render: (id: string, text: string) => Promise<{ svg: string }>;
+}
+
 // Minimal safe config: disable htmlLabels to reduce XSS surface
-const baseConfig: any = {
+const baseConfig: MermaidConfig = {
   startOnLoad: false,
   securityLevel: "strict",
   theme: "base",
@@ -35,10 +56,10 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
     (async () => {
       try {
         // Prefer ESM builds; fall back to package entry if needed
-        const mod: any = await import("mermaid/dist/mermaid.esm.min.mjs")
+        const mod: unknown = await import("mermaid/dist/mermaid.esm.min.mjs")
           .catch(() => import("mermaid/dist/mermaid.esm.mjs"))
           .catch(() => import("mermaid"));
-        const mm = mod?.default ?? mod;
+        const mm = ((mod as { default?: unknown })?.default ?? mod) as MermaidAPI;
         if (!mm || cancelled) return;
         mm.initialize(baseConfig);
         // Sanitize: collapse newlines within bracketed labels to avoid parser errors
@@ -56,7 +77,7 @@ export default function Mermaid({ chart, className, caption }: MermaidProps) {
         }
       } catch (e) {
         if (!cancelled && containerRef.current) {
-          console.error("Mermaid rendering error:", e);
+          logger.error("Mermaid rendering error:", e);
           containerRef.current.innerHTML =
             '<div class="text-destructive text-xs">Failed to render diagram</div>';
         }

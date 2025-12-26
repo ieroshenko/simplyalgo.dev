@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -38,7 +39,7 @@ export const useAutoSave = (
         setLastSaved(new Date());
         onSaveSuccess?.();
       } catch (error) {
-        console.error("Auto-save failed:", error);
+        logger.error("[useAutoSave] Auto-save failed:", error);
         setHasUnsavedChanges(true);
         onSaveError?.("Failed to save changes");
       } finally {
@@ -55,11 +56,11 @@ export const useAutoSave = (
         return;
       }
       setHasUnsavedChanges(true);
-      
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
+
       timeoutRef.current = setTimeout(() => saveCode(code), debounceMs);
     },
     [saveCode, debounceMs, user?.id],
@@ -86,7 +87,7 @@ export const useAutoSave = (
       );
       return attempt?.code || null;
     } catch (error) {
-      console.error("Failed to load latest code:", error);
+      logger.error("[useAutoSave] Failed to load latest code:", error);
       return null;
     }
   }, [user?.id, problemId]);

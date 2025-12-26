@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -47,7 +48,7 @@ vi.mock('@/hooks/useAuth', () => ({
     }),
 }));
 
-vi.mock('@/hooks/useProblems', () => ({
+vi.mock('@/features/problems/hooks/useProblems', () => ({
     useProblems: () => ({
         problems: [mockProblem],
         toggleStar: vi.fn(),
@@ -57,13 +58,7 @@ vi.mock('@/hooks/useProblems', () => ({
     }),
 }));
 
-vi.mock('@/hooks/useUserStats', () => ({
-    useUserStats: () => ({
-        updateStatsOnProblemSolved: vi.fn(),
-    }),
-}));
-
-vi.mock('@/hooks/useSubmissions', () => ({
+vi.mock('@/features/problems/hooks/useSubmissions', () => ({
     useSubmissions: () => ({
         submissions: [],
         loading: false,
@@ -73,25 +68,17 @@ vi.mock('@/hooks/useSubmissions', () => ({
     }),
 }));
 
-vi.mock('@/hooks/useSolutions', () => ({
+vi.mock('@/features/problems/hooks/useSolutions', () => ({
     useSolutions: () => ({
         solutions: [],
         loading: false,
+        error: null,
     }),
 }));
 
-vi.mock('@/hooks/useTheme', () => ({
-    useTheme: () => ({
-        theme: 'dark',
-        setTheme: vi.fn(),
-        isDark: true,
-    }),
-}));
-
-vi.mock('@/hooks/useEditorTheme', () => ({
-    useEditorTheme: () => ({
-        currentTheme: 'vs-dark',
-        defineCustomThemes: vi.fn(),
+vi.mock('@/hooks/useUserStats', () => ({
+    useUserStats: () => ({
+        updateStatsOnProblemSolved: vi.fn(),
     }),
 }));
 
@@ -115,6 +102,21 @@ vi.mock('@/hooks/useCoachingNew', () => ({
         cancelInput: vi.fn(),
         closeFeedback: vi.fn(),
         startOptimization: vi.fn(),
+    }),
+}));
+
+vi.mock('@/hooks/useTheme', () => ({
+    useTheme: () => ({
+        theme: 'dark',
+        setTheme: vi.fn(),
+        isDark: true,
+    }),
+}));
+
+vi.mock('@/hooks/useEditorTheme', () => ({
+    useEditorTheme: () => ({
+        currentTheme: 'vs-dark',
+        defineCustomThemes: vi.fn(),
     }),
 }));
 
@@ -144,8 +146,9 @@ vi.mock('@/services/overlayPositionManager', () => ({
 
 // Mock components
 vi.mock('@/components/CodeEditor', () => ({
-    default: ({ onCodeChange, onRun, isRunning, onStartCoaching, onStopCoaching, isCoachModeActive }: any) => (
+    default: ({ initialCode, onCodeChange, onRun, onSubmit, isRunning, onStartCoaching, onStopCoaching, isCoachModeActive }: any) => (
         <div data-testid="code-editor">
+            <div>Initial Code: {initialCode}</div>
             <textarea
                 data-testid="code-textarea"
                 onChange={(e) => onCodeChange?.(e.target.value)}
@@ -165,7 +168,7 @@ vi.mock('@/components/CodeEditor', () => ({
     ),
 }));
 
-vi.mock('@/components/problem/ProblemPanel', () => ({
+vi.mock('@/features/problems/components/ProblemPanel', () => ({
     default: ({ problem, activeTab, onTabChange }: any) => (
         <div data-testid="problem-panel">
             <h2>{problem?.title}</h2>
@@ -259,11 +262,15 @@ vi.mock('@monaco-editor/react', () => ({
     default: ({ value }: any) => <div data-testid="monaco-viewer">{value}</div>,
 }));
 
-// Mock sonner
-vi.mock('sonner', () => ({
-    toast: {
+// Mock notifications service
+vi.mock('@/shared/services/notificationService', () => ({
+    notifications: {
         success: vi.fn(),
         error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn(),
+        loading: vi.fn(),
+        dismiss: vi.fn(),
     },
 }));
 
@@ -297,7 +304,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 import ProblemSolverNew from '../ProblemSolverNew';
 import { TestRunnerService } from '@/services/testRunner';
-import { toast } from 'sonner';
+import { notifications } from '@/shared/services/notificationService';
 
 const renderWithRouter = (component: React.ReactElement) => {
     return render(
@@ -410,7 +417,7 @@ describe('ProblemSolverNew', () => {
             await userEvent.click(runButton);
 
             await waitFor(() => {
-                expect(toast.success).toHaveBeenCalledWith('All tests passed! 🎉');
+                expect(notifications.success).toHaveBeenCalledWith('All tests passed! 🎉');
             });
         });
 
@@ -427,7 +434,7 @@ describe('ProblemSolverNew', () => {
             await userEvent.click(runButton);
 
             await waitFor(() => {
-                expect(toast.error).toHaveBeenCalledWith('0/1 test cases passed');
+                expect(notifications.error).toHaveBeenCalledWith('0/1 test cases passed');
             });
         });
     });

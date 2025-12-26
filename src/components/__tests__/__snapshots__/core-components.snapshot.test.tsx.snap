@@ -1,0 +1,415 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Core Components Snapshot Tests > BehavioralHeader > should match snapshot 1`] = `
+<div>
+  <div
+    class="flex justify-between items-start p-6 border-b border-border"
+  >
+    <div>
+      <h1
+        class="text-2xl font-bold text-foreground"
+      >
+        Behavioral Interview Prep
+      </h1>
+      <p
+        class="text-muted-foreground mt-1"
+      >
+        Master technical behavioral interviews and ace your next interview
+      </p>
+    </div>
+    <button
+      class="justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:text-accent-foreground h-10 flex items-center space-x-3 px-4 py-2 hover:bg-secondary rounded-lg"
+    >
+      <span
+        class="relative flex shrink-0 overflow-hidden rounded-full w-8 h-8"
+      >
+        <span
+          class="flex h-full w-full items-center justify-center rounded-full bg-muted text-xs"
+        >
+          U
+        </span>
+      </span>
+      <div
+        class="text-left"
+      >
+        <div
+          class="text-sm font-medium text-foreground"
+        >
+          User
+        </div>
+        <div
+          class="text-xs text-muted-foreground"
+        >
+          View Profile
+        </div>
+      </div>
+    </button>
+  </div>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > ConfirmDialog > should match snapshot - closed 1`] = `<div />`;
+
+exports[`Core Components Snapshot Tests > ConfirmDialog > should match snapshot - open 1`] = `<div />`;
+
+exports[`Core Components Snapshot Tests > LoadingSpinner > should match snapshot - default 1`] = `
+<div>
+  <div
+    class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-[9999]"
+  >
+    <div
+      class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-4"
+    >
+      <div
+        class="w-8 h-8 animate-spin"
+      >
+        <svg
+          class="w-full h-full text-blue-500"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="animate-spin"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="32"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+          <circle
+            class="animate-spin opacity-30"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="16"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+        </svg>
+      </div>
+      <div
+        class="text-sm text-gray-600 dark:text-gray-300 font-medium"
+      >
+        AI is thinking...
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > LoadingSpinner > should match snapshot - fullScreen 1`] = `
+<div>
+  <div
+    class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-[9999]"
+  >
+    <div
+      class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-4"
+    >
+      <div
+        class="w-8 h-8 animate-spin"
+      >
+        <svg
+          class="w-full h-full text-blue-500"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="animate-spin"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="32"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+          <circle
+            class="animate-spin opacity-30"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="16"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+        </svg>
+      </div>
+      <div
+        class="text-sm text-gray-600 dark:text-gray-300 font-medium"
+      >
+        AI is thinking...
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > LoadingSpinner > should match snapshot - with message 1`] = `
+<div>
+  <div
+    class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-[9999]"
+  >
+    <div
+      class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-4"
+    >
+      <div
+        class="w-8 h-8 animate-spin"
+      >
+        <svg
+          class="w-full h-full text-blue-500"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="animate-spin"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="32"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+          <circle
+            class="animate-spin opacity-30"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-dasharray="32"
+            stroke-dashoffset="16"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+        </svg>
+      </div>
+      <div
+        class="text-sm text-gray-600 dark:text-gray-300 font-medium"
+      >
+        Loading data...
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > MissionStrip > should match snapshot 1`] = `
+<div>
+  <div
+    class="border-b border-border/20 px-6 py-4"
+  >
+    <div
+      class="flex items-center gap-8 flex-wrap text-sm"
+    >
+      <div
+        class="flex items-center gap-2"
+      >
+        <span
+          class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+        >
+          Status:
+        </span>
+        <span
+          class="flex items-center gap-1.5"
+        >
+          <span
+            class="text-xs font-semibold text-foreground uppercase"
+          >
+            Active
+          </span>
+          <span
+            class="w-1.5 h-1.5 bg-green-500 rounded-full"
+          />
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-2"
+      >
+        <span
+          class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+        >
+          Focus:
+        </span>
+        <span
+          class="text-xs font-semibold text-foreground uppercase"
+        >
+          Interview
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-2 ml-auto"
+      >
+        <span
+          class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+        >
+          Streak:
+        </span>
+        <span
+          class="text-xs font-semibold text-foreground"
+        >
+          <div
+            class="animate-pulse rounded-md bg-muted h-4 w-6 inline-block"
+          />
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > ShortcutsHelp > should match snapshot 1`] = `
+<div>
+  <button
+    aria-controls="radix-:r4:"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    aria-label="Keyboard shortcuts"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent h-9 rounded-md px-3 text-muted-foreground hover:text-foreground"
+    data-state="closed"
+    title="Keyboard shortcuts"
+    type="button"
+  >
+    <svg
+      class="lucide lucide-keyboard w-4 h-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M10 8h.01"
+      />
+      <path
+        d="M12 12h.01"
+      />
+      <path
+        d="M14 8h.01"
+      />
+      <path
+        d="M16 12h.01"
+      />
+      <path
+        d="M18 8h.01"
+      />
+      <path
+        d="M6 8h.01"
+      />
+      <path
+        d="M7 16h10"
+      />
+      <path
+        d="M8 12h.01"
+      />
+      <rect
+        height="16"
+        rx="2"
+        width="20"
+        x="2"
+        y="4"
+      />
+    </svg>
+  </button>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > Timer > should match snapshot - default state 1`] = `
+<div>
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent h-9 rounded-md px-3 text-muted-foreground hover:text-foreground"
+    data-state="closed"
+    id="radix-:r0:"
+    type="button"
+  >
+    <svg
+      class="lucide lucide-timer w-4 h-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <line
+        x1="10"
+        x2="14"
+        y1="2"
+        y2="2"
+      />
+      <line
+        x1="12"
+        x2="15"
+        y1="14"
+        y2="11"
+      />
+      <circle
+        cx="12"
+        cy="14"
+        r="8"
+      />
+    </svg>
+  </button>
+</div>
+`;
+
+exports[`Core Components Snapshot Tests > Timer > should match snapshot - running state 1`] = `
+<div>
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent h-9 rounded-md px-3 text-muted-foreground hover:text-foreground"
+    data-state="closed"
+    id="radix-:r2:"
+    type="button"
+  >
+    <svg
+      class="lucide lucide-timer w-4 h-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <line
+        x1="10"
+        x2="14"
+        y1="2"
+        y2="2"
+      />
+      <line
+        x1="12"
+        x2="15"
+        y1="14"
+        y2="11"
+      />
+      <circle
+        cx="12"
+        cy="14"
+        r="8"
+      />
+    </svg>
+  </button>
+</div>
+`;

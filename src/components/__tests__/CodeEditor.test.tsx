@@ -3,9 +3,24 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
+interface MockMonacoEditorProps {
+    value: string;
+    onChange?: (value: string) => void;
+    onMount?: (editor: unknown, monaco: unknown) => void;
+    options?: Record<string, unknown>;
+    theme?: string;
+}
+
+interface MockEditorSettingsProps {
+    selectedTheme: string;
+    onThemeChange: (theme: string) => void;
+    vimMode: boolean;
+    onVimModeChange: (enabled: boolean) => void;
+}
+
 // Mock Monaco Editor
 vi.mock('@monaco-editor/react', () => ({
-    default: ({ value, onChange, onMount, options, theme }: any) => {
+    default: ({ value, onChange, onMount }: MockMonacoEditorProps) => {
         // Simulate editor mounting
         React.useEffect(() => {
             const mockEditor = {
@@ -71,7 +86,7 @@ vi.mock('@/hooks/useEditorTheme', () => ({
 
 // Mock EditorSettings component
 vi.mock('@/components/EditorSettings', () => ({
-    default: ({ selectedTheme, onThemeChange, vimMode, onVimModeChange }: any) => (
+    default: ({ selectedTheme, onThemeChange, vimMode, onVimModeChange }: MockEditorSettingsProps) => (
         <div data-testid="editor-settings">
             <button
                 data-testid="theme-button"

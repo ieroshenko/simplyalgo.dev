@@ -10,9 +10,14 @@ export const FEATURE_FLAGS = {
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
 
 export const isFeatureEnabled = (feature: FeatureFlag): boolean => {
+  // Check localStorage first for easy toggling during development
+  const override = localStorage.getItem(`feature_${feature}`);
+  if (override !== null) {
+    return override === 'true';
+  }
   return FEATURE_FLAGS[feature];
 };
 
-export const isFeatureEnabledBooleal = (isEnabled: boolean): boolean => {
+export const isFeatureEnabledBoolean = (isEnabled: boolean): boolean => {
   return isEnabled;
 };

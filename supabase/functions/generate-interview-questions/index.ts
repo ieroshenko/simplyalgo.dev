@@ -6,19 +6,52 @@ import OpenAI from "https://esm.sh/openai@4";
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
 
-// Initialize OpenAI client
-let openaiInstance: OpenAI | null = null;
+// LLM Provider Configuration
+const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
+const openrouterModel = Deno.env.get("OPENROUTER_MODEL") || "google/gemini-3-flash-preview";
+const openaiModel = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
 
-function initializeOpenAI(): OpenAI {
-  if (openaiInstance) return openaiInstance;
-  
+// Model selection via env var
+const configuredModel = (useOpenRouter ? openrouterModel : openaiModel).trim();
+
+// Initialize LLM client (OpenRouter or OpenAI)
+let llmInstance: OpenAI | null = null;
+
+function initializeLLM(): OpenAI {
+  if (llmInstance) return llmInstance;
+
+  // Try OpenRouter first
+  if (useOpenRouter) {
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (openrouterKey) {
+      const siteUrl = Deno.env.get("OPENROUTER_SITE_URL") || "https://simplyalgo.dev";
+      const appName = Deno.env.get("OPENROUTER_APP_NAME") || "SimplyAlgo";
+
+      console.log(`[generate-interview-questions] Using OpenRouter: model=${configuredModel}`);
+
+      llmInstance = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
+        },
+      });
+      return llmInstance;
+    }
+  }
+
+  // Fallback to OpenAI
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    throw new Error(useOpenRouter
+      ? "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set"
+      : "OPENAI_API_KEY environment variable is not set");
   }
-  
-  openaiInstance = new OpenAI({ apiKey: openaiKey });
-  return openaiInstance;
+
+  console.log(`[generate-interview-questions] Using OpenAI (fallback): model=${configuredModel}`);
+  llmInstance = new OpenAI({ apiKey: openaiKey });
+  return llmInstance;
 }
 
 const corsHeaders = {
@@ -35,8 +68,8 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize OpenAI
-    const openai = initializeOpenAI();
+    // Initialize LLM client
+    const llm = initializeLLM();
 
     // Parse request body
     const body = await req.json();
@@ -104,8 +137,8 @@ Categories should be from: general, technical_leadership, code_review_collaborat
 
 Make sure the questions are diverse and cover different behavioral aspects relevant to the role.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completionParams: unknown = {
+      model: configuredModel,
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -114,12 +147,18 @@ Make sure the questions are diverse and cover different behavioral aspects relev
         },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
-    });
+    };
+
+    // Only add temperature for non-GPT-5 models
+    if (!configuredModel.startsWith("gpt-5")) {
+      completionParams.temperature = 0.7;
+    }
+
+    const completion = await llm.chat.completions.create(completionParams);
 
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
-      throw new Error("No response from OpenAI");
+      throw new Error("No response from LLM");
     }
 
     // Parse JSON response

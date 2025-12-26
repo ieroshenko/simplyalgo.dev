@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Shared mock responses
@@ -16,7 +17,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
 }));
 
-import { SurveyService } from '../surveyService';
+import { SurveyService } from '@/features/survey/services/surveyService';
 import { supabase } from '@/integrations/supabase/client';
 import { SurveyData } from '@/types/survey';
 

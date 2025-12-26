@@ -152,7 +152,7 @@ export interface CoachingSession {
   session_state: 'active' | 'completed' | 'paused';
   initial_code: string;
   total_steps: number;
-  steps: any[];
+  steps: unknown[];
 }
 
 export interface CoachingValidation {

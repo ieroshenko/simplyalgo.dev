@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { formatTimeAgo } from "@/lib/date";
+import { cn } from "@/lib/utils";
 
 type ActivityItem = {
   id: string;
@@ -31,7 +32,7 @@ const RecentActivity = () => {
         return;
       }
       setLoading(true);
-      const rows = await UserAttemptsService.getRecentActivity(user.id, 3);
+      const rows = await UserAttemptsService.getRecentActivity(user.id, 4);
       if (!mounted) return;
       const mapped: ActivityItem[] = rows.map((r) => ({
         id: r.id,
@@ -50,64 +51,53 @@ const RecentActivity = () => {
     };
   }, [user?.id]);
 
-  const quickActions = useMemo(
-    () => [
-      // {
-      //   title: "Random Pattern Drill",
-      //   icon: Plus,
-      //   action: () => console.log("Random Pattern Drill"),
-      // },
-      // {
-      //   title: "Random LC Problem",
-      //   icon: Plus,
-      //   action: () => console.log("Random LC Problem"),
-      // },
-    ],
-    [],
-  );
-
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-bold text-foreground">
-          Recent Activity
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {loading ? (
-            <div className="text-sm text-muted-foreground">Loading...</div>
-          ) : items.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No recent activity yet.</div>
-          ) : (
-            items.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                onClick={() => navigate(`/problem/${a.problem_id}`)}
-                role="button"
-                aria-label={`Open ${a.title}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-foreground truncate">
-                    {a.status === "passed"
-                      ? "Solved"
-                      : a.status === "failed"
-                      ? "Attempt failed"
-                      : "Attempted"}
-                    : {a.title}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {a.difficulty ? `${a.difficulty} • ` : ""}
-                    {formatTimeAgo(a.updated_at)}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">
+            Recent Activity
+          </h3>
+
+          <div className="space-y-2">
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
               </div>
-            ))
-          )}
+            ) : items.length === 0 ? (
+              <div className="text-xs text-muted-foreground">No recent activity.</div>
+            ) : (
+              items.map((a) => (
+                <button
+                  key={a.id}
+                  className="w-full text-left p-3 rounded-lg hover:bg-accent/5 transition-colors group border border-transparent hover:border-border/40"
+                  onClick={() => navigate(`/problem/${a.problem_id}`)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-foreground truncate mb-1">
+                        {a.title}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className={cn(
+                          "font-medium",
+                          a.difficulty === "Easy" ? "text-green-600" :
+                            a.difficulty === "Medium" ? "text-amber-600" : "text-red-600"
+                        )}>
+                          {a.difficulty}
+                        </span>
+                        <span>·</span>
+                        <span>{formatTimeAgo(a.updated_at)}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

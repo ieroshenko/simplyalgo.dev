@@ -2,6 +2,35 @@ import { useState, useRef, useCallback } from "react";
 import { speechRecognitionService } from "@/services/speechRecognition";
 import { logger } from "@/utils/logger";
 
+interface SpeechRecognitionResultEvent {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+interface SpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
 interface SpeechToTextOptions {
   onResult: (transcript: string) => void;
   onError: (error: string) => void;
@@ -29,7 +58,7 @@ export const useSpeechToText = (
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Initialize speech recognition capabilities
@@ -39,9 +68,9 @@ export const useSpeechToText = (
       setIsSupported(true);
       setHasNativeSupport(true);
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
+        (window as Record<string, unknown>).SpeechRecognition ||
+        (window as Record<string, unknown>).webkitSpeechRecognition;
+      recognitionRef.current = new (SpeechRecognition as new () => SpeechRecognition)();
 
       const recognition = recognitionRef.current;
       recognition.continuous = false;
@@ -51,7 +80,7 @@ export const useSpeechToText = (
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionResultEvent) => {
         let finalTranscript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
@@ -63,7 +92,7 @@ export const useSpeechToText = (
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         setError(event.error);
         options.onError(event.error);
         setIsListening(false);
@@ -185,6 +214,7 @@ export const useSpeechToText = (
     hasNativeSupport,
     initializeSpeechRecognition,
     startWebSpeechRecognition,
+    options,
   ]);
 
   const stopListening = useCallback(() => {

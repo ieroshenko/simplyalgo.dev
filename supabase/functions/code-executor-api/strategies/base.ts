@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Base interface for all problem strategies
 export interface ProblemStrategy {
     /**

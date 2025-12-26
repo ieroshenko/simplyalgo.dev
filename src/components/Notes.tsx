@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, Save, FileCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { notifications } from "@/shared/services/notificationService";
 import { debounce } from "lodash";
 import {
   NotesData,
@@ -141,7 +141,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     } catch (error) {
       logger.error('[Notes] Error syncing notes', { error, problemId });
       if (!cached) {
-        toast.error("Failed to load notes");
+        notifications.error("Failed to load notes");
       } else {
         logger.debug('[Notes] Using cached notes due to sync error', { problemId });
       }
@@ -196,7 +196,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
         logger.debug('[Notes] Saved successfully', { problemId });
       } catch (error) {
         logger.error('[Notes] Error saving notes', { error, problemId });
-        toast.error("Failed to save notes");
+        notifications.error("Failed to save notes");
 
         // Revert optimistic update on error
         const revertedCache = loadFromCache();
@@ -211,6 +211,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
     [user, problemId, loadFromCache, saveToCache],
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSave = useCallback(
     debounce((noteContent: string) => {
       if (noteContent.trim() !== "") {
@@ -241,7 +242,7 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
 
   const handleSave = async () => {
     await saveNotes(content);
-    toast.success("Notes saved!");
+    notifications.success("Notes saved!");
   };
 
   const handleClear = async () => {
@@ -255,14 +256,14 @@ const Notes = forwardRef<NotesHandle, NotesProps>(({ problemId }, ref) => {
       setContent("");
       setHasUnsavedChanges(true);
       await saveNotes("");
-      toast.success("Notes cleared");
+      notifications.success("Notes cleared");
     }
   };
 
   // Initialize notes on mount or when user/problemId changes
   useEffect(() => {
     loadNotes();
-  }, [user?.id, problemId]); // Don't depend on loadNotes to avoid unnecessary re-runs
+  }, [user?.id, problemId, loadNotes]);
 
   useEffect(() => {
     return () => {
