@@ -88,8 +88,8 @@ describe('PaywallStep - Stripe Checkout', () => {
 
             expect(screen.getByText('Monthly')).toBeInTheDocument();
             expect(screen.getByText('Yearly')).toBeInTheDocument();
-            expect(screen.getByText('$49')).toBeInTheDocument();
-            expect(screen.getByText('$15.99')).toBeInTheDocument();
+            expect(screen.getByText('$20.00')).toBeInTheDocument();
+            expect(screen.getByText('$10.00')).toBeInTheDocument();
         });
 
         it('should default to monthly plan selected', () => {

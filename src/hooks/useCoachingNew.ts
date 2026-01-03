@@ -5,6 +5,15 @@ import { useCallback, useRef } from "react";
 import { CoachHighlightArea, InteractiveCoachSession } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
+import {
+    trackCoachModeEnabled,
+    trackCoachStepPrompted,
+    trackCoachStepSubmitted,
+    trackCoachStepCorrect,
+    trackCoachStepIncorrect,
+    trackCoachProblemCompleted,
+    trackCoachProblemAbandoned,
+} from "@/services/analytics";
 
 // Import from coaching module
 import {
@@ -45,6 +54,13 @@ export const useCoachingNew = ({
     getElapsedTime,
   } = useCoachingState(positionManager);
 
+  // Analytics tracking refs
+  const stepPromptedTimeRef = useRef<Map<string | number, number>>(new Map());
+  const stepAttemptNumberRef = useRef<Map<string | number, number>>(new Map());
+  const coachModeStartTimeRef = useRef<number | null>(null);
+  const stepsCompletedCountRef = useRef<number>(0);
+  const currentStepNumberRef = useRef<number>(1);
+
   // Wrap showInteractiveQuestion with required dependencies
   const showInteractiveQuestion = useCallback(({ question, hint, highlightArea }: {
     question: string;
@@ -52,12 +68,66 @@ export const useCoachingNew = ({
     highlightArea?: CoachHighlightArea;
   }) => {
     showInteractiveQuestionBase({ question, hint, highlightArea }, applyHighlight, getPositionBelowLastLine);
-  }, [showInteractiveQuestionBase, applyHighlight, getPositionBelowLastLine]);
+    
+    // Track step prompted
+    // Use our tracked step number as the source of truth
+    const stepId = currentStepNumberRef.current;
+    
+    // If session has a higher step number, sync with it (for initial steps only)
+    // This handles the case where the backend session step number is ahead of our local tracking
+    if (coachingState.session?.currentStepNumber && coachingState.session.currentStepNumber > currentStepNumberRef.current) {
+      currentStepNumberRef.current = coachingState.session.currentStepNumber;
+      // Reset attempt counter when syncing with backend step number
+      stepAttemptNumberRef.current.set(currentStepNumberRef.current, 0);
+    }
+    
+    stepPromptedTimeRef.current.set(stepId, Date.now());
+    // Ensure attempt counter is initialized for this step (should already be reset when step increments)
+    if (!stepAttemptNumberRef.current.has(stepId)) {
+      stepAttemptNumberRef.current.set(stepId, 0);
+    }
+    
+    logger.debug("Tracking step prompted", { 
+      component: "Coaching", 
+      stepId, 
+      question: question.substring(0, 50) + "..." 
+    });
+    
+    trackCoachStepPrompted(problemId, stepId);
+  }, [showInteractiveQuestionBase, applyHighlight, getPositionBelowLastLine, coachingState.session, problemId]);
 
   // Stop coaching session
   const stopCoaching = useCallback(() => {
+    // Track abandonment if coach mode was active
+    if (coachingState.isCoachModeActive && coachModeStartTimeRef.current) {
+      const totalTimeMs = Date.now() - coachModeStartTimeRef.current;
+      const currentStepId = currentStepNumberRef.current;
+      
+      logger.debug("Tracking coach problem abandoned", { 
+        component: "Coaching", 
+        problemId, 
+        currentStepId,
+        stepsCompleted: stepsCompletedCountRef.current,
+        totalTimeMs 
+      });
+      
+      trackCoachProblemAbandoned(
+        problemId,
+        stepsCompletedCountRef.current,
+        totalTimeMs,
+        currentStepId
+      );
+    }
+    
+    // Reset analytics tracking refs
+    stepPromptedTimeRef.current.clear();
+    stepAttemptNumberRef.current.clear();
+    coachModeStartTimeRef.current = null;
+    stepsCompletedCountRef.current = 0;
+    currentStepNumberRef.current = 1;
+    
     resetCoachingState(applyHighlight);
-  }, [resetCoachingState, applyHighlight]);
+  }, [resetCoachingState, applyHighlight, coachingState.isCoachModeActive, problemId]);
 
   // Start coaching session
   const startCoaching = useCallback(async () => {
@@ -90,6 +160,12 @@ export const useCoachingNew = ({
       logger.debug("Session started", { component: "Coaching", data });
 
       startTimeRef.current = new Date();
+      coachModeStartTimeRef.current = Date.now();
+      stepsCompletedCountRef.current = 0;
+      currentStepNumberRef.current = 1;
+
+      // Track coach mode enabled
+      trackCoachModeEnabled(problemId);
 
       // Update context state for Responses API optimization
       setContextState({
@@ -101,6 +177,16 @@ export const useCoachingNew = ({
       // Check if session started as already completed
       if (data.isCompleted) {
         logger.debug("Solution already complete at session start", { component: "Coaching", isOptimizable: data.isOptimizable });
+
+        // Track problem completion (immediate completion)
+        if (coachModeStartTimeRef.current) {
+          const totalTimeMs = Date.now() - coachModeStartTimeRef.current;
+          trackCoachProblemCompleted(
+            problemId,
+            0, // No steps completed since solution was already complete
+            totalTimeMs
+          );
+        }
 
         setCoachingState(prev => ({
           ...prev,
@@ -165,6 +251,16 @@ export const useCoachingNew = ({
 
           logger.debug("Solution validated as complete", { component: "Coaching", isOptimizable: validation.isOptimizable });
 
+          // Track problem completion (completed during initial validation)
+          if (coachModeStartTimeRef.current) {
+            const totalTimeMs = Date.now() - coachModeStartTimeRef.current;
+            trackCoachProblemCompleted(
+              problemId,
+              0, // No steps completed since solution was already complete
+              totalTimeMs
+            );
+          }
+
           setCoachingState(prev => ({
             ...prev,
             isOptimizable: validation.isOptimizable,
@@ -221,6 +317,24 @@ export const useCoachingNew = ({
     }
 
     logger.debug("Submitting code for validation", { component: "Coaching", userCode, userInput });
+
+    // Track step submitted
+    // Always use our tracked step number as the source of truth (it's incremented when we move to next step)
+    const stepId = currentStepNumberRef.current;
+    const currentAttempt = (stepAttemptNumberRef.current.get(stepId) || 0) + 1;
+    stepAttemptNumberRef.current.set(stepId, currentAttempt);
+    
+    const stepPromptedTime = stepPromptedTimeRef.current.get(stepId);
+    const timeToSubmitMs = stepPromptedTime ? Date.now() - stepPromptedTime : undefined;
+    
+    logger.debug("Tracking step submission", { 
+      component: "Coaching", 
+      stepId, 
+      currentAttempt, 
+      timeToSubmitMs 
+    });
+    
+    trackCoachStepSubmitted(problemId, stepId, currentAttempt, timeToSubmitMs);
 
     setCoachingState(prev => ({
       ...prev,
@@ -298,15 +412,43 @@ export const useCoachingNew = ({
       }
 
       // Default: validate correctness flow
-      logger.debug("validate_coaching_submission payload", { component: "Coaching", codeLen: currentCode.length });
+      // Ensure we have valid code values - use currentEditorCode as fallback for studentCode
+      const codeToValidate = userCode || currentCode || "";
+      const editorCode = currentCode || "";
+      
+      if (!codeToValidate || !editorCode) {
+        logger.error("Missing code for validation", { 
+          component: "Coaching", 
+          hasUserCode: !!userCode, 
+          hasCurrentCode: !!currentCode 
+        });
+        setCoachingState(prev => ({
+          ...prev,
+          isValidating: false,
+          isWaitingForResponse: false,
+          feedback: {
+            show: true,
+            type: "error",
+            message: "No code to validate. Please write some code first.",
+            showConfetti: false,
+          },
+        }));
+        return;
+      }
+      
+      logger.debug("validate_coaching_submission payload", { 
+        component: "Coaching", 
+        codeLen: codeToValidate.length,
+        editorCodeLen: editorCode.length 
+      });
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           action: 'validate_coaching_submission',
           sessionId: coachingState.session.id,
-          studentCode: userCode,
-          studentResponse: userInput,
-          currentEditorCode: currentCode,
-          code: currentCode,
+          studentCode: codeToValidate,
+          studentResponse: userInput || "",
+          currentEditorCode: editorCode,
+          code: editorCode,
           previousResponseId: contextState.responseId,
         },
       });
@@ -325,6 +467,28 @@ export const useCoachingNew = ({
       }
 
       setCoachingState(prev => ({ ...prev, isValidating: false, isWaitingForResponse: false }));
+
+      // Track step correctness
+      // Always use our tracked step number as the source of truth
+      const stepId = currentStepNumberRef.current;
+      const currentAttempt = stepAttemptNumberRef.current.get(stepId) || 1;
+      const stepPromptedTime = stepPromptedTimeRef.current.get(stepId);
+      const timeToSubmitMs = stepPromptedTime ? Date.now() - stepPromptedTime : undefined;
+      
+      logger.debug("Tracking step correctness", { 
+        component: "Coaching", 
+        stepId, 
+        currentAttempt, 
+        isCorrect: data.isCorrect,
+        timeToSubmitMs 
+      });
+      
+      if (data.isCorrect) {
+        trackCoachStepCorrect(problemId, stepId, currentAttempt, timeToSubmitMs);
+        stepsCompletedCountRef.current += 1;
+      } else {
+        trackCoachStepIncorrect(problemId, stepId, currentAttempt, timeToSubmitMs);
+      }
 
       if (data.isCorrect && data.nextAction === "insert_and_continue") {
         logger.debug("Code validated successfully", { component: "Coaching" });
@@ -390,6 +554,13 @@ export const useCoachingNew = ({
 
             if (data.nextStep?.question) {
               logger.debug("Showing next question after code insertion", { component: "Coaching" });
+              // Always increment step number when moving to next step after correct answer
+              currentStepNumberRef.current += 1;
+              const newStepId = currentStepNumberRef.current;
+              
+              // Reset attempt counter for the new step
+              stepAttemptNumberRef.current.set(newStepId, 0);
+              
               showInteractiveQuestion({
                 question: data.nextStep.question,
                 hint: data.nextStep.hint,
@@ -431,16 +602,20 @@ export const useCoachingNew = ({
 
           const isComplete = data.nextAction === "complete_session" || !data.nextStep?.question;
 
-          if (!isComplete && data.nextStep?.question) {
-            setTimeout(() => {
-              showInteractiveQuestion({
-                question: data.nextStep.question,
-                hint: data.nextStep.hint,
-                highlightArea: data.nextStep.highlightArea,
-              });
-            }, 2000);
-          } else {
+          // Don't automatically show next step - wait for user to click Continue
+          // The continueToNextStep function will handle showing the next step
+          if (isComplete) {
             logger.debug("Solution complete, ending session", { component: "Coaching" });
+
+            // Track problem completion
+            if (coachModeStartTimeRef.current) {
+              const totalTimeMs = Date.now() - coachModeStartTimeRef.current;
+              trackCoachProblemCompleted(
+                problemId,
+                stepsCompletedCountRef.current,
+                totalTimeMs
+              );
+            }
 
             setCoachingState(prev => ({
               ...prev,
@@ -470,6 +645,16 @@ export const useCoachingNew = ({
         }
       } else if (data.isCorrect === true && data.nextAction === "complete_session") {
         logger.debug("Session completed", { component: "Coaching" });
+
+        // Track problem completion
+        if (coachModeStartTimeRef.current) {
+          const totalTimeMs = Date.now() - coachModeStartTimeRef.current;
+          trackCoachProblemCompleted(
+            problemId,
+            stepsCompletedCountRef.current,
+            totalTimeMs
+          );
+        }
 
         setCoachingState(prev => ({
           ...prev,
@@ -591,6 +776,40 @@ export const useCoachingNew = ({
     await submitCoachingCode(response, response);
   }, [submitCoachingCode]);
 
+  // Continue to next step after correct answer (without re-validating)
+  const continueToNextStep = useCallback(() => {
+    // Check if we have a next step ready from the last validation
+    if (!coachingState.lastValidation?.isCorrect || !coachingState.lastValidation?.nextStep?.question) {
+      logger.debug("No next step available to continue", { component: "Coaching" });
+      return;
+    }
+
+    const nextStep = coachingState.lastValidation.nextStep;
+    const isNewStep = coachingState.session?.currentQuestion !== nextStep.question;
+
+    if (isNewStep) {
+      // Increment step number when continuing to next step
+      currentStepNumberRef.current += 1;
+      const newStepId = currentStepNumberRef.current;
+      
+      // Reset attempt counter for the new step
+      stepAttemptNumberRef.current.set(newStepId, 0);
+      
+      // Show the next step
+      showInteractiveQuestion({
+        question: nextStep.question,
+        hint: nextStep.hint,
+        highlightArea: nextStep.highlightArea,
+      });
+      
+      // Clear the validation result so we don't show it again
+      setCoachingState(prev => ({
+        ...prev,
+        lastValidation: null,
+      }));
+    }
+  }, [coachingState.lastValidation, coachingState.session, showInteractiveQuestion, setCoachingState]);
+
   // Skip current step
   const skipStep = useCallback(() => {
     logger.debug("Skip step called - ending coaching session", { component: "Coaching" });
@@ -661,6 +880,7 @@ export const useCoachingNew = ({
     cancelInput,
     closeFeedback,
     skipStep,
+    continueToNextStep,
     startOptimization,
     getElapsedTime,
     handlePositionChange,

@@ -143,6 +143,9 @@ export const OverlayContent: React.FC<OverlayContentProps> = ({
                         <p className="text-sm text-muted-foreground mb-4">
                             You've successfully completed this challenge.
                         </p>
+                        {validationResult?.feedback && <p className="text-sm text-muted-foreground mb-4">
+                            Feedback: {validationResult.feedback}
+                        </p>}
 
                         {/* Show next step hint or question if available */}
                         {validationResult?.nextStep && (

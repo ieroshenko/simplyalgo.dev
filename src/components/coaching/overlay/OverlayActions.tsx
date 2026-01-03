@@ -11,6 +11,7 @@ interface OverlayActionsProps {
     onCancel: () => void;
     onFinish?: () => void;
     onExitCoach?: () => void;
+    onContinueToNextStep?: () => void; // Continue to next step without validating
     onStartOptimization?: (type: 'optimization' | 'alternative') => void;
     isValidating: boolean;
     isInserting: boolean;
@@ -27,6 +28,7 @@ export const OverlayActions: React.FC<OverlayActionsProps> = ({
     onCancel,
     onFinish,
     onExitCoach,
+    onContinueToNextStep,
     onStartOptimization,
     isValidating,
     isInserting,
@@ -121,7 +123,15 @@ export const OverlayActions: React.FC<OverlayActionsProps> = ({
 
                 {!hasError && overlayState === 'correct' && (
                     <Button
-                        onClick={onValidate}
+                        onClick={() => {
+                            // If we have a next step ready, continue without validating
+                            // Otherwise, validate (for edge cases)
+                            if (onContinueToNextStep && validationResult?.nextStep?.question) {
+                                onContinueToNextStep();
+                            } else {
+                                onValidate();
+                            }
+                        }}
                         disabled={isValidating}
                         size='sm'
                         className='bg-green-600 hover:bg-green-700 text-green-50 px-6'

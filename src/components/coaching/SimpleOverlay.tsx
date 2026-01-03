@@ -19,6 +19,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
   onExitCoach,
   onFinishCoaching,
   onInsertCorrectCode,
+  onContinueToNextStep,
   isValidating = false,
   hasError = false,
   question,
@@ -270,6 +271,7 @@ const SimpleOverlay: React.FC<SimpleOverlayProps> = ({
           onCancel={onCancel}
           onFinish={onFinishCoaching}
           onExitCoach={onExitCoach}
+          onContinueToNextStep={onContinueToNextStep}
           onStartOptimization={onStartOptimization}
           isValidating={isValidating}
           isInserting={isInserting}

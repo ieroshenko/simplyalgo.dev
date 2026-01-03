@@ -31,6 +31,7 @@ export interface SimpleOverlayProps {
     onFinishCoaching?: () => void;
     onInsertCorrectCode?: () => Promise<void> | void;
     onInsertCode?: (code: string) => void; // Legacy support
+    onContinueToNextStep?: () => void; // Continue to next step without validating
     onStartOptimization?: (type: 'optimization' | 'alternative') => void;
     isValidating?: boolean;
     hasError?: boolean;

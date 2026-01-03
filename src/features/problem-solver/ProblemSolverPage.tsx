@@ -31,6 +31,7 @@ import type { editor } from "monaco-editor";
 import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
+import { trackProblemStarted } from '@/services/analytics';
 
 // Feature-local imports
 import { ProblemSolverDialogs } from "./components/ProblemSolverDialogs";
@@ -150,6 +151,18 @@ const ProblemSolverNew = () => {
     }
   }, [submissions]);
 
+  // Track when user starts a problem
+  useEffect(() => {
+    if (problem && problemId) {
+      trackProblemStarted(
+        problemId,
+        problem.title,
+        problem.difficulty,
+        problem.category
+      );
+    }
+  }, [problem, problemId]);
+
   // Initialize code when problem is loaded
   useEffect(() => {
     if (problem?.functionSignature && code === "") {
@@ -173,6 +186,7 @@ const ProblemSolverNew = () => {
     insertCorrectCode,
     cancelInput,
     closeFeedback,
+    continueToNextStep,
     startOptimization,
   } = useCoachingNew({
     problemId: problemId || "",
@@ -452,6 +466,7 @@ const ProblemSolverNew = () => {
         submitCoachingCode={submitCoachingCode}
         cancelInput={cancelInput}
         insertCorrectCode={insertCorrectCode}
+        continueToNextStep={continueToNextStep}
         startOptimization={startOptimization}
         stopCoaching={stopCoaching}
         closeFeedback={closeFeedback}

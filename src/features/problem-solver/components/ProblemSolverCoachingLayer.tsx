@@ -13,6 +13,7 @@ type ProblemSolverCoachingLayerProps = {
   submitCoachingCode: (code: string, explanation?: string) => void;
   cancelInput: () => void;
   insertCorrectCode: () => void | Promise<void>;
+  continueToNextStep?: () => void;
   startOptimization: (type?: 'optimization' | 'alternative') => void | Promise<void>;
   stopCoaching: () => void;
   closeFeedback: () => void;
@@ -29,6 +30,7 @@ export const ProblemSolverCoachingLayer = ({
   submitCoachingCode,
   cancelInput,
   insertCorrectCode,
+  continueToNextStep,
   startOptimization,
   stopCoaching,
   closeFeedback,
@@ -77,6 +79,7 @@ export const ProblemSolverCoachingLayer = ({
                   : null
               }
               onInsertCorrectCode={insertCorrectCode}
+              onContinueToNextStep={continueToNextStep}
               onPositionChange={(pos) => {
                 // TODO: useCoachingNew should expose a setter for inputPosition
                 // (avoids direct mutation of hook state)

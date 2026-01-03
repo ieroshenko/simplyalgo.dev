@@ -174,6 +174,15 @@ export const AnalyticsEvents = {
     AI_COACHING_SESSION_STARTED: 'ai_coaching_session_started',
     AI_COACHING_STEP_COMPLETED: 'ai_coaching_step_completed',
 
+    // ===== Coach Mode events =====
+    COACH_MODE_ENABLED: 'coach_mode_enabled',
+    COACH_STEP_PROMPTED: 'coach_step_prompted',
+    COACH_STEP_SUBMITTED: 'coach_step_submitted',
+    COACH_STEP_CORRECT: 'coach_step_correct',
+    COACH_STEP_INCORRECT: 'coach_step_incorrect',
+    COACH_PROBLEM_COMPLETED: 'coach_problem_completed',
+    COACH_PROBLEM_ABANDONED: 'coach_problem_abandoned',
+
     // ===== Behavioral events =====
     BEHAVIORAL_PRACTICE_STARTED: 'behavioral_practice_started',
     BEHAVIORAL_STORY_CREATED: 'behavioral_story_created',
@@ -246,6 +255,7 @@ export const AnalyticsEvents = {
  * Track when a user starts working on a problem
  */
 export const trackProblemStarted = (problemId: string, problemTitle: string, difficulty: string, category: string) => {
+    console.log('trackProblemStarted', problemId, problemTitle, difficulty, category);
     trackEvent(AnalyticsEvents.PROBLEM_STARTED, {
         problem_id: problemId,
         problem_title: problemTitle,
@@ -272,6 +282,7 @@ export const trackCodeRun = (problemId: string, language: string, passed: boolea
  * Track AI chat interaction
  */
 export const trackAIChatMessage = (problemId: string, messageLength: number, isUserMessage: boolean) => {
+    console.log('trackAIChatMessage', problemId, messageLength, isUserMessage);
     trackEvent(AnalyticsEvents.AI_CHAT_MESSAGE_SENT, {
         problem_id: problemId,
         message_length: messageLength,
@@ -300,6 +311,124 @@ export const trackError = (errorType: string, errorMessage: string, context?: Re
         error_type: errorType,
         error_message: errorMessage,
         ...context,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+// ===== COACH MODE TRACKING HELPERS =====
+
+/**
+ * Track when coach mode is enabled
+ */
+export const trackCoachModeEnabled = (problemId: string) => {
+    console.log('trackCoachModeEnabled', problemId);
+    trackEvent(AnalyticsEvents.COACH_MODE_ENABLED, {
+        problem_id: problemId,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach step is prompted to the user
+ */
+export const trackCoachStepPrompted = (problemId: string, stepId: string | number) => {
+    console.log('trackCoachStepPrompted', problemId, stepId);
+    trackEvent(AnalyticsEvents.COACH_STEP_PROMPTED, {
+        problem_id: problemId,
+        step_id: String(stepId),
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach step is submitted
+ */
+export const trackCoachStepSubmitted = (
+    problemId: string,
+    stepId: string | number,
+    attemptNumber: number,
+    timeToSubmitMs?: number
+) => {
+    console.log('trackCoachStepSubmitted', problemId, stepId, attemptNumber, timeToSubmitMs);
+    trackEvent(AnalyticsEvents.COACH_STEP_SUBMITTED, {
+        problem_id: problemId,
+        step_id: String(stepId),
+        attempt_number: attemptNumber,
+        time_to_submit_ms: timeToSubmitMs,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach step is answered correctly
+ */
+export const trackCoachStepCorrect = (
+    problemId: string,
+    stepId: string | number,
+    attemptNumber: number,
+    timeToSubmitMs?: number
+) => {
+    console.log('trackCoachStepCorrect', problemId, stepId, attemptNumber, timeToSubmitMs);
+    trackEvent(AnalyticsEvents.COACH_STEP_CORRECT, {
+        problem_id: problemId,
+        step_id: String(stepId),
+        attempt_number: attemptNumber,
+        time_to_submit_ms: timeToSubmitMs,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach step is answered incorrectly
+ */
+export const trackCoachStepIncorrect = (
+    problemId: string,
+    stepId: string | number,
+    attemptNumber: number,
+    timeToSubmitMs?: number
+) => {
+    console.log('trackCoachStepIncorrect', problemId, stepId, attemptNumber, timeToSubmitMs);
+    trackEvent(AnalyticsEvents.COACH_STEP_INCORRECT, {
+        problem_id: problemId,
+        step_id: String(stepId),
+        attempt_number: attemptNumber,
+        time_to_submit_ms: timeToSubmitMs,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach problem is completed
+ */
+export const trackCoachProblemCompleted = (
+    problemId: string,
+    stepsCompleted: number,
+    totalTimeMs?: number
+) => {
+    console.log('trackCoachProblemCompleted', problemId, stepsCompleted, totalTimeMs);
+    trackEvent(AnalyticsEvents.COACH_PROBLEM_COMPLETED, {
+        problem_id: problemId,
+        steps_completed: stepsCompleted,
+        total_time_ms: totalTimeMs,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when a coach problem is abandoned
+ */
+export const trackCoachProblemAbandoned = (
+    problemId: string,
+    stepsCompleted: number,
+    totalTimeMs?: number,
+    currentStepId?: string | number
+) => {
+    console.log('trackCoachProblemAbandoned', problemId, stepsCompleted, totalTimeMs, currentStepId);
+    trackEvent(AnalyticsEvents.COACH_PROBLEM_ABANDONED, {
+        problem_id: problemId,
+        steps_completed: stepsCompleted,
+        total_time_ms: totalTimeMs,
+        current_step_id: currentStepId ? String(currentStepId) : undefined,
         timestamp: new Date().toISOString(),
     });
 };

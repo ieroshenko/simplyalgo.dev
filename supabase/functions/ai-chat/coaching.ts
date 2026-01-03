@@ -908,7 +908,7 @@ CRITICAL NEXT STEP GENERATION:
     console.log("🎯 [validateCoachingSubmission] Parsed validation:", validation);
 
     // Validate required fields
-    if (!validation.feedback || !validation.nextStep) {
+    if (!validation.feedback || !validation.nextAction) {
       console.error("🚨 [validateCoachingSubmission] Missing required fields:", validation);
       throw new Error("Validation missing required fields");
     }
