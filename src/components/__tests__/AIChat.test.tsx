@@ -187,7 +187,7 @@ describe('AIChat', () => {
         it('should render the AI Coach header', () => {
             render(<AIChat {...defaultProps} />);
 
-            expect(screen.getByText('AI Coach')).toBeInTheDocument();
+            expect(screen.getByText('Chat')).toBeInTheDocument();
         });
 
         it('should render the chat status', () => {
@@ -300,7 +300,7 @@ describe('AIChat', () => {
             render(<AIChat {...defaultProps} onInsertCodeSnippet={onInsert} />);
 
             // Component should render without error
-            expect(screen.getByText('AI Coach')).toBeInTheDocument();
+            expect(screen.getByText('Chat')).toBeInTheDocument();
         });
     });
 
@@ -316,13 +316,13 @@ describe('AIChat', () => {
         it('should accept problemId', () => {
             render(<AIChat {...defaultProps} problemId="three-sum" />);
 
-            expect(screen.getByText('AI Coach')).toBeInTheDocument();
+            expect(screen.getByText('Chat')).toBeInTheDocument();
         });
 
         it('should accept currentCode', () => {
             render(<AIChat {...defaultProps} currentCode="def solution(): pass" />);
 
-            expect(screen.getByText('AI Coach')).toBeInTheDocument();
+            expect(screen.getByText('Chat')).toBeInTheDocument();
         });
 
         it('should handle missing optional props', () => {
@@ -333,7 +333,7 @@ describe('AIChat', () => {
                 />
             );
 
-            expect(screen.getByText('AI Coach')).toBeInTheDocument();
+            expect(screen.getByText('Chat')).toBeInTheDocument();
         });
     });
 });

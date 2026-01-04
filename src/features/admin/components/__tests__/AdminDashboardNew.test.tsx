@@ -398,7 +398,7 @@ describe('AdminDashboardNew', () => {
 
             // Look for AI Coach label
             await waitFor(() => {
-                const aiCoachLabels = screen.queryAllByText('AI Coach');
+                const aiCoachLabels = screen.queryAllByText('Chat');
                 // Toggle buttons should exist
             });
         });

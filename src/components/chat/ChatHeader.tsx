@@ -21,7 +21,7 @@ export function ChatHeader({
           <Bot className="w-4 h-4 text-primary-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-foreground truncate">AI Coach</div>
+          <div className="font-medium text-foreground truncate">Chat</div>
           <div className="text-xs text-muted-foreground truncate">
             {loading ? "Loading chat..." : hasSession ? "Chat loaded" : "Online"}
           </div>

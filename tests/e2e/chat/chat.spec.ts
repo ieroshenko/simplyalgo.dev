@@ -24,7 +24,7 @@ test.describe('AI Chat', () => {
   test.describe('AI Chat Panel', () => {
     test('should display AI Coach header', async ({ page }) => {
       // AI Coach should be visible in the panel (use exact match to avoid matching placeholder text)
-      await expect(page.getByText('AI Coach', { exact: true })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('Chat', { exact: true })).toBeVisible({ timeout: 10000 });
     });
 
     test('should display chat input area', async ({ page }) => {

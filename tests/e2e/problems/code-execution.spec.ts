@@ -159,7 +159,7 @@ test.describe('Code Execution', () => {
     test.describe('AI Chat', () => {
         test('should have AI chat panel', async ({ page }) => {
             // Look for AI Coach header
-            await expect(page.getByText('AI Coach', { exact: true })).toBeVisible();
+            await expect(page.getByText('Chat', { exact: true })).toBeVisible();
         });
     });
 

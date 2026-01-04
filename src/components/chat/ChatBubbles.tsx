@@ -147,7 +147,7 @@ const ChatBubbles = ({
             <Bot className="w-4 h-4 text-primary-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-foreground truncate">AI Coach</div>
+            <div className="font-medium text-foreground truncate">Chat</div>
             <div className="text-xs text-muted-foreground truncate">
               {loading ? "Loading chat..." : session ? "Chat loaded" : "Online"}
             </div>
@@ -213,7 +213,7 @@ const ChatBubbles = ({
                   ? " Listening..."
                   : isProcessing
                     ? "🔄 Processing audio..."
-                    : "Ask your AI coach anything..."
+                    : "Ask anything..."
               }
               disabled={loading || isTyping}
               className={`w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${hasNativeSupport ? "pr-10" : "pr-3"
