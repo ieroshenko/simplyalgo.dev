@@ -12,6 +12,7 @@ export const CustomizationIntroStep: React.FC<SurveyStepProps> = (props) => {
           src={letsMakeSimplyalgoFitImage}
           alt="Let's make SimplyAlgo fit you"
           className="w-full max-w-sm rounded-lg"
+          loading="eager"
         />
       </div>
       

@@ -12,6 +12,7 @@ export const PlanGenerationIntroStep: React.FC<SurveyStepProps> = (props) => {
           src={timeToGeneratePlanImage}
           alt="Time to generate your custom plan"
           className="w-full max-w-sm rounded-lg"
+          loading="eager"
         />
       </div>
       

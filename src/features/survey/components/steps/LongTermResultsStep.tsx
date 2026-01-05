@@ -18,6 +18,7 @@ export const LongTermResultsStep: React.FC<SurveyStepProps> = (props) => {
           src={longTermResultsImage}
           alt="Simplyalgo creates long-term results"
           className="w-full max-w-md rounded-lg"
+          loading="eager"
         />
       </div>
     </div>

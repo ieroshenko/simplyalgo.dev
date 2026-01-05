@@ -49,7 +49,8 @@ export const SocialProofStep: React.FC<SurveyStepProps> = (props) => {
         </h1>
       </div>
       
-      <div className="space-y-6 mb-8">
+      {/* Customer reviews hidden temporarily */}
+      {/* <div className="space-y-6 mb-8">
         {reviews.map((review, index) => (
           <div key={index} className="bg-muted/50 rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
@@ -70,7 +71,7 @@ export const SocialProofStep: React.FC<SurveyStepProps> = (props) => {
             </p>
           </div>
         ))}
-      </div>
+      </div> */}
     </div>
   );
 };

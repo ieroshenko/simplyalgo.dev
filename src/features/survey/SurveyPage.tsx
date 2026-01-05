@@ -12,7 +12,7 @@ import { InterviewAssessmentFrequencyStep } from '@/features/survey/components/s
 import { FrustrationsStep } from '@/features/survey/components/steps/FrustrationsStep';
 import { GoalsStep } from '@/features/survey/components/steps/GoalsStep';
 import { BottlenecksStep } from '@/features/survey/components/steps/BottlenecksStep';
-import { SocialProofStep } from '@/features/survey/components/steps/SocialProofStep';
+// import { SocialProofStep } from '@/features/survey/components/steps/SocialProofStep'; // Hidden temporarily
 import { CustomizationIntroStep } from '@/features/survey/components/steps/CustomizationIntroStep';
 import { CompanyTypeStep } from '@/features/survey/components/steps/CompanyTypeStep';
 import { FocusAreasStep } from '@/features/survey/components/steps/FocusAreasStep';
@@ -25,6 +25,13 @@ import { PaywallStep } from '@/features/survey/components/steps/PaywallStep';
 import { useSurveyData } from '@/features/survey/hooks/useSurveyData';
 import { useAuth } from '@/hooks/useAuth';
 import { logger } from '@/utils/logger';
+// Import images for eager loading
+import longTermResultsImage from '@/assets/survey/simply-algo-creates-long-term-results.png';
+import letsMakeSimplyalgoFitImage from '@/assets/survey/lets-make-simplyalgo-fit.png';
+import timeToGeneratePlanImage from '@/assets/survey/time-to-generate-custom-plan.png';
+import jakePhoto from '@/assets/survey/user_reviews/jake.png';
+import priyaPhoto from '@/assets/survey/user_reviews/priya.png';
+import ashwinPhoto from '@/assets/survey/user_reviews/ashwin.png';
 
 const TOTAL_STEPS = 20;
 
@@ -44,6 +51,23 @@ const Survey: React.FC = () => {
     saveToDatabase
   } = useSurveyData();
 
+  // Eager load all survey images
+  useEffect(() => {
+    const images = [
+      longTermResultsImage,
+      letsMakeSimplyalgoFitImage,
+      timeToGeneratePlanImage,
+      jakePhoto,
+      priyaPhoto,
+      ashwinPhoto
+    ];
+
+    images.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
+
   // Validate step access
   useEffect(() => {
     if (currentStep < 1 || currentStep > TOTAL_STEPS) {
@@ -51,14 +75,22 @@ const Survey: React.FC = () => {
       return;
     }
 
+    // Skip step 11 (SocialProofStep) - redirect to step 12
+    if (currentStep === 11) {
+      navigate('/survey/12');
+      return;
+    }
+
     // Check if user can access this step
     if (currentStep > 1) {
       const canAccess = Array.from({ length: currentStep - 1 }, (_, i) => i + 1)
+        .filter(step => step !== 11) // Exclude step 11 from validation
         .every(step => completedSteps.has(step));
 
       if (!canAccess) {
-        // Find the first incomplete step
+        // Find the first incomplete step (excluding step 11)
         const firstIncomplete = Array.from({ length: currentStep - 1 }, (_, i) => i + 1)
+          .filter(step => step !== 11)
           .find(step => !completedSteps.has(step));
 
         if (firstIncomplete) {
@@ -86,10 +118,15 @@ const Survey: React.FC = () => {
       handleAnswer(currentStep, "viewed");
     }
     if (currentStep < TOTAL_STEPS) {
-      navigate(`/survey/${currentStep + 1}`);
+      // Skip step 11 (SocialProofStep)
+      let nextStep = currentStep + 1;
+      if (nextStep === 11) {
+        nextStep = 12;
+      }
+      navigate(`/survey/${nextStep}`);
 
       // If we're going to the analyzing step (step 17), save data asynchronously
-      if (currentStep + 1 === 17) {
+      if (nextStep === 17) {
         // Save data in background during analyzing step
         saveAllSurveyDataAsync();
       }
@@ -111,7 +148,12 @@ const Survey: React.FC = () => {
 
   const handleBack = () => {
     if (currentStep > 1) {
-      navigate(`/survey/${currentStep - 1}`);
+      // Skip step 11 (SocialProofStep) when going back
+      let prevStep = currentStep - 1;
+      if (prevStep === 11) {
+        prevStep = 10;
+      }
+      navigate(`/survey/${prevStep}`);
     }
   };
 
@@ -155,7 +197,7 @@ const Survey: React.FC = () => {
       case 8: return <FrustrationsStep {...stepProps} />;
       case 9: return <GoalsStep {...stepProps} />;
       case 10: return <BottlenecksStep {...stepProps} />;
-      case 11: return <SocialProofStep {...stepProps} />;
+      case 11: return null; // SocialProofStep hidden
       case 12: return <CustomizationIntroStep {...stepProps} />;
       case 13: return <CompanyTypeStep {...stepProps} />;
       case 14: return <FocusAreasStep {...stepProps} />;
