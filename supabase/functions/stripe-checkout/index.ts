@@ -114,7 +114,7 @@ serve(async (req) => {
 
     if (plan === 'monthly') {
       priceId = Deno.env.get('STRIPE_MONTHLY_PRICE_ID') || ''
-      trialPeriodDays = undefined // No trial for monthly
+      trialPeriodDays = hasHadTrial ? undefined : 7 // 7-day trial for monthly
     } else if (plan === 'yearly') {
       priceId = Deno.env.get('STRIPE_YEARLY_PRICE_ID') || ''
       // Only give trial to users who haven't had one before

@@ -200,14 +200,27 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
       <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Monthly Plan */}
         <div
-          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+          className={`p-4 border-2 rounded-lg cursor-pointer transition-all relative ${
             selectedPlan === 'monthly'
               ? 'border-primary bg-primary/5 dark:bg-primary/10'
               : 'border-border bg-card hover:bg-muted/50'
           }`}
           onClick={() => setSelectedPlan('monthly')}
         >
-          <div className="flex justify-between items-start mb-2">
+          {isEligibleForTrial ? (
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+              <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
+                7 DAYS FREE
+              </div>
+            </div>
+          ) : (
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+              <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
+                NO TRIAL
+              </div>
+            </div>
+          )}
+          <div className="flex justify-between items-start mb-2 mt-2">
             <div>
               <h3 className="font-medium text-foreground">Monthly</h3>
               <p className="text-2xl font-bold text-foreground">$20.00</p>

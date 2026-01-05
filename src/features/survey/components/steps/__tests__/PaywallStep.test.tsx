@@ -114,9 +114,10 @@ describe('PaywallStep - Stripe Checkout', () => {
             });
         });
 
-        it('should show 3 DAYS FREE badge for trial-eligible users on yearly plan', () => {
+        it('should show trial badges for trial-eligible users on both plans', () => {
             render(<PaywallStep {...defaultProps} />);
 
+            expect(screen.getByText('7 DAYS FREE')).toBeInTheDocument();
             expect(screen.getByText('3 DAYS FREE')).toBeInTheDocument();
         });
 
