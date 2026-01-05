@@ -7,13 +7,20 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { Monitor, Moon, Sun, LogOut, CheckCircle, ExternalLink } from "lucide-react";
+import { Monitor, Moon, Sun, LogOut, CheckCircle, ExternalLink, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { notifications } from "@/shared/services/notificationService";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
+
+interface StripeSubscriptionDetails {
+  current_period_end: number;
+  cancel_at_period_end: boolean;
+  canceled_at: number | null;
+  trial_end: number | null;
+}
 
 const Settings = () => {
   useTrackFeatureTime(Features.SETTINGS);
@@ -23,6 +30,8 @@ const Settings = () => {
   const { subscription, hasActiveSubscription, isLoading } = useSubscription();
   const navigate = useNavigate();
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
+  const [stripeDetails, setStripeDetails] = useState<StripeSubscriptionDetails | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -63,6 +72,46 @@ const Settings = () => {
       day: 'numeric'
     });
   };
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const fetchStripeSubscriptionDetails = useCallback(async () => {
+    if (!subscription?.stripe_subscription_id) return;
+
+    setIsLoadingDetails(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-get-subscription-details', {
+        body: {
+          subscription_id: subscription.stripe_subscription_id
+        }
+      });
+
+      if (error) {
+        logger.error('[Settings] Error fetching subscription details', { error });
+        return;
+      }
+
+      setStripeDetails(data);
+    } catch (err) {
+      logger.error('[Settings] Error fetching subscription details', { error: err });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  }, [subscription?.stripe_subscription_id]);
+
+  useEffect(() => {
+    if (subscription?.stripe_subscription_id) {
+      fetchStripeSubscriptionDetails();
+    }
+  }, [subscription?.stripe_subscription_id, fetchStripeSubscriptionDetails]);
 
   const themeOptions = [
     { value: "light", label: "Light", icon: Sun },
@@ -112,18 +161,35 @@ const Settings = () => {
                       <span className="text-base font-medium text-stone-900 dark:text-stone-100">
                         {subscription?.plan ? `${subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan` : 'Premium Plan'}
                       </span>
-                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Active
-                      </Badge>
+                      {subscription?.status === 'trialing' ? (
+                        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Trial
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex gap-6 mt-3 text-sm text-stone-500 dark:text-stone-400">
-                      <span>
-                        Started: <span className="text-stone-700 dark:text-stone-300">{subscription?.created_at ? formatDate(subscription.created_at) : 'N/A'}</span>
-                      </span>
-                      <span>
-                        Last updated: <span className="text-stone-700 dark:text-stone-300">{subscription?.updated_at ? formatDate(subscription.updated_at) : 'N/A'}</span>
-                      </span>
+                    <div className="flex flex-col gap-2 mt-3 text-sm text-stone-500 dark:text-stone-400">
+                      <div className="flex gap-6">
+                        <span>
+                          Started: <span className="text-stone-700 dark:text-stone-300">{subscription?.created_at ? formatDate(subscription.created_at) : 'N/A'}</span>
+                        </span>
+                        <span>
+                          Last updated: <span className="text-stone-700 dark:text-stone-300">{subscription?.updated_at ? formatDate(subscription.updated_at) : 'N/A'}</span>
+                        </span>
+                      </div>
+                      {subscription?.status === 'trialing' && stripeDetails?.trial_end && new Date(stripeDetails.trial_end * 1000) > new Date() && (
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                          <Calendar className="w-4 h-4" />
+                          <span>
+                            Trial ends on <span className="font-medium">{formatTimestamp(stripeDetails.trial_end)}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
