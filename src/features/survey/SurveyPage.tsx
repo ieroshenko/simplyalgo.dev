@@ -100,7 +100,7 @@ const Survey: React.FC = () => {
     }
   }, [currentStep, completedSteps, navigate]);
 
-  const handleAnswer = async (step: number, answer: string) => {
+  const handleAnswer = (step: number, answer: string) => {
     // Define which steps are question steps (require answer selection)
     const questionSteps = [1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14, 15];
     const isQuestionStep = questionSteps.includes(step);
@@ -109,7 +109,9 @@ const Survey: React.FC = () => {
     // For non-question steps, always mark as completed when they call onAnswer
     const shouldMarkCompleted = !isQuestionStep || (answer && answer.trim() !== '');
 
-    await updateSurveyData(step, answer, shouldMarkCompleted);
+    // Save asynchronously - don't await, let it happen in the background
+    // The optimistic update already makes the UI responsive
+    updateSurveyData(step, answer, shouldMarkCompleted);
   };
 
   const handleNext = () => {
@@ -254,7 +256,7 @@ const Survey: React.FC = () => {
             onContinue={handleNext}
             canContinue={canContinue}
             isLastStep={currentStep === TOTAL_STEPS}
-            isSaving={isSaving}
+            isSaving={false}
           />
         </div>
       )}
