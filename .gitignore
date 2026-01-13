@@ -38,3 +38,9 @@ supabase/migrations/
 
 # Documentation (internal notes)
 documents/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.auth/
+tests/playwright/.auth/

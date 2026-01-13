@@ -29,11 +29,13 @@ import {
   Star,
   Clock,
   Brain,
+  Play,
 } from "lucide-react";
 import { useFlashcards } from "@/hooks/useFlashcards";
 import type { FlashcardDeck } from "@/types/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { FlashcardReviewInterface } from "./FlashcardReviewInterface";
 
 interface FlashcardDeckManagerProps {
   userId: string;
@@ -43,6 +45,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
   const navigate = useNavigate();
   const {
     flashcards,
+    dueCards,
     removeFromFlashcards,
     isRemovingFromFlashcards,
     isLoading,
@@ -52,6 +55,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
   const [masteryFilter, setMasteryFilter] = useState<string>("all");
   const [selectedCard, setSelectedCard] = useState<FlashcardDeck | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   // Filter flashcards based on search and mastery level
   const filteredCards = flashcards.filter((card) => {
@@ -147,6 +151,18 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
               </p>
             </div>
           </div>
+          {/* Start Review Button */}
+          <Button
+            onClick={() => setShowReviewModal(true)}
+            disabled={dueCards.length === 0}
+            className="gap-2"
+          >
+            <Play className="w-4 h-4" />
+            {dueCards.length > 0
+              ? `Review ${dueCards.length} Card${dueCards.length > 1 ? 's' : ''}`
+              : 'No Cards Due'
+            }
+          </Button>
         </div>
 
         {/* Stats Summary */}
@@ -357,6 +373,13 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Flashcard Review Modal */}
+        <FlashcardReviewInterface
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          userId={userId}
+        />
       </div>
     </div>
   );

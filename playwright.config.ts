@@ -11,8 +11,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Use multiple workers for faster CI - GitHub runners have 2 cores */
+  workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -20,9 +20,9 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:8080',
 
-    /* Slow down actions for debugging (set to 0 for normal speed) */
+    /* Slow down actions for debugging locally (disabled in CI for speed) */
     launchOptions: {
-      slowMo: 500, // 500ms delay between actions - remove or set to 0 for fast tests
+      slowMo: process.env.CI ? 0 : 500, // 500ms delay locally for debugging, 0 in CI for speed
     },
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
