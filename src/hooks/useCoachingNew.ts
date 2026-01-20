@@ -708,35 +708,32 @@ export const useCoachingNew = ({
 
   // Insert correct code from AI validation
   const insertCorrectCode = useCallback(async () => {
+    console.log('[insertCorrectCode] Called');
+    console.log('[insertCorrectCode] lastValidation:', !!coachingState.lastValidation);
+    console.log('[insertCorrectCode] codeToAdd:', coachingState.lastValidation?.codeToAdd?.substring(0, 50));
     if (!coachingState.lastValidation?.codeToAdd) return;
 
     const codeToInsert = stripCodeFences(coachingState.lastValidation.codeToAdd);
+    console.log('[insertCorrectCode] codeToInsert:', codeToInsert?.substring(0, 50));
 
     try {
       const editor = editorRef.current;
       const before = editor?.getValue() || "";
 
+      console.log('[insertCorrectCode] before code length:', before?.length);
+      console.log('[insertCorrectCode] codeContainsSnippet:', codeContainsSnippet(before, codeToInsert));
       if (!codeContainsSnippet(before, codeToInsert)) {
-        if (isLargeInsertion(codeToInsert)) {
-          const lines = codeToInsert.split('\n').filter(l => l.trim().length > 0);
-          const ok = confirmLargeInsert
-            ? await confirmLargeInsert({ code: codeToInsert, lineCount: lines.length })
-            : window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
-          if (!ok) {
-            setCoachingState(prev => ({
-              ...prev,
-              feedback: { show: true, type: 'hint', message: 'Insertion canceled. You can paste manually or apply a smaller change.', showConfetti: false },
-            }));
-            return;
-          }
-        } else {
-          logger.debug("Using smart replacement for code correction", { component: "Coaching" });
-        }
+        // Skip large insertion check for coaching - the code is AI-validated and typically small helper functions
+        // The isLargeInsertion check was triggering for any function definition which is too aggressive
+        logger.debug("Proceeding with coaching code insertion", { component: "Coaching", codeLength: codeToInsert.length });
 
         logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
+        console.log('[insertCorrectCode] onCodeInsert exists:', !!onCodeInsert);
 
         if (onCodeInsert) {
+          console.log('[insertCorrectCode] Calling onCodeInsert...');
           await onCodeInsert(codeToInsert);
+          console.log('[insertCorrectCode] onCodeInsert completed');
         }
 
         logger.debug("Shared insertion completed successfully", { component: "Coaching" });

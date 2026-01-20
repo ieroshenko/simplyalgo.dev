@@ -55,6 +55,97 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
         .map((s) => s.user_id)
     );
 
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const { data: usageRows } = await supabase
+      .from("user_ai_usage")
+      .select("user_id, tokens_total, estimated_cost, created_at")
+      .gte("created_at", monthStart.toISOString());
+
+    const usageByUserId = new Map<
+      string,
+      { tokensToday: number; tokensMonth: number; costToday: number; costMonth: number }
+    >();
+
+    for (const row of usageRows || []) {
+      const userId = row.user_id;
+      const createdAt = row.created_at ? new Date(row.created_at) : null;
+      const tokens = row.tokens_total ?? 0;
+      const cost = row.estimated_cost ?? 0;
+
+      const existing = usageByUserId.get(userId) || {
+        tokensToday: 0,
+        tokensMonth: 0,
+        costToday: 0,
+        costMonth: 0,
+      };
+
+      existing.tokensMonth += tokens;
+      existing.costMonth += cost;
+
+      if (createdAt && createdAt >= todayStart) {
+        existing.tokensToday += tokens;
+        existing.costToday += cost;
+      }
+
+      usageByUserId.set(userId, existing);
+    }
+
+    // Pre-fetch last activity dates from all activity sources (more efficient than per-user queries)
+    const [
+      { data: chatActivity },
+      { data: coachingActivity },
+      { data: problemActivity },
+      { data: behavioralActivity },
+      { data: technicalActivity },
+      { data: systemDesignActivity },
+      { data: flashcardActivity },
+    ] = await Promise.all([
+      supabase.from("ai_chat_sessions").select("user_id, updated_at"),
+      supabase.from("coaching_sessions").select("user_id, updated_at"),
+      supabase.from("user_problem_attempts").select("user_id, updated_at"),
+      supabase.from("behavioral_interview_sessions").select("user_id, started_at"),
+      supabase.from("technical_interview_sessions").select("user_id, started_at"),
+      supabase.from("system_design_sessions").select("user_id, updated_at"),
+      supabase.from("flashcard_reviews").select("deck_id, reviewed_at"),
+    ]);
+
+    // Get flashcard deck owners for mapping reviews to users
+    const deckIds = [...new Set((flashcardActivity || []).map((r) => r.deck_id))];
+    const { data: deckOwners } = deckIds.length > 0
+      ? await supabase.from("flashcard_decks").select("id, user_id").in("id", deckIds)
+      : { data: [] };
+
+    const deckToUserMap = new Map((deckOwners || []).map((d) => [d.id, d.user_id]));
+
+    // Build a map of user_id -> most recent activity date
+    const lastActivityByUser = new Map<string, Date>();
+
+    const updateLastActivity = (userId: string | null, dateStr: string | null) => {
+      if (!userId || !dateStr) return;
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return;
+      const existing = lastActivityByUser.get(userId);
+      if (!existing || date > existing) {
+        lastActivityByUser.set(userId, date);
+      }
+    };
+
+    // Process all activity sources
+    (chatActivity || []).forEach((row) => updateLastActivity(row.user_id, row.updated_at));
+    (coachingActivity || []).forEach((row) => updateLastActivity(row.user_id, row.updated_at));
+    (problemActivity || []).forEach((row) => updateLastActivity(row.user_id, row.updated_at));
+    (behavioralActivity || []).forEach((row) => updateLastActivity(row.user_id, row.started_at));
+    (technicalActivity || []).forEach((row) => updateLastActivity(row.user_id, row.started_at));
+    (systemDesignActivity || []).forEach((row) => updateLastActivity(row.user_id, row.updated_at));
+    (flashcardActivity || []).forEach((row) => {
+      const userId = deckToUserMap.get(row.deck_id);
+      updateLastActivity(userId || null, row.reviewed_at);
+    });
+
     // For each user, fetch their stats
     const userStatsPromises = (profilesData || []).map(async (profile) => {
       const userId = profile.user_id;
@@ -106,14 +197,19 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
         .single();
 
       // Get AI usage (today and this month)
+      const aggregatedUsage = usageByUserId.get(userId);
       const aiUsage = {
-        tokens_today: 0,
-        tokens_month: 0,
-        cost_today: 0,
-        cost_month: 0,
+        tokens_today: aggregatedUsage?.tokensToday ?? 0,
+        tokens_month: aggregatedUsage?.tokensMonth ?? 0,
+        cost_today: aggregatedUsage?.costToday ?? 0,
+        cost_month: aggregatedUsage?.costMonth ?? 0,
       };
 
       const solvedCount = statsData?.total_solved || passedCount || 0;
+
+      // Get last active from pre-computed map (tracks all activities, not just problem solving)
+      const lastActiveDate = lastActivityByUser.get(userId);
+      const lastActive = lastActiveDate ? lastActiveDate.toISOString() : null;
 
       return {
         id: userId,
@@ -123,7 +219,7 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
         problems_solved: solvedCount,
         chat_messages: chatCount || 0,
         coaching_sessions: coachingCount || 0,
-        last_active: statsData?.last_activity_date || null,
+        last_active: lastActive,
         recent_problems: (recentProblems || []).map((p) => p.problem_id),
         ai_restriction: aiRestriction
           ? {
@@ -244,8 +340,10 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
     const monthlyPrice = 9.99;
     const yearlyPrice = 99.99;
 
-    (subscriptions || []).forEach((sub: SubscriptionWithProfile) => {
-      const userEmail = sub.user_profiles?.email;
+    (subscriptions || []).forEach((sub) => {
+      const userEmail = (
+        sub as unknown as { user_profiles?: { email?: string | null } }
+      ).user_profiles?.email;
 
       // Skip admin users
       if (adminEmails.includes(userEmail)) {

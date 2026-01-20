@@ -1,10 +1,103 @@
 // @ts-expect-error - Deno URL import
 import OpenAI from "https://esm.sh/openai@4";
+// @ts-expect-error - Deno URL import
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ResponsesApiRequest, ResponsesApiResponse, SessionContext, ContextualResponse } from "./types.ts";
 import { logger } from "./utils/logger.ts";
 
 // Ambient declaration for Deno types
 declare const Deno: { env: { get(name: string): string | undefined } };
+
+// Usage tracking types
+export type UsageContext = {
+  userId: string;
+  feature: string;
+};
+
+type UsageInfo = {
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  tokensTotal: number | null;
+};
+
+// Supabase admin client for usage logging
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+
+function estimateTokensFromText(text: string): number {
+  return Math.max(1, Math.ceil((text || "").length / 4));
+}
+
+function extractUsageInfoFromResponse(response: unknown): UsageInfo {
+  const r = response as {
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
+  const usage = r?.usage;
+  if (!usage) {
+    return { tokensInput: null, tokensOutput: null, tokensTotal: null };
+  }
+  return {
+    tokensInput: typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : null,
+    tokensOutput: typeof usage.completion_tokens === "number" ? usage.completion_tokens : null,
+    tokensTotal: typeof usage.total_tokens === "number" ? usage.total_tokens : null,
+  };
+}
+
+function normalizeUsageInfo(usage: UsageInfo, prompt: string, output: string): UsageInfo {
+  const hasAnyUsage = usage.tokensInput !== null || usage.tokensOutput !== null || usage.tokensTotal !== null;
+  if (hasAnyUsage) {
+    return {
+      tokensInput: usage.tokensInput,
+      tokensOutput: usage.tokensOutput,
+      tokensTotal: usage.tokensTotal ?? (((usage.tokensInput ?? 0) + (usage.tokensOutput ?? 0)) || null),
+    };
+  }
+  // Estimate tokens from text if provider didn't return usage
+  const tokensInput = estimateTokensFromText(prompt);
+  const tokensOutput = estimateTokensFromText(output);
+  return { tokensInput, tokensOutput, tokensTotal: tokensInput + tokensOutput };
+}
+
+async function logUsageToDb(context: UsageContext, model: string, usage: UsageInfo): Promise<void> {
+  if (!supabaseAdmin) {
+    console.warn("[usage] Logging disabled: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    return;
+  }
+  if (!context?.userId) {
+    console.warn("[usage] Logging skipped: missing userId");
+    return;
+  }
+  if (usage.tokensInput === null && usage.tokensOutput === null && usage.tokensTotal === null) {
+    console.warn("[usage] Logging skipped: no usage data");
+    return;
+  }
+  try {
+    const { error } = await supabaseAdmin.from("user_ai_usage").insert({
+      user_id: context.userId,
+      feature: context.feature,
+      model,
+      tokens_input: usage.tokensInput,
+      tokens_output: usage.tokensOutput,
+      tokens_total: usage.tokensTotal,
+      estimated_cost: null,
+      session_id: null,
+    });
+    if (error) {
+      console.warn("[usage] Failed to insert:", error.message);
+    } else {
+      console.log("[usage] Logged:", { userId: context.userId, feature: context.feature, tokens: usage.tokensTotal });
+    }
+  } catch (e) {
+    console.warn("[usage] Insert error:", (e as Error)?.message);
+  }
+}
 
 // LLM Provider Configuration
 const useOpenRouter = !!Deno.env.get("OPENROUTER_API_KEY");
@@ -154,6 +247,7 @@ export async function llmText(
     maxTokens?: number;
     responseFormat?: "json_object" | undefined;
   },
+  usageContext?: UsageContext,
 ): Promise<string> {
   const openai = getOpenAI();
   const model = configuredModel;
@@ -199,7 +293,7 @@ export async function llmText(
     `[ai-chat] Using Chat Completions API with model=${chatModel} (fallback=${useResponsesApi ? "yes" : "no"})`,
   );
 
-  const chatRequestParams: unknown = {
+  const chatRequestParams: Record<string, unknown> = {
     model: chatModel,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: opts.maxTokens ?? 500,
@@ -208,13 +302,26 @@ export async function llmText(
       : undefined,
   };
 
+  // Request usage data from OpenRouter when we need to log it
+  if (useOpenRouter && usageContext) {
+    chatRequestParams.usage = { include: true };
+  }
+
   // Only add temperature for non-GPT-5 models
   if (!chatModel.startsWith("gpt-5")) {
     chatRequestParams.temperature = opts.temperature ?? 0.7;
   }
 
-  const chat = await openai.chat.completions.create(chatRequestParams as unknown as { choices: Array<{ message?: { content?: string } }> });
-  return chat.choices[0]?.message?.content || "";
+  const chat = await (openai.chat.completions as unknown as { create: (body: unknown) => Promise<unknown> }).create(chatRequestParams);
+  const content = (chat as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || "";
+
+  // Log usage if context provided
+  if (usageContext) {
+    const rawUsage = extractUsageInfoFromResponse(chat);
+    await logUsageToDb(usageContext, chatModel, normalizeUsageInfo(rawUsage, prompt, content));
+  }
+
+  return content;
 }
 
 /**
@@ -223,12 +330,13 @@ export async function llmText(
 export async function llmJson(
   prompt: string,
   opts: { temperature?: number; maxTokens?: number },
+  usageContext?: UsageContext,
 ): Promise<string> {
   return await llmText(prompt, {
     temperature: opts.temperature,
     maxTokens: opts.maxTokens,
     responseFormat: "json_object",
-  });
+  }, usageContext);
 }
 
 /**

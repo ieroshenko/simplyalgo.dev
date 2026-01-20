@@ -1,4 +1,4 @@
-import { llmText, llmJson, llmJsonFast, llmWithSessionContext, getOrCreateSessionContext, updateSessionContext } from "./openai-utils.ts";
+import { llmText, llmJson, llmJsonFast, llmWithSessionContext, getOrCreateSessionContext, updateSessionContext, UsageContext } from "./openai-utils.ts";
 import { CodeSnippet, ChatMessage, ContextualResponse } from "./types.ts";
 import { generateModeSpecificPrompt, validateCoachingMode, type CoachingMode } from "./prompts.ts";
 
@@ -107,6 +107,7 @@ export async function generateConversationResponse(
   currentCode?: string,
   sessionId?: string, // context management key
   options?: { previousResponseId?: string | null; forceNewContext?: boolean; coachingMode?: "socratic" | "comprehensive" },
+  usageContext?: UsageContext,
 ): Promise<string> {
   // Check if we can use context-aware approach or need to fallback
   if (!sessionId) {
@@ -132,7 +133,7 @@ Analyze their current code and respond naturally based on their question.`;
       const response = await llmText(fullPrompt, {
         temperature: 0.3,
         maxTokens: 220,
-      });
+      }, usageContext);
       return response || "I'm sorry, I couldn't generate a response. Please try again.";
     } catch (error) {
       console.error("[chat] Legacy generation failed:", error);
@@ -476,6 +477,11 @@ export async function insertSnippetSmart(
     usedFallback: boolean;
   }
 }> {
+  console.log("[insertSnippetSmart] Starting", {
+    codeLength: code?.length || 0,
+    snippetLength: snippet?.code?.length || 0,
+    hasExistingCode: (code?.trim()?.length || 0) > 0,
+  });
 
   const mergePrompt = `You are a smart code merging assistant. Your job is to intelligently merge the current code with the new snippet while PRESERVING as much of the existing code as possible.
 
@@ -519,7 +525,9 @@ Return JSON:
 }`;
 
   try {
+    console.log("[insertSnippetSmart] Calling llmJson with prompt length:", mergePrompt.length);
     const raw = await llmJson(mergePrompt, { maxTokens: 1500 });
+    console.log("[insertSnippetSmart] llmJson returned, raw length:", raw?.length || 0);
     const result = JSON.parse(raw || '{}');
 
     if (!result.newCode) {

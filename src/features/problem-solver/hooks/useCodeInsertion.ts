@@ -128,8 +128,12 @@ export const useCodeInsertion = ({
                 currentCodeLength: currentCode.length,
                 cursorPosition,
             });
+            console.log('[CodeInsertion] About to call ai-chat insert_snippet...');
+            console.log('[CodeInsertion] Current code length:', currentCode.length);
+            console.log('[CodeInsertion] Snippet code:', snippet.code?.substring(0, 100));
 
             try {
+                console.log('[CodeInsertion] Invoking supabase.functions.invoke...');
                 const { data, error } = await supabase.functions.invoke("ai-chat", {
                     body: {
                         action: "insert_snippet",
