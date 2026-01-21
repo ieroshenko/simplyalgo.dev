@@ -97,7 +97,7 @@ const CoreBattleCards = () => {
   });
 
   return (
-    <div className="space-y-8 px-6">
+    <div data-tour="core-battle-cards" className="space-y-8 px-6">
       <section className="space-y-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">Assessment Prep</h2>
 

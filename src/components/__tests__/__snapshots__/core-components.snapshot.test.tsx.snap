@@ -3,16 +3,16 @@
 exports[`Core Components Snapshot Tests > BehavioralHeader > should match snapshot 1`] = `
 <div>
   <div
-    class="flex justify-between items-start p-6 border-b border-border"
+    class="flex justify-between items-start py-[1.75rem] px-6"
   >
     <div>
       <h1
-        class="text-2xl font-bold text-foreground"
+        class="text-2xl font-bold text-foreground leading-tight"
       >
         Behavioral Interview Prep
       </h1>
       <p
-        class="text-muted-foreground mt-1"
+        class="text-muted-foreground mt-1 leading-tight"
       >
         Master technical behavioral interviews and ace your next interview
       </p>
@@ -206,6 +206,7 @@ exports[`Core Components Snapshot Tests > MissionStrip > should match snapshot 1
 <div>
   <div
     class="border-b border-border/20 px-6 py-4"
+    data-tour="mission-strip"
   >
     <div
       class="flex items-center gap-8 flex-wrap text-sm"

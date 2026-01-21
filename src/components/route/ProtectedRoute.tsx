@@ -1,7 +1,8 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { logger } from "@/utils/logger";
+import { DEMO_PROBLEM_ID } from "@/features/onboarding/demoTourSteps";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { hasActiveSubscription, isLoading: subscriptionLoading, subscription } = useSubscription();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   // Define public pages that don't require subscription
   const publicPages = [
@@ -42,6 +44,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const isSurveyPage = location.pathname.startsWith('/survey/');
   const isPublicPage = publicPages.includes(location.pathname) || isSurveyPage;
 
+  // Check if user is accessing demo mode (allowed without subscription)
+  const isDemoMode = searchParams.get('demo') === 'true';
+  const isDemoProblemPage = location.pathname === `/problems/${DEMO_PROBLEM_ID}`;
+  const isAllowedDemoAccess = isDemoMode && isDemoProblemPage;
+
+  // Check if admin is testing survey flow
+  const isAdminSurveyTest = searchParams.get('admin') === 'true';
+
   // Show loading while auth is loading
   if (authLoading) {
     return (
@@ -69,25 +79,29 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   // Now we know user is authenticated and subscription state is loaded
   // If user has subscription and is on survey page, redirect to dashboard
-  if (hasActiveSubscription && isSurveyPage) {
+  // Exception: Allow admin to test survey flow with ?admin=true
+  if (hasActiveSubscription && isSurveyPage && !isAdminSurveyTest) {
     logger.debug("[ProtectedRoute] User has subscription and is on survey page, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
   // If user doesn't have subscription and is on protected page, redirect to survey
-  if (!hasActiveSubscription && !isPublicPage) {
+  // Exception: Allow demo access to the demo problem
+  if (!hasActiveSubscription && !isPublicPage && !isAllowedDemoAccess) {
     logger.debug("[ProtectedRoute] User doesn't have subscription and is on protected page, redirecting to survey");
     return <Navigate to="/survey/1" replace />;
   }
 
   // If user has subscription and is on survey page, don't render (will redirect)
-  if (hasActiveSubscription && isSurveyPage) {
+  // Exception: Allow admin to test survey flow with ?admin=true
+  if (hasActiveSubscription && isSurveyPage && !isAdminSurveyTest) {
     logger.debug("[ProtectedRoute] User has subscription and is on survey page, don't render");
     return null;
   }
 
   // If user doesn't have subscription and is on protected page, don't render (will redirect)
-  if (!hasActiveSubscription && !isPublicPage) {
+  // Exception: Allow demo access to the demo problem
+  if (!hasActiveSubscription && !isPublicPage && !isAllowedDemoAccess) {
     logger.debug("[ProtectedRoute] User doesn't have subscription and is on protected page, don't render");
     return null;
   }

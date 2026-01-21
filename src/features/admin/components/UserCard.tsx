@@ -12,6 +12,7 @@ import {
   Clock,
   Settings,
   Zap,
+  RotateCcw,
 } from "lucide-react";
 import type { UserStats, DialogUserInfo } from "../types/admin.types";
 import {
@@ -36,6 +37,7 @@ interface UserCardProps {
   onRemoveCooldown: (userId: string, email: string) => void;
   onOpenCooldownDialog: (user: DialogUserInfo) => void;
   onOpenLimitsDialog: (user: DialogUserInfo, dailyLimit: number, monthlyLimit: number) => void;
+  onResetSurvey?: (userId: string, email: string) => void;
 }
 
 export function UserCard({
@@ -47,6 +49,7 @@ export function UserCard({
   onRemoveCooldown,
   onOpenCooldownDialog,
   onOpenLimitsDialog,
+  onResetSurvey,
 }: UserCardProps) {
   return (
     <Card className="p-4">
@@ -302,6 +305,16 @@ export function UserCard({
             >
               <Gift className="h-4 w-4 mr-1" />
               Grant Premium
+            </Button>
+          )}
+          {onResetSurvey && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onResetSurvey(user.id, user.email)}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Reset Survey
             </Button>
           )}
           <Button

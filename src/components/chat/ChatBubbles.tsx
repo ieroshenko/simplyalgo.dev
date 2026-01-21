@@ -3,8 +3,14 @@
  * Refactored to use extracted components
  */
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { logger } from "@/utils/logger";
-import { Send, Bot, Trash2, Loader2, Mic, MicOff } from "lucide-react";
+import { Send, Bot, Trash2, Loader2, Mic, MicOff, HelpCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useChatSession } from "@/hooks/useChatSession";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
@@ -139,7 +145,7 @@ const ChatBubbles = ({
   }, [messages, isTyping]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col border-l border-border">
+    <div className="h-full min-h-0 flex flex-col border-l border-border" data-tour="ai-chat-panel">
       {/* Chat Header */}
       <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between min-w-0">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
@@ -147,7 +153,19 @@ const ChatBubbles = ({
             <Bot className="w-4 h-4 text-primary-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-foreground truncate">Chat</div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-foreground truncate">Chat</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Ask questions, get hints, and discuss your approach</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <div className="text-xs text-muted-foreground truncate">
               {loading ? "Loading chat..." : session ? "Chat loaded" : "Online"}
             </div>

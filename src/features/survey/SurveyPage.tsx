@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Play } from 'lucide-react';
+import { DEMO_PROBLEM_ID } from '@/features/onboarding/demoTourSteps';
 import { SurveyHeader } from '@/features/survey/components/SurveyHeader';
 import { SurveyFooter } from '@/features/survey/components/SurveyFooter';
 import { CurrentRoleStep } from '@/features/survey/components/steps/CurrentRoleStep';
@@ -23,7 +26,6 @@ import { CongratulationsStep } from '@/features/survey/components/steps/Congratu
 import { CustomizedResultsStep } from '@/features/survey/components/steps/CustomizedResultsStep';
 import { PaywallStep } from '@/features/survey/components/steps/PaywallStep';
 import { useSurveyData } from '@/features/survey/hooks/useSurveyData';
-import { useAuth } from '@/hooks/useAuth';
 import { logger } from '@/utils/logger';
 // Import images for eager loading
 import longTermResultsImage from '@/assets/survey/simply-algo-creates-long-term-results.png';
@@ -38,16 +40,23 @@ const TOTAL_STEPS = 20;
 const Survey: React.FC = () => {
   const { stepNumber } = useParams<{ stepNumber: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const currentStep = parseInt(stepNumber || '1', 10);
+
+  // Admin mode detection
+  const isAdminMode = searchParams.get('admin') === 'true';
+
+  // Navigate to demo for admin testing
+  const handleGoToDemo = () => {
+    navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
+  };
 
   // Get survey data, passing user as parameter
   const {
     surveyData,
     completedSteps,
     isLoading,
-    isSaving,
     updateSurveyData,
-    saveToLocalStorage,
     saveToDatabase
   } = useSurveyData();
 
@@ -71,13 +80,18 @@ const Survey: React.FC = () => {
   // Validate step access
   useEffect(() => {
     if (currentStep < 1 || currentStep > TOTAL_STEPS) {
-      navigate('/survey/1');
+      navigate(`/survey/1${isAdminMode ? '?admin=true' : ''}`);
       return;
     }
 
     // Skip step 11 (SocialProofStep) - redirect to step 12
     if (currentStep === 11) {
-      navigate('/survey/12');
+      navigate(`/survey/12${isAdminMode ? '?admin=true' : ''}`);
+      return;
+    }
+
+    // Admin mode bypasses step validation
+    if (isAdminMode) {
       return;
     }
 
@@ -98,7 +112,7 @@ const Survey: React.FC = () => {
         }
       }
     }
-  }, [currentStep, completedSteps, navigate]);
+  }, [currentStep, completedSteps, navigate, isAdminMode]);
 
   const handleAnswer = (step: number, answer: string) => {
     // Define which steps are question steps (require answer selection)
@@ -125,7 +139,14 @@ const Survey: React.FC = () => {
       if (nextStep === 11) {
         nextStep = 12;
       }
-      navigate(`/survey/${nextStep}`);
+
+      // After step 19 (CustomizedResultsStep), redirect to demo problem
+      if (currentStep === 19) {
+        navigate('/problems/climbing-stairs?demo=true');
+        return;
+      }
+
+      navigate(`/survey/${nextStep}${isAdminMode ? '?admin=true' : ''}`);
 
       // If we're going to the analyzing step (step 17), save data asynchronously
       if (nextStep === 17) {
@@ -155,7 +176,7 @@ const Survey: React.FC = () => {
       if (prevStep === 11) {
         prevStep = 10;
       }
-      navigate(`/survey/${prevStep}`);
+      navigate(`/survey/${prevStep}${isAdminMode ? '?admin=true' : ''}`);
     }
   };
 
@@ -246,6 +267,15 @@ const Survey: React.FC = () => {
         />
       )}
 
+      {/* Admin Mode Indicator */}
+      {isAdminMode && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center">
+          <span className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+            Admin Mode - Step validation bypassed
+          </span>
+        </div>
+      )}
+
       <main className={`flex-1 flex flex-col ${showFooter ? 'pb-24' : ''}`}>
         {renderStep()}
       </main>
@@ -259,6 +289,17 @@ const Survey: React.FC = () => {
             isSaving={false}
           />
         </div>
+      )}
+
+      {/* Admin-only Go to Demo button */}
+      {isAdminMode && (
+        <Button
+          onClick={handleGoToDemo}
+          className="fixed top-4 right-4 z-20 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
+        >
+          <Play className="h-4 w-4 mr-2" />
+          Go to Demo
+        </Button>
       )}
     </div>
   );

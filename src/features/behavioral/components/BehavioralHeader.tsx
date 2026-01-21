@@ -15,12 +15,12 @@ const BehavioralHeader = () => {
   const avatarUrl = getUserAvatarUrl(user, profile, 80);
 
   return (
-    <div className="flex justify-between items-start p-6 border-b border-border">
+    <div className="flex justify-between items-start py-[1.75rem] px-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-2xl font-bold text-foreground leading-tight">
           Behavioral Interview Prep
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 leading-tight">
           Master technical behavioral interviews and ace your next interview
         </p>
       </div>

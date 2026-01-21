@@ -30,6 +30,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { ProtectedRoute } from "./components/route/ProtectedRoute";
 import { AdminRoute } from "./components/route/AdminRoute";
 import { AnalyticsProvider } from "./components/analytics/AnalyticsProvider";
+import { OnboardingProvider } from "./features/onboarding/OnboardingContext";
 import { Analytics } from '@vercel/analytics/react';
 
 // Configure React Query with sensible cache defaults
@@ -57,6 +58,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AnalyticsProvider>
+            <OnboardingProvider>
             <Routes>
               <Route path="/" element={<Auth />} />
               <Route path="/terms" element={<TermsOfService />} />
@@ -257,6 +259,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </OnboardingProvider>
           </AnalyticsProvider>
         </BrowserRouter>
         <Analytics />

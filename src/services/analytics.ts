@@ -247,6 +247,23 @@ export const AnalyticsEvents = {
     SETTINGS_CHANGED: 'settings_changed',
     FEEDBACK_SUBMITTED: 'feedback_submitted',
     ERROR_ENCOUNTERED: 'error_encountered',
+
+    // ===== Demo Mode & Onboarding events =====
+    DEMO_STARTED: 'demo_started',
+    DEMO_TOUR_STARTED: 'demo_tour_started',
+    DEMO_TOUR_STEP_VIEWED: 'demo_tour_step_viewed',
+    DEMO_TOUR_COMPLETED: 'demo_tour_completed',
+    DEMO_TOUR_SKIPPED: 'demo_tour_skipped',
+    DEMO_PROBLEM_ATTEMPTED: 'demo_problem_attempted',
+    DEMO_PROBLEM_SOLVED: 'demo_problem_solved',
+    DEMO_COMPLETED: 'demo_completed',
+
+    // ===== Onboarding Tour events (post-signup) =====
+    ONBOARDING_TOUR_STARTED: 'onboarding_tour_started',
+    ONBOARDING_TOUR_STEP_VIEWED: 'onboarding_tour_step_viewed',
+    ONBOARDING_TOUR_COMPLETED: 'onboarding_tour_completed',
+    ONBOARDING_TOUR_SKIPPED: 'onboarding_tour_skipped',
+    ONBOARDING_TOURS_RESET: 'onboarding_tours_reset',
 } as const;
 
 // ===== Helper functions for tracking with rich context =====
@@ -585,3 +602,72 @@ export const createFeatureTracker = (feature: FeatureName, metadata?: Record<str
     onMount: () => startFeatureTimer(feature, metadata),
     onUnmount: () => stopFeatureTimer(feature),
 });
+
+// ===== ONBOARDING TOUR TRACKING HELPERS =====
+
+type OnboardingTourPage = 'dashboard' | 'problems' | 'behavioral' | 'profile';
+
+/**
+ * Track when an onboarding tour is started
+ */
+export const trackOnboardingTourStarted = (page: OnboardingTourPage) => {
+    trackEvent(AnalyticsEvents.ONBOARDING_TOUR_STARTED, {
+        page,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when an onboarding tour step is viewed
+ */
+export const trackOnboardingTourStepViewed = (
+    page: OnboardingTourPage,
+    step: number,
+    totalSteps: number
+) => {
+    trackEvent(AnalyticsEvents.ONBOARDING_TOUR_STEP_VIEWED, {
+        page,
+        step,
+        total_steps: totalSteps,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when an onboarding tour is completed
+ */
+export const trackOnboardingTourCompleted = (
+    page: OnboardingTourPage,
+    stepsViewed: number
+) => {
+    trackEvent(AnalyticsEvents.ONBOARDING_TOUR_COMPLETED, {
+        page,
+        steps_viewed: stepsViewed,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when an onboarding tour is skipped
+ */
+export const trackOnboardingTourSkipped = (
+    page: OnboardingTourPage,
+    stepsViewed: number,
+    totalSteps: number
+) => {
+    trackEvent(AnalyticsEvents.ONBOARDING_TOUR_SKIPPED, {
+        page,
+        steps_viewed: stepsViewed,
+        total_steps: totalSteps,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+/**
+ * Track when all onboarding tours are reset (admin action)
+ */
+export const trackOnboardingToursReset = () => {
+    trackEvent(AnalyticsEvents.ONBOARDING_TOURS_RESET, {
+        timestamp: new Date().toISOString(),
+    });
+};

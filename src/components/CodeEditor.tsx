@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Play,
   Upload,
   Save,
@@ -211,66 +217,75 @@ const CodeEditor = ({
             )}
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <EditorSettings
-            selectedTheme={selectedTheme}
-            onThemeChange={setCurrentTheme}
-            vimMode={vimMode}
-            onVimModeChange={handleVimModeToggle}
-          />
-          
-          {/* Coach Mode Button */}
-          {onStartCoaching && onStopCoaching && (
-            <Button
-              variant={isCoachModeActive ? "default" : "outline"}
-              size="sm"
-              onClick={isCoachModeActive ? onStopCoaching : onStartCoaching}
-              disabled={isCoachingLoading}
-              className={isCoachModeActive 
-                ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg"
-                : "bg-purple-50 hover:bg-purple-100 dark:bg-purple-950 dark:hover:bg-purple-900 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
-              }
-            >
-              {isCoachingLoading ? (
-                <>
-                  <div className="w-4 h-4 mr-1 border border-current/30 border-t-current rounded-full animate-spin" />
-                  Starting...
-                </>
-              ) : isCoachModeActive ? (
-                <>
-                  <Brain className="w-4 h-4 mr-1" />
-                  Stop Coach
-                </>
-              ) : (
-                <>
-                  <GraduationCap className="w-4 h-4 mr-1" />
-                  Coach Mode
-                </>
-              )}
-            </Button>
-          )}
-          
-          {!hideSubmit && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRun}
-              disabled={isRunning}
-              className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-            >
-              <Zap className="w-4 h-4 mr-1" />
-              {isRunning ? "Running..." : "Submit"}
-            </Button>
-          )}
-          {/* <Button 
-            size="sm" 
-            onClick={onSubmit}
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
-          >
-            <Send className="w-4 h-4 mr-1" />
-            Submit
-          </Button> */}
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center space-x-2">
+            <EditorSettings
+              selectedTheme={selectedTheme}
+              onThemeChange={setCurrentTheme}
+              vimMode={vimMode}
+              onVimModeChange={handleVimModeToggle}
+            />
+
+            {/* Coach Mode Button */}
+            {onStartCoaching && onStopCoaching && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isCoachModeActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={isCoachModeActive ? onStopCoaching : onStartCoaching}
+                    disabled={isCoachingLoading}
+                    data-tour="coach-mode-button"
+                    className={isCoachModeActive
+                      ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg"
+                      : "bg-purple-50 hover:bg-purple-100 dark:bg-purple-950 dark:hover:bg-purple-900 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
+                    }
+                  >
+                    {isCoachingLoading ? (
+                      <>
+                        <div className="w-4 h-4 mr-1 border border-current/30 border-t-current rounded-full animate-spin" />
+                        Starting...
+                      </>
+                    ) : isCoachModeActive ? (
+                      <>
+                        <Brain className="w-4 h-4 mr-1" />
+                        Stop Coach
+                      </>
+                    ) : (
+                      <>
+                        <GraduationCap className="w-4 h-4 mr-1" />
+                        Coach Mode
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>AI-powered step-by-step guidance to solve problems</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {!hideSubmit && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRun}
+                    disabled={isRunning}
+                    className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                  >
+                    <Zap className="w-4 h-4 mr-1" />
+                    {isRunning ? "Running..." : "Submit"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Submit your solution for evaluation</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Vim Status Bar */}

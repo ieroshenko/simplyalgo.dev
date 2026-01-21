@@ -41,7 +41,7 @@ const ProgressRadar = () => {
   }, [stats.totalSolved, totalProblems]);
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card data-tour="progress-radar" className="w-full max-w-sm">
       <CardContent className="p-6">
         <div className="space-y-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">

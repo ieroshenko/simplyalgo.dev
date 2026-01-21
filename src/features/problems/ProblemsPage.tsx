@@ -11,30 +11,38 @@ import {
 import Sidebar from "@/components/Sidebar";
 import ProblemTable from "@/features/problems/components/ProblemTable";
 import CompanyIcon from "@/components/CompanyIcon";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import { useState, useEffect, useMemo } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getUserAvatarUrl, getUserInitials, getUserName } from "@/lib/userAvatar";
 import { useNavigate } from "react-router-dom";
 import {
-  Clock,
-  Target,
   Search,
-  User,
   Trophy,
   Zap,
-  TrendingUp,
-  Code2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/features/problems/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
+import { useOnboarding } from "@/features/onboarding/hooks/useOnboarding";
 
 const Problems = () => {
   useTrackFeatureTime(Features.PROBLEMS_LIST);
 
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  // Onboarding tour
+  const {
+    isTourActive,
+    currentStep,
+    currentTourSteps,
+    nextStep,
+    prevStep,
+    skipTour,
+    completeTour,
+  } = useOnboarding('problems');
   const {
     problems,
     categories: dbCategories,
@@ -282,7 +290,7 @@ const Problems = () => {
         {/* Main Content - Data Structures tab hidden for launch */}
         <div className="space-y-6">
           {/* Filters */}
-          <div className="space-y-4">
+          <div data-tour="problem-filters" className="space-y-4">
             <h2 className="text-lg font-semibold text-foreground">
               Filters
             </h2>
@@ -386,7 +394,7 @@ const Problems = () => {
           </div>
 
           {/* Search */}
-          <div className="space-y-4">
+          <div data-tour="problem-search" className="space-y-4">
             <h2 className="text-lg font-semibold text-foreground">
               Search
             </h2>
@@ -403,7 +411,7 @@ const Problems = () => {
           </div>
 
           {/* Problems Table */}
-          <div className="space-y-4">
+          <div data-tour="problem-table" className="space-y-4">
             <h2 className="text-lg font-semibold text-foreground">
               {selectedCategory || selectedCompany || selectedDifficulty
                 ? [
@@ -424,6 +432,17 @@ const Problems = () => {
           </div>
         </div>
       </div>
+
+      {/* Onboarding Tour */}
+      <ProductTour
+        steps={currentTourSteps}
+        currentStep={currentStep}
+        isActive={isTourActive}
+        onNext={nextStep}
+        onPrev={prevStep}
+        onSkip={skipTour}
+        onComplete={completeTour}
+      />
     </div>
   );
 };

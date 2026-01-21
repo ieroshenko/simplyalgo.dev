@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -9,9 +9,11 @@ import RecentActivity from "@/components/RecentActivity";
 import { PersonalPlanCard } from "@/components/PersonalPlanCard";
 import PrimaryFocusCard from "@/components/PrimaryFocusCard";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import { useAuth } from "@/hooks/useAuth";
 import { useSurveyData } from "@/features/survey/hooks/useSurveyData";
 import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
+import { useOnboarding } from "@/features/onboarding/hooks/useOnboarding";
 
 const Dashboard = () => {
   useTrackFeatureTime(Features.DASHBOARD);
@@ -19,6 +21,17 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { surveyData } = useSurveyData();
+
+  // Onboarding tour
+  const {
+    isTourActive,
+    currentStep,
+    currentTourSteps,
+    nextStep,
+    prevStep,
+    skipTour,
+    completeTour,
+  } = useOnboarding('dashboard');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,6 +68,17 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Onboarding Tour */}
+      <ProductTour
+        steps={currentTourSteps}
+        currentStep={currentStep}
+        isActive={isTourActive}
+        onNext={nextStep}
+        onPrev={prevStep}
+        onSkip={skipTour}
+        onComplete={completeTour}
+      />
     </div>
   );
 };

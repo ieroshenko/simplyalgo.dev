@@ -3,8 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Activity, Search, ArrowLeft, BarChart3 } from "lucide-react";
+import { Users, Activity, Search, ArrowLeft, BarChart3, Play, RotateCcw, ClipboardList } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { notifications } from "@/shared/services/notificationService";
+import { DEMO_PROBLEM_ID } from "@/features/onboarding/demoTourSteps";
+import { useOnboardingContext } from "@/features/onboarding/OnboardingContext";
 
 // Feature imports
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
@@ -21,6 +25,7 @@ import type { DialogUserInfo } from "../types/admin.types";
 
 export function AdminDashboardNew() {
   const navigate = useNavigate();
+  const { resetAllTours } = useOnboardingContext();
 
   // Dashboard data hook
   const {
@@ -110,6 +115,40 @@ export function AdminDashboardNew() {
     }
   }, [cooldownDialogUser, cooldownHoursInput, cooldownReasonInput, setCooldown]);
 
+  // Reset survey handler for testing onboarding flow
+  const handleResetSurvey = useCallback(async (userId: string, email: string) => {
+    try {
+      const { error } = await supabase
+        .from('survey_responses')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      notifications.success(`Survey reset for ${email}`);
+      handleUpdate();
+    } catch (error) {
+      notifications.error('Failed to reset survey');
+    }
+  }, [handleUpdate]);
+
+  // Open demo mode for testing
+  const handleTestDemoMode = useCallback(() => {
+    window.open(`/problems/${DEMO_PROBLEM_ID}?demo=true`, '_blank');
+  }, []);
+
+  // Replay onboarding tour for testing
+  const handleReplayOnboardingTour = useCallback(() => {
+    resetAllTours();
+    notifications.success('Onboarding tours reset! Redirecting to dashboard...');
+    navigate('/dashboard');
+  }, [resetAllTours, navigate]);
+
+  // Open survey flow for testing
+  const handleTestSurveyFlow = useCallback(() => {
+    window.open('/survey/1?admin=true', '_blank');
+  }, []);
+
   if (loading) {
     return <AdminDashboardSkeleton />;
   }
@@ -128,10 +167,24 @@ export function AdminDashboardNew() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <Button onClick={handleRefresh} variant="outline">
-          <Activity className="h-4 w-4 mr-2" />
-          Refresh Data
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleReplayOnboardingTour} variant="outline">
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Replay Onboarding Tour
+          </Button>
+          <Button onClick={handleTestSurveyFlow} variant="outline">
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Test Survey Flow
+          </Button>
+          <Button onClick={handleTestDemoMode} variant="outline">
+            <Play className="h-4 w-4 mr-2" />
+            Test Demo Mode
+          </Button>
+          <Button onClick={handleRefresh} variant="outline">
+            <Activity className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
+        </div>
       </div>
 
       {/* Overview Cards */}
@@ -188,6 +241,7 @@ export function AdminDashboardNew() {
                       onRemoveCooldown={removeCooldown}
                       onOpenCooldownDialog={handleOpenCooldownDialog}
                       onOpenLimitsDialog={handleOpenLimitsDialog}
+                      onResetSurvey={handleResetSurvey}
                     />
                   ))
                 )}

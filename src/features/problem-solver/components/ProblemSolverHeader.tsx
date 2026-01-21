@@ -92,12 +92,14 @@ export const ProblemSolverHeader: React.FC<ProblemSolverHeaderProps> = ({
                             <StarOff className="w-4 h-4" />
                         )}
                     </Button>
-                    <FlashcardButton
-                        problemId={problem.id}
-                        problemStatus={problem.status}
-                        userId={userId}
-                        className="ml-2"
-                    />
+                    <div data-tour="flashcard-button">
+                        <FlashcardButton
+                            problemId={problem.id}
+                            problemStatus={problem.status}
+                            userId={userId}
+                            className="ml-2"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

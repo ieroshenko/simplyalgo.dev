@@ -52,7 +52,7 @@ const RecentActivity = () => {
   }, [user?.id]);
 
   return (
-    <Card>
+    <Card data-tour="recent-activity">
       <CardContent className="p-6">
         <div className="space-y-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/20 pb-3">

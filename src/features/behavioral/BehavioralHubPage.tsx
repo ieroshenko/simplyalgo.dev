@@ -4,19 +4,19 @@ import Sidebar from "@/components/Sidebar";
 import BehavioralHeader from "@/features/behavioral/components/BehavioralHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import { useAuth } from "@/hooks/useAuth";
 import { usePracticeAnswers } from "@/hooks/usePracticeAnswers";
 import { useUserStories } from "@/hooks/useUserStories";
 import {
   BookOpen,
   FileText,
-  TrendingUp,
   ArrowRight,
   Users,
-  ChevronRight,
 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { useTrackFeatureTime, Features } from "@/hooks/useFeatureTracking";
+import { useOnboarding } from "@/features/onboarding/hooks/useOnboarding";
 
 const Behavioral = () => {
   const navigate = useNavigate();
@@ -26,6 +26,17 @@ const Behavioral = () => {
 
   // Track behavioral interview feature usage
   useTrackFeatureTime(Features.BEHAVIORAL);
+
+  // Onboarding tour
+  const {
+    isTourActive,
+    currentStep,
+    currentTourSteps,
+    nextStep,
+    prevStep,
+    skipTour,
+    completeTour,
+  } = useOnboarding('behavioral');
 
   const [stats, setStats] = useState<{
     totalQuestionsPracticed: number;
@@ -84,21 +95,24 @@ const Behavioral = () => {
       description: "Browse technical behavioral questions organized by category",
       icon: BookOpen,
       path: "/behavioral/questions",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      tourId: "question-bank-card",
     },
     {
       title: "My Experiences",
       description: "Build and manage your personal experience library",
       icon: FileText,
       path: "/behavioral/stories",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      tourId: "experiences-card",
     },
     {
       title: "Mock Interview",
       description: "Upload your resume and get personalized interview questions",
       icon: Users,
       path: "/behavioral/mock-interview",
-      status: "BETA"
+      status: "BETA",
+      tourId: "mock-interview-card",
     },
   ];
 
@@ -142,6 +156,7 @@ const Behavioral = () => {
               return (
                 <Card
                   key={card.path}
+                  data-tour={card.tourId}
                   className="hover:shadow-md transition-shadow cursor-pointer group"
                   onClick={() => navigate(card.path)}
                 >
@@ -171,6 +186,17 @@ const Behavioral = () => {
           </div>
         </div>
       </div>
+
+      {/* Onboarding Tour */}
+      <ProductTour
+        steps={currentTourSteps}
+        currentStep={currentStep}
+        isActive={isTourActive}
+        onNext={nextStep}
+        onPrev={prevStep}
+        onSkip={skipTour}
+        onComplete={completeTour}
+      />
     </div>
   );
 };

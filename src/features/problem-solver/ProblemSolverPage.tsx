@@ -13,7 +13,7 @@ import CodeEditor from "@/components/CodeEditor";
 import ChatBubbles from "@/components/chat/ChatBubbles";
 import ProblemPanel from "@/features/problems/components/ProblemPanel";
 import Notes, { NotesHandle } from "@/components/Notes";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProblems } from "@/features/problems/hooks/useProblems";
 import { useUserStats } from "@/hooks/useUserStats";
@@ -21,7 +21,7 @@ import { useSubmissions } from "@/features/problems/hooks/useSubmissions";
 import { useSolutions } from "@/features/problems/hooks/useSolutions";
 import { UserAttemptsService } from "@/services/userAttempts";
 import { CodeSnippet } from "@/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { notifications } from "@/shared/services/notificationService";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoachingNew } from "@/hooks/useCoachingNew";
@@ -31,7 +31,13 @@ import type { editor } from "monaco-editor";
 import { logger } from "@/utils/logger";
 import { OverlayPositionManager } from "@/services/overlayPositionManager";
 import { useTrackFeatureTime, Features } from '@/hooks/useFeatureTracking';
-import { trackProblemStarted } from '@/services/analytics';
+import { trackProblemStarted, trackEvent } from '@/services/analytics';
+
+// Demo mode imports
+import { DemoModeProvider, useDemoMode } from "@/features/onboarding/DemoModeContext";
+import { DemoBanner } from "@/components/onboarding/DemoBanner";
+import { ProductTour } from "@/components/onboarding/ProductTour";
+import { DEMO_TOUR_STEPS } from "@/features/onboarding/demoTourSteps";
 
 // Feature-local imports
 import { ProblemSolverDialogs } from "./components/ProblemSolverDialogs";
@@ -329,6 +335,42 @@ const ProblemSolverNew = () => {
     }
   };
 
+  // Demo mode hooks (must be called before early returns for React hooks rules)
+  const {
+    isDemoMode,
+    isTourActive,
+    tourStep,
+    nextTourStep,
+    prevTourStep,
+    skipTour,
+    completeTour,
+  } = useDemoMode();
+
+  // Track demo problem attempts
+  const handleDemoRun = useCallback(() => {
+    if (isDemoMode) {
+      trackEvent('demo_problem_attempted', { action: 'run' });
+    }
+    handleRun();
+  }, [isDemoMode, handleRun]);
+
+  const handleDemoSubmit = useCallback(() => {
+    if (isDemoMode) {
+      trackEvent('demo_problem_attempted', { action: 'submit' });
+    }
+    handleSubmit();
+  }, [isDemoMode, handleSubmit]);
+
+  // Track when problem is solved in demo mode
+  const handleDemoProblemSolved = useCallback(async (
+    difficulty: "Easy" | "Medium" | "Hard",
+  ) => {
+    if (isDemoMode) {
+      trackEvent('demo_problem_solved');
+    }
+    await handleProblemSolved(difficulty);
+  }, [isDemoMode, handleProblemSolved]);
+
   // Loading state
   if (loading) {
     return (
@@ -356,6 +398,9 @@ const ProblemSolverNew = () => {
 
   return (
     <div className="h-screen min-h-0 bg-background flex flex-col overflow-hidden">
+      {/* Demo Mode Banner */}
+      <DemoBanner />
+
       {/* Header */}
       <ProblemSolverHeader
         problem={problem}
@@ -365,6 +410,17 @@ const ProblemSolverNew = () => {
         isDark={isDark}
         onToggleTheme={toggleTheme}
         onToggleStar={handleToggleStar}
+      />
+
+      {/* Product Tour Overlay */}
+      <ProductTour
+        steps={DEMO_TOUR_STEPS}
+        currentStep={tourStep}
+        isActive={isTourActive}
+        onNext={nextTourStep}
+        onPrev={prevTourStep}
+        onSkip={skipTour}
+        onComplete={completeTour}
       />
 
       {/* Main Content */}
@@ -415,8 +471,8 @@ const ProblemSolverNew = () => {
                   problemId={problem.id}
                   onCodeChange={handleCodeChange}
                   editorRef={codeEditorRef}
-                  onRun={handleRun}
-                  onSubmit={handleSubmit}
+                  onRun={handleDemoRun}
+                  onSubmit={handleDemoSubmit}
                   isRunning={isRunning}
                   onStartCoaching={() => startCoaching()}
                   onStopCoaching={stopCoaching}
@@ -512,7 +568,7 @@ const ProblemSolverNew = () => {
                 optimisticAdd(saved);
               }
               watchForAcceptance(30_000, 2_000);
-              await handleProblemSolved(
+              await handleDemoProblemSolved(
                 problem.difficulty as "Easy" | "Medium" | "Hard",
               );
               notifications.success("Solution saved to submissions! 🎉");
@@ -530,4 +586,13 @@ const ProblemSolverNew = () => {
   );
 };
 
-export default ProblemSolverNew;
+// Wrapper component that provides DemoModeContext
+const ProblemSolverPage: React.FC = () => {
+  return (
+    <DemoModeProvider>
+      <ProblemSolverNew />
+    </DemoModeProvider>
+  );
+};
+
+export default ProblemSolverPage;

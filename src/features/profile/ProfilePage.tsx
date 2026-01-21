@@ -4,10 +4,12 @@ import { useFlashcards } from "@/hooks/useFlashcards";
 import { useProblems } from "@/features/problems/hooks/useProblems";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import { getUserAvatarUrl, getUserInitials, getUserName } from "@/lib/userAvatar";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { useOnboarding } from "@/features/onboarding/hooks/useOnboarding";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -15,6 +17,17 @@ const Profile = () => {
   const { stats, profile, loading: statsLoading } = useUserStats(user?.id);
   const { stats: flashcardStats, isLoading: flashcardsLoading } = useFlashcards(user?.id);
   const { problems } = useProblems(user?.id);
+
+  // Onboarding tour
+  const {
+    isTourActive,
+    currentStep,
+    currentTourSteps,
+    nextStep,
+    prevStep,
+    skipTour,
+    completeTour,
+  } = useOnboarding('profile');
 
   const displayName = getUserName(user, profile);
   const initials = getUserInitials(displayName);
@@ -92,7 +105,7 @@ const Profile = () => {
         </div>
 
         {/* Performance Summary */}
-        <section className="bg-card rounded-lg p-8 border border-border shadow-sm">
+        <section data-tour="profile-stats" className="bg-card rounded-lg p-8 border border-border shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-6">
             Performance
           </h2>
@@ -170,7 +183,7 @@ const Profile = () => {
         </section>
 
         {/* Flashcards Section */}
-        <section className="bg-card rounded-lg p-8 border border-border shadow-sm">
+        <section data-tour="flashcards-section" className="bg-card rounded-lg p-8 border border-border shadow-sm">
           <div className="mb-6">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Flashcards
@@ -227,6 +240,17 @@ const Profile = () => {
           </Button>
         </section>
       </div>
+
+      {/* Onboarding Tour */}
+      <ProductTour
+        steps={currentTourSteps}
+        currentStep={currentStep}
+        isActive={isTourActive}
+        onNext={nextStep}
+        onPrev={prevStep}
+        onSkip={skipTour}
+        onComplete={completeTour}
+      />
     </motion.div>
   );
 };

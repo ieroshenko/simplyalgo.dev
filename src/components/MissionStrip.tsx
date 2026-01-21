@@ -7,7 +7,7 @@ const MissionStrip = () => {
   const { stats, loading } = useUserStats(user?.id);
 
   return (
-    <div className="border-b border-border/20 px-6 py-4">
+    <div data-tour="mission-strip" className="border-b border-border/20 px-6 py-4">
       <div className="flex items-center gap-8 flex-wrap text-sm">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status:</span>
