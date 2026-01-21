@@ -139,7 +139,7 @@ const ChatBubbles = ({
   }, [messages, isTyping]);
 
   return (
-    <div className="h-full flex flex-col border-l border-border">
+    <div className="h-full min-h-0 flex flex-col border-l border-border">
       {/* Chat Header */}
       <div className="flex-shrink-0 h-12 px-6 border-b border-border flex items-center justify-between min-w-0">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
@@ -171,8 +171,7 @@ const ChatBubbles = ({
       {/* Messages */}
       <div
         ref={scrollAreaRef}
-        className="flex-1"
-        style={{ height: "calc(100% - 49px)", overflow: "auto" }}
+        className="flex-1 min-h-0 overflow-y-auto"
       >
         <div className="p-6">
           {loading ? (

@@ -56,6 +56,31 @@ const ProblemSolverNew = () => {
   const { theme, setTheme, isDark } = useTheme();
   const { currentTheme, defineCustomThemes } = useEditorTheme();
 
+  // Hard-lock page scrolling for this route.
+  // The Problem Solver UI is a multi-pane app; only internal panes (chat/problem/test results)
+  // should scroll. When chat history grows, some browsers/layouts can otherwise push scroll to body.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlHeight = html.style.height;
+    const prevBodyHeight = body.style.height;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.height = "100%";
+    body.style.height = "100%";
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      html.style.height = prevHtmlHeight;
+      body.style.height = prevBodyHeight;
+    };
+  }, []);
+
   // Local state
   const [activeTab, setActiveTab] = useState("question");
   const [code, setCode] = useState("");
@@ -330,7 +355,7 @@ const ProblemSolverNew = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="h-screen min-h-0 bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <ProblemSolverHeader
         problem={problem}
@@ -343,12 +368,12 @@ const ProblemSolverNew = () => {
       />
 
       {/* Main Content */}
-      <div className="flex-1" style={{ height: "calc(100vh - 81px)" }}>
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0">
           {/* Left Panel - Problem Description */}
           {panelState.showLeftPanel && (
             <>
-              <ResizablePanel defaultSize={35} minSize={25}>
+              <ResizablePanel defaultSize={35} minSize={25} className="min-h-0">
                 <ProblemPanel
                   problem={problem}
                   problemId={problemId}
@@ -377,11 +402,13 @@ const ProblemSolverNew = () => {
                   : 100
             }
             minSize={30}
+            className="min-h-0"
           >
-            <ResizablePanelGroup direction="vertical">
+            <ResizablePanelGroup direction="vertical" className="h-full min-h-0">
               <ResizablePanel
                 defaultSize={panelState.showBottomPanel ? 65 : 100}
                 minSize={40}
+                className="min-h-0"
               >
                 <CodeEditor
                   initialCode={problem.functionSignature}
@@ -400,7 +427,7 @@ const ProblemSolverNew = () => {
               {panelState.showBottomPanel && (
                 <>
                   <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={testPanelSize} minSize={20}>
+                  <ResizablePanel defaultSize={testPanelSize} minSize={20} className="min-h-0">
                     <div className="h-full bg-background border-t border-border flex flex-col">
                       <ProblemSolverTestResultsPanel
                         testResults={testResults}
@@ -425,6 +452,7 @@ const ProblemSolverNew = () => {
                 onResize={(size) => {
                   localStorage.setItem("ai-chat-width", String(size));
                 }}
+                className="min-h-0"
               >
                 <ChatBubbles
                   problemId={problem.id}
