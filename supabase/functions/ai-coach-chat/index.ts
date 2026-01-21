@@ -255,6 +255,7 @@ serve(async (req) => {
                         previousResponseId: typeof previousResponseId === 'string' ? previousResponseId : null,
                         coachingMode: validatedCoachingMode,
                     },
+                    userId ? { userId, feature: "ai_chat" } : undefined,
                 ),
                 analyzeCodeSnippets(
                     (message || "").slice(0, 800),

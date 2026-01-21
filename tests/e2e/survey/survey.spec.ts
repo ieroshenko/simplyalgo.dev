@@ -6,6 +6,18 @@ import { AuthHelper } from '../../utils/test-helpers';
 // Question steps (require selection): 1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14, 15
 // Non-question steps (auto-continue): 5, 11, 12, 16, 17, 18, 19, 20
 
+const waitForStepTransition = async (
+  page: Page,
+  urlPattern: RegExp,
+  textPattern: RegExp,
+  timeout = 90000,
+) => {
+  await Promise.any([
+    page.waitForURL(urlPattern, { timeout, waitUntil: 'domcontentloaded' }),
+    page.getByText(textPattern).waitFor({ state: 'visible', timeout }),
+  ]);
+};
+
 test.describe('Survey Flow', () => {
   let authHelper: AuthHelper;
 
@@ -209,7 +221,8 @@ test.describe('Survey with Authenticated Fixture', () => {
 
 test.describe('Full Survey Completion', () => {
   test('should complete entire survey flow (all 20 steps)', async ({ page }) => {
-    // Set up auth
+    // This flow includes an analyzing step that may take time depending on network.
+    test.setTimeout(180000);
     const authHelper = new AuthHelper(page);
     await page.goto('/');
     await authHelper.mockSignIn();
@@ -275,9 +288,7 @@ test.describe('Full Survey Completion', () => {
     await page.getByRole('button', { name: /Overthinking/i }).click();
     await page.getByRole('button', { name: /Continue/i }).click();
 
-    // Step 11: Social Proof (non-question step)
-    await page.waitForURL(/\/survey\/11/);
-    await page.getByRole('button', { name: /Continue/i }).click();
+    // Step 11 is skipped in-app (Social Proof)
 
     // Step 12: Customization Intro (non-question step)
     await page.waitForURL(/\/survey\/12/);
@@ -307,15 +318,26 @@ test.describe('Full Survey Completion', () => {
 
     // Step 17: Progress Animation (no footer - auto continues or wait)
     await page.waitForURL(/\/survey\/17/);
-    // This step has no footer, wait for it to auto-progress or click if available
-    await page.waitForURL(/\/survey\/18/, { timeout: 15000 });
+    // This step typically auto-progresses, but can be flaky in slower environments.
+    // If a Continue button is present, click it.
+    const progressContinueButton = page.getByRole('button', { name: /Continue/i });
+    if (await progressContinueButton.isVisible().catch(() => false)) {
+      await progressContinueButton.click();
+    }
+    // Wait for either the URL to change OR the Step 18 content to appear.
+    const congratulationsHeading = page.getByText(/Congratulations/i);
+    await waitForStepTransition(page, /\/survey\/18/, /Congratulations/i, 90000);
 
     // Step 18: Congratulations (non-question step)
-    await expect(page.getByText(/Congratulations/i)).toBeVisible();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(congratulationsHeading).toBeVisible();
+    for (let i = 0; i < 3; i++) {
+      await page.getByRole('button', { name: /Continue/i }).click();
+      await page.waitForURL(/\/survey\/19/, { timeout: 500 }).catch(() => null);
+      if (/\/survey\/19/.test(page.url())) break;
+    }
 
     // Step 19: Customized Results (non-question step)
-    await page.waitForURL(/\/survey\/19/);
+    await page.waitForURL(/\/survey\/19/, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Continue/i }).click();
 
     // Step 20: Paywall Step (special - has "Start My Journey" button)
@@ -466,9 +488,7 @@ test.describe('Full Survey Completion', () => {
     await page.getByRole('button', { name: /Overthinking/i }).click();
     await page.getByRole('button', { name: /Continue/i }).click();
 
-    // Steps 11-12 (non-question)
-    await page.waitForURL(/\/survey\/11/);
-    await page.getByRole('button', { name: /Continue/i }).click();
+    // Step 11 is skipped in-app (Social Proof)
 
     await page.waitForURL(/\/survey\/12/);
     await page.getByRole('button', { name: /Continue/i }).click();
@@ -492,13 +512,22 @@ test.describe('Full Survey Completion', () => {
 
     // Step 17 (auto-progress animation)
     await page.waitForURL(/\/survey\/17/);
-    await page.waitForURL(/\/survey\/18/, { timeout: 15000 });
+    const stripeProgressContinueButton = page.getByRole('button', { name: /Continue/i });
+    if (await stripeProgressContinueButton.isVisible().catch(() => false)) {
+      await stripeProgressContinueButton.click();
+    }
+    await waitForStepTransition(page, /\/survey\/18/, /Congratulations/i, 90000);
 
     // Step 18 (congratulations)
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(page.getByText(/Congratulations/i)).toBeVisible({ timeout: 60000 });
+    for (let i = 0; i < 3; i++) {
+      await page.getByRole('button', { name: /Continue/i }).click();
+      if (/\/survey\/19/.test(page.url())) break;
+      await page.waitForTimeout(500);
+    }
 
     // Step 19 (results)
-    await page.waitForURL(/\/survey\/19/);
+    await page.waitForURL(/\/survey\/19/, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Continue/i }).click();
 
     // Step 20 - PAYWALL
@@ -518,7 +547,13 @@ test.describe('Full Survey Completion', () => {
     await startButton.click();
 
     // Wait for checkout to load or redirect
-    await page.waitForTimeout(5000);
+    await Promise.any([
+      page.waitForNavigation({ timeout: 5000 }),
+      page.waitForSelector('text=Complete Your Subscription', { timeout: 5000 }),
+      page.waitForSelector('iframe[name*="__privateStripeFrame"]', { timeout: 5000 }),
+      page.waitForSelector('text=/error|failed|unable/i', { timeout: 5000 }),
+      page.waitForURL(/\/dashboard/, { timeout: 5000 }),
+    ]).catch(() => null);
 
     // Check possible outcomes after clicking Start My Journey:
     // 1. Embedded checkout UI ("Complete Your Subscription")

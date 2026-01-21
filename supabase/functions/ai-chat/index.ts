@@ -54,6 +54,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : supabase;
+const enableCodePreviewLogs =
+  Deno.env.get("LOG_LEVEL") === "debug" || Deno.env.get("DEBUG") === "true";
 
 /**
  * CORS headers for all responses
@@ -505,6 +507,11 @@ serve(async (req) => {
       }
 
       try {
+        console.log("[ai-chat] Calling insertSnippetSmart...");
+        if (enableCodePreviewLogs) {
+          console.log("[ai-chat] Code preview:", code?.substring(0, 100));
+          console.log("[ai-chat] Snippet preview:", snippet?.code?.substring(0, 100));
+        }
         const result = await insertSnippetSmart(
           code,
           snippet,
@@ -512,6 +519,7 @@ serve(async (req) => {
           cursorPosition,
           message || ""
         );
+        console.log("[ai-chat] insertSnippetSmart completed successfully");
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -868,6 +876,7 @@ Conversation: ${JSON.stringify(conversationHistory)}`;
             previousResponseId: typeof previousResponseId === 'string' ? previousResponseId : null,
             coachingMode: validatedCoachingMode,
           },
+          userId ? { userId, feature: "ai_chat" } : undefined,
         ),
         analyzeCodeSnippets(
           (message || "").slice(0, 800),
