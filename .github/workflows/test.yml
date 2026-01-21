@@ -38,7 +38,7 @@ jobs:
         run: npm ci
 
       - name: Run unit and integration tests
-        run: npm test -- --run --reporter=verbose
+        run: npm test -- --run --reporter=verbose --pool=threads --poolOptions.threads.maxThreads=4
         env:
           CI: true
 
@@ -71,8 +71,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Detect Playwright version
+        id: playwright-version
+        run: |
+          PLAYWRIGHT_VERSION=$(node -p "require('./package.json').devDependencies?.playwright || require('./package.json').dependencies?.playwright || ''")
+          echo "version=${PLAYWRIGHT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ hashFiles('**/package-lock.json') }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright deps only (if cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Start dev server
         run: |
@@ -93,7 +111,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Run Playwright tests
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --workers=2
         env:
           CI: true
           # Add any required env variables for e2e tests

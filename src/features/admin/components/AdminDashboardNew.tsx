@@ -3,15 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Activity, Search, ArrowLeft } from "lucide-react";
+import { Users, Activity, Search, ArrowLeft, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // Feature imports
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
+import { useAdminAnalytics } from "../hooks/useAdminAnalytics";
 import { useUserManagement } from "../hooks/useUserManagement";
 import { OverviewCards } from "./OverviewCards";
 import { UserCard } from "./UserCard";
 import { ApiUsageTab } from "./ApiUsageTab";
+import { AnalyticsTab } from "./AnalyticsTab";
 import { SetLimitsDialog } from "./SetLimitsDialog";
 import { SetCooldownDialog } from "./SetCooldownDialog";
 import { AdminDashboardSkeleton } from "./AdminDashboardSkeleton";
@@ -33,11 +35,17 @@ export function AdminDashboardNew() {
     refetchOverviewStats,
   } = useAdminDashboard();
 
+  const { analytics, loading: analyticsLoading, refresh: refreshAnalytics } = useAdminAnalytics();
+
   // User management hook
   const handleUpdate = useCallback(() => {
     refetchUserStats();
     refetchOverviewStats();
   }, [refetchUserStats, refetchOverviewStats]);
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refresh(), refreshAnalytics()]);
+  }, [refresh, refreshAnalytics]);
 
   const {
     grantPremium,
@@ -120,7 +128,7 @@ export function AdminDashboardNew() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <Button onClick={refresh} variant="outline">
+        <Button onClick={handleRefresh} variant="outline">
           <Activity className="h-4 w-4 mr-2" />
           Refresh Data
         </Button>
@@ -139,6 +147,10 @@ export function AdminDashboardNew() {
           <TabsTrigger value="usage">
             <Activity className="h-4 w-4 mr-2" />
             API Usage
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -187,6 +199,11 @@ export function AdminDashboardNew() {
         {/* API Usage Tab */}
         <TabsContent value="usage" className="space-y-4">
           <ApiUsageTab openRouterStats={openRouterStats} />
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-4">
+          <AnalyticsTab stats={analytics} loading={analyticsLoading} />
         </TabsContent>
       </Tabs>
 

@@ -94,6 +94,7 @@ const createQueryBuilder = (data: unknown = [], count: number | null = null) => 
         eq: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
         gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
         single: vi.fn().mockReturnThis(),
@@ -358,7 +359,9 @@ describe('AdminDashboardNew', () => {
                 expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
             });
 
-            // May have tabs for Users, Overview, etc.
+            expect(screen.getByText('Users')).toBeInTheDocument();
+            expect(screen.getByText('API Usage')).toBeInTheDocument();
+            expect(screen.getByText('Analytics')).toBeInTheDocument();
         });
     });
 

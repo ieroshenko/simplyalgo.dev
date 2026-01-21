@@ -708,35 +708,51 @@ export const useCoachingNew = ({
 
   // Insert correct code from AI validation
   const insertCorrectCode = useCallback(async () => {
+    logger.debug("[insertCorrectCode] Called", { component: "Coaching" });
+    logger.debug("[insertCorrectCode] lastValidation", {
+      component: "Coaching",
+      hasLastValidation: !!coachingState.lastValidation,
+    });
+    logger.debug("[insertCorrectCode] codeToAdd", {
+      component: "Coaching",
+      preview: coachingState.lastValidation?.codeToAdd?.substring(0, 50),
+    });
     if (!coachingState.lastValidation?.codeToAdd) return;
 
     const codeToInsert = stripCodeFences(coachingState.lastValidation.codeToAdd);
+    logger.debug("[insertCorrectCode] codeToInsert", {
+      component: "Coaching",
+      preview: codeToInsert?.substring(0, 50),
+      length: codeToInsert.length,
+    });
 
     try {
       const editor = editorRef.current;
       const before = editor?.getValue() || "";
 
+      logger.debug("[insertCorrectCode] before code length", {
+        component: "Coaching",
+        length: before?.length ?? 0,
+      });
+      logger.debug("[insertCorrectCode] codeContainsSnippet", {
+        component: "Coaching",
+        contains: codeContainsSnippet(before, codeToInsert),
+      });
       if (!codeContainsSnippet(before, codeToInsert)) {
-        if (isLargeInsertion(codeToInsert)) {
-          const lines = codeToInsert.split('\n').filter(l => l.trim().length > 0);
-          const ok = confirmLargeInsert
-            ? await confirmLargeInsert({ code: codeToInsert, lineCount: lines.length })
-            : window.confirm('The suggested fix looks large and may replace part of your function. Proceed?');
-          if (!ok) {
-            setCoachingState(prev => ({
-              ...prev,
-              feedback: { show: true, type: 'hint', message: 'Insertion canceled. You can paste manually or apply a smaller change.', showConfetti: false },
-            }));
-            return;
-          }
-        } else {
-          logger.debug("Using smart replacement for code correction", { component: "Coaching" });
-        }
+        // Skip large insertion check for coaching - the code is AI-validated and typically small helper functions
+        // The isLargeInsertion check was triggering for any function definition which is too aggressive
+        logger.debug("Proceeding with coaching code insertion", { component: "Coaching", codeLength: codeToInsert.length });
 
         logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
+        logger.debug("[insertCorrectCode] onCodeInsert exists", {
+          component: "Coaching",
+          hasOnCodeInsert: !!onCodeInsert,
+        });
 
         if (onCodeInsert) {
+          logger.debug("[insertCorrectCode] Calling onCodeInsert...", { component: "Coaching" });
           await onCodeInsert(codeToInsert);
+          logger.debug("[insertCorrectCode] onCodeInsert completed", { component: "Coaching" });
         }
 
         logger.debug("Shared insertion completed successfully", { component: "Coaching" });
