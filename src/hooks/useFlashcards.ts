@@ -6,6 +6,14 @@ import type { FlashcardDeck, FlashcardReview, FlashcardStats } from "@/types/api
 import type { FlashcardDeckRow, FlashcardReviewRow, FlashcardDeckWithRelations } from "@/types/supabase";
 import { logger } from "@/utils/logger";
 
+interface GetFlashcardStatsRow {
+  total_cards: number | string | null;
+  due_today: number | string | null;
+  new_cards: number | string | null;
+  learning_cards: number | string | null;
+  mastered_cards: number | string | null;
+  average_ease_factor: number | string | null;
+}
 
 export const useFlashcards = (userId?: string) => {
   const queryClient = useQueryClient();
@@ -70,8 +78,7 @@ export const useFlashcards = (userId?: string) => {
           learningCards: 0,
           masteredCards: 0,
           averageEaseFactor: 2.5,
-          longestStreak: 0,
-          currentStreak: 0,
+          // Streaks not yet implemented - fields are optional
         };
       }
 
@@ -81,7 +88,7 @@ export const useFlashcards = (userId?: string) => {
       });
 
       if (!rpcError && rpcData && rpcData.length > 0) {
-        const statsRow = rpcData[0];
+        const statsRow = rpcData[0] as GetFlashcardStatsRow;
         return {
           totalCards: Number(statsRow.total_cards) || 0,
           dueToday: Number(statsRow.due_today) || 0,
@@ -89,13 +96,16 @@ export const useFlashcards = (userId?: string) => {
           learningCards: Number(statsRow.learning_cards) || 0,
           masteredCards: Number(statsRow.mastered_cards) || 0,
           averageEaseFactor: Number(statsRow.average_ease_factor) || 2.5,
-          longestStreak: 0, // TODO: Calculate from review history
-          currentStreak: 0, // TODO: Calculate from review history
+          // Streaks not yet implemented - fields are optional
         };
       }
 
+      if (rpcError) {
+        logger.warn("[useFlashcards] RPC stats unavailable", { error: rpcError });
+      }
+
       // Fallback to client-side calculation if RPC not available
-      logger.debug("[useFlashcards] RPC not available, using client-side stats calculation");
+      logger.debug("[useFlashcards] RPC stats unavailable, using client-side calculation");
 
       const { data: decks, error } = await supabase
         .from("flashcard_decks")

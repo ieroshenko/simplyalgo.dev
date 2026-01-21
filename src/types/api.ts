@@ -70,8 +70,10 @@ export interface FlashcardStats {
   learningCards: number;
   masteredCards: number;
   averageEaseFactor: number;
-  longestStreak: number;
-  currentStreak: number;
+  /** Longest consecutive days of flashcard reviews. Optional - not yet implemented. */
+  longestStreak?: number;
+  /** Current consecutive days of flashcard reviews. Optional - not yet implemented. */
+  currentStreak?: number;
 }
 
 // TODO: Add other API types as we migrate them from individual files

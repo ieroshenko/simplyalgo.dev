@@ -36,6 +36,7 @@ import priyaPhoto from '@/assets/survey/user_reviews/priya.png';
 import ashwinPhoto from '@/assets/survey/user_reviews/ashwin.png';
 
 const TOTAL_STEPS = 20;
+const DEMO_STATE_KEY = 'simplyalgo_demo_state';
 
 const Survey: React.FC = () => {
   const { stepNumber } = useParams<{ stepNumber: string }>();
@@ -46,11 +47,15 @@ const Survey: React.FC = () => {
   // Admin mode detection
   const isAdminMode = searchParams.get('admin') === 'true';
 
+  // Helper to navigate to demo problem with fresh tour state
+  const navigateToDemo = () => {
+    localStorage.removeItem(DEMO_STATE_KEY);
+    navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
+  };
+
   // Navigate to demo for admin testing
   const handleGoToDemo = () => {
-    // Clear demo state so tour starts fresh
-    localStorage.removeItem('simplyalgo_demo_state');
-    navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
+    navigateToDemo();
   };
 
   // Get survey data, passing user as parameter
@@ -144,9 +149,7 @@ const Survey: React.FC = () => {
 
       // After step 19 (CustomizedResultsStep), redirect to demo problem
       if (currentStep === 19) {
-        // Clear demo state so tour starts fresh
-        localStorage.removeItem('simplyalgo_demo_state');
-        navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
+        navigateToDemo();
         return;
       }
 

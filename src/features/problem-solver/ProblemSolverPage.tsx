@@ -65,7 +65,10 @@ const ProblemSolverNew = () => {
   // Use single problem hook for the solver page (includes test_cases)
   const { problem, loading: problemLoading, refetch: refetchProblem } = useProblem(problemId, user?.id);
   const loading = listLoading || problemLoading;
-  const refetch = () => { refetchList(); refetchProblem(); };
+  const refetch = useCallback(() => {
+    refetchList();
+    refetchProblem();
+  }, [refetchList, refetchProblem]);
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const { theme, setTheme, isDark } = useTheme();
   const { currentTheme, defineCustomThemes } = useEditorTheme();
@@ -112,6 +115,18 @@ const ProblemSolverNew = () => {
   const [code, setCode] = useState("");
   const notesRef = useRef<NotesHandle>(null);
   const codeEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Ref for demo completion timeout to prevent memory leak on unmount
+  const demoCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup demo completion timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (demoCompletionTimeoutRef.current) {
+        clearTimeout(demoCompletionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Initialize OverlayPositionManager for coaching overlay positioning
   const overlayPositionManager = useRef<OverlayPositionManager | null>(null);
@@ -175,7 +190,11 @@ const ProblemSolverNew = () => {
         // New user - show toast and redirect to checkout
         notifications.success("Congratulations! You solved the demo problem! Redirecting to checkout...");
         // Small delay to let user see the success message
-        setTimeout(() => {
+        // Clear any existing timeout before setting a new one
+        if (demoCompletionTimeoutRef.current) {
+          clearTimeout(demoCompletionTimeoutRef.current);
+        }
+        demoCompletionTimeoutRef.current = setTimeout(() => {
           completeDemo();
         }, 2000);
       }

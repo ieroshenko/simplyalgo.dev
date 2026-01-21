@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { SurveyStepProps } from '@/types/survey';
 import longTermResultsImage from '@/assets/survey/simply-algo-creates-long-term-results.png';
 
-export const LongTermResultsStep: React.FC<SurveyStepProps> = (props) => {
+export const LongTermResultsStep: React.FC<SurveyStepProps> = (_props) => {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}

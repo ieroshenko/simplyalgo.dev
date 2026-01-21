@@ -1,20 +1,26 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { SurveyStepProps } from '@/types/survey';
-import { Target, Calendar, Clover, GraduationCap, Blocks, TrendingUp, Wrench, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Target, Calendar, Clover, GraduationCap, Blocks, TrendingUp, Wrench, Sparkles } from 'lucide-react';
 
 interface CustomizedResultsStepProps extends SurveyStepProps {
   surveyData?: { [key: number]: string };
 }
 
+const SURVEY_STEP = {
+  GOAL: 9,
+  FOCUS_AREAS: 14,
+  COMMITMENT: 15,
+} as const;
+
 export const CustomizedResultsStep: React.FC<CustomizedResultsStepProps> = (props) => {
   const { surveyData } = props;
 
   // Get user's answers from the survey data
-  const userGoal = surveyData?.[9] || "Land a role at Big Tech";
-  const userCommitment = surveyData?.[15] || "3 sessions per week";
-  const userFocusAreas = surveyData?.[14] ? 
-    (surveyData[14] === "Both" ? ["Assessments", "Interviews"] : surveyData[14].split(',').map(area => area.trim())) 
+  const userGoal = surveyData?.[SURVEY_STEP.GOAL] || "Land a role at Big Tech";
+  const userCommitment = surveyData?.[SURVEY_STEP.COMMITMENT] || "3 sessions per week";
+  const userFocusAreas = surveyData?.[SURVEY_STEP.FOCUS_AREAS] ? 
+    (surveyData[SURVEY_STEP.FOCUS_AREAS] === "Both" ? ["Assessments", "Interviews"] : surveyData[SURVEY_STEP.FOCUS_AREAS].split(',').map(area => area.trim())) 
     : ["Interviews"];
 
   const recommendations = [

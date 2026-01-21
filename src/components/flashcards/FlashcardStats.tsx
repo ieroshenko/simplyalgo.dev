@@ -95,7 +95,7 @@ export const FlashcardStats = ({
             <div className="text-xs text-muted-foreground">Mastered</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.currentStreak}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.currentStreak ?? "—"}</div>
             <div className="text-xs text-muted-foreground">Day Streak</div>
           </div>
         </div>
@@ -169,7 +169,7 @@ export const FlashcardStats = ({
           <div className="text-xs text-muted-foreground text-center">
             <Flame className="h-3 w-3 inline mr-1" />
             Average ease: {stats.averageEaseFactor.toFixed(1)}
-            {stats.longestStreak > 0 && ` • Best streak: ${stats.longestStreak} days`}
+            {stats.longestStreak != null && stats.longestStreak > 0 && ` • Best streak: ${stats.longestStreak} days`}
           </div>
         )}
       </CardContent>

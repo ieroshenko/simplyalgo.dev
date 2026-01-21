@@ -562,20 +562,9 @@ describe('ProblemSolverNew', () => {
 });
 
 describe('ProblemSolverNew - Loading State', () => {
-    it('should document loading behavior', () => {
-        // When problems are loading, the component shows a loading spinner
-        // This is verified by checking for the spinner element
-        // Note: Would require module reset to fully test different mock states
-        expect(true).toBe(true);
-    });
+    it.todo('should show loading spinner when problems are loading');
 });
 
 describe('ProblemSolverNew - Problem Not Found', () => {
-    it('should document not found behavior', () => {
-        // When problem is not found, the component shows:
-        // - "Problem not found" heading
-        // - "Back to Problems" button
-        // Note: Would require module reset to fully test different mock states
-        expect(true).toBe(true);
-    });
+    it.todo('should show not found UI when problem missing');
 });

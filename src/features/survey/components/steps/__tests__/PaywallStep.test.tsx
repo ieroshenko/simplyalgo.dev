@@ -88,16 +88,16 @@ describe('PaywallStep - Stripe Checkout', () => {
 
             expect(screen.getByText('Monthly')).toBeInTheDocument();
             expect(screen.getByText('Yearly')).toBeInTheDocument();
-            expect(screen.getByText('$20.00')).toBeInTheDocument();
-            expect(screen.getByText('$10.00')).toBeInTheDocument();
+            expect(screen.getByText('$20')).toBeInTheDocument();
+            expect(screen.getByText('$10')).toBeInTheDocument();
         });
 
         it('should default to monthly plan selected', () => {
             render(<PaywallStep {...defaultProps} />);
 
-            // Check that monthly is selected (should have primary border)
+            // Check that monthly is selected (should have emerald border)
             const monthlyPlan = screen.getByText('Monthly').closest('div[class*="cursor-pointer"]');
-            expect(monthlyPlan).toHaveClass('border-primary');
+            expect(monthlyPlan).toHaveClass('border-emerald-600');
         });
 
         it('should allow switching between plans', async () => {
@@ -110,23 +110,23 @@ describe('PaywallStep - Stripe Checkout', () => {
             }
 
             await waitFor(() => {
-                expect(yearlyPlan).toHaveClass('border-primary');
+                expect(yearlyPlan).toHaveClass('border-emerald-600');
             });
         });
 
         it('should show trial badges for trial-eligible users on both plans', () => {
             render(<PaywallStep {...defaultProps} />);
 
-            expect(screen.getByText('7 DAYS FREE')).toBeInTheDocument();
-            expect(screen.getByText('3 DAYS FREE')).toBeInTheDocument();
+            expect(screen.getByText('7 Days Free')).toBeInTheDocument();
+            expect(screen.getByText(/3 Days Free/i)).toBeInTheDocument();
         });
 
         it('should show benefits list', () => {
             render(<PaywallStep {...defaultProps} />);
 
-            expect(screen.getByText('Personalized learning plan based on your survey')).toBeInTheDocument();
-            expect(screen.getByText('AI-powered coaching and feedback')).toBeInTheDocument();
-            expect(screen.getByText('Track your progress with detailed analytics')).toBeInTheDocument();
+            expect(screen.getByText('Personalized Plan')).toBeInTheDocument();
+            expect(screen.getByText('AI Coaching')).toBeInTheDocument();
+            expect(screen.getByText('Detailed Analytics')).toBeInTheDocument();
         });
 
         it('should show Start My Journey button', () => {
@@ -135,10 +135,10 @@ describe('PaywallStep - Stripe Checkout', () => {
             expect(screen.getByRole('button', { name: /Start My Journey/i })).toBeInTheDocument();
         });
 
-        it('should show No Commitment - Cancel Anytime text', () => {
+        it('should show Cancel Anytime text', () => {
             render(<PaywallStep {...defaultProps} />);
 
-            expect(screen.getByText('No Commitment - Cancel Anytime')).toBeInTheDocument();
+            expect(screen.getByText('Cancel Anytime')).toBeInTheDocument();
         });
     });
 
@@ -193,7 +193,7 @@ describe('PaywallStep - Stripe Checkout', () => {
             fireEvent.click(startButton);
 
             await waitFor(() => {
-                expect(screen.getByText(/Redirecting to Payment/i)).toBeInTheDocument();
+                expect(screen.getByText(/Redirecting to secure checkout/i)).toBeInTheDocument();
             });
         });
     });

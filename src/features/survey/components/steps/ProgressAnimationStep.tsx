@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
 import { SurveyStepProps } from '@/types/survey';
+
+const CIRCLE_RADIUS = 88;
+const CIRCLE_STROKE_WIDTH = 8;
+const CIRCLE_CENTER = CIRCLE_RADIUS + CIRCLE_STROKE_WIDTH;
+const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 
 export const ProgressAnimationStep: React.FC<SurveyStepProps> = (props) => {
   const { onAnswer, onNext } = props;
@@ -48,24 +52,24 @@ export const ProgressAnimationStep: React.FC<SurveyStepProps> = (props) => {
         <div className="relative w-48 h-48 mx-auto mb-10">
           <svg className="w-full h-full transform -rotate-90">
             <circle
-              cx="96"
-              cy="96"
-              r="88"
+              cx={CIRCLE_CENTER}
+              cy={CIRCLE_CENTER}
+              r={CIRCLE_RADIUS}
               stroke="currentColor"
-              strokeWidth="8"
+              strokeWidth={CIRCLE_STROKE_WIDTH}
               fill="transparent"
               className="text-emerald-50 dark:text-emerald-950/20"
             />
             <motion.circle
-              cx="96"
-              cy="96"
-              r="88"
+              cx={CIRCLE_CENTER}
+              cy={CIRCLE_CENTER}
+              r={CIRCLE_RADIUS}
               stroke="currentColor"
-              strokeWidth="8"
+              strokeWidth={CIRCLE_STROKE_WIDTH}
               fill="transparent"
-              strokeDasharray={552.92}
-              initial={{ strokeDashoffset: 552.92 }}
-              animate={{ strokeDashoffset: 552.92 - (552.92 * progress) / 100 }}
+              strokeDasharray={CIRCLE_CIRCUMFERENCE}
+              initial={{ strokeDashoffset: CIRCLE_CIRCUMFERENCE }}
+              animate={{ strokeDashoffset: CIRCLE_CIRCUMFERENCE - (CIRCLE_CIRCUMFERENCE * progress) / 100 }}
               transition={{ duration: 0.1, ease: "linear" }}
               className="text-emerald-600"
               strokeLinecap="round"

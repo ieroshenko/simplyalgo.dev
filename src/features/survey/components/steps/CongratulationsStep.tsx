@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { PartyPopper, Sparkles } from 'lucide-react';
 import { SurveyStepProps } from '@/types/survey';
 
-export const CongratulationsStep: React.FC<SurveyStepProps> = (props) => {
+export const CongratulationsStep: React.FC<SurveyStepProps> = (_props) => {
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}

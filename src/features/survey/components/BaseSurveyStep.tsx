@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { SurveyStepProps } from '@/types/survey';
 
-interface BaseSurveyOption {
+export interface BaseSurveyOption {
   label: string;
   icon?: React.ReactNode;
 }

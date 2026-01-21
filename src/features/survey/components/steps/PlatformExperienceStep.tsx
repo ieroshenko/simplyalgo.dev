@@ -1,10 +1,10 @@
 import React from 'react';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { BaseSurveyStep } from '../BaseSurveyStep';
+import { BaseSurveyStep, BaseSurveyOption } from '../BaseSurveyStep';
 import { SurveyStepProps } from '@/types/survey';
 
 export const PlatformExperienceStep: React.FC<SurveyStepProps> = (props) => {
-  const options = [
+  const options: BaseSurveyOption[] = [
     { label: "Yes", icon: <ThumbsUp className="w-5 h-5" /> },
     { label: "No", icon: <ThumbsDown className="w-5 h-5" /> }
   ];

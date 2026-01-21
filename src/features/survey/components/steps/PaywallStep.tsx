@@ -93,17 +93,18 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
       } else {
         throw new Error('No client secret or URL received');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('[PaywallStep] Error creating checkout session', { error });
-      
+
       // Check if user already has an active subscription
-      if (error.message && error.message.includes('already has an active subscription')) {
+      if (errorMessage.includes('already has an active subscription')) {
         // User already has subscription, redirect to dashboard
         window.location.href = '/dashboard';
         return;
       }
       
-      handlePaymentError(`Failed to create checkout session: ${error.message || error}`);
+      handlePaymentError(`Failed to create checkout session: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -113,62 +114,81 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
   // Show embedded checkout if we have a client secret
   if (showCheckout && clientSecret) {
     return (
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-8">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-semibold text-foreground mb-2">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-8"
+      >
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 mb-2 tracking-tight">
             Complete Your Subscription
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-lg">
             You're almost there! Complete your payment to unlock SimplyAlgo.
           </p>
         </div>
         
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-[600px] bg-white dark:bg-zinc-900 rounded-[2.5rem] p-4 md:p-8 shadow-2xl border border-emerald-100 dark:border-emerald-900/30 overflow-hidden relative">
           <div className="w-full h-full min-h-[600px]">
             {checkoutError ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <p className="text-red-600 mb-4">Embedded checkout failed to load</p>
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+                <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
+                  <ShieldCheck className="w-8 h-8 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-2">Checkout failed to load</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto">Please try our secure redirect checkout instead.</p>
+                </div>
                 <Button
                   onClick={() => {
-                    // Try redirect-based checkout as fallback
                     window.location.href = `${window.location.origin}/stripe-checkout?plan=${selectedPlan}`;
                   }}
-                  className="bg-primary text-primary-foreground"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-12 rounded-full font-bold shadow-lg"
                 >
                   Continue with Redirect Checkout
                 </Button>
               </div>
             ) : (
-              <EmbeddedCheckoutProvider
-                stripe={stripePromise}
-                options={{ 
-                  clientSecret,
-                  onComplete: () => {
-                    logger.info('[PaywallStep] Payment completed successfully');
-                    handlePaymentSuccess();
-                  }
-                }}
-              >
-                <EmbeddedCheckout />
-              </EmbeddedCheckoutProvider>
+              <div className="relative z-10">
+                <EmbeddedCheckoutProvider
+                  stripe={stripePromise}
+                  options={{ 
+                    clientSecret,
+                    onComplete: () => {
+                      logger.info('[PaywallStep] Payment completed successfully');
+                      handlePaymentSuccess();
+                    }
+                  }}
+                >
+                  <EmbeddedCheckout />
+                </EmbeddedCheckoutProvider>
+              </div>
             )}
           </div>
+          
+          {/* Loading backdrop that shows until Stripe loads */}
+          {!checkoutError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm pointer-events-none z-0">
+              <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-4" />
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Loading secure checkout...</p>
+            </div>
+          )}
         </div>
         
-        <div className="mt-6 text-center">
+        <div className="mt-10 text-center">
           <Button
             variant="ghost"
             onClick={() => {
               setShowCheckout(false);
               setClientSecret(null);
             }}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mx-auto"
+            className="flex items-center gap-2 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 transition-colors mx-auto"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Plans
           </Button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 

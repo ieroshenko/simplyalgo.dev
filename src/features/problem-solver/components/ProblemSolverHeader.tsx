@@ -47,20 +47,20 @@ export const ProblemSolverHeader: React.FC<ProblemSolverHeaderProps> = ({
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                     {showNavigation && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate("/problems")}
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                    {showNavigation && (
-                        <ProblemSelector
-                            problems={problems}
-                            currentProblemId={problemId}
-                        />
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate("/problems")}
+                            >
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Back
+                            </Button>
+                            <ProblemSelector
+                                problems={problems}
+                                currentProblemId={problemId}
+                            />
+                        </>
                     )}
                     <div className="flex items-center space-x-3">
                         <h1 className="text-xl font-bold text-foreground">

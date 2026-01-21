@@ -84,7 +84,7 @@ export class ProblemService {
 
     /**
      * Fetch all problems with their categories and test cases
-     * @deprecated Use getAllForList() for list views or getById() for single problem with test cases
+     * @deprecated since v1.9 - remove by 2025-06-30. Migrate to getAllForList() for list views or getById() for single problem fetches.
      */
     static async getAllWithRelations(): Promise<ProblemWithRelations[]> {
         const { data, error } = await supabase

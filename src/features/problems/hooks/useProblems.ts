@@ -66,7 +66,7 @@ const getStatus = (
   attempts: UserAttemptStatusRow[]
 ): "solved" | "attempted" | "not-started" => {
   const problemAttempts = attempts.filter((a) => a.problem_id === problemId);
-  if (!problemAttempts || problemAttempts.length === 0) return "not-started";
+  if (problemAttempts.length === 0) return "not-started";
   const hasPassed = problemAttempts.some((attempt) => attempt.status === "passed");
   if (hasPassed) return "solved";
   return "attempted";
