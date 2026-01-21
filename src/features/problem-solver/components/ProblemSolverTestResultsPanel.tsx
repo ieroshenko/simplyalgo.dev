@@ -27,29 +27,32 @@ export const ProblemSolverTestResultsPanel = ({
   const active = testResults[activeTestCase];
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-4 pt-4 pb-2">
+    <div className="h-full flex flex-col min-w-0">
+      <div className="px-4 pt-4 pb-2 min-w-0">
         <div className="text-sm font-medium text-foreground mb-3">Test Results</div>
-        <div className="flex gap-2 mb-3">
-          {testResults.map((result, index) => {
-            let buttonClass =
-              'flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ';
-            if (activeTestCase === index) {
-              buttonClass += result.passed
-                ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600'
-                : 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600';
-            } else {
-              buttonClass += result.passed
-                ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20'
-                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20';
-            }
-            return (
-              <button key={index} onClick={() => setActiveTestCase(index)} className={buttonClass}>
-                {result.passed ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                <span>Case {index + 1}</span>
-              </button>
-            );
-          })}
+        {/* Horizontal scroll when there are many test cases */}
+        <div className="overflow-x-auto pb-1">
+          <div className="flex gap-2 mb-3 w-max min-w-full">
+            {testResults.map((result, index) => {
+              let buttonClass =
+                'flex items-center space-x-2 px-3 py-1.5 text-xs font-medium transition-all rounded border-2 ';
+              if (activeTestCase === index) {
+                buttonClass += result.passed
+                  ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600'
+                  : 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600';
+              } else {
+                buttonClass += result.passed
+                  ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/10 dark:text-green-500 dark:border-green-800 dark:hover:bg-green-900/20'
+                  : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-500 dark:border-red-800 dark:hover:bg-red-900/20';
+              }
+              return (
+                <button key={index} onClick={() => setActiveTestCase(index)} className={buttonClass}>
+                  {result.passed ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                  <span>Case {index + 1}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
