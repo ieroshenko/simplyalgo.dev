@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock data
 const mockUsers = [
@@ -83,6 +84,24 @@ vi.mock('sonner', () => ({
     },
 }));
 
+// Mock useSubscription hook
+vi.mock('@/hooks/useSubscription', () => ({
+    useSubscription: () => ({
+        hasActiveSubscription: true,
+        isLoading: false,
+        subscription: { status: 'active' },
+    }),
+}));
+
+// Mock useAuth hook
+vi.mock('@/hooks/useAuth', () => ({
+    useAuth: () => ({
+        user: { id: 'admin-user-1', email: 'admin@example.com' },
+        loading: false,
+        session: { user: { id: 'admin-user-1' } },
+    }),
+}));
+
 // Create chainable query builder
 const createQueryBuilder = (data: unknown = [], count: number | null = null) => {
     const builder = {
@@ -109,8 +128,8 @@ vi.mock('@/integrations/supabase/client', () => ({
         from: vi.fn((table: string) => {
             if (table === 'user_profiles') {
                 return createQueryBuilder([
-                    { id: '1', user_id: 'user-1', email: 'user1@example.com', created_at: '2024-01-15T10:00:00Z' },
-                    { id: '2', user_id: 'user-2', email: 'user2@example.com', created_at: '2024-01-10T10:00:00Z' },
+                    { id: '1', user_id: 'user-1', email: 'user1@example.com', created_at: '2024-01-15T10:00:00Z', onboarding_tours_seen: null },
+                    { id: '2', user_id: 'user-2', email: 'user2@example.com', created_at: '2024-01-10T10:00:00Z', onboarding_tours_seen: null },
                 ], 2);
             }
             if (table === 'user_subscriptions') {
@@ -142,6 +161,12 @@ vi.mock('@/integrations/supabase/client', () => ({
             }
             return createQueryBuilder();
         }),
+        auth: {
+            onAuthStateChange: vi.fn(() => ({
+                data: { subscription: { unsubscribe: vi.fn() } },
+            })),
+            getSession: vi.fn(() => Promise.resolve({ data: { session: { user: { id: 'user-1' } } }, error: null })),
+        },
     },
 }));
 
@@ -161,12 +186,29 @@ vi.stubGlobal('import.meta', {
 
 import { AdminDashboardNew } from '../AdminDashboardNew';
 import { toast } from 'sonner';
+import { OnboardingProvider } from '@/features/onboarding/OnboardingContext';
+
+// Create a test QueryClient
+const createTestQueryClient = () =>
+    new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                gcTime: 0,
+                staleTime: 0,
+            },
+        },
+    });
 
 const renderWithRouter = (component: React.ReactElement) => {
     return render(
-        <MemoryRouter>
-            {component}
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+            <OnboardingProvider>
+                <MemoryRouter>
+                    {component}
+                </MemoryRouter>
+            </OnboardingProvider>
+        </QueryClientProvider>
     );
 };
 

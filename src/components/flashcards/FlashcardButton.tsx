@@ -1,11 +1,5 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { BookOpen, CheckCircle } from "lucide-react";
 import { useFlashcards } from "@/hooks/useFlashcards";
 import { useSolutions } from "@/features/problems/hooks/useSolutions";
@@ -101,52 +95,34 @@ export const FlashcardButton = ({
 
   if (isAlreadyInFlashcards) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`
-                border-emerald-600 text-emerald-700 bg-emerald-50
-                dark:border-emerald-500 dark:text-emerald-200 dark:bg-emerald-900/30
-                disabled:opacity-100 disabled:pointer-events-none
-                ${className}
-              `}
-              disabled
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Added to Deck
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Already in your flashcard deck</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        variant="outline"
+        size="sm"
+        className={`
+          border-emerald-600 text-emerald-700 bg-emerald-50
+          dark:border-emerald-500 dark:text-emerald-200 dark:bg-emerald-900/30
+          disabled:opacity-100
+          ${className}
+        `}
+        disabled
+      >
+        <CheckCircle className="h-4 w-4 mr-2" />
+        Added to Deck
+      </Button>
     );
   }
 
   return (
     <>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={variant === "submission" ? "outline" : "ghost"}
-              size="sm"
-              onClick={handleAddToFlashcards}
-              disabled={isAddingToFlashcards}
-              className={variant === "submission" ? className : `p-1.5 hover:bg-muted/50 ${className}`}
-            >
-              <BookOpen className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Save solutions for spaced repetition review</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        variant={variant === "submission" ? "outline" : "ghost"}
+        size="sm"
+        onClick={handleAddToFlashcards}
+        disabled={isAddingToFlashcards}
+        className={variant === "submission" ? className : `p-1.5 hover:bg-muted/50 ${className}`}
+      >
+        <BookOpen className="h-4 w-4" />
+      </Button>
 
       {showSolutionSelector && (
         <SolutionSelectorModal

@@ -134,6 +134,8 @@ export function AdminDashboardNew() {
 
   // Open demo mode for testing
   const handleTestDemoMode = useCallback(() => {
+    // Clear demo state so tour starts fresh
+    localStorage.removeItem('simplyalgo_demo_state');
     window.open(`/problems/${DEMO_PROBLEM_ID}?demo=true`, '_blank');
   }, []);
 
