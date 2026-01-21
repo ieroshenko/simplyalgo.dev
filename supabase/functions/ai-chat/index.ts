@@ -54,6 +54,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : supabase;
+const enableCodePreviewLogs =
+  Deno.env.get("LOG_LEVEL") === "debug" || Deno.env.get("DEBUG") === "true";
 
 /**
  * CORS headers for all responses
@@ -506,8 +508,10 @@ serve(async (req) => {
 
       try {
         console.log("[ai-chat] Calling insertSnippetSmart...");
-        console.log("[ai-chat] Code preview:", code?.substring(0, 100));
-        console.log("[ai-chat] Snippet preview:", snippet?.code?.substring(0, 100));
+        if (enableCodePreviewLogs) {
+          console.log("[ai-chat] Code preview:", code?.substring(0, 100));
+          console.log("[ai-chat] Snippet preview:", snippet?.code?.substring(0, 100));
+        }
         const result = await insertSnippetSmart(
           code,
           snippet,

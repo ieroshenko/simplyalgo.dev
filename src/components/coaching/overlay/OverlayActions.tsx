@@ -62,15 +62,10 @@ export const OverlayActions: React.FC<OverlayActionsProps> = ({
     };
 
     const handleInsertWrapper = async () => {
-        console.log('[OverlayActions] handleInsertWrapper called');
-        console.log('[OverlayActions] onInsertCorrectCode exists:', !!onInsertCorrectCode);
         if (!onInsertCorrectCode) return;
         try {
-            console.log('[OverlayActions] Setting isInserting to true');
             setIsInserting(true);
-            console.log('[OverlayActions] Calling onInsertCorrectCode...');
             await onInsertCorrectCode();
-            console.log('[OverlayActions] onInsertCorrectCode completed');
         } finally {
             setIsInserting(false);
         }

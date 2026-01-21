@@ -13,11 +13,22 @@ const ProgressRadar = () => {
 
   useEffect(() => {
     const fetchTotals = async () => {
-      const { count, error } = await supabase
+      // Fetch all problems with their categories to filter out non-algorithm problems
+      const { data, error } = await supabase
         .from("problems")
-        .select("id", { count: "exact", head: true });
-      if (!error && typeof count === "number") {
-        setTotalProblems(count);
+        .select("id, categories!inner(name)");
+
+      if (!error && data) {
+        // Filter out System Design and Data Structure Implementations (same logic as technical interview)
+        const algorithmProblems = data.filter((problem) => {
+          const categoryName = (problem.categories as { name?: string })?.name || "";
+          return (
+            categoryName !== "System Design" &&
+            categoryName !== "Data Structure Implementations" &&
+            !problem.id.startsWith("sd_")
+          );
+        });
+        setTotalProblems(algorithmProblems.length);
       }
     };
     fetchTotals();

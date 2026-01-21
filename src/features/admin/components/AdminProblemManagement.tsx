@@ -18,8 +18,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Search } from "lucide-react";
+import { Loader2, Plus, Pencil, Search, Download } from "lucide-react";
 import { AdminProblemDialog, type Problem } from "@/features/admin/components/AdminProblemDialog";
+import { LeetCodeImportDialog } from "@/features/admin/components/LeetCodeImportDialog";
 
 interface Category {
     id: string;
@@ -31,6 +32,7 @@ const AdminProblemManagement = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
 
     // Filter state
@@ -98,9 +100,14 @@ const AdminProblemManagement = () => {
         <div className="container mx-auto py-10 px-4">
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold">Problem Administration</h1>
-                <Button onClick={handleAddProblem}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Problem
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                        <Download className="mr-2 h-4 w-4" /> Import from LeetCode
+                    </Button>
+                    <Button onClick={handleAddProblem}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Problem
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -218,6 +225,14 @@ const AdminProblemManagement = () => {
                     setIsDialogOpen(false);
                 }}
                 categories={categories}
+            />
+
+            <LeetCodeImportDialog
+                open={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                onImported={(importedProblem) => {
+                    setProblems(prev => [importedProblem, ...prev]);
+                }}
             />
         </div>
     );

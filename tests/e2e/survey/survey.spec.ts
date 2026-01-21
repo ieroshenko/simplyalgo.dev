@@ -6,6 +6,18 @@ import { AuthHelper } from '../../utils/test-helpers';
 // Question steps (require selection): 1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14, 15
 // Non-question steps (auto-continue): 5, 11, 12, 16, 17, 18, 19, 20
 
+const waitForStepTransition = async (
+  page: Page,
+  urlPattern: RegExp,
+  textPattern: RegExp,
+  timeout = 90000,
+) => {
+  await Promise.any([
+    page.waitForURL(urlPattern, { timeout, waitUntil: 'domcontentloaded' }),
+    page.getByText(textPattern).waitFor({ state: 'visible', timeout }),
+  ]);
+};
+
 test.describe('Survey Flow', () => {
   let authHelper: AuthHelper;
 
@@ -313,17 +325,15 @@ test.describe('Full Survey Completion', () => {
       await progressContinueButton.click();
     }
     // Wait for either the URL to change OR the Step 18 content to appear.
-    await Promise.race([
-      page.waitForURL(/\/survey\/18/, { timeout: 90000, waitUntil: 'domcontentloaded' }),
-      expect(page.getByText(/Congratulations/i)).toBeVisible({ timeout: 90000 }),
-    ]);
+    const congratulationsHeading = page.getByText(/Congratulations/i);
+    await waitForStepTransition(page, /\/survey\/18/, /Congratulations/i, 90000);
 
     // Step 18: Congratulations (non-question step)
-    await expect(page.getByText(/Congratulations/i)).toBeVisible();
+    await expect(congratulationsHeading).toBeVisible();
     for (let i = 0; i < 3; i++) {
       await page.getByRole('button', { name: /Continue/i }).click();
+      await page.waitForURL(/\/survey\/19/, { timeout: 500 }).catch(() => null);
       if (/\/survey\/19/.test(page.url())) break;
-      await page.waitForTimeout(500);
     }
 
     // Step 19: Customized Results (non-question step)
@@ -506,10 +516,7 @@ test.describe('Full Survey Completion', () => {
     if (await stripeProgressContinueButton.isVisible().catch(() => false)) {
       await stripeProgressContinueButton.click();
     }
-    await Promise.race([
-      page.waitForURL(/\/survey\/18/, { timeout: 90000, waitUntil: 'domcontentloaded' }),
-      expect(page.getByText(/Congratulations/i)).toBeVisible({ timeout: 90000 }),
-    ]);
+    await waitForStepTransition(page, /\/survey\/18/, /Congratulations/i, 90000);
 
     // Step 18 (congratulations)
     await expect(page.getByText(/Congratulations/i)).toBeVisible({ timeout: 60000 });
@@ -540,7 +547,13 @@ test.describe('Full Survey Completion', () => {
     await startButton.click();
 
     // Wait for checkout to load or redirect
-    await page.waitForTimeout(5000);
+    await Promise.any([
+      page.waitForNavigation({ timeout: 5000 }),
+      page.waitForSelector('text=Complete Your Subscription', { timeout: 5000 }),
+      page.waitForSelector('iframe[name*="__privateStripeFrame"]', { timeout: 5000 }),
+      page.waitForSelector('text=/error|failed|unable/i', { timeout: 5000 }),
+      page.waitForURL(/\/dashboard/, { timeout: 5000 }),
+    ]).catch(() => null);
 
     // Check possible outcomes after clicking Start My Journey:
     // 1. Embedded checkout UI ("Complete Your Subscription")

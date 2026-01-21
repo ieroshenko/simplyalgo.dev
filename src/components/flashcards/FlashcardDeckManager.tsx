@@ -84,15 +84,15 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
   const getMasteryLabel = (level: number, reviewCount: number) => {
     // If card has been reviewed but still shows as level 0, it should be Learning
     if (level === 0 && reviewCount > 0) {
-      return { label: "Learning", color: "bg-blue-100 text-blue-800" };
+      return { label: "Learning", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200" };
     }
 
     switch (level) {
-      case 0: return { label: "New", color: "bg-gray-100 text-gray-800" };
-      case 1: return { label: "Learning", color: "bg-blue-100 text-blue-800" };
-      case 2: return { label: "Good", color: "bg-green-100 text-green-800" };
-      case 3: return { label: "Mastered", color: "bg-purple-100 text-purple-800" };
-      default: return { label: "Unknown", color: "bg-gray-100 text-gray-800" };
+      case 0: return { label: "New", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-200" };
+      case 1: return { label: "Learning", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200" };
+      case 2: return { label: "Good", color: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200" };
+      case 3: return { label: "Mastered", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200" };
+      default: return { label: "Unknown", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-200" };
     }
   };
 
@@ -139,7 +139,7 @@ export const FlashcardDeckManager = ({ userId }: FlashcardDeckManagerProps) => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate(-1)}
               className="hover:bg-secondary"
             >
               <ArrowLeft className="w-5 h-5" />

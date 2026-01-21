@@ -318,7 +318,11 @@ export async function llmText(
   // Log usage if context provided
   if (usageContext) {
     const rawUsage = extractUsageInfoFromResponse(chat);
-    await logUsageToDb(usageContext, chatModel, normalizeUsageInfo(rawUsage, prompt, content));
+    logUsageToDb(usageContext, chatModel, normalizeUsageInfo(rawUsage, prompt, content)).catch(
+      (error) => {
+        console.error("[ai-chat] Failed to log usage to DB:", error);
+      },
+    );
   }
 
   return content;

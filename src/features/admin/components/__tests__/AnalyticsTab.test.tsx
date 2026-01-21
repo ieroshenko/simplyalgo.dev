@@ -91,6 +91,78 @@ const mockStats: AdminAnalyticsStats = {
   },
 };
 
+const emptyStats: AdminAnalyticsStats = {
+  engagement: {
+    dau: 0,
+    wau: 0,
+    mau: 0,
+    newUsers30d: 0,
+    retention7d: 0,
+    retention30d: 0,
+  },
+  aiUsage: {
+    tokens30d: 0,
+    cost30d: 0,
+    sessions30d: 0,
+    avgMessagesPerSession: 0,
+    featureBreakdown: [],
+    modelBreakdown: [],
+    dailySeries: [],
+  },
+  problems: {
+    attempts30d: 0,
+    passRate30d: 0,
+    uniqueProblems30d: 0,
+    avgAttemptsPerProblem: 0,
+    topProblems: [],
+  },
+  streaks: {
+    averageCurrentStreak: 0,
+    maxStreak: 0,
+    atRiskUsers: 0,
+  },
+  flashcards: {
+    decksTotal: 0,
+    reviews30d: 0,
+    dueNow: 0,
+    avgMastery: 0,
+  },
+  behavioral: {
+    sessionsStarted30d: 0,
+    sessionsCompleted30d: 0,
+    avgScore30d: 0,
+  },
+  mockInterviews: {
+    sessionsStarted30d: 0,
+    sessionsCompleted30d: 0,
+    avgScore30d: 0,
+  },
+  content: {
+    questionsAdded30d: 0,
+    solutionsAdded30d: 0,
+    storiesAdded30d: 0,
+    storyReuseRate30d: 0,
+  },
+  feedback: {
+    newFeedback30d: 0,
+    openCount: 0,
+    resolvedCount: 0,
+  },
+  subscriptions: {
+    active: 0,
+    trialing: 0,
+    cancelled: 0,
+    pastDue: 0,
+    new30d: 0,
+    churned30d: 0,
+    userJoinDates: [],
+    cancellationsDates: [],
+    subscriptionJoinDates: [],
+    userJoinTimeline: [],
+    cancellationsTimeline: [],
+  },
+};
+
 describe("AnalyticsTab", () => {
   beforeEach(() => {
     mockResizeObserver();
@@ -117,5 +189,135 @@ describe("AnalyticsTab", () => {
     render(<AnalyticsTab stats={mockStats} loading />);
 
     expect(screen.queryByText("Engagement")).not.toBeInTheDocument();
+  });
+
+  describe("Engagement metrics", () => {
+    it("displays DAU, WAU, and MAU values correctly", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      // 120 appears multiple times (DAU, dueNow, active subscriptions)
+      const dau120Elements = screen.getAllByText("120");
+      expect(dau120Elements.length).toBeGreaterThan(0);
+      expect(screen.getByText("540")).toBeInTheDocument(); // WAU
+      expect(screen.getByText("2.1K")).toBeInTheDocument(); // MAU (2100 formatted)
+    });
+
+    it("displays retention percentages correctly", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("42%")).toBeInTheDocument(); // 7d retention
+      expect(screen.getByText("28%")).toBeInTheDocument(); // 30d retention
+    });
+  });
+
+  describe("AI Usage metrics", () => {
+    it("displays token count and cost correctly", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("1.5M")).toBeInTheDocument(); // tokens30d formatted
+      expect(screen.getByText("$420.50")).toBeInTheDocument(); // cost30d
+    });
+
+    it("displays session count correctly", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("680")).toBeInTheDocument(); // sessions30d
+    });
+
+    it("displays feature breakdown", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("Usage by Feature")).toBeInTheDocument();
+      expect(screen.getByText("chat")).toBeInTheDocument();
+      expect(screen.getByText("coach")).toBeInTheDocument();
+    });
+  });
+
+  describe("Problem metrics", () => {
+    it("displays pass rate as percentage", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("58%")).toBeInTheDocument(); // passRate30d
+    });
+
+    it("displays attempt count", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("1.2K")).toBeInTheDocument(); // attempts30d formatted
+    });
+  });
+
+  describe("Subscription metrics", () => {
+    it("displays subscription counts correctly", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      // Use getAllByText for values that appear multiple times
+      const activeElements = screen.getAllByText("120");
+      expect(activeElements.length).toBeGreaterThan(0); // Active subscriptions (and DAU and dueNow)
+      // Trialing shows as 18 - may appear multiple times
+      const trialingElements = screen.getAllByText("18");
+      expect(trialingElements.length).toBeGreaterThan(0);
+      // Cancelled shows as 6
+      const cancelledElements = screen.getAllByText("6");
+      expect(cancelledElements.length).toBeGreaterThan(0);
+    });
+
+    it("displays churn metrics", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      // new30d = 25
+      const newElements = screen.getAllByText("25");
+      expect(newElements.length).toBeGreaterThan(0);
+      // churned30d = 4 (may also match openCount)
+      const churnElements = screen.getAllByText("4");
+      expect(churnElements.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Empty state handling", () => {
+    it("handles empty data gracefully", () => {
+      render(<AnalyticsTab stats={emptyStats} loading={false} />);
+
+      // Should still render sections
+      expect(screen.getByText("Engagement")).toBeInTheDocument();
+      expect(screen.getByText("AI Usage")).toBeInTheDocument();
+
+      // Should show "No data available" for empty breakdowns
+      const noDataMessages = screen.getAllByText("No data available");
+      expect(noDataMessages.length).toBeGreaterThan(0);
+    });
+
+    it("shows zero values without crashing", () => {
+      render(<AnalyticsTab stats={emptyStats} loading={false} />);
+
+      // Multiple 0s should be present
+      const zeroElements = screen.getAllByText("0");
+      expect(zeroElements.length).toBeGreaterThan(0);
+
+      // Zero percentage
+      expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Learning Tools metrics", () => {
+    it("displays flashcard deck count", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("430")).toBeInTheDocument(); // decksTotal
+    });
+
+    it("displays behavioral session count with completed helper", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("75")).toBeInTheDocument(); // behavioral sessions started
+      expect(screen.getByText("60 completed")).toBeInTheDocument(); // helper text
+    });
+
+    it("displays mock interview metrics", () => {
+      render(<AnalyticsTab stats={mockStats} loading={false} />);
+
+      expect(screen.getByText("42")).toBeInTheDocument(); // mock interviews started
+      expect(screen.getByText("30 completed")).toBeInTheDocument(); // helper text
+    });
   });
 });

@@ -148,23 +148,29 @@ const SkeletonGrid = () => (
 
 export const AnalyticsTab = ({ stats, loading }: AnalyticsTabProps) => {
   const [resolution, setResolution] = useState<AnalyticsResolution>("month");
+  const joinDates = stats?.subscriptions?.userJoinDates ?? [];
+  const cancellationDates = stats?.subscriptions?.cancellationsDates ?? [];
+  const premiumJoinDates = stats?.subscriptions?.subscriptionJoinDates ?? [];
 
   const joinTimeline = useMemo(
-    () => aggregateTimeline(stats.subscriptions.userJoinDates, resolution),
-    [stats.subscriptions.userJoinDates, resolution]
+    () => aggregateTimeline(joinDates, resolution),
+    [joinDates, resolution]
   );
 
   const cancellationsTimeline = useMemo(
-    () => aggregateTimeline(stats.subscriptions.cancellationsDates, resolution),
-    [stats.subscriptions.cancellationsDates, resolution]
+    () => aggregateTimeline(cancellationDates, resolution),
+    [cancellationDates, resolution]
   );
 
   const premiumsTimeline = useMemo(
-    () => aggregateTimeline(stats.subscriptions.subscriptionJoinDates, resolution),
-    [stats.subscriptions.subscriptionJoinDates, resolution]
+    () => aggregateTimeline(premiumJoinDates, resolution),
+    [premiumJoinDates, resolution]
   );
 
   const combinedTimeline = useMemo(() => {
+    const joinMap = new Map(joinTimeline.map((point) => [point.date, point.count]));
+    const premiumMap = new Map(premiumsTimeline.map((point) => [point.date, point.count]));
+    const cancelMap = new Map(cancellationsTimeline.map((point) => [point.date, point.count]));
     const allDates = new Set([
       ...joinTimeline.map((p) => p.date),
       ...premiumsTimeline.map((p) => p.date),
@@ -174,9 +180,9 @@ export const AnalyticsTab = ({ stats, loading }: AnalyticsTabProps) => {
     return Array.from(allDates)
       .sort()
       .map((date) => {
-        const joins = joinTimeline.find((p) => p.date === date)?.count || 0;
-        const premiums = premiumsTimeline.find((p) => p.date === date)?.count || 0;
-        const cancels = cancellationsTimeline.find((p) => p.date === date)?.count || 0;
+        const joins = joinMap.get(date) || 0;
+        const premiums = premiumMap.get(date) || 0;
+        const cancels = cancelMap.get(date) || 0;
         return {
           date,
           joins,

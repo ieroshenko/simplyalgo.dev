@@ -32,13 +32,13 @@ export const CorrectCodeDialog: React.FC<CorrectCodeDialogProps> = ({
     };
 
     const handleInsert = async () => {
-        console.log('[CorrectCodeDialog] handleInsert called');
-        console.log('[CorrectCodeDialog] onInsertCode exists:', !!onInsertCode);
-        console.log('[CorrectCodeDialog] isInserting:', isInserting);
+        logger.debug('[CorrectCodeDialog] handleInsert called');
+        logger.debug('[CorrectCodeDialog] onInsertCode exists:', !!onInsertCode);
+        logger.debug('[CorrectCodeDialog] isInserting:', isInserting);
         if (onInsertCode) {
-            console.log('[CorrectCodeDialog] Calling onInsertCode...');
+            logger.debug('[CorrectCodeDialog] Calling onInsertCode...');
             await onInsertCode();
-            console.log('[CorrectCodeDialog] onInsertCode completed');
+            logger.debug('[CorrectCodeDialog] onInsertCode completed');
             onClose();
         }
     };

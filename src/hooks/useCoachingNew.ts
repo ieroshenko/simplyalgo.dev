@@ -708,32 +708,51 @@ export const useCoachingNew = ({
 
   // Insert correct code from AI validation
   const insertCorrectCode = useCallback(async () => {
-    console.log('[insertCorrectCode] Called');
-    console.log('[insertCorrectCode] lastValidation:', !!coachingState.lastValidation);
-    console.log('[insertCorrectCode] codeToAdd:', coachingState.lastValidation?.codeToAdd?.substring(0, 50));
+    logger.debug("[insertCorrectCode] Called", { component: "Coaching" });
+    logger.debug("[insertCorrectCode] lastValidation", {
+      component: "Coaching",
+      hasLastValidation: !!coachingState.lastValidation,
+    });
+    logger.debug("[insertCorrectCode] codeToAdd", {
+      component: "Coaching",
+      preview: coachingState.lastValidation?.codeToAdd?.substring(0, 50),
+    });
     if (!coachingState.lastValidation?.codeToAdd) return;
 
     const codeToInsert = stripCodeFences(coachingState.lastValidation.codeToAdd);
-    console.log('[insertCorrectCode] codeToInsert:', codeToInsert?.substring(0, 50));
+    logger.debug("[insertCorrectCode] codeToInsert", {
+      component: "Coaching",
+      preview: codeToInsert?.substring(0, 50),
+      length: codeToInsert.length,
+    });
 
     try {
       const editor = editorRef.current;
       const before = editor?.getValue() || "";
 
-      console.log('[insertCorrectCode] before code length:', before?.length);
-      console.log('[insertCorrectCode] codeContainsSnippet:', codeContainsSnippet(before, codeToInsert));
+      logger.debug("[insertCorrectCode] before code length", {
+        component: "Coaching",
+        length: before?.length ?? 0,
+      });
+      logger.debug("[insertCorrectCode] codeContainsSnippet", {
+        component: "Coaching",
+        contains: codeContainsSnippet(before, codeToInsert),
+      });
       if (!codeContainsSnippet(before, codeToInsert)) {
         // Skip large insertion check for coaching - the code is AI-validated and typically small helper functions
         // The isLargeInsertion check was triggering for any function definition which is too aggressive
         logger.debug("Proceeding with coaching code insertion", { component: "Coaching", codeLength: codeToInsert.length });
 
         logger.debug("Using shared insertion logic for consistency with chat mode", { component: "Coaching" });
-        console.log('[insertCorrectCode] onCodeInsert exists:', !!onCodeInsert);
+        logger.debug("[insertCorrectCode] onCodeInsert exists", {
+          component: "Coaching",
+          hasOnCodeInsert: !!onCodeInsert,
+        });
 
         if (onCodeInsert) {
-          console.log('[insertCorrectCode] Calling onCodeInsert...');
+          logger.debug("[insertCorrectCode] Calling onCodeInsert...", { component: "Coaching" });
           await onCodeInsert(codeToInsert);
-          console.log('[insertCorrectCode] onCodeInsert completed');
+          logger.debug("[insertCorrectCode] onCodeInsert completed", { component: "Coaching" });
         }
 
         logger.debug("Shared insertion completed successfully", { component: "Coaching" });
