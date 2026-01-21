@@ -1,93 +1,97 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { SurveyStepProps } from '@/types/survey';
-import { Target, Calendar, Clover, GraduationCap, Blocks, TrendingUp, Wrench, Sparkles } from 'lucide-react';
+import { Target, Calendar, Clover, GraduationCap, Blocks, TrendingUp, Wrench, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface CustomizedResultsStepProps extends SurveyStepProps {
   surveyData?: { [key: number]: string };
 }
 
 export const CustomizedResultsStep: React.FC<CustomizedResultsStepProps> = (props) => {
-  const { onAnswer, surveyData } = props;
-
-  // Auto-mark as viewed when component mounts
-//   React.useEffect(() => {
-//     onAnswer("viewed");
-//   }, [onAnswer]);
+  const { surveyData } = props;
 
   // Get user's answers from the survey data
-  const userGoal = surveyData?.[9] || "Land a role at Big Tech"; // GoalsStep is step 9
-  const userCommitment = surveyData?.[15] || "3 session(s) per week"; // SessionsPerWeekStep is step 15
+  const userGoal = surveyData?.[9] || "Land a role at Big Tech";
+  const userCommitment = surveyData?.[15] || "3 sessions per week";
   const userFocusAreas = surveyData?.[14] ? 
     (surveyData[14] === "Both" ? ["Assessments", "Interviews"] : surveyData[14].split(',').map(area => area.trim())) 
-    : ["Dynamic Programming", "Graphs"]; // FocusAreasStep is step 14
+    : ["Interviews"];
 
   const recommendations = [
     {
-      icon: <GraduationCap className="w-6 h-6 text-yellow-600" />,
+      icon: <GraduationCap className="w-5 h-5 text-emerald-600" />,
       text: "Use coach mode on harder problems"
     },
     {
-      icon: <Blocks className="w-6 h-6 text-amber-700" />,
+      icon: <Blocks className="w-5 h-5 text-emerald-600" />,
       text: "Get first-principle hints when stuck"
     },
     {
-      icon: <TrendingUp className="w-6 h-6 text-red-600" />,
+      icon: <TrendingUp className="w-5 h-5 text-emerald-600" />,
       text: "Review feedback after each session"
     },
     {
-      icon: <Wrench className="w-6 h-6 text-yellow-600" />,
+      icon: <Wrench className="w-5 h-5 text-emerald-600" />,
       text: "Focus on writing structured, readable code"
     }
   ];
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-semibold text-foreground mb-6">
-          Congratulations your custom plan is ready!
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8"
+    >
+      <div className="text-center mb-10">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-zinc-800 dark:text-zinc-100 mb-4 tracking-tight leading-tight">
+          Congratulations, your custom plan is ready!
         </h1>
       </div>
 
-      {/* User's Custom Plan */}
-      <div className="space-y-4 mb-8">
+      {/* User's Custom Plan Summary */}
+      <div className="bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/30 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-500/5 mb-10 space-y-6">
         {/* Your Goal */}
-        <div className="flex items-center gap-3">
-          <Target className="w-6 h-6 text-red-600" />
-          <span className="text-base font-medium text-foreground">Your goal:</span>
-          <div className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-base">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-3 min-w-[140px]">
+            <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+              <Target className="w-4 h-4 text-red-500" />
+            </div>
+            <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Your goal</span>
+          </div>
+          <div className="inline-flex bg-emerald-50/50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold border border-emerald-100 dark:border-emerald-800/30">
             {userGoal}
           </div>
         </div>
 
         {/* Commitment */}
-        <div className="flex items-center gap-3">
-          {userCommitment === "Not looking for strict structure" ? (
-            <Sparkles className="w-6 h-6 text-accent" />
-          ) : (
-            <Calendar className="w-6 h-6 text-amber-700" />
-          )}
-          <span className="text-base font-medium text-foreground">Commitment:</span>
-          {userCommitment === "Not looking for strict structure" ? (
-            <div className="bg-gradient-to-r from-secondary to-background dark:from-secondary/50 dark:to-card border-2 border-primary/30 dark:border-primary/50 text-foreground px-4 py-2 rounded-lg text-base font-medium shadow-sm">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-accent" />
-                <span>Flexible schedule - practice at your own pace</span>
-              </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-3 min-w-[140px]">
+            <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+              {userCommitment === "Not looking for strict structure" ? (
+                <Sparkles className="w-4 h-4 text-amber-500" />
+              ) : (
+                <Calendar className="w-4 h-4 text-amber-500" />
+              )}
             </div>
-          ) : (
-            <div className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-base">
-              {userCommitment}
-            </div>
-          )}
+            <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Commitment</span>
+          </div>
+          <div className="inline-flex bg-emerald-50/50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold border border-emerald-100 dark:border-emerald-800/30">
+            {userCommitment === "Not looking for strict structure" ? "Flexible schedule" : userCommitment}
+          </div>
         </div>
 
         {/* Focus Areas */}
-        <div className="flex items-center gap-3">
-          <Clover className="w-6 h-6 text-green-600" />
-          <span className="text-base font-medium text-foreground">Focus areas:</span>
-          <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-3 min-w-[140px]">
+            <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
+              <Clover className="w-4 h-4 text-green-500" />
+            </div>
+            <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Focus areas</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {userFocusAreas.map((area, index) => (
-              <div key={index} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-base">
+              <div key={index} className="bg-emerald-50/50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 px-4 py-1.5 rounded-full text-sm font-semibold border border-emerald-100 dark:border-emerald-800/30">
                 {area}
               </div>
             ))}
@@ -96,20 +100,35 @@ export const CustomizedResultsStep: React.FC<CustomizedResultsStepProps> = (prop
       </div>
 
       {/* How to reach your goal */}
-      <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-2xl font-bold text-white mb-6 tracking-tight">
+      <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/30 rounded-[2rem] p-8 md:p-10 shadow-xl shadow-emerald-500/5">
+        <div className="absolute top-0 right-0 p-8 opacity-5">
+          <Sparkles className="w-24 h-24 text-emerald-600" />
+        </div>
+        
+        <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-8 tracking-tight flex items-center gap-3">
           How to reach your goal
+          <div className="h-px flex-1 bg-emerald-100 dark:bg-emerald-800/20" />
         </h2>
         
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {recommendations.map((rec, index) => (
-            <div key={index} className="flex items-center gap-3">
-              {rec.icon}
-              <span className="text-base text-gray-300">{rec.text}</span>
-            </div>
+            <motion.div 
+              key={index}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 + index * 0.1 }}
+              className="flex items-start gap-4"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100/50 dark:border-emerald-800/30 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                {rec.icon}
+              </div>
+              <span className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 font-medium leading-tight pt-1">
+                {rec.text}
+              </span>
+            </motion.div>
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

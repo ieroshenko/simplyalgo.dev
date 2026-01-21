@@ -27,7 +27,8 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/" replace />;
   }
 
-  if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
+  const userEmailLower = user.email?.toLowerCase();
+  if (!userEmailLower || !ADMIN_EMAILS.some(email => email.toLowerCase() === userEmailLower)) {
     logger.warn('[AdminRoute] Unauthorized access attempt', { email: user.email, path: '/admin' });
     return <Navigate to="/dashboard" replace />;
   }

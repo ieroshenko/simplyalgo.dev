@@ -58,7 +58,7 @@ export const useFlashcards = (userId?: string) => {
     enabled: !!userId,
   });
 
-  // Get flashcard statistics
+  // Get flashcard statistics using optimized RPC function
   const { data: stats } = useQuery({
     queryKey: ["flashcard-stats", userId],
     queryFn: async (): Promise<FlashcardStats> => {
@@ -74,6 +74,28 @@ export const useFlashcards = (userId?: string) => {
           currentStreak: 0,
         };
       }
+
+      // Try to use the optimized RPC function (server-side aggregation)
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_flashcard_stats", {
+        p_user_id: userId,
+      });
+
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const statsRow = rpcData[0];
+        return {
+          totalCards: Number(statsRow.total_cards) || 0,
+          dueToday: Number(statsRow.due_today) || 0,
+          newCards: Number(statsRow.new_cards) || 0,
+          learningCards: Number(statsRow.learning_cards) || 0,
+          masteredCards: Number(statsRow.mastered_cards) || 0,
+          averageEaseFactor: Number(statsRow.average_ease_factor) || 2.5,
+          longestStreak: 0, // TODO: Calculate from review history
+          currentStreak: 0, // TODO: Calculate from review history
+        };
+      }
+
+      // Fallback to client-side calculation if RPC not available
+      logger.debug("[useFlashcards] RPC not available, using client-side stats calculation");
 
       const { data: decks, error } = await supabase
         .from("flashcard_decks")
@@ -99,13 +121,9 @@ export const useFlashcards = (userId?: string) => {
       const dueToday = decks.filter((deck) => deck.next_review_date <= today).length;
       const newCards = decks.filter((deck) => deck.mastery_level === 0).length;
       const learningCards = decks.filter((deck) => deck.mastery_level === 1).length;
-      const masteredCards = decks.filter((deck) => deck.mastery_level === 3).length;
+      const masteredCards = decks.filter((deck) => deck.mastery_level >= 3).length;
       const averageEaseFactor =
         decks.reduce((sum, deck) => sum + (deck.ease_factor ?? 2.5), 0) / decks.length || 2.5;
-
-      // TODO: Calculate streak data from review history
-      const longestStreak = 0;
-      const currentStreak = 0;
 
       return {
         totalCards,
@@ -114,8 +132,8 @@ export const useFlashcards = (userId?: string) => {
         learningCards,
         masteredCards,
         averageEaseFactor,
-        longestStreak,
-        currentStreak,
+        longestStreak: 0,
+        currentStreak: 0,
       };
     },
     enabled: !!userId,

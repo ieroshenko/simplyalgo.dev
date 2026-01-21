@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SurveyStepProps } from '@/types/survey';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowLeft } from 'lucide-react';
+import { Check, ArrowLeft, Sparkles, ShieldCheck, Zap, TrendingUp, Infinity as InfinityIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
@@ -92,7 +93,7 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
       } else {
         throw new Error('No client secret or URL received');
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       logger.error('[PaywallStep] Error creating checkout session', { error });
       
       // Check if user already has an active subscription
@@ -172,146 +173,204 @@ export const PaywallStep: React.FC<PaywallStepProps> = (props) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-8"
+    >
       {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-semibold text-foreground mb-4">
+      <div className="text-center mb-10">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-zinc-800 dark:text-zinc-100 mb-4 tracking-tight leading-tight">
           Unlock SimplyAlgo to reach your goals faster.
         </h1>
+        <p className="text-muted-foreground text-lg max-w-md mx-auto">
+          Join engineers crushing their interviews with personalized prep.
+        </p>
       </div>
 
-      {/* Benefits */}
-      <div className="space-y-4 mb-8">
-        <div className="flex items-center gap-3">
-          <Check className="w-5 h-5 text-green-600" />
-          <span className="text-foreground">Personalized learning plan based on your survey</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Check className="w-5 h-5 text-green-600" />
-          <span className="text-foreground">AI-powered coaching and feedback</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Check className="w-5 h-5 text-green-600" />
-          <span className="text-foreground">Track your progress with detailed analytics</span>
+      {/* Benefits Card */}
+      <div className="bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/30 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-500/5 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center flex-shrink-0 text-emerald-600">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-800 dark:text-zinc-200">Personalized Plan</p>
+              <p className="text-sm text-muted-foreground">Tailored roadmap based on your survey answers.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center flex-shrink-0 text-blue-600">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-800 dark:text-zinc-200">AI Coaching</p>
+              <p className="text-sm text-muted-foreground">First-principle hints and real-time feedback.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center flex-shrink-0 text-purple-600">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-800 dark:text-zinc-200">Detailed Analytics</p>
+              <p className="text-sm text-muted-foreground">Track your readiness and identify bottlenecks.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center flex-shrink-0 text-amber-600">
+              <InfinityIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-800 dark:text-zinc-200">Lifetime Access</p>
+              <p className="text-sm text-muted-foreground">All features included in your subscription.</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Subscription Plans */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
         {/* Monthly Plan */}
-        <div
-          className={`p-4 border-2 rounded-lg cursor-pointer transition-all relative ${
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`p-6 border-2 rounded-[2rem] cursor-pointer transition-all relative ${
             selectedPlan === 'monthly'
-              ? 'border-primary bg-primary/5 dark:bg-primary/10'
-              : 'border-border bg-card hover:bg-muted/50'
+              ? 'border-emerald-600 bg-emerald-50/30 dark:bg-emerald-900/10 shadow-lg shadow-emerald-500/10'
+              : 'border-emerald-100/50 dark:border-emerald-900/20 bg-white dark:bg-zinc-900 hover:border-emerald-200'
           }`}
           onClick={() => setSelectedPlan('monthly')}
         >
           {isEligibleForTrial ? (
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                7 DAYS FREE
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+              <div className="bg-zinc-900 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full shadow-lg">
+                7 Days Free
               </div>
             </div>
           ) : (
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
-                NO TRIAL
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+              <div className="bg-zinc-200 text-zinc-600 text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full">
+                Standard
               </div>
             </div>
           )}
-          <div className="flex justify-between items-start mb-2 mt-2">
-            <div>
-              <h3 className="font-medium text-foreground">Monthly</h3>
-              <p className="text-2xl font-bold text-foreground">$20.00</p>
-              <p className="text-sm text-muted-foreground">/mo</p>
+          
+          <div className="flex flex-col items-center text-center">
+            <h3 className="font-bold text-zinc-500 uppercase tracking-tighter text-sm mb-2">Monthly</h3>
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-4xl font-extrabold text-zinc-800 dark:text-zinc-100">$20</span>
+              <span className="text-zinc-500 font-medium">/mo</span>
             </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selectedPlan === 'monthly' 
-                ? 'border-primary bg-primary' 
-                : 'border-muted-foreground'
-            }`}>
-              {selectedPlan === 'monthly' && <div className="w-2 h-2 bg-primary-foreground rounded-full" />}
-            </div>
+            <p className="text-xs text-zinc-400 font-medium italic">Billed monthly</p>
           </div>
-        </div>
+
+          <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+            selectedPlan === 'monthly' 
+              ? 'border-emerald-600 bg-emerald-600' 
+              : 'border-zinc-200 dark:border-zinc-800'
+          }`}>
+            {selectedPlan === 'monthly' && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+          </div>
+        </motion.div>
 
         {/* Yearly Plan */}
-        <div
-          className={`p-4 border-2 rounded-lg cursor-pointer transition-all relative ${
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`p-6 border-2 rounded-[2rem] cursor-pointer transition-all relative ${
             selectedPlan === 'yearly'
-              ? 'border-primary bg-primary/5 dark:bg-primary/10'
-              : 'border-border bg-card hover:bg-muted/50'
+              ? 'border-emerald-600 bg-emerald-50/30 dark:bg-emerald-900/10 shadow-lg shadow-emerald-500/10'
+              : 'border-emerald-100/50 dark:border-emerald-900/20 bg-white dark:bg-zinc-900 hover:border-emerald-200'
           }`}
           onClick={() => setSelectedPlan('yearly')}
         >
           {isEligibleForTrial ? (
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                3 DAYS FREE
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+              <div className="bg-emerald-600 text-white text-[10px] font-bold tracking-widest uppercase px-4 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 fill-current" />
+                Best Value • 3 Days Free
               </div>
             </div>
           ) : (
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
-                NO TRIAL
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+              <div className="bg-emerald-600 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full">
+                Most Popular
               </div>
             </div>
           )}
-          <div className="flex justify-between items-start mb-2 mt-2">
-            <div>
-              <h3 className="font-medium text-foreground">Yearly</h3>
-              <p className="text-2xl font-bold text-foreground">$10.00</p>
-              <p className="text-sm text-muted-foreground">/mo</p>
+          
+          <div className="flex flex-col items-center text-center">
+            <h3 className="font-bold text-zinc-500 uppercase tracking-tighter text-sm mb-2">Yearly</h3>
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-4xl font-extrabold text-zinc-800 dark:text-zinc-100">$10</span>
+              <span className="text-zinc-500 font-medium">/mo</span>
             </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selectedPlan === 'yearly' 
-                ? 'border-primary bg-primary' 
-                : 'border-muted-foreground'
-            }`}>
-              {selectedPlan === 'yearly' && <div className="w-2 h-2 bg-primary-foreground rounded-full" />}
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Save 50% ($120/year)</p>
+          </div>
+
+          <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+            selectedPlan === 'yearly' 
+              ? 'border-emerald-600 bg-emerald-600' 
+              : 'border-zinc-200 dark:border-zinc-800'
+          }`}>
+            {selectedPlan === 'yearly' && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Action Section */}
+      <div className="space-y-6">
+        <Button
+          onClick={createCheckoutSession}
+          disabled={isLoading}
+          className="w-full h-16 rounded-full text-lg font-bold bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Redirecting to secure checkout...
+            </>
+          ) : (
+            'Start My Journey'
+          )}
+        </Button>
+
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6 text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              Secure Payment
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <Check className="w-4 h-4 text-emerald-500" />
+              Cancel Anytime
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <Check className="w-4 h-4 text-emerald-500" />
+              7-Day Money Back
             </div>
           </div>
+          
+          <p className="text-xs text-zinc-400 max-w-sm text-center leading-relaxed">
+            By clicking "Start My Journey", you agree to our Terms of Service. Billed as one payment of $120/year or $20/month.
+          </p>
+        </div>
+
+        {/* Back Button */}
+        <div className="pt-4 flex justify-center">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="flex items-center gap-2 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to custom plan
+          </Button>
         </div>
       </div>
-
-      {/* No Commitment */}
-      <div className="flex items-center gap-2 mb-6">
-        <Check className="w-4 h-4 text-green-600" />
-        <span className="text-sm text-muted-foreground">No Commitment - Cancel Anytime</span>
-      </div>
-
-      {/* Start Journey Button */}
-      <Button
-        onClick={createCheckoutSession}
-        disabled={isLoading}
-        className="w-full py-4 text-lg font-medium"
-        size="lg"
-      >
-        {isLoading ? 'Redirecting to Payment...' : 'Start My Journey'}
-      </Button>
-
-      {/* Price Summary */}
-      <div className="text-center mt-4">
-        <p className="text-sm text-muted-foreground">
-          {selectedPlan === 'monthly' 
-            ? 'Just $20.00 per month' 
-            : 'Just $10.00 per month, billed annually'
-          }
-        </p>
-      </div>
-
-      {/* Back Button */}
-      <div className="mt-6">
-        <Button
-          variant="ghost"
-          onClick={onBack}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Button>
-      </div>
-    </div>
+    </motion.div>
   );
 };

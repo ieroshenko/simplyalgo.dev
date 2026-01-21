@@ -19,6 +19,8 @@ interface ProblemSolverHeaderProps {
     problemId: string | undefined;
     userId: string | undefined;
     isDark: boolean;
+    isDemoMode?: boolean;
+    hasSubscription?: boolean;
     onToggleTheme: () => void;
     onToggleStar: () => void;
 }
@@ -29,27 +31,37 @@ export const ProblemSolverHeader: React.FC<ProblemSolverHeaderProps> = ({
     problemId,
     userId,
     isDark,
+    isDemoMode = false,
+    hasSubscription = false,
     onToggleTheme,
     onToggleStar,
 }) => {
     const navigate = useNavigate();
 
+    // Hide back button and problem selector for new users in demo mode (no subscription)
+    // Show them for admins testing demo (have subscription)
+    const showNavigation = !isDemoMode || hasSubscription;
+
     return (
         <div className="border-b border-border bg-background p-4 flex-shrink-0">
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate("/problems")}
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back
-                    </Button>
-                    <ProblemSelector
-                        problems={problems}
-                        currentProblemId={problemId}
-                    />
+                    {showNavigation && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate("/problems")}
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back
+                        </Button>
+                    )}
+                    {showNavigation && (
+                        <ProblemSelector
+                            problems={problems}
+                            currentProblemId={problemId}
+                        />
+                    )}
                     <div className="flex items-center space-x-3">
                         <h1 className="text-xl font-bold text-foreground">
                             {problem.title}

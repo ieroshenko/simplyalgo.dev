@@ -48,10 +48,46 @@ vi.mock('@/hooks/useAuth', () => ({
     }),
 }));
 
+vi.mock('@/hooks/useSubscription', () => ({
+    useSubscription: () => ({
+        subscription: { status: 'active' },
+        hasActiveSubscription: true,
+        isLoading: false,
+        invalidateSubscription: vi.fn(),
+    }),
+}));
+
+vi.mock('@/features/onboarding/DemoModeContext', () => ({
+    useDemoMode: () => ({
+        isDemoMode: false,
+        tourStep: 0,
+        tourComplete: false,
+        isTourActive: false,
+        setTourStep: vi.fn(),
+        startTour: vi.fn(),
+        completeTour: vi.fn(),
+        skipTour: vi.fn(),
+        nextTourStep: vi.fn(),
+        prevTourStep: vi.fn(),
+        completeDemo: vi.fn(),
+        totalTourSteps: 3,
+    }),
+    DemoModeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 vi.mock('@/features/problems/hooks/useProblems', () => ({
     useProblems: () => ({
         problems: [mockProblem],
         toggleStar: vi.fn(),
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+    }),
+}));
+
+vi.mock('@/features/problems/hooks/useProblem', () => ({
+    useProblem: () => ({
+        problem: mockProblem,
         loading: false,
         error: null,
         refetch: vi.fn(),

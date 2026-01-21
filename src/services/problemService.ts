@@ -26,6 +26,21 @@ export interface ProblemWithRelations extends ProblemRow {
     test_cases: Array<{ input: string; expected_output: string }> | null;
 }
 
+/**
+ * Lightweight type for list views (without test_cases)
+ */
+export interface ProblemListItem extends ProblemRow {
+    categories: { name: string; color: string };
+}
+
+/**
+ * Minimal type for mapping problem IDs to categories
+ */
+export interface ProblemCategoryMapping {
+    id: string;
+    categories: { name: string };
+}
+
 export interface CategoryRow {
     id: string;
     name: string;
@@ -69,6 +84,7 @@ export class ProblemService {
 
     /**
      * Fetch all problems with their categories and test cases
+     * @deprecated Use getAllForList() for list views or getById() for single problem with test cases
      */
     static async getAllWithRelations(): Promise<ProblemWithRelations[]> {
         const { data, error } = await supabase
@@ -86,6 +102,44 @@ export class ProblemService {
 
         logger.debug("[ProblemService] Fetched problems", { count: data?.length });
         return (data as unknown as ProblemWithRelations[]) ?? [];
+    }
+
+    /**
+     * Fetch all problems for list views (without test_cases for better performance)
+     */
+    static async getAllForList(): Promise<ProblemListItem[]> {
+        const { data, error } = await supabase
+            .from("problems")
+            .select(`
+        id, title, difficulty, description, function_signature,
+        examples, constraints, likes, dislikes, acceptance_rate,
+        recommended_time_complexity, recommended_space_complexity, companies,
+        categories!inner(name, color)
+      `);
+
+        if (error) {
+            logger.error("[ProblemService] Error fetching problems for list", { error });
+            throw error;
+        }
+
+        logger.debug("[ProblemService] Fetched problems for list", { count: data?.length });
+        return (data as unknown as ProblemListItem[]) ?? [];
+    }
+
+    /**
+     * Get lightweight problem ID to category mappings for solved count calculations
+     */
+    static async getProblemCategoryMappings(): Promise<ProblemCategoryMapping[]> {
+        const { data, error } = await supabase
+            .from("problems")
+            .select("id, categories!inner(name)");
+
+        if (error) {
+            logger.error("[ProblemService] Error fetching problem category mappings", { error });
+            throw error;
+        }
+
+        return (data as unknown as ProblemCategoryMapping[]) ?? [];
     }
 
     /**

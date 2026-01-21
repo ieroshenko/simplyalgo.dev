@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { logger } from "@/utils/logger";
 import {
   ProblemService,
-  ProblemWithRelations,
+  ProblemListItem,
   CategoryRow,
   UserStarRow,
   UserAttemptStatusRow,
@@ -73,18 +73,13 @@ const getStatus = (
 };
 
 /**
- * Transform database row to Problem interface
+ * Transform database row to Problem interface (for list views without test_cases)
  */
-const transformProblem = (
-  problem: ProblemWithRelations,
+const transformProblemForList = (
+  problem: ProblemListItem,
   attempts: UserAttemptStatusRow[],
   stars: UserStarRow[]
 ): Problem => {
-  const mappedTestCases = (problem.test_cases || []).map((tc) => ({
-    input: tc.input,
-    expected: tc.expected_output,
-  }));
-
   return {
     id: problem.id,
     title: problem.title,
@@ -96,7 +91,7 @@ const transformProblem = (
     functionSignature: problem.function_signature,
     examples: (problem.examples || []) as Problem["examples"],
     constraints: (problem.constraints || []) as string[],
-    testCases: mappedTestCases,
+    testCases: [], // List views don't need test cases
     likes: problem.likes ?? undefined,
     dislikes: problem.dislikes ?? undefined,
     acceptanceRate: problem.acceptance_rate ?? undefined,
@@ -111,13 +106,13 @@ const transformProblem = (
 // ============================================================================
 
 /**
- * Fetch all problems with user-specific data
+ * Fetch all problems with user-specific data (optimized for list views - no test_cases)
  */
 async function fetchProblemsData(userId?: string): Promise<Problem[]> {
-  // Fetch problems using the service
-  const problemsData = await ProblemService.getAllWithRelations();
+  // Fetch problems using the optimized list query (no test_cases)
+  const problemsData = await ProblemService.getAllForList();
 
-  logger.debug("[useProblems] Fetched problems", {
+  logger.debug("[useProblems] Fetched problems for list", {
     count: problemsData.length,
     hasLinkedList: !!problemsData.find((p) => p.id === "implement-linked-list"),
   });
@@ -135,7 +130,7 @@ async function fetchProblemsData(userId?: string): Promise<Problem[]> {
 
   // Transform problems to UI format
   const formattedProblems = problemsData.map((problem) =>
-    transformProblem(problem, userAttempts, userStars)
+    transformProblemForList(problem, userAttempts, userStars)
   );
 
   logger.debug("[useProblems] Formatted problems", {
@@ -147,7 +142,7 @@ async function fetchProblemsData(userId?: string): Promise<Problem[]> {
 }
 
 /**
- * Fetch categories with solved counts
+ * Fetch categories with solved counts (optimized - no duplicate problem fetch)
  */
 async function fetchCategoriesData(userId?: string): Promise<Category[]> {
   // Fetch categories and counts using the service
@@ -159,13 +154,14 @@ async function fetchCategoriesData(userId?: string): Promise<Category[]> {
   // Get solved counts if user is logged in
   let solvedByCategory = new Map<string, number>();
   if (userId) {
-    const solvedIds = await ProblemService.getUserSolvedProblemIds(userId);
-
-    // Get all problems to map problem IDs to categories
-    const problems = await ProblemService.getAllWithRelations();
+    // Fetch solved IDs and lightweight category mappings in parallel
+    const [solvedIds, problemMappings] = await Promise.all([
+      ProblemService.getUserSolvedProblemIds(userId),
+      ProblemService.getProblemCategoryMappings(), // Lightweight query instead of getAllWithRelations
+    ]);
 
     solvedIds.forEach((problemId) => {
-      const problem = problems.find((p) => p.id === problemId);
+      const problem = problemMappings.find((p) => p.id === problemId);
       if (problem) {
         const catName = problem.categories.name;
         solvedByCategory.set(catName, (solvedByCategory.get(catName) ?? 0) + 1);

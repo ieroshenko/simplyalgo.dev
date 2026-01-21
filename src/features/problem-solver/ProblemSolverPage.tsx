@@ -15,7 +15,9 @@ import ProblemPanel from "@/features/problems/components/ProblemPanel";
 import Notes, { NotesHandle } from "@/components/Notes";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useProblems } from "@/features/problems/hooks/useProblems";
+import { useProblem } from "@/features/problems/hooks/useProblem";
 import { useUserStats } from "@/hooks/useUserStats";
 import { useSubmissions } from "@/features/problems/hooks/useSubmissions";
 import { useSolutions } from "@/features/problems/hooks/useSolutions";
@@ -57,10 +59,28 @@ const ProblemSolverNew = () => {
   const { problemId } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { problems, toggleStar, loading, error, refetch } = useProblems(user?.id);
+  const { hasActiveSubscription } = useSubscription();
+  // Use problems list for navigation (no test_cases needed)
+  const { problems, toggleStar, loading: listLoading, refetch: refetchList } = useProblems(user?.id);
+  // Use single problem hook for the solver page (includes test_cases)
+  const { problem, loading: problemLoading, refetch: refetchProblem } = useProblem(problemId, user?.id);
+  const loading = listLoading || problemLoading;
+  const refetch = () => { refetchList(); refetchProblem(); };
   const { updateStatsOnProblemSolved } = useUserStats(user?.id);
   const { theme, setTheme, isDark } = useTheme();
   const { currentTheme, defineCustomThemes } = useEditorTheme();
+
+  // Demo mode hooks - must be called early for use in callbacks
+  const {
+    isDemoMode,
+    isTourActive,
+    tourStep,
+    nextTourStep,
+    prevTourStep,
+    skipTour,
+    completeTour,
+    completeDemo,
+  } = useDemoMode();
 
   // Hard-lock page scrolling for this route.
   // The Problem Solver UI is a multi-pane app; only internal panes (chat/problem/test results)
@@ -111,7 +131,7 @@ const ProblemSolverNew = () => {
     setShowBottomPanel,
   } = usePanelState();
 
-  const problem = problems.find((p) => p.id === problemId);
+  // problem is now fetched directly with test_cases via useProblem hook
 
   const {
     submissions,
@@ -137,14 +157,33 @@ const ProblemSolverNew = () => {
     setCode,
   });
 
-  // Callback for problem solved
+  // Callback for problem solved - handles both regular and demo mode
   const handleProblemSolved = useCallback(async (
     difficulty: "Easy" | "Medium" | "Hard",
   ) => {
     if (!problemId) return;
+
+    // Handle demo mode completion
+    if (isDemoMode) {
+      trackEvent('demo_problem_solved');
+
+      // Show congratulations toast for everyone in demo mode
+      if (hasActiveSubscription) {
+        // Admin testing - just show the toast, no redirect
+        notifications.success("Congratulations! You solved the demo problem!");
+      } else {
+        // New user - show toast and redirect to checkout
+        notifications.success("Congratulations! You solved the demo problem! Redirecting to checkout...");
+        // Small delay to let user see the success message
+        setTimeout(() => {
+          completeDemo();
+        }, 2000);
+      }
+    }
+
     await updateStatsOnProblemSolved(difficulty, problemId);
     refetch();
-  }, [problemId, updateStatsOnProblemSolved, refetch]);
+  }, [problemId, updateStatsOnProblemSolved, refetch, isDemoMode, hasActiveSubscription, completeDemo]);
 
   // Test execution hook
   const {
@@ -335,17 +374,6 @@ const ProblemSolverNew = () => {
     }
   };
 
-  // Demo mode hooks (must be called before early returns for React hooks rules)
-  const {
-    isDemoMode,
-    isTourActive,
-    tourStep,
-    nextTourStep,
-    prevTourStep,
-    skipTour,
-    completeTour,
-  } = useDemoMode();
-
   // Track demo problem attempts
   const handleDemoRun = useCallback(() => {
     if (isDemoMode) {
@@ -360,16 +388,6 @@ const ProblemSolverNew = () => {
     }
     handleSubmit();
   }, [isDemoMode, handleSubmit]);
-
-  // Track when problem is solved in demo mode
-  const handleDemoProblemSolved = useCallback(async (
-    difficulty: "Easy" | "Medium" | "Hard",
-  ) => {
-    if (isDemoMode) {
-      trackEvent('demo_problem_solved');
-    }
-    await handleProblemSolved(difficulty);
-  }, [isDemoMode, handleProblemSolved]);
 
   // Loading state
   if (loading) {
@@ -408,6 +426,8 @@ const ProblemSolverNew = () => {
         problemId={problemId}
         userId={user?.id}
         isDark={isDark}
+        isDemoMode={isDemoMode}
+        hasSubscription={hasActiveSubscription}
         onToggleTheme={toggleTheme}
         onToggleStar={handleToggleStar}
       />
@@ -568,7 +588,7 @@ const ProblemSolverNew = () => {
                 optimisticAdd(saved);
               }
               watchForAcceptance(30_000, 2_000);
-              await handleDemoProblemSolved(
+              await handleProblemSolved(
                 problem.difficulty as "Easy" | "Medium" | "Hard",
               );
               notifications.success("Solution saved to submissions! 🎉");

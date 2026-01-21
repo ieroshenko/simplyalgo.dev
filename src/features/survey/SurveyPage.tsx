@@ -48,6 +48,8 @@ const Survey: React.FC = () => {
 
   // Navigate to demo for admin testing
   const handleGoToDemo = () => {
+    // Clear demo state so tour starts fresh
+    localStorage.removeItem('simplyalgo_demo_state');
     navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
   };
 
@@ -142,6 +144,8 @@ const Survey: React.FC = () => {
 
       // After step 19 (CustomizedResultsStep), redirect to demo problem
       if (currentStep === 19) {
+        // Clear demo state so tour starts fresh
+        localStorage.removeItem('simplyalgo_demo_state');
         navigate(`/problems/${DEMO_PROBLEM_ID}?demo=true`);
         return;
       }
