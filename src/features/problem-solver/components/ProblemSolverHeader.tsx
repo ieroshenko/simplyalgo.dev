@@ -44,26 +44,29 @@ export const ProblemSolverHeader: React.FC<ProblemSolverHeaderProps> = ({
 
     return (
         <div className="border-b border-border bg-background p-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
+                <div className="flex min-w-0 items-center space-x-4">
                     {showNavigation && (
                         <>
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => navigate("/problems")}
+                                className="shrink-0"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 Back
                             </Button>
-                            <ProblemSelector
-                                problems={problems}
-                                currentProblemId={problemId}
-                            />
+                            <div className="min-w-0">
+                                <ProblemSelector
+                                    problems={problems}
+                                    currentProblemId={problemId}
+                                />
+                            </div>
                         </>
                     )}
-                    <div className="flex items-center space-x-3">
-                        <h1 className="text-xl font-bold text-foreground">
+                    <div className="flex min-w-0 items-center space-x-3">
+                        <h1 className="truncate text-xl font-bold text-foreground">
                             {problem.title}
                         </h1>
                         <Badge className={getDifficultyColor(problem.difficulty)}>
@@ -75,7 +78,18 @@ export const ProblemSolverHeader: React.FC<ProblemSolverHeaderProps> = ({
                     </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center gap-3 whitespace-nowrap">
+                    <img
+                        src="/simplyalgo-logo.png"
+                        alt="SimplyAlgo logo"
+                        className="h-9 w-9 rounded-md object-cover"
+                    />
+                    <div className="text-2xl font-bold text-foreground">
+                        Simplyalgo.dev
+                    </div>
+                </div>
+
+                <div className="flex min-w-0 items-center justify-end space-x-2">
                     <FeedbackButton />
                     <Timer />
                     <ShortcutsHelp />
