@@ -371,6 +371,13 @@ describe('ProblemSolverNew', () => {
             expect(titles.length).toBeGreaterThan(0);
         });
 
+        it('should render the Simplyalgo.dev brand and logo in the header', () => {
+            renderWithRouter(<ProblemSolverNew />);
+
+            expect(screen.getByText('Simplyalgo.dev')).toBeInTheDocument();
+            expect(screen.getByAltText('SimplyAlgo logo')).toBeInTheDocument();
+        });
+
         it('should render the difficulty badge', () => {
             renderWithRouter(<ProblemSolverNew />);
 
