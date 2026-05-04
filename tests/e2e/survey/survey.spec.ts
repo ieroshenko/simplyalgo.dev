@@ -18,6 +18,17 @@ const waitForStepTransition = async (
   ]);
 };
 
+const answerSingleChoiceAndWait = async (
+  page: Page,
+  optionName: RegExp,
+  nextUrlPattern: RegExp,
+) => {
+  const option = page.getByRole('button', { name: optionName }).first();
+  await expect(option).toBeVisible({ timeout: 15000 });
+  await option.click();
+  await page.waitForURL(nextUrlPattern, { timeout: 15000, waitUntil: 'domcontentloaded' });
+};
+
 test.describe('Survey Flow', () => {
   let authHelper: AuthHelper;
 
@@ -58,7 +69,7 @@ test.describe('Survey Flow', () => {
       await expect(page.getByRole('button', { name: /Continue/i })).toBeVisible();
     });
 
-    test('should have enabled Continue button after selecting an option', async ({ page }) => {
+    test('should auto-advance after selecting an option', async ({ page }) => {
       await page.goto('/survey/1');
 
       // Continue button should be visible but disabled initially (no selection)
@@ -66,31 +77,19 @@ test.describe('Survey Flow', () => {
       await expect(continueButton).toBeVisible();
       await expect(continueButton).toBeDisabled();
 
-      // Select an option
-      await page.getByRole('button', { name: /Student/i }).click();
-
-      // Now Continue should be enabled
-      await expect(continueButton).toBeEnabled();
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
     });
 
-    test('should navigate to next step after selecting option and clicking Continue', async ({ page }) => {
+    test('should navigate to next step after selecting option', async ({ page }) => {
       await page.goto('/survey/1');
 
-      // Select an option
-      await page.getByRole('button', { name: /Student/i }).click();
-
-      // Click Continue
-      await page.getByRole('button', { name: /Continue/i }).click();
-
-      // Should be on step 2
-      await expect(page).toHaveURL(/\/survey\/2/);
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
     });
 
     test('should allow going back to previous step', async ({ page }) => {
       // Start at step 1, complete it
       await page.goto('/survey/1');
-      await page.getByRole('button', { name: /Student/i }).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
 
       // Now on step 2, click back
       await expect(page).toHaveURL(/\/survey\/2/);
@@ -117,18 +116,13 @@ test.describe('Survey Flow', () => {
       await page.goto('/survey/1');
 
       // Select "Student" option
-      const studentOption = page.getByRole('button', { name: /Student/i });
-      await studentOption.click();
-
-      // Continue to step 2
-      await page.getByRole('button', { name: /Continue/i }).click();
-      await expect(page).toHaveURL(/\/survey\/2/);
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
 
       // Go back to step 1
       await page.goto('/survey/1');
 
       // The option should still be selected (highlighted)
-      await expect(studentOption).toHaveClass(/bg-primary/);
+      await expect(page.getByRole('button', { name: /Student/i })).toHaveClass(/bg-emerald-600/);
     });
   });
 
@@ -136,18 +130,13 @@ test.describe('Survey Flow', () => {
     test('should complete first 3 steps', async ({ page }) => {
       // Step 1 - Current Role
       await page.goto('/survey/1');
-      await page.getByRole('button', { name: /Student/i }).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
 
       // Step 2 - Interview Frequency
-      await expect(page).toHaveURL(/\/survey\/2/);
-      await page.getByRole('button').filter({ hasText: /month|week|year/i }).first().click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Daily/i, /\/survey\/3/);
 
       // Step 3 - Source
-      await expect(page).toHaveURL(/\/survey\/3/);
-      await page.getByRole('button').filter({ hasText: /./i }).nth(1).click(); // Select any option
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /LinkedIn/i, /\/survey\/4/);
 
       // Should be on step 4
       await expect(page).toHaveURL(/\/survey\/4/);
@@ -159,23 +148,16 @@ test.describe('Survey Flow', () => {
       await page.goto('/survey/1');
 
       // Complete step 1
-      await page.getByRole('button', { name: /Student/i }).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
 
       // Complete step 2
-      await page.waitForURL(/\/survey\/2/);
-      await page.getByRole('button').filter({ hasText: /.+/ }).nth(1).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Daily/i, /\/survey\/3/);
 
       // Complete step 3
-      await page.waitForURL(/\/survey\/3/);
-      await page.getByRole('button').filter({ hasText: /.+/ }).nth(1).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /LinkedIn/i, /\/survey\/4/);
 
       // Complete step 4
-      await page.waitForURL(/\/survey\/4/);
-      await page.getByRole('button').filter({ hasText: /.+/ }).nth(1).click();
-      await page.getByRole('button', { name: /Continue/i }).click();
+      await answerSingleChoiceAndWait(page, /Yes/i, /\/survey\/5/);
 
       // Step 5 is a non-question step - Continue should be enabled immediately
       await page.waitForURL(/\/survey\/5/);
@@ -228,92 +210,68 @@ test.describe('Full Survey Completion', () => {
     await authHelper.mockSignIn();
 
     // Navigate to survey start
-    await page.goto('/survey/1');
+    await page.goto('/survey/1?admin=true');
 
     // Step 1: Current Role (question step)
     await expect(page.getByText('What is your current role?')).toBeVisible();
-    await page.getByRole('button', { name: /Student/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Student/i, /\/survey\/2/);
 
     // Step 2: Interview Frequency (question step)
-    await page.waitForURL(/\/survey\/2/);
     await expect(page.getByText('How often do you solve interview challenges?')).toBeVisible();
-    await page.getByRole('button', { name: /Daily/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Daily/i, /\/survey\/3/);
 
     // Step 3: Source (question step)
-    await page.waitForURL(/\/survey\/3/);
-    await expect(page.getByText('Where did you hear about us?')).toBeVisible();
-    await page.getByRole('button', { name: /LinkedIn/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(page.getByText('How did you hear about us?')).toBeVisible();
+    await answerSingleChoiceAndWait(page, /LinkedIn/i, /\/survey\/4/);
 
     // Step 4: Platform Experience (question step)
-    await page.waitForURL(/\/survey\/4/);
-    await expect(page.getByText(/other interview prep platforms/i)).toBeVisible();
-    await page.getByRole('button', { name: /Yes/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(page.getByText(/coding prep platform/i)).toBeVisible();
+    await answerSingleChoiceAndWait(page, /Yes/i, /\/survey\/5/);
 
     // Step 5: Long Term Results (non-question step - just continue)
-    await page.waitForURL(/\/survey\/5/);
     await expect(page.getByText(/long-term results/i)).toBeVisible();
     await page.getByRole('button', { name: /Continue/i }).click();
 
     // Step 6: Interviewing Location (question step)
     await page.waitForURL(/\/survey\/6/);
     await expect(page.getByText('Where are you interviewing?')).toBeVisible();
-    await page.getByRole('button', { name: /Big Tech/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Big Tech/i, /\/survey\/7/);
 
     // Step 7: Interview Assessment Frequency (question step)
-    await page.waitForURL(/\/survey\/7/);
     await expect(page.getByText('How often do you get interviews/assessments?')).toBeVisible();
-    await page.getByRole('button', { name: /Often/i }).first().click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Often/i, /\/survey\/8/);
 
     // Step 8: Frustrations (question step)
-    await page.waitForURL(/\/survey\/8/);
     await expect(page.getByText(/frustrating part/i)).toBeVisible();
-    await page.getByRole('button', { name: /Forgetting solutions/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Forgetting solutions/i, /\/survey\/9/);
 
     // Step 9: Goals (question step)
-    await page.waitForURL(/\/survey\/9/);
     await expect(page.getByText(/biggest goal/i)).toBeVisible();
-    await page.getByRole('button', { name: /Big Tech/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Big Tech/i, /\/survey\/10/);
 
     // Step 10: Bottlenecks (question step)
-    await page.waitForURL(/\/survey\/10/);
     await expect(page.getByText(/bottleneck/i)).toBeVisible();
-    await page.getByRole('button', { name: /Overthinking/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Overthinking/i, /\/survey\/12/);
 
     // Step 11 is skipped in-app (Social Proof)
 
     // Step 12: Customization Intro (non-question step)
-    await page.waitForURL(/\/survey\/12/);
     await page.getByRole('button', { name: /Continue/i }).click();
 
     // Step 13: Company Type (question step)
     await page.waitForURL(/\/survey\/13/);
-    await expect(page.getByText(/company-type/i)).toBeVisible();
-    await page.getByRole('button', { name: /FAANG/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await expect(page.getByText(/type of company/i)).toBeVisible();
+    await answerSingleChoiceAndWait(page, /FAANG/i, /\/survey\/14/);
 
     // Step 14: Focus Areas (question step)
-    await page.waitForURL(/\/survey\/14/);
     await expect(page.getByText(/focus on/i)).toBeVisible();
-    await page.getByRole('button', { name: /Both/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Both/i, /\/survey\/15/);
 
     // Step 15: Sessions Per Week (question step)
-    await page.waitForURL(/\/survey\/15/);
     await expect(page.getByRole('heading', { name: /sessions per week/i })).toBeVisible();
-    await page.getByRole('button', { name: /Daily/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
+    await answerSingleChoiceAndWait(page, /Daily/i, /\/survey\/16/);
 
     // Step 16: Plan Generation Intro (non-question step)
-    await page.waitForURL(/\/survey\/16/);
     await page.getByRole('button', { name: /Continue/i }).click();
 
     // Step 17: Progress Animation (no footer - auto continues or wait)
@@ -340,16 +298,9 @@ test.describe('Full Survey Completion', () => {
     await page.waitForURL(/\/survey\/19/, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Continue/i }).click();
 
-    // Step 20: Paywall Step (special - has "Start My Journey" button)
-    await page.waitForURL(/\/survey\/20/);
-    await expect(page.getByText(/Unlock SimplyAlgo/i)).toBeVisible();
-
-    // Should show pricing plans
-    await expect(page.getByText(/Monthly/i)).toBeVisible();
-    await expect(page.getByText(/Yearly/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Start My Journey/i })).toBeVisible();
-
-    // Survey complete! (Don't click payment - that's for payment tests)
+    // Survey complete: current flow sends users into the demo problem.
+    await page.waitForURL(/\/problems\//, { timeout: 30000, waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/demo=true/);
   });
 
   test('should show paywall with pricing options at end of survey', async ({ page }) => {
@@ -434,109 +385,15 @@ test.describe('Full Survey Completion', () => {
 
     console.log('✅ Logged in as stripe-test user');
 
-    // Navigate to survey start
-    await page.goto('/survey/1');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
-
-    // Check if we're on survey or redirected
-    if (!page.url().includes('/survey')) {
-      console.log('⚠️ Not on survey page - user may have completed survey or has subscription');
-      expect(true).toBeTruthy();
-      return;
-    }
-
-    // Step 1 (question step)
-    await page.getByRole('button', { name: /Student/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await page.waitForURL(/\/survey\/2/);
-
-    // Step 2 (question step)
-    await page.getByRole('button', { name: /Daily/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await page.waitForURL(/\/survey\/3/);
-
-    await page.getByRole('button', { name: /LinkedIn/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await page.waitForURL(/\/survey\/4/);
-
-    await page.getByRole('button', { name: /Yes/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Step 5 (non-question)
-    await page.waitForURL(/\/survey\/5/);
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Steps 6-10 (question steps)
-    await page.waitForURL(/\/survey\/6/);
-    await page.getByRole('button', { name: /Big Tech/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/7/);
-    await page.getByRole('button', { name: /Often/i }).first().click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/8/);
-    await page.getByRole('button', { name: /Forgetting solutions/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/9/);
-    await page.getByRole('button', { name: /Big Tech/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/10/);
-    await page.getByRole('button', { name: /Overthinking/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Step 11 is skipped in-app (Social Proof)
-
-    await page.waitForURL(/\/survey\/12/);
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Steps 13-15 (question steps)
-    await page.waitForURL(/\/survey\/13/);
-    await page.getByRole('button', { name: /FAANG/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/14/);
-    await page.getByRole('button', { name: /Both/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    await page.waitForURL(/\/survey\/15/);
-    await page.getByRole('button', { name: /Daily/i }).click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Step 16 (non-question)
-    await page.waitForURL(/\/survey\/16/);
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Step 17 (auto-progress animation)
-    await page.waitForURL(/\/survey\/17/);
-    const stripeProgressContinueButton = page.getByRole('button', { name: /Continue/i });
-    if (await stripeProgressContinueButton.isVisible().catch(() => false)) {
-      await stripeProgressContinueButton.click();
-    }
-    await waitForStepTransition(page, /\/survey\/18/, /Congratulations/i, 90000);
-
-    // Step 18 (congratulations)
-    await expect(page.getByText(/Congratulations/i)).toBeVisible({ timeout: 60000 });
-    for (let i = 0; i < 3; i++) {
-      await page.getByRole('button', { name: /Continue/i }).click();
-      if (/\/survey\/19/.test(page.url())) break;
-      await page.waitForTimeout(500);
-    }
-
-    // Step 19 (results)
-    await page.waitForURL(/\/survey\/19/, { timeout: 60000, waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: /Continue/i }).click();
-
-    // Step 20 - PAYWALL
-    await page.waitForURL(/\/survey\/20/);
+    // Go directly to the paywall in admin mode. The normal survey flow now
+    // sends users into the demo after step 19, while this test is scoped to checkout.
+    await page.goto('/survey/20?admin=true');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText(/Unlock SimplyAlgo/i)).toBeVisible();
 
     // Verify pricing is displayed (don't check exact amounts as pricing may change)
-    await expect(page.getByText('Monthly')).toBeVisible();
-    await expect(page.getByText('Yearly')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Monthly' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Yearly' })).toBeVisible();
     // Should show some price with $ symbol
     const hasPricing = await page.locator('text=/\\$\\d+/').count() > 0;
     expect(hasPricing).toBeTruthy();
