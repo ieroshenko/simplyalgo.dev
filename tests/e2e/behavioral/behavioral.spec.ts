@@ -2,6 +2,18 @@ import { test, expect } from '../../utils/test-fixtures';
 
 test.describe('Behavioral Interview Hub', () => {
     test.beforeEach(async ({ page }) => {
+        await page.addInitScript(() => {
+            window.localStorage.setItem(
+                'simplyalgo_onboarding_tours',
+                JSON.stringify({
+                    dashboard: true,
+                    problems: true,
+                    behavioral: true,
+                    profile: true,
+                }),
+            );
+        });
+
         // Navigate to behavioral page
         await page.goto('/behavioral');
 
@@ -30,7 +42,8 @@ test.describe('Behavioral Interview Hub', () => {
 
     test.describe('Navigation Cards', () => {
         test('should display Question Bank card', async ({ page }) => {
-            await expect(page.getByRole('heading', { name: 'Question Bank' })).toBeVisible();
+            const questionBankCard = page.locator('[data-tour="question-bank-card"]');
+            await expect(questionBankCard.getByRole('heading', { name: 'Question Bank' })).toBeVisible();
             await expect(page.getByText('Browse technical behavioral questions')).toBeVisible();
         });
 
@@ -45,17 +58,17 @@ test.describe('Behavioral Interview Hub', () => {
         });
 
         test('should navigate to Question Bank when clicking that card', async ({ page }) => {
-            await page.getByRole('heading', { name: 'Question Bank' }).click();
+            await page.locator('[data-tour="question-bank-card"]').click();
             await expect(page).toHaveURL(/\/behavioral\/questions/);
         });
 
         test('should navigate to My Experiences when clicking that card', async ({ page }) => {
-            await page.getByRole('heading', { name: 'My Experiences' }).click();
+            await page.locator('[data-tour="experiences-card"]').click();
             await expect(page).toHaveURL(/\/behavioral\/stories/);
         });
 
         test('should navigate to Mock Interview when clicking that card', async ({ page }) => {
-            await page.getByRole('heading', { name: 'Mock Interview' }).click();
+            await page.locator('[data-tour="mock-interview-card"]').click();
             await expect(page).toHaveURL(/\/behavioral\/mock-interview/);
         });
     });
